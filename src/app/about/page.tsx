@@ -17,14 +17,14 @@ export default function AboutPage() {
           subtitle="您在清邁的家人"
         />
 
-        {/* Family Photo */}
+        {/* Founders Photo */}
         <div className="mb-12 rounded-2xl overflow-hidden shadow-xl">
           <Image
-            src="/images/family.jpg"
-            alt="Eric、Min 與孩子們的全家福 - 清微旅行"
+            src="/images/eric-min.jpg"
+            alt="Eric 與 Min 穿著泰服在清邁銀廟前 - 清微旅行創辦人"
             width={1200}
-            height={800}
-            className="w-full h-auto"
+            height={1500}
+            className="w-full h-auto object-cover"
             priority
           />
         </div>
