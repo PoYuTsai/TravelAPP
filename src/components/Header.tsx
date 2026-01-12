@@ -14,42 +14,26 @@ const navLinks = [
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isVisible, setIsVisible] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
+  const [isScrolled, setIsScrolled] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY
-
-      if (currentScrollY < 100) {
-        // Always show header at top of page
-        setIsVisible(true)
-      } else if (currentScrollY > lastScrollY) {
-        // Scrolling down - hide header
-        setIsVisible(false)
-        setIsMenuOpen(false)
-      } else {
-        // Scrolling up - show header
-        setIsVisible(true)
-      }
-
-      setLastScrollY(currentScrollY)
+      setIsScrolled(window.scrollY > 100)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [lastScrollY])
+  }, [])
 
   return (
-    <header
-      className={`bg-white shadow-sm fixed top-0 left-0 right-0 z-50 transition-transform duration-300 ${
-        isVisible ? 'translate-y-0' : '-translate-y-full'
-      }`}
-    >
+    <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center">
+        <div className={`flex justify-between items-center transition-all duration-300 ${isScrolled ? 'h-14' : 'h-16'}`}>
+          {/* Logo - hides when scrolled */}
+          <Link
+            href="/"
+            className={`flex items-center transition-all duration-300 ${isScrolled ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}
+          >
             <Image
               src="/images/logo.png"
               alt="清微旅行 Chiangway Travel"
@@ -60,8 +44,20 @@ export default function Header() {
             />
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* Desktop Navigation - always visible, moves left when logo hides */}
+          <nav className={`hidden md:flex items-center space-x-8 transition-all duration-300 ${isScrolled ? 'flex-1 justify-start' : ''}`}>
+            {/* Mini logo when scrolled */}
+            {isScrolled && (
+              <Link href="/" className="mr-4">
+                <Image
+                  src="/images/logo.png"
+                  alt="清微旅行"
+                  width={100}
+                  height={33}
+                  className="h-8 w-auto"
+                />
+              </Link>
+            )}
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -80,6 +76,19 @@ export default function Header() {
               LINE 諮詢
             </a>
           </nav>
+
+          {/* Mobile: Mini logo when scrolled */}
+          {isScrolled && (
+            <Link href="/" className="md:hidden">
+              <Image
+                src="/images/logo.png"
+                alt="清微旅行"
+                width={100}
+                height={33}
+                className="h-8 w-auto"
+              />
+            </Link>
+          )}
 
           {/* Mobile Menu Button */}
           <button
