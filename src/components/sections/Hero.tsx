@@ -1,15 +1,27 @@
+import Image from 'next/image'
 import Button from '@/components/ui/Button'
 
 export default function Hero() {
   return (
-    <section className="relative bg-gradient-to-br from-primary-light to-white py-20 md:py-32">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            清邁親子自由行
-            <span className="block text-primary mt-2">專屬包車服務</span>
+    <section className="relative">
+      {/* Hero Image */}
+      <div className="relative w-full h-[50vh] md:h-[60vh] lg:h-[70vh]">
+        <Image
+          src="/images/hero-bg.png"
+          alt="清微旅行 - 清邁親子包車自由行"
+          fill
+          className="object-cover object-center"
+          priority
+        />
+      </div>
+
+      {/* CTA Section */}
+      <div className="bg-white py-8 md:py-12">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            清邁親子自由行，找清微旅行就對了！
           </h1>
-          <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto">
+          <p className="text-lg text-gray-600 mb-6">
             住在清邁的台泰夫妻，為您打造安全、舒適、難忘的家庭旅行體驗
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -22,7 +34,6 @@ export default function Hero() {
           </div>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-white to-transparent" />
     </section>
   )
 }
