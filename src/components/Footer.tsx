@@ -61,9 +61,9 @@ export default function Footer() {
               <Image
                 src="/images/logo.png"
                 alt="清微旅行 Chiangway Travel"
-                width={140}
-                height={47}
-                className="h-12 w-auto brightness-0 invert"
+                width={160}
+                height={53}
+                className="h-14 w-auto"
               />
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
