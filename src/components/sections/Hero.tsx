@@ -5,12 +5,12 @@ export default function Hero() {
   return (
     <section className="relative">
       {/* Hero Image */}
-      <div className="relative w-full h-[40vh] md:h-[50vh] lg:h-[60vh] bg-[#d4a574]">
+      <div className="relative w-full aspect-[21/9]">
         <Image
           src="/images/hero-bg.png"
           alt="清微旅行 - 清邁親子包車自由行"
           fill
-          className="object-contain"
+          className="object-cover object-top"
           priority
         />
       </div>
