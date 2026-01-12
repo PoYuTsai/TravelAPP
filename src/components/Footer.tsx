@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 const navLinks = [
   { href: '/', label: '首頁' },
@@ -56,11 +57,14 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-xl">🐘</span>
-              </div>
-              <span className="font-bold text-lg">清微旅行</span>
+            <div className="mb-4">
+              <Image
+                src="/images/logo.png"
+                alt="清微旅行 Chiangway Travel"
+                width={140}
+                height={47}
+                className="h-12 w-auto brightness-0 invert"
+              />
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
               清邁親子自由行首選！我們是住在清邁的台泰夫妻，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。
