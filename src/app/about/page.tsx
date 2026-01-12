@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 
@@ -15,6 +16,18 @@ export default function AboutPage() {
           title="關於清微旅行"
           subtitle="您在清邁的家人"
         />
+
+        {/* Family Photo */}
+        <div className="mb-12 rounded-2xl overflow-hidden shadow-xl">
+          <Image
+            src="/images/family.jpg"
+            alt="Eric、Min 與孩子們的全家福 - 清微旅行"
+            width={1200}
+            height={800}
+            className="w-full h-auto"
+            priority
+          />
+        </div>
 
         <div className="prose prose-lg max-w-none">
           <div className="bg-primary-light rounded-2xl p-8 mb-12">
