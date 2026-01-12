@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import Header from '@/components/Header'
 
 export const metadata: Metadata = {
   title: {
@@ -24,7 +25,7 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <body className="flex flex-col min-h-screen">
-        {/* Header will be added here */}
+        <Header />
         <main className="flex-grow">
           {children}
         </main>
