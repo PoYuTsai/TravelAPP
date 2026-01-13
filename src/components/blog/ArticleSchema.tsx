@@ -7,6 +7,8 @@ interface ArticleSchemaProps {
   image?: string
 }
 
+const SITE_URL = 'https://chiangway.com'
+
 export default function ArticleSchema({
   title,
   description,
@@ -20,25 +22,25 @@ export default function ArticleSchema({
     '@type': 'Article',
     headline: title,
     description: description,
-    image: `https://chiangwaytravel.com${image}`,
+    image: `${SITE_URL}${image}`,
     datePublished: datePublished,
     dateModified: dateModified || datePublished,
     author: {
       '@type': 'Organization',
       name: '清微旅行 Chiangway Travel',
-      url: 'https://chiangwaytravel.com',
+      url: SITE_URL,
     },
     publisher: {
       '@type': 'Organization',
       name: '清微旅行 Chiangway Travel',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://chiangwaytravel.com/images/logo.png',
+        url: `${SITE_URL}/images/logo.png`,
       },
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': `https://chiangwaytravel.com/blog/${slug}`,
+      '@id': `${SITE_URL}/blog/${slug}`,
     },
   }
 
