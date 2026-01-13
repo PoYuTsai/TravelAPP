@@ -27,8 +27,8 @@ const localBusinessSchema = {
   name: '清微旅行 Chiangway Travel',
   description: '清邁親子自由行首選！台泰夫妻在地經營，專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
   url: 'https://chiangway.com',
-  telephone: '+66-XX-XXX-XXXX', // 需要替換為實際電話
-  email: 'info@chiangway.com', // 需要替換為實際 email
+  telephone: '+66-63-790-0666',
+  email: 'eric19921204@gmail.com',
   address: {
     '@type': 'PostalAddress',
     addressLocality: 'Chiang Mai',
