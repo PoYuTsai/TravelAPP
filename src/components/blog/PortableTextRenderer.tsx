@@ -100,8 +100,8 @@ const ImageBlock = ({ value }: { value: { asset: any; alt?: string; caption?: st
   if (!value?.asset) return null
 
   return (
-    <figure className="my-8">
-      <div className="rounded-lg overflow-hidden">
+    <figure className="my-10 not-prose">
+      <div className="rounded-xl overflow-hidden shadow-md">
         <Image
           src={urlFor(value).width(1200).url()}
           alt={value.alt || '文章圖片'}
@@ -111,8 +111,8 @@ const ImageBlock = ({ value }: { value: { asset: any; alt?: string; caption?: st
         />
       </div>
       {value.caption && (
-        <figcaption className="text-center text-sm text-gray-500 mt-2">
-          {value.caption}
+        <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg -mt-1">
+          📷 {value.caption}
         </figcaption>
       )}
     </figure>
@@ -130,18 +130,27 @@ const components: PortableTextComponents = {
   },
   block: {
     h2: ({ children }) => (
-      <h2 id={children?.toString().toLowerCase().replace(/\s+/g, '-')} className="scroll-mt-20">
+      <h2
+        id={children?.toString().toLowerCase().replace(/\s+/g, '-')}
+        className="scroll-mt-20 !mt-12 !mb-6 pb-2 border-b-2 border-primary/30"
+      >
         {children}
       </h2>
     ),
     h3: ({ children }) => (
-      <h3 id={children?.toString().toLowerCase().replace(/\s+/g, '-')} className="scroll-mt-20">
+      <h3
+        id={children?.toString().toLowerCase().replace(/\s+/g, '-')}
+        className="scroll-mt-20 !mt-8 !mb-4 pl-3 border-l-4 border-primary"
+      >
         {children}
       </h3>
     ),
-    h4: ({ children }) => <h4 className="scroll-mt-20">{children}</h4>,
+    h4: ({ children }) => <h4 className="scroll-mt-20 !mt-6 !mb-3">{children}</h4>,
+    normal: ({ children }) => (
+      <p className="!mb-6 !leading-relaxed">{children}</p>
+    ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-primary pl-4 italic text-gray-700">
+      <blockquote className="!my-8 border-l-4 border-primary bg-primary-light/50 pl-6 pr-4 py-4 italic text-gray-700 rounded-r-lg">
         {children}
       </blockquote>
     ),
@@ -188,7 +197,7 @@ export default function PortableTextRenderer({ content }: PortableTextRendererPr
   if (!content) return null
 
   return (
-    <div className="prose prose-lg max-w-none prose-headings:scroll-mt-20 prose-headings:font-bold prose-h2:text-2xl prose-h3:text-xl prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg">
+    <div className="prose prose-lg max-w-none prose-headings:scroll-mt-20 prose-headings:font-bold prose-h2:text-2xl prose-h3:text-xl prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-img:rounded-lg prose-p:text-gray-700 prose-p:leading-8 prose-li:text-gray-700 prose-li:leading-7 prose-strong:text-gray-900">
       <PortableText value={content} components={components} />
     </div>
   )
