@@ -7,6 +7,77 @@ export const metadata: Metadata = {
   description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。清邁一日 NT$ 3,200 起。',
 }
 
+// FAQ Schema for rich snippets
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: '清邁包車價格包含什麼？',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '包含車輛、司機、油資、過路費。導遊服務另計，依行程複雜度報價。',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: '清邁包車可以帶嬰兒車嗎？',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '可以，我們的車輛空間充足。請事先告知，我們會確保有足夠空間。',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: '清邁包車有兒童安全座椅嗎？',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '請告知孩子年齡和體重，我們會準備適合的安全座椅，免費提供。',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: '清邁包車可以客製行程嗎？',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '當然可以，這是我們的特色。告訴我們想去的地方、孩子年齡，我們幫你規劃。',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: '清邁包車怎麼預訂？',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: '透過 LINE 聯繫我們，討論需求後會提供報價，確認後付訂金即可。',
+      },
+    },
+  ],
+}
+
+// Service Schema
+const serviceSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Service',
+  name: '清邁親子包車服務',
+  description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。',
+  provider: {
+    '@type': 'LocalBusiness',
+    name: '清微旅行 Chiangway Travel',
+  },
+  areaServed: {
+    '@type': 'City',
+    name: 'Chiang Mai',
+  },
+  offers: {
+    '@type': 'Offer',
+    priceCurrency: 'TWD',
+    price: '3200',
+    priceValidUntil: '2026-12-31',
+    description: '清邁一日（10小時）NT$ 3,200 起',
+  },
+}
+
 const features = [
   {
     icon: '🚐',
@@ -71,7 +142,18 @@ const faqs = [
 
 export default function CarCharterPage() {
   return (
-    <div className="py-12 md:py-20">
+    <>
+      {/* SEO Schema Markup */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
+      />
+
+      <div className="py-12 md:py-20">
       {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
         <div className="text-center mb-8">
@@ -175,6 +257,7 @@ export default function CarCharterPage() {
           </Button>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   )
 }
