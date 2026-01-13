@@ -7,10 +7,10 @@ import { useState, useEffect } from 'react'
 
 const navLinks = [
   { href: '/', label: '首頁' },
-  { href: '/about', label: '關於我們' },
-  { href: '/tours', label: '行程介紹' },
+  { href: '/services/car-charter', label: '包車服務' },
+  { href: '/homestay', label: '芳縣民宿' },
   { href: '/blog', label: '部落格' },
-  { href: '/contact', label: '聯繫我們' },
+  { href: '/about', label: '關於我們' },
 ]
 
 export default function Header() {

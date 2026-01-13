@@ -1,17 +1,22 @@
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
 
+// Simple blur placeholder (light golden gradient matching brand)
+const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBQYSIRMxQWH/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8AotuXM19qN5cXEhmWOdkjQnpFXrgA/PtZpSlIr//Z'
+
 export default function Hero() {
   return (
     <section className="relative">
       {/* Hero Image */}
-      <div className="relative w-full aspect-[21/9]">
+      <div className="relative w-full aspect-[21/9] bg-primary-light">
         <Image
           src="/images/hero-bg.png"
           alt="清微旅行 - 清邁親子包車自由行"
           fill
           className="object-cover object-top"
           priority
+          placeholder="blur"
+          blurDataURL={blurDataURL}
         />
       </div>
 

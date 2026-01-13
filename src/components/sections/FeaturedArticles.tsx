@@ -4,6 +4,17 @@ import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 
+interface Post {
+  _id: string
+  title: string
+  slug: { current: string }
+  excerpt: string
+  mainImage?: {
+    alt?: string
+  }
+  category: string
+}
+
 const featuredQuery = `*[_type == "post" && featured == true] | order(publishedAt desc)[0...3] {
   _id,
   title,
@@ -45,7 +56,7 @@ export default async function FeaturedArticles() {
           subtitle="在地爸媽的清邁旅遊攻略"
         />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {posts.map((post: any) => (
+          {posts.map((post: Post) => (
             <Link
               key={post._id}
               href={`/blog/${post.slug.current}`}
