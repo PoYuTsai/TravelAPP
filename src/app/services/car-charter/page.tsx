@@ -4,7 +4,7 @@ import SectionTitle from '@/components/ui/SectionTitle'
 
 export const metadata: Metadata = {
   title: '清邁親子包車服務 | 清微旅行',
-  description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。每日 NT$ 3,500 起。',
+  description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。清邁一日 NT$ 3,200 起。',
 }
 
 const features = [
@@ -41,9 +41,9 @@ const features = [
 ]
 
 const pricingTiers = [
-  { duration: '半日（4小時）', price: 'NT$ 2,000 起' },
-  { duration: '一日（8小時）', price: 'NT$ 3,500 起' },
-  { duration: '機場接送（單程）', price: 'NT$ 800 起' },
+  { duration: '清邁一日（10小時）', price: 'NT$ 3,200 ~ 4,000' },
+  { duration: '清萊一日（12小時）', price: 'NT$ 4,500' },
+  { duration: '機場接送（單程）', price: 'NT$ 600' },
 ]
 
 const faqs = [

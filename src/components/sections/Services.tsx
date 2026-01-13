@@ -11,7 +11,7 @@ const services = [
       '行程彈性不趕路',
       '接機 / 送機服務',
     ],
-    price: '每日 NT$ 3,500 起',
+    price: '每日 NT$ 3,200 起',
     cta: { text: '了解包車服務', href: '/services/car-charter' },
   },
   {
