@@ -11,3 +11,16 @@
 body {
   font-family: var(--font-family-sans);
 }
+
+/* Focus styles for accessibility */
+*:focus-visible {
+  outline: 2px solid #F7C009;
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #F7C009;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

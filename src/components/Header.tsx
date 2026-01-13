@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 
 const navLinks = [
@@ -13,6 +14,7 @@ const navLinks = [
 ]
 
 export default function Header() {
+  const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
 
@@ -57,7 +59,11 @@ export default function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-gray-600 hover:text-primary transition-colors font-medium"
+                className={`transition-colors font-medium ${
+                  pathname === link.href
+                    ? 'text-primary'
+                    : 'text-gray-600 hover:text-primary'
+                }`}
               >
                 {link.label}
               </Link>
@@ -111,7 +117,11 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-gray-600 hover:text-primary transition-colors font-medium"
+                  className={`transition-colors font-medium ${
+                    pathname === link.href
+                      ? 'text-primary'
+                      : 'text-gray-600 hover:text-primary'
+                  }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {link.label}
