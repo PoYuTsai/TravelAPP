@@ -11,10 +11,25 @@ export const metadata: Metadata = {
   description: '清邁親子自由行首選！專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
+  metadataBase: new URL('https://chiangway.com'),
   openGraph: {
     type: 'website',
     locale: 'zh_TW',
     siteName: '清微旅行 Chiangway Travel',
+    images: [
+      {
+        url: '/images/hero-bg.png',
+        width: 1200,
+        height: 630,
+        alt: '清微旅行 - 清邁親子包車自由行',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '清微旅行 Chiangway Travel | 清邁親子包車自由行',
+    description: '清邁親子自由行首選！專業中文導遊、安全舒適包車服務。',
+    images: ['/images/hero-bg.png'],
   },
 }
 
