@@ -15,7 +15,7 @@ export default function ArticleSchema({
   slug,
   datePublished,
   dateModified,
-  image = '/images/hero-bg.jpg',
+  image = '/images/og-image.png',
 }: ArticleSchemaProps) {
   const jsonLd = {
     '@context': 'https://schema.org',

@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     siteName: '清微旅行 Chiangway Travel',
     images: [
       {
-        url: '/images/hero-bg.png',
+        url: '/images/og-image.png',
         width: 1200,
         height: 630,
         alt: '清微旅行 - 清邁親子包車自由行',
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '清微旅行 Chiangway Travel | 清邁親子包車自由行',
     description: '清邁親子自由行首選！專業中文導遊、安全舒適包車服務。',
-    images: ['/images/hero-bg.png'],
+    images: ['/images/og-image.png'],
   },
 }
 

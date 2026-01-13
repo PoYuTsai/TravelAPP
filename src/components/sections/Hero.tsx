@@ -10,7 +10,7 @@ export default function Hero() {
       {/* Hero Image */}
       <div className="relative w-full aspect-[21/9] bg-primary-light">
         <Image
-          src="/images/hero-bg.png"
+          src="/images/hero-bg.webp"
           alt="清微旅行 - 清邁親子包車自由行"
           fill
           className="object-cover object-top"
