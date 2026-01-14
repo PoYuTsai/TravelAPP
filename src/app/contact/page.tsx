@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 import ContactForm from '@/components/ContactForm'
+import { FAQSection } from '@/components/cms'
 
 export const metadata: Metadata = {
   title: '聯繫我們',
@@ -36,6 +37,21 @@ const contactMethods = [
     description: '清邁短影音，發現更多玩法',
     link: 'https://www.tiktok.com/@chiangway_travel',
     linkText: '@chiangway_travel',
+  },
+]
+
+const faqItems = [
+  {
+    question: '需要提前多久預約？',
+    answer: '建議出發前 1-2 週預約，旺季（11-2月）建議提前更久。',
+  },
+  {
+    question: '可以客製化行程嗎？',
+    answer: '當然可以！我們會根據您的需求量身規劃行程。',
+  },
+  {
+    question: '費用如何計算？',
+    answer: '根據行程內容、人數、天數報價，歡迎 LINE 詢問。',
   },
 ]
 
@@ -80,22 +96,9 @@ export default function ContactPage() {
             </div>
 
             {/* 常見問題 */}
-            <div className="bg-primary-light rounded-2xl p-6">
+            <div>
               <h3 className="text-lg font-bold text-gray-900 mb-4">常見問題</h3>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-bold text-gray-900 text-sm">Q: 需要提前多久預約？</h4>
-                  <p className="text-gray-600 text-sm">建議出發前 1-2 週預約，旺季（11-2月）建議提前更久。</p>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-900 text-sm">Q: 可以客製化行程嗎？</h4>
-                  <p className="text-gray-600 text-sm">當然可以！我們會根據您的需求量身規劃行程。</p>
-                </div>
-                <div>
-                  <h4 className="font-bold text-gray-900 text-sm">Q: 費用如何計算？</h4>
-                  <p className="text-gray-600 text-sm">根據行程內容、人數、天數報價，歡迎 LINE 詢問。</p>
-                </div>
-              </div>
+              <FAQSection items={faqItems} />
               <div className="mt-4">
                 <Button href="https://line.me/R/ti/p/@037nyuwk" external size="sm" variant="secondary">
                   更多問題？LINE 我們
