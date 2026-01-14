@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { trackLineClick } from '@/lib/analytics'
 
 interface ButtonProps {
   children: React.ReactNode
@@ -36,18 +39,46 @@ export default function Button({
   }
   const styles = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`
 
+  // 檢查是否為 LINE 連結
+  const isLineLink = href?.includes('line.me')
+
+  // 處理點擊事件（追蹤 LINE 點擊）
+  const handleClick = () => {
+    if (isLineLink) {
+      // 從按鈕文字取得位置標籤
+      const buttonText = typeof children === 'string' ? children : 'LINE Button'
+      trackLineClick(buttonText)
+    }
+    onClick?.()
+  }
+
   if (href) {
     if (external) {
-      return <a href={href} target="_blank" rel="noopener noreferrer" className={styles}>{children}</a>
+      return (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={styles}
+          onClick={handleClick}
+        >
+          {children}
+        </a>
+      )
     }
-    return <Link href={href} className={styles}>{children}</Link>
+    return (
+      <Link href={href} className={styles} onClick={handleClick}>
+        {children}
+      </Link>
+    )
   }
+
   const disabledStyles = disabled ? 'opacity-50 cursor-not-allowed' : ''
   return (
     <button
       type={type}
       disabled={disabled}
-      onClick={onClick}
+      onClick={handleClick}
       className={`${styles} ${disabledStyles}`}
     >
       {children}

@@ -1,5 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
+import { trackLineClick } from '@/lib/analytics'
 
 const navLinks = [
   { href: '/', label: '首頁' },
@@ -99,6 +102,7 @@ export default function Footer() {
                   rel="noopener noreferrer"
                   className="text-gray-400 hover:text-primary transition-colors"
                   aria-label={social.label}
+                  onClick={social.label === 'LINE' ? () => trackLineClick('Footer - Social Icon') : undefined}
                 >
                   {social.icon}
                 </a>
@@ -109,6 +113,7 @@ export default function Footer() {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors text-sm"
+              onClick={() => trackLineClick('Footer - CTA Button')}
             >
               LINE 立即諮詢
             </a>
