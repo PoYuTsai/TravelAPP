@@ -7,7 +7,7 @@ interface ArticleSchemaProps {
   image?: string
 }
 
-const SITE_URL = 'https://chiangway.com'
+const SITE_URL = 'https://chiangway-travel.com'
 
 export default function ArticleSchema({
   title,

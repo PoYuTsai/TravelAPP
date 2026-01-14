@@ -14,7 +14,7 @@ async function getBlogSlugs() {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://chiangway.com'
+  const baseUrl = 'https://chiangway-travel.com'
 
   // 靜態頁面
   const staticPages: MetadataRoute.Sitemap = [

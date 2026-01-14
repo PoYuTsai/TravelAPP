@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: '清邁親子自由行首選！專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
-  metadataBase: new URL('https://chiangway.com'),
+  metadataBase: new URL('https://chiangway-travel.com'),
   openGraph: {
     type: 'website',
     locale: 'zh_TW',
@@ -37,10 +37,10 @@ export const metadata: Metadata = {
 const localBusinessSchema = {
   '@context': 'https://schema.org',
   '@type': 'LocalBusiness',
-  '@id': 'https://chiangway.com/#business',
+  '@id': 'https://chiangway-travel.com/#business',
   name: '清微旅行 Chiangway Travel',
   description: '清邁親子自由行首選！台泰夫妻在地經營，專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
-  url: 'https://chiangway.com',
+  url: 'https://chiangway-travel.com',
   telephone: '+66-63-790-0666',
   email: 'eric19921204@gmail.com',
   address: {
