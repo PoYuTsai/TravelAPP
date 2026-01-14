@@ -13,6 +13,21 @@ export const metadata: Metadata = {
   },
 }
 
+// Post 類型定義
+interface Post {
+  _id: string
+  title: string
+  slug: { current: string }
+  excerpt?: string
+  mainImage?: {
+    asset: { _ref: string }
+    alt?: string
+  }
+  category?: string
+  featured?: boolean
+  publishedAt?: string
+}
+
 // Sanity 查詢
 const postsQuery = `*[_type == "post"] | order(featured desc, publishedAt desc) {
   _id,
@@ -36,9 +51,9 @@ const categoryNames: Record<string, string> = {
 }
 
 // 取得文章
-async function getPosts() {
+async function getPosts(): Promise<Post[]> {
   try {
-    const posts = await client.fetch(postsQuery)
+    const posts = await client.fetch<Post[]>(postsQuery)
     return posts
   } catch {
     return []
@@ -50,8 +65,8 @@ export const revalidate = 60 // 每 60 秒重新驗證
 export default async function BlogPage() {
   const posts = await getPosts()
 
-  const featuredPost = posts.find((p: any) => p.featured)
-  const otherPosts = posts.filter((p: any) => !p.featured)
+  const featuredPost = posts.find((p) => p.featured)
+  const otherPosts = posts.filter((p) => !p.featured)
 
   // 如果沒有文章，顯示提示
   if (posts.length === 0) {
@@ -108,7 +123,7 @@ export default async function BlogPage() {
                 <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs bg-primary/20 text-primary-dark px-2 py-1 rounded-full font-medium">
-                      {categoryNames[featuredPost.category] || featuredPost.category}
+                      {featuredPost.category ? (categoryNames[featuredPost.category] || featuredPost.category) : '文章'}
                     </span>
                     {featuredPost.publishedAt && (
                       <span className="text-xs text-gray-400">
@@ -132,7 +147,7 @@ export default async function BlogPage() {
         {/* 其他文章 */}
         {otherPosts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {otherPosts.map((post: any) => (
+            {otherPosts.map((post) => (
               <Link key={post._id} href={`/blog/${post.slug.current}`} className="group">
                 <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
                   <div className="relative h-48">
@@ -152,7 +167,7 @@ export default async function BlogPage() {
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs bg-primary/20 text-primary-dark px-2 py-1 rounded-full font-medium">
-                        {categoryNames[post.category] || post.category}
+                        {post.category ? (categoryNames[post.category] || post.category) : '文章'}
                       </span>
                       {post.publishedAt && (
                         <span className="text-xs text-gray-400">

@@ -1,6 +1,8 @@
 'use client'
 
 import { PortableText, PortableTextComponents } from '@portabletext/react'
+import type { PortableTextBlock } from '@portabletext/types'
+import type { SanityImageSource } from '@sanity/image-url'
 import Image from 'next/image'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/client'
@@ -96,7 +98,7 @@ const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells
 )
 
 // 圖片區塊
-const ImageBlock = ({ value }: { value: { asset: any; alt?: string; caption?: string } }) => {
+const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string; caption?: string } }) => {
   if (!value?.asset) return null
 
   return (
@@ -190,7 +192,7 @@ const components: PortableTextComponents = {
 }
 
 interface PortableTextRendererProps {
-  content: any[]
+  content: PortableTextBlock[]
 }
 
 export default function PortableTextRenderer({ content }: PortableTextRendererProps) {
