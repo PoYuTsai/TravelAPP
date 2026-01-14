@@ -1,4 +1,7 @@
 import post from './post'
 import tour from './tour'
+import landingPage from './landingPage'
+import carCharter from './carCharter'
+import homestay from './homestay'
 
-export const schemaTypes = [post, tour]
+export const schemaTypes = [post, tour, landingPage, carCharter, homestay]

@@ -1,0 +1,84 @@
+'use client'
+
+import { useState } from 'react'
+import Image from 'next/image'
+import { urlFor } from '@/sanity/client'
+import type { SanityImageSource } from '@sanity/image-url'
+
+interface GalleryImage {
+  asset: SanityImageSource
+  alt?: string
+  caption?: string
+}
+
+interface ImageGalleryProps {
+  images: GalleryImage[]
+  columns?: 2 | 3 | 4
+}
+
+export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps) {
+  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null)
+
+  if (!images || images.length === 0) return null
+
+  const gridCols = {
+    2: 'grid-cols-2',
+    3: 'grid-cols-2 md:grid-cols-3',
+    4: 'grid-cols-2 md:grid-cols-4',
+  }
+
+  return (
+    <>
+      <div className={`grid ${gridCols[columns]} gap-4`}>
+        {images.map((image, index) => (
+          <button
+            key={index}
+            onClick={() => setSelectedImage(image)}
+            className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer"
+          >
+            <Image
+              src={urlFor(image.asset).width(600).height(450).url()}
+              alt={image.alt || `照片 ${index + 1}`}
+              fill
+              className="object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            {image.caption && (
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                <p className="text-white text-sm">{image.caption}</p>
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
+            onClick={() => setSelectedImage(null)}
+            aria-label="關閉"
+          >
+            &times;
+          </button>
+          <div className="relative max-w-5xl max-h-[90vh] w-full h-full">
+            <Image
+              src={urlFor(selectedImage.asset).width(1200).url()}
+              alt={selectedImage.alt || '照片'}
+              fill
+              className="object-contain"
+            />
+          </div>
+          {selectedImage.caption && (
+            <p className="absolute bottom-4 left-0 right-0 text-center text-white">
+              {selectedImage.caption}
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  )
+}

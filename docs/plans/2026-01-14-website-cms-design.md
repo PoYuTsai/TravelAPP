@@ -1,8 +1,8 @@
-# 服務頁面 CMS 化設計文件
+# 網站 CMS 化設計文件
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** 將包車服務與民宿頁面改為 Sanity CMS 管理，讓內容可在後台編輯
+**Goal:** 將首頁、包車服務與民宿頁面改為 Sanity CMS 管理，讓內容可在後台編輯
 
 **Architecture:** 使用 Sanity Singleton 模式管理單一頁面，前端透過 API 取得資料渲染
 
@@ -26,12 +26,243 @@ Next.js 頁面 (前端顯示)
 
 | Schema | 用途 | 類型 |
 |--------|------|------|
+| `landingPage` | 首頁 | Singleton |
 | `carCharter` | 包車服務頁面 | Singleton |
 | `homestay` | 民宿頁面 | Singleton |
 
 ---
 
-## 二、包車服務頁面設計
+## 二、首頁（Landing Page）設計
+
+### 頁面結構
+
+```
+① Hero 區塊（主視覺圖、標題、副標題、CTA）
+    ↓
+② TrustNumbers（信任數據：服務家庭數、五星好評、年份）
+    ↓
+③ Services（服務卡片：包車 + 民宿）
+    ↓
+④ WhyUs（為什麼選擇我們：4 個理由）
+    ↓
+⑤ FeaturedArticles（精選文章，從 Blog 自動抓取）
+    ↓
+⑥ CTA（最終轉換區塊）
+```
+
+### Schema: `landingPage`
+
+```typescript
+// src/sanity/schemas/landingPage.ts
+
+export default {
+  name: 'landingPage',
+  title: '首頁',
+  type: 'document',
+  fields: [
+    // === Hero 區塊 ===
+    {
+      name: 'hero',
+      title: 'Hero 區塊',
+      type: 'object',
+      fields: [
+        {
+          name: 'backgroundImage',
+          title: '背景圖片',
+          type: 'image',
+          options: { hotspot: true },
+          fields: [
+            { name: 'alt', title: 'Alt 文字', type: 'string' },
+          ],
+        },
+        { name: 'title', title: '主標題', type: 'string' },
+        { name: 'subtitle', title: '副標題', type: 'string' },
+        { name: 'description', title: '說明文字', type: 'text', rows: 2 },
+        { name: 'primaryCtaText', title: '主要 CTA 文字', type: 'string' },
+        { name: 'primaryCtaLink', title: '主要 CTA 連結', type: 'url' },
+        { name: 'secondaryCtaText', title: '次要 CTA 文字', type: 'string' },
+        { name: 'secondaryCtaLink', title: '次要 CTA 連結', type: 'string' },
+      ],
+    },
+
+    // === 信任數據 ===
+    {
+      name: 'trustNumbers',
+      title: '信任數據',
+      type: 'array',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'value', title: '數值', type: 'string', description: '例如: 110+、⭐⭐⭐⭐⭐、2024' },
+            { name: 'label', title: '標籤', type: 'string' },
+            { name: 'link', title: '連結（可選）', type: 'url' },
+          ],
+          preview: {
+            select: { title: 'label', subtitle: 'value' },
+          },
+        },
+      ],
+    },
+
+    // === 服務卡片 ===
+    {
+      name: 'services',
+      title: '服務區塊',
+      type: 'object',
+      fields: [
+        { name: 'sectionTitle', title: '區塊標題', type: 'string' },
+        { name: 'sectionSubtitle', title: '區塊副標題', type: 'string' },
+        {
+          name: 'items',
+          title: '服務項目',
+          type: 'array',
+          of: [
+            {
+              type: 'object',
+              fields: [
+                {
+                  name: 'image',
+                  title: '服務圖片',
+                  type: 'image',
+                  options: { hotspot: true },
+                  fields: [
+                    { name: 'alt', title: 'Alt 文字', type: 'string' },
+                  ],
+                },
+                { name: 'title', title: '服務名稱', type: 'string' },
+                { name: 'subtitle', title: '副標題（可選）', type: 'string' },
+                {
+                  name: 'features',
+                  title: '特色列表',
+                  type: 'array',
+                  of: [{ type: 'string' }],
+                },
+                { name: 'price', title: '價格顯示（可選）', type: 'string' },
+                { name: 'ctaText', title: 'CTA 文字', type: 'string' },
+                { name: 'ctaLink', title: 'CTA 連結', type: 'string' },
+              ],
+              preview: {
+                select: { title: 'title', subtitle: 'subtitle' },
+              },
+            },
+          ],
+        },
+      ],
+    },
+
+    // === 為什麼選擇我們 ===
+    {
+      name: 'whyUs',
+      title: '為什麼選擇我們',
+      type: 'object',
+      fields: [
+        { name: 'sectionTitle', title: '區塊標題', type: 'string' },
+        { name: 'sectionSubtitle', title: '區塊副標題', type: 'string' },
+        {
+          name: 'reasons',
+          title: '理由',
+          type: 'array',
+          of: [
+            {
+              type: 'object',
+              fields: [
+                { name: 'icon', title: 'Icon (emoji)', type: 'string' },
+                { name: 'title', title: '標題', type: 'string' },
+                { name: 'description', title: '說明', type: 'text', rows: 2 },
+              ],
+              preview: {
+                select: { title: 'title', subtitle: 'icon' },
+              },
+            },
+          ],
+        },
+      ],
+    },
+
+    // === 精選文章設定 ===
+    {
+      name: 'featuredArticles',
+      title: '精選文章區塊',
+      type: 'object',
+      fields: [
+        { name: 'sectionTitle', title: '區塊標題', type: 'string' },
+        { name: 'sectionSubtitle', title: '區塊副標題', type: 'string' },
+        { name: 'showCount', title: '顯示篇數', type: 'number', initialValue: 3 },
+        { name: 'ctaText', title: '查看更多文字', type: 'string' },
+        { name: 'ctaLink', title: '查看更多連結', type: 'string' },
+      ],
+    },
+
+    // === 最終 CTA ===
+    {
+      name: 'cta',
+      title: '最終 CTA 區塊',
+      type: 'object',
+      fields: [
+        { name: 'title', title: '標題', type: 'string' },
+        { name: 'description', title: '說明', type: 'text', rows: 2 },
+        { name: 'primaryCtaText', title: '主要 CTA 文字', type: 'string' },
+        { name: 'primaryCtaLink', title: '主要 CTA 連結', type: 'url' },
+        { name: 'secondaryCtaText', title: '次要 CTA 文字', type: 'string' },
+        { name: 'secondaryCtaLink', title: '次要 CTA 連結', type: 'string' },
+      ],
+    },
+
+    // === SEO ===
+    {
+      name: 'seo',
+      title: 'SEO 設定',
+      type: 'object',
+      fields: [
+        { name: 'metaTitle', title: 'Meta Title', type: 'string' },
+        { name: 'metaDescription', title: 'Meta Description', type: 'text', rows: 2 },
+      ],
+    },
+  ],
+
+  preview: {
+    prepare() {
+      return { title: '首頁設定' }
+    },
+  },
+}
+```
+
+### 前端呈現
+
+```
+┌────────────────────────────────────────────────────┐
+│                  HERO 區塊                          │
+│  ┌──────────────────────────────────────────────┐  │
+│  │          [背景圖片 - CMS 可換]                │  │
+│  └──────────────────────────────────────────────┘  │
+│              清邁親子自由行                         │
+│        在地家庭經營，專為爸媽設計的旅程              │
+│    [LINE 免費諮詢]   [瀏覽服務]                    │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│   110+ 服務家庭    ⭐⭐⭐⭐⭐ 五星好評    2024 創立  │
+└────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────┐
+│              我們的服務                             │
+│       包車 + 住宿，一站式親子旅遊體驗               │
+│  ┌──────────────┐    ┌──────────────┐            │
+│  │ [真實照片]    │    │ [真實照片]    │            │
+│  │ 親子包車服務   │    │ 芳縣特色民宿   │            │
+│  │ ✓ 專屬司機    │    │ ✓ 遠離觀光區   │            │
+│  │ ✓ 兒童座椅    │    │ ✓ 在地生活     │            │
+│  │ NT$3,200起   │    │              │            │
+│  │ [了解包車]    │    │ [了解民宿]    │            │
+│  └──────────────┘    └──────────────┘            │
+└────────────────────────────────────────────────────┘
+```
+
+---
+
+## 三、包車服務頁面設計
 
 ### 頁面結構
 
@@ -268,7 +499,7 @@ export default {
 
 ---
 
-## 三、民宿頁面設計
+## 四、民宿頁面設計
 
 ### 頁面結構
 
@@ -443,7 +674,7 @@ export default {
 
 ---
 
-## 四、前端實作
+## 五、前端實作
 
 ### 需要建立的元件
 
@@ -451,6 +682,8 @@ export default {
 |------|------|------|
 | `YouTubeEmbed` | 嵌入 YouTube 影片 | ✅ |
 | `FeatureGrid` | 服務/民宿特色網格 | ✅ |
+| `ServiceCard` | 首頁服務卡片（含圖片） | 首頁專用 |
+| `TrustNumbersBar` | 信任數據列 | 首頁專用 |
 | `PricingTable` | 包車價格表（雙欄） | 包車專用 |
 | `ProcessSteps` | 預訂流程步驟 | 包車專用 |
 | `ImageGallery` | 照片網格 | ✅ |
@@ -461,6 +694,9 @@ export default {
 ### 資料取得
 
 ```typescript
+// 首頁
+const landingPageQuery = `*[_type == "landingPage"][0]`
+
 // 包車頁面
 const carCharterQuery = `*[_type == "carCharter"][0]`
 
@@ -470,12 +706,13 @@ const homestayQuery = `*[_type == "homestay"][0]`
 
 ---
 
-## 五、Sanity Studio 設定
+## 六、Sanity Studio 設定
 
 ### 新增到 Schema Index
 
 ```typescript
 // src/sanity/schemas/index.ts
+import landingPage from './landingPage'
 import carCharter from './carCharter'
 import homestay from './homestay'
 
@@ -484,6 +721,7 @@ export const schemaTypes = [
   post,
   tour,
   // 新增
+  landingPage,
   carCharter,
   homestay,
 ]
@@ -491,11 +729,24 @@ export const schemaTypes = [
 
 ### Singleton 處理
 
-在 Sanity Studio 結構中設定，讓這兩個文件類型只顯示單一編輯入口，不會建立多筆。
+在 Sanity Studio 結構中設定，讓這三個文件類型只顯示單一編輯入口，不會建立多筆。
 
 ---
 
-## 六、Sanity 後台管理項目總覽
+## 七、Sanity 後台管理項目總覽
+
+### 首頁
+
+| 項目 | 數量 | 操作 |
+|------|------|------|
+| Hero 背景圖 | 1 張 | 上傳圖片 |
+| Hero 文字 | - | 填寫標題、副標題、CTA |
+| 信任數據 | 3 個 | 填數值 + 標籤 + 連結 |
+| 服務卡片 | 2 個 | 上傳圖片 + 填文字 |
+| 選擇理由 | 4 個 | 填 emoji + 文字 |
+| 精選文章設定 | - | 填標題 + 顯示篇數 |
+| CTA 區塊 | - | 填文字 + 連結 |
+| SEO | - | 填 meta |
 
 ### 包車服務
 
@@ -527,32 +778,88 @@ export const schemaTypes = [
 
 ---
 
-## 七、實作順序
+## 八、實作順序（3 大 Tasks）
 
-### Phase 1: Schema 建立
-1. 建立 `carCharter.ts` schema
-2. 建立 `homestay.ts` schema
-3. 註冊到 schema index
-4. 設定 Singleton 結構
+### Task 1: Schema 建立與 Sanity Studio 設定
 
-### Phase 2: 前端元件
-1. 建立共用元件（YouTubeEmbed, FeatureGrid, ImageGallery, FAQSection）
-2. 建立包車專用元件（PricingTable, ProcessSteps）
-3. 建立民宿專用元件（RoomCards, LocationInfo）
+**Step 1: 建立 Landing Page Schema**
+- Create: `src/sanity/schemas/landingPage.ts`
+- 參照上方 Schema 定義
 
-### Phase 3: 頁面整合
-1. 修改 `/services/car-charter/page.tsx` 改為從 Sanity 取資料
-2. 修改 `/homestay/page.tsx` 改為從 Sanity 取資料
-3. 保留 Schema markup（FAQ Schema, Service Schema）
+**Step 2: 建立 Car Charter Schema**
+- Create: `src/sanity/schemas/carCharter.ts`
+- 參照上方 Schema 定義
 
-### Phase 4: 內容填入
-1. 在 Sanity Studio 建立包車服務內容
-2. 在 Sanity Studio 建立民宿內容
-3. 上傳所有圖片和影片
+**Step 3: 建立 Homestay Schema**
+- Create: `src/sanity/schemas/homestay.ts`
+- 參照上方 Schema 定義
+
+**Step 4: 註冊 Schema**
+- Modify: `src/sanity/schemas/index.ts`
+- 加入 landingPage, carCharter, homestay
+
+**Step 5: 設定 Singleton 結構**
+- Modify: `src/sanity/structure.ts` (如果有) 或 `sanity.config.ts`
+- 讓三個頁面只能編輯，不能新增多筆
+
+**Step 6: 測試 Sanity Studio**
+- Run: `npm run dev`
+- 確認 Studio 可正常顯示三個頁面編輯入口
 
 ---
 
-## 八、注意事項
+### Task 2: 前端元件建立
+
+**Step 1: 建立共用元件**
+- Create: `src/components/cms/YouTubeEmbed.tsx`
+- Create: `src/components/cms/FeatureGrid.tsx`
+- Create: `src/components/cms/ImageGallery.tsx`
+- Create: `src/components/cms/FAQSection.tsx`
+
+**Step 2: 建立首頁專用元件**
+- Create: `src/components/cms/ServiceCard.tsx`
+- Create: `src/components/cms/TrustNumbersBar.tsx`
+
+**Step 3: 建立包車專用元件**
+- Create: `src/components/cms/PricingTable.tsx`
+- Create: `src/components/cms/ProcessSteps.tsx`
+
+**Step 4: 建立民宿專用元件**
+- Create: `src/components/cms/RoomCards.tsx`
+- Create: `src/components/cms/LocationInfo.tsx`
+
+---
+
+### Task 3: 頁面整合與內容填入
+
+**Step 1: 整合首頁**
+- Modify: `src/app/page.tsx`
+- Modify: `src/components/sections/Hero.tsx`
+- Modify: `src/components/sections/TrustNumbers.tsx`
+- Modify: `src/components/sections/Services.tsx`
+- Modify: `src/components/sections/WhyUs.tsx`
+- Modify: `src/components/sections/CTA.tsx`
+- 改為從 Sanity 取資料
+
+**Step 2: 整合包車服務頁**
+- Modify: `src/app/services/car-charter/page.tsx`
+- 改為從 Sanity 取資料
+- 保留 FAQ Schema markup
+
+**Step 3: 整合民宿頁**
+- Modify: `src/app/homestay/page.tsx`
+- 改為從 Sanity 取資料
+- 保留 FAQ Schema markup
+
+**Step 4: 內容填入**
+- 在 Sanity Studio 建立首頁內容
+- 在 Sanity Studio 建立包車服務內容
+- 在 Sanity Studio 建立民宿內容
+- 上傳所有圖片（服務照片、車輛照片、民宿照片）
+
+---
+
+## 九、注意事項
 
 1. **SEO Schema 保留** - FAQ Schema 和 Service Schema 要保留，從 CMS 資料動態產生
 2. **圖片優化** - 使用 Sanity 的圖片 CDN 和 Next.js Image 元件

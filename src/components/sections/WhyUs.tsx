@@ -1,6 +1,7 @@
 import SectionTitle from '@/components/ui/SectionTitle'
 
-const reasons = [
+// Default values
+const defaultReasons = [
   {
     icon: '🏠',
     title: '在地家庭經營',
@@ -23,21 +24,38 @@ const reasons = [
   },
 ]
 
-export default function WhyUs() {
+interface Reason {
+  icon?: string
+  title: string
+  description: string
+}
+
+interface WhyUsProps {
+  sectionTitle?: string
+  sectionSubtitle?: string
+  reasons?: Reason[]
+}
+
+export default function WhyUs({
+  sectionTitle = '為什麼選擇清微旅行',
+  sectionSubtitle = '不只是包車，更是您在清邁的家人',
+  reasons,
+}: WhyUsProps) {
+  const items = reasons && reasons.length > 0 ? reasons : defaultReasons
+
   return (
     <section className="py-16 md:py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionTitle
-          title="為什麼選擇清微旅行"
-          subtitle="不只是包車，更是您在清邁的家人"
-        />
+        <SectionTitle title={sectionTitle} subtitle={sectionSubtitle} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {reasons.map((reason) => (
+          {items.map((reason, index) => (
             <div
-              key={reason.title}
+              key={index}
               className="flex gap-4 p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
             >
-              <div className="text-4xl flex-shrink-0">{reason.icon}</div>
+              {reason.icon && (
+                <div className="text-4xl flex-shrink-0">{reason.icon}</div>
+              )}
               <div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">
                   {reason.title}

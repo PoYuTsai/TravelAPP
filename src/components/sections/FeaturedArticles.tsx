@@ -15,15 +15,6 @@ interface Post {
   category: string
 }
 
-const featuredQuery = `*[_type == "post" && featured == true] | order(publishedAt desc)[0...3] {
-  _id,
-  title,
-  slug,
-  excerpt,
-  mainImage,
-  category
-}`
-
 const categoryNames: Record<string, string> = {
   guide: '攻略',
   attraction: '景點',
@@ -33,16 +24,38 @@ const categoryNames: Record<string, string> = {
   itinerary: '行程',
 }
 
-async function getFeaturedPosts() {
+async function getFeaturedPosts(count: number = 3) {
+  const query = `*[_type == "post" && featured == true] | order(publishedAt desc)[0...${count}] {
+    _id,
+    title,
+    slug,
+    excerpt,
+    mainImage,
+    category
+  }`
   try {
-    return await client.fetch(featuredQuery)
+    return await client.fetch(query)
   } catch {
     return []
   }
 }
 
-export default async function FeaturedArticles() {
-  const posts = await getFeaturedPosts()
+interface FeaturedArticlesProps {
+  sectionTitle?: string
+  sectionSubtitle?: string
+  showCount?: number
+  ctaText?: string
+  ctaLink?: string
+}
+
+export default async function FeaturedArticles({
+  sectionTitle = '精選文章',
+  sectionSubtitle = '在地爸媽的清邁旅遊攻略',
+  showCount = 3,
+  ctaText = '查看更多文章',
+  ctaLink = '/blog',
+}: FeaturedArticlesProps) {
+  const posts = await getFeaturedPosts(showCount)
 
   if (posts.length === 0) {
     return null // Don't render section if no featured posts
@@ -51,10 +64,7 @@ export default async function FeaturedArticles() {
   return (
     <section className="py-16 md:py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionTitle
-          title="精選文章"
-          subtitle="在地爸媽的清邁旅遊攻略"
-        />
+        <SectionTitle title={sectionTitle} subtitle={sectionSubtitle} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {posts.map((post: Post) => (
             <Link
@@ -96,8 +106,8 @@ export default async function FeaturedArticles() {
           ))}
         </div>
         <div className="text-center mt-8">
-          <Button href="/blog" variant="outline">
-            查看更多文章
+          <Button href={ctaLink} variant="outline">
+            {ctaText}
           </Button>
         </div>
       </div>
