@@ -115,8 +115,21 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Copyright */}
+        {/* Legal Links & Copyright */}
         <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500 text-sm">
+          <div className="flex justify-center space-x-4 mb-4">
+            <Link href="/privacy" className="hover:text-primary transition-colors">
+              隱私權政策
+            </Link>
+            <span>|</span>
+            <Link href="/terms" className="hover:text-primary transition-colors">
+              服務條款
+            </Link>
+            <span>|</span>
+            <Link href="/cancellation" className="hover:text-primary transition-colors">
+              取消政策
+            </Link>
+          </div>
           <p>&copy; {currentYear} 清微旅行 Chiangway Travel. All rights reserved.</p>
         </div>
       </div>

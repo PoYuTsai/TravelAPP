@@ -12,6 +12,20 @@ export const metadata: Metadata = {
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
   metadataBase: new URL('https://chiangway-travel.com'),
+  // PWA 設定
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: '清微旅行',
+  },
+  formatDetection: {
+    telephone: true,
+    email: true,
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
   openGraph: {
     type: 'website',
     locale: 'zh_TW',
@@ -87,6 +101,10 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
+        <meta name="theme-color" content="#FFD700" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}

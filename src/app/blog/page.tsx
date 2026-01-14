@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import { Suspense } from 'react'
 import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
+import CategoryFilter from '@/components/blog/CategoryFilter'
 
 export const metadata: Metadata = {
   title: '部落格 | 清邁旅遊攻略',
@@ -28,18 +30,6 @@ interface Post {
   publishedAt?: string
 }
 
-// Sanity 查詢
-const postsQuery = `*[_type == "post"] | order(featured desc, publishedAt desc) {
-  _id,
-  title,
-  slug,
-  excerpt,
-  mainImage,
-  category,
-  featured,
-  publishedAt
-}`
-
 // 分類名稱對照
 const categoryNames: Record<string, string> = {
   guide: '攻略',
@@ -51,9 +41,24 @@ const categoryNames: Record<string, string> = {
 }
 
 // 取得文章
-async function getPosts(): Promise<Post[]> {
+async function getPosts(category?: string): Promise<Post[]> {
+  const categoryFilter = category && category !== 'all'
+    ? ` && category == "${category}"`
+    : ''
+
+  const query = `*[_type == "post"${categoryFilter}] | order(featured desc, publishedAt desc) {
+    _id,
+    title,
+    slug,
+    excerpt,
+    mainImage,
+    category,
+    featured,
+    publishedAt
+  }`
+
   try {
-    const posts = await client.fetch<Post[]>(postsQuery)
+    const posts = await client.fetch<Post[]>(query)
     return posts
   } catch {
     return []
@@ -62,8 +67,14 @@ async function getPosts(): Promise<Post[]> {
 
 export const revalidate = 60 // 每 60 秒重新驗證
 
-export default async function BlogPage() {
-  const posts = await getPosts()
+interface BlogPageProps {
+  searchParams: Promise<{ category?: string }>
+}
+
+export default async function BlogPage({ searchParams }: BlogPageProps) {
+  const params = await searchParams
+  const category = params.category
+  const posts = await getPosts(category)
 
   const featuredPost = posts.find((p) => p.featured)
   const otherPosts = posts.filter((p) => !p.featured)
@@ -77,11 +88,20 @@ export default async function BlogPage() {
             title="部落格"
             subtitle="清邁旅遊資訊、親子攻略、在地推薦"
           />
+
+          <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
+            <CategoryFilter />
+          </Suspense>
+
           <div className="text-center py-16">
-            <p className="text-gray-500 mb-4">文章正在準備中...</p>
-            <p className="text-sm text-gray-400">
-              請前往 <Link href="/studio" className="text-primary hover:underline">/studio</Link> 新增文章
+            <p className="text-gray-500 mb-4">
+              {category ? `「${categoryNames[category] || category}」分類暫無文章` : '文章正在準備中...'}
             </p>
+            {category && (
+              <Link href="/blog" className="text-primary hover:underline">
+                ← 查看所有文章
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -96,8 +116,13 @@ export default async function BlogPage() {
           subtitle="清邁旅遊資訊、親子攻略、在地推薦"
         />
 
+        {/* 分類篩選 */}
+        <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
+          <CategoryFilter />
+        </Suspense>
+
         {/* 精選文章 */}
-        {featuredPost && (
+        {featuredPost && !category && (
           <Link href={`/blog/${featuredPost.slug.current}`} className="block mb-12 group">
             <article className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
               <div className="md:flex">
@@ -144,10 +169,10 @@ export default async function BlogPage() {
           </Link>
         )}
 
-        {/* 其他文章 */}
-        {otherPosts.length > 0 && (
+        {/* 文章列表 */}
+        {(category ? posts : otherPosts).length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {otherPosts.map((post) => (
+            {(category ? posts : otherPosts).map((post) => (
               <Link key={post._id} href={`/blog/${post.slug.current}`} className="group">
                 <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
                   <div className="relative h-48">
