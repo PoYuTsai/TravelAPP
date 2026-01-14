@@ -13,72 +13,55 @@
 
 ---
 
-## Phase 2.1：SEO 基礎優化
+## Phase 2.1：SEO 基礎優化 ✅ 已完成
 
-### Task A1: 麵包屑導航
+### Task A1: 麵包屑導航 ✅
 
 **Files:**
-- Create: `src/components/ui/Breadcrumb.tsx`
-- Modify: `src/app/blog/[slug]/page.tsx`
+- ✅ Created: `src/components/blog/Breadcrumb.tsx`
+- ✅ Modified: `src/app/blog/[slug]/page.tsx`
 
-**需求：**
+**實作內容：**
 - 部落格文章頁顯示：首頁 > 部落格 > 文章標題
-- 加入 BreadcrumbList Schema (JSON-LD)
+- 包含 BreadcrumbList Schema (JSON-LD)
 - 可點擊跳轉
 
-**驗收：**
-- 文章頁頂部顯示麵包屑
-- Google Rich Results Test 驗證 Schema
+---
+
+### Task A3: 作者區塊 ✅
+
+**Files:**
+- ✅ Created: `src/components/blog/AuthorCard.tsx`
+- ✅ Modified: `src/app/blog/[slug]/page.tsx`
+
+**實作內容：**
+- 文章頂部和底部顯示作者資訊
+- 包含：頭像、名字（Eric & Min）、簡介
+- E-E-A-T 信號：「住在清邁的台泰夫妻，專營親子包車旅遊服務」
 
 ---
 
-### Task A3: 作者區塊
+### Task A4: 最後更新日期 ✅
 
 **Files:**
-- Create: `src/components/blog/AuthorBox.tsx`
-- Modify: `src/app/blog/[slug]/page.tsx`
+- ✅ Modified: `src/app/blog/[slug]/page.tsx`
 
-**需求：**
-- 文章底部顯示作者資訊
-- 包含：頭像、名字、簡介、社群連結
-- E-E-A-T 信號：「住在清邁的台灣人 Eric」
-
-**內容：**
-```
-┌─────────────────────────────────────────┐
-│ 👤 [照片]                               │
-│ 關於作者                                │
-│ Eric｜清微旅行創辦人                     │
-│ 住在清邁的台灣人，與泰國太太 Min 經營     │
-│ 親子包車服務。用在地爸媽的角度，分享最     │
-│ 真實的清邁旅遊資訊。                     │
-│ [LINE 諮詢] [Instagram]                 │
-└─────────────────────────────────────────┘
-```
-
----
-
-### Task A4: 最後更新日期
-
-**Files:**
-- Modify: `src/app/blog/[slug]/page.tsx`
-- Modify: `src/sanity/schemas/post.ts`（已有 updatedAt 欄位）
-
-**需求：**
+**實作內容：**
 - 文章頁顯示「發布日期」和「最後更新」
 - 格式：2024 年 12 月 15 日
-- 若 updatedAt 有值才顯示更新日期
+- 若 updatedAt 有值且與 publishedAt 不同才顯示更新日期
 
 ---
 
-### Task A6: Article Schema
+### Task A6: Article Schema ✅
 
 **Files:**
-- Modify: `src/app/blog/[slug]/page.tsx`
+- ✅ Created: `src/components/blog/ArticleSchema.tsx`
+- ✅ Modified: `src/app/blog/[slug]/page.tsx`
 
-**需求：**
+**實作內容：**
 - 每篇文章加入 Article Schema (JSON-LD)
-- 包含：headline, author, datePublished, dateModified, image, publisher
+- 包含：headline, author, datePublished, dateModified, image, publisher, mainEntityOfPage
 
 ---
 
@@ -341,8 +324,8 @@ Week 7-8: Phase 2.4 + 2.5
 
 ## 驗收標準
 
-- [ ] 麵包屑 + Schema 通過 Google Rich Results Test
-- [ ] Article Schema 通過驗證
+- [x] 麵包屑 + Schema 通過 Google Rich Results Test ✅
+- [x] Article Schema 通過驗證 ✅
 - [ ] Sanity 後台可編輯價格、FAQ、評價
 - [ ] 包車頁有客戶評價、行程範例、流程圖
 - [ ] 所有 placeholder 替換為真實照片
