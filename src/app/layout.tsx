@@ -113,6 +113,8 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
         />
+      </head>
+      <body className="flex flex-col min-h-screen">
         {/* Google Analytics */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
@@ -126,8 +128,6 @@ export default function RootLayout({
             gtag('config', '${GA_MEASUREMENT_ID}');
           `}
         </Script>
-      </head>
-      <body className="flex flex-col min-h-screen">
         <Header />
         <main className="flex-grow pt-20">
           {children}
