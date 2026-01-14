@@ -1,4 +1,8 @@
 import { client } from '@/sanity/client'
+
+// Disable caching for this page
+export const revalidate = 0
+
 import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import Services from '@/components/sections/Services'

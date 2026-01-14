@@ -4,6 +4,9 @@ import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, PricingTable, FAQSection, YouTubeEmbed, ImageGallery, ProcessSteps } from '@/components/cms'
 
+// Disable caching for this page
+export const revalidate = 0
+
 export const metadata: Metadata = {
   title: '清邁親子包車服務 | 清微旅行',
   description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。清邁一日 NT$ 3,200 起。',

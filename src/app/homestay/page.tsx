@@ -5,6 +5,9 @@ import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, FAQSection, YouTubeEmbed, RoomCards, ImageGallery, LocationInfo } from '@/components/cms'
 
+// Disable caching for this page
+export const revalidate = 0
+
 export const metadata: Metadata = {
   title: '芳縣特色民宿 | Huen San Fang Hotel | 清微旅行',
   description: '遠離觀光區的寧靜民宿，體驗泰北在地生活。適合長住深度旅遊，民宿主人親自接待。',
