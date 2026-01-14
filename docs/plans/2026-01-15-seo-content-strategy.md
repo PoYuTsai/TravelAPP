@@ -162,7 +162,7 @@
 
 ## 下一步行動
 
-- [ ] 建立 B2 FAQ Schema（提升搜尋結果呈現）
+- [x] 建立 B2 FAQ Schema（提升搜尋結果呈現）✅ 2026-01-15 完成
 - [ ] 開始寫第一篇：#7 清邁交通攻略
 - [ ] 設定 Google Search Console（追蹤排名）
 - [ ] 設定 Google Analytics（追蹤流量）
