@@ -25,7 +25,7 @@ export default function TermsPage() {
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>親子包車服務（含司機、車輛）</li>
-              <li>中文導遊服務（依需求另計）</li>
+              <li>中文導遊服務</li>
               <li>機場接送服務</li>
               <li>芳縣民宿住宿</li>
             </ul>
@@ -49,10 +49,9 @@ export default function TermsPage() {
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>銀行轉帳（台灣銀行帳戶）</li>
               <li>現金（泰銖或台幣）</li>
-              <li>LINE Pay（依當時匯率換算）</li>
             </ul>
             <p className="text-gray-700 mt-4">
-              訂金為總金額的 30%，尾款於行程結束後支付。
+              訂金為總金額的 50%，尾款於行程結束後支付。
             </p>
           </section>
 

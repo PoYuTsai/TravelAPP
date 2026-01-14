@@ -119,7 +119,7 @@ export default function CancellationPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">退款方式</h2>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>退款將以原付款方式退回</li>
-              <li>銀行轉帳退款約需 3-5 個工作天</li>
+              <li>確認退款後，請告訴我們您的帳戶資訊，我們會儘快將款項退回給您</li>
               <li>跨國轉帳手續費由雙方各負擔一半</li>
             </ul>
           </section>
