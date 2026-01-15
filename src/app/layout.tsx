@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
   metadataBase: new URL('https://chiangway-travel.com'),
+  // Google Search Console 驗證
+  verification: {
+    google: 't6ojmkzAh42vwoUXXbPtayrjeZ_ZVNTetV9RvBL9ToI',
+  },
   // PWA 設定
   manifest: '/manifest.webmanifest',
   appleWebApp: {
