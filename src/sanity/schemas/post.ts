@@ -290,6 +290,7 @@ export default defineType({
           { title: '住宿', value: 'accommodation' },
           { title: '交通', value: 'transportation' },
           { title: '行程', value: 'itinerary' },
+          { title: '故事', value: 'story' },
         ],
         layout: 'radio',
       },
@@ -327,7 +328,7 @@ export default defineType({
     },
     prepare: ({ title, category, featured, media }) => ({
       title: featured ? `⭐ ${title}` : title,
-      subtitle: category === 'guide' ? '攻略' : category === 'attraction' ? '景點' : category === 'food' ? '美食' : category === 'accommodation' ? '住宿' : category === 'transportation' ? '交通' : '行程',
+      subtitle: category === 'guide' ? '攻略' : category === 'attraction' ? '景點' : category === 'food' ? '美食' : category === 'accommodation' ? '住宿' : category === 'transportation' ? '交通' : category === 'itinerary' ? '行程' : category === 'story' ? '故事' : '文章',
       media,
     }),
   },

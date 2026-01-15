@@ -38,6 +38,7 @@ const categoryNames: Record<string, string> = {
   accommodation: '住宿',
   transportation: '交通',
   itinerary: '行程',
+  story: '故事',
 }
 
 // 取得文章

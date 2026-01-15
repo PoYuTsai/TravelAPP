@@ -11,6 +11,7 @@ const categories = [
   { key: 'accommodation', label: '住宿' },
   { key: 'transportation', label: '交通' },
   { key: 'itinerary', label: '行程' },
+  { key: 'story', label: '故事' },
 ]
 
 export default function CategoryFilter() {
