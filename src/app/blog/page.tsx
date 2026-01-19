@@ -78,7 +78,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   const posts = await getPosts(category)
 
   const featuredPost = posts.find((p) => p.featured)
-  const otherPosts = posts.filter((p) => !p.featured)
+  const otherPosts = posts.filter((p) => p._id !== featuredPost?._id)
 
   // 如果沒有文章，顯示提示
   if (posts.length === 0) {
