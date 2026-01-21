@@ -211,14 +211,12 @@ export default defineType({
           title: '數量（張）',
           type: 'number',
           hidden: ({ parent }) => !parent?.required,
-          validation: (Rule) => Rule.min(1),
         }),
         defineField({
           name: 'days',
           title: '天數',
           type: 'number',
           hidden: ({ parent }) => !parent?.required,
-          validation: (Rule) => Rule.min(1),
         }),
       ],
     }),
@@ -240,14 +238,12 @@ export default defineType({
           type: 'number',
           initialValue: 1,
           hidden: ({ parent }) => !parent?.required,
-          validation: (Rule) => Rule.min(1),
         }),
         defineField({
           name: 'days',
           title: '天數',
           type: 'number',
           hidden: ({ parent }) => !parent?.required,
-          validation: (Rule) => Rule.min(1),
         }),
       ],
     }),
@@ -747,48 +743,12 @@ export default defineType({
         }).warning(),
     }),
     defineField({
-      name: 'quotationNote',
-      title: '報價備註',
-      type: 'text',
-      group: 'quotation',
-      rows: 4,
-      description: '例：包含油費、停車費、過路費；用車時間10小時，超時200/hr',
-    }),
-    defineField({
-      name: 'serviceDescription',
-      title: '服務說明',
-      type: 'text',
-      group: 'quotation',
-      rows: 6,
-      description: '導遊服務內容說明',
-      initialValue: `導遊會全程照顧大家，包含景點文化導覽介紹、道地餐廳推薦點菜
-我們也會全程在群組線上協助，幫忙代訂餐廳，協助一些意外狀況`,
-    }),
-    defineField({
-      name: 'expenseManagement',
-      title: '費用管理說明',
-      type: 'text',
-      group: 'quotation',
-      rows: 5,
-      description: '門票、餐費如何處理',
-      initialValue: `門票費用跟餐費可以根據預算給導遊處理
-例如: 第一天換錢後先給導遊20000泰銖，交代導遊用餐口味的偏好限制
-(如:不吃海鮮，牛肉，菜色不要太辣等等)
-每一筆都會請她記錄，多退少補，這樣後續大家算錢會比較簡單跟清楚`,
-    }),
-    defineField({
       name: 'travelRemarks',
-      title: '旅遊備註',
+      title: '旅遊備註（LINE 輸出用）',
       type: 'text',
       group: 'quotation',
-      rows: 8,
-      description: '給客人的注意事項（匯率、入境規定等）',
-      initialValue: `備註:
-1.個人花費跟按摩費視個人預算看攜帶多少
-(泰國入境的規定是每人至少攜帶20000的等值泰銖，雖然不一定會被抽查，供參考)
-2.清邁最好的巫宗雄匯率: 截至2025/12/29最新:
-泰銖:台幣=1:0.98
-3.入境要填TDAC (建議出國3天前就先填好，沒填一定會被海關擋下來，要求去旁邊的機器填完才能重排，比較花時間)`,
+      rows: 12,
+      description: '會輸出到 LINE 文字的備註區塊',
     }),
 
     // === 費用說明 ===
