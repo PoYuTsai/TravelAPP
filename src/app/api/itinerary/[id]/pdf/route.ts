@@ -9,19 +9,20 @@ import { generateItineraryHTML } from '@/lib/pdf/itinerary-template'
 export const dynamic = 'force-dynamic'
 
 // Vercel serverless 需要更長的執行時間
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  let browser = null
+
   try {
     const { id } = await params
 
     // 從 Sanity 取得資料
     const itinerary = await getItineraryById(id)
 
-    // Debug: 印出從 Sanity 取得的資料
     console.log('=== PDF Debug ===')
     console.log('Document ID:', id)
     console.log('Days count:', itinerary?.days?.length)
@@ -36,11 +37,19 @@ export async function GET(
     // 產生 HTML
     const html = generateItineraryHTML(itinerary)
 
+    // 取得 executablePath
+    const executablePath = await chromium.executablePath()
+    console.log('Chromium path:', executablePath)
+
     // 使用 Puppeteer 產生 PDF (支援 Vercel serverless)
-    const browser = await puppeteerCore.launch({
-      args: chromium.args,
+    browser = await puppeteerCore.launch({
+      args: [
+        ...chromium.args,
+        '--hide-scrollbars',
+        '--disable-web-security',
+      ],
       defaultViewport: { width: 1200, height: 800 },
-      executablePath: await chromium.executablePath(),
+      executablePath,
       headless: true,
     })
 
@@ -54,6 +63,7 @@ export async function GET(
     })
 
     await browser.close()
+    browser = null
 
     // 回傳 PDF
     const filename = `${itinerary.clientName}-行程表.pdf`
@@ -68,9 +78,18 @@ export async function GET(
     })
   } catch (error) {
     console.error('PDF generation error:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
+
     return NextResponse.json(
-      { error: 'Failed to generate PDF' },
+      {
+        error: 'Failed to generate PDF',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 }
     )
+  } finally {
+    if (browser) {
+      await browser.close().catch(console.error)
+    }
   }
 }
