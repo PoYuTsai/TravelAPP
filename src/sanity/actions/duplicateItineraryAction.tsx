@@ -61,7 +61,7 @@ export function duplicateItineraryAction(props: DocumentActionProps) {
         }
 
         // 建立新文件
-        await client.create(newDoc)
+        await client.create(newDoc as any)
 
         toast.push({
           status: 'success',
