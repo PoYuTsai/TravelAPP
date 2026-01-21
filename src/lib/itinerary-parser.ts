@@ -91,45 +91,16 @@ function isActivityLine(line: string): boolean {
 }
 
 /**
- * 判斷活動內容應該屬於哪個時段
- * 根據關鍵字判斷
+ * 判斷是否為晚上專屬內容（晚餐、住宿）
  */
-function detectTimeSlot(content: string): 'morning' | 'afternoon' | 'evening' | null {
-  const lower = content.toLowerCase()
-
-  // 晚上關鍵字
-  const eveningKeywords = [
-    '夜間', '夜市', '晚上', '夜景', '夜遊', '晚餐', 'dinner',
-    '日落', 'sunset', '夕陽', 'bar', 'pub', '酒吧',
-  ]
-  for (const kw of eveningKeywords) {
-    if (content.includes(kw) || lower.includes(kw)) {
-      return 'evening'
+function isEveningOnly(content: string): boolean {
+  const eveningOnlyKeywords = ['晚餐', '住宿', 'dinner', 'hotel', 'check-in', 'checkin']
+  for (const kw of eveningOnlyKeywords) {
+    if (content.includes(kw) || content.toLowerCase().includes(kw)) {
+      return true
     }
   }
-
-  // 下午關鍵字
-  const afternoonKeywords = [
-    '下午', '午後', '下午茶', 'afternoon', 'tea time',
-  ]
-  for (const kw of afternoonKeywords) {
-    if (content.includes(kw) || lower.includes(kw)) {
-      return 'afternoon'
-    }
-  }
-
-  // 早上關鍵字
-  const morningKeywords = [
-    '早上', '早餐', '上午', '早晨', 'morning', 'breakfast',
-    '機場接機', '接機',
-  ]
-  for (const kw of morningKeywords) {
-    if (content.includes(kw) || lower.includes(kw)) {
-      return 'morning'
-    }
-  }
-
-  return null // 無法判斷
+  return false
 }
 
 /**
@@ -137,6 +108,87 @@ function detectTimeSlot(content: string): 'morning' | 'afternoon' | 'evening' | 
  */
 function cleanActivityContent(line: string): string {
   return line.trim().replace(/^[・\-•·]\s*/, '')
+}
+
+/**
+ * 分配活動到早/午/晚時段
+ * 規則：
+ * 1. 有午餐：午餐前→早，午餐後到晚餐前→午，晚餐和住宿→晚
+ * 2. 沒午餐：自動分配讓午不為空，晚餐和住宿→晚
+ */
+function distributeActivities(
+  activities: string[],
+  lunch: string | undefined,
+  dinner: string | undefined
+): { morning: string; afternoon: string; evening: string } {
+  const result = { morning: '', afternoon: '', evening: '' }
+
+  if (activities.length === 0) return result
+
+  // 找出午餐和晚餐的位置
+  let lunchIndex = -1
+  let dinnerIndex = -1
+
+  for (let i = 0; i < activities.length; i++) {
+    const act = activities[i]
+    if (lunchIndex === -1 && (act.includes('午餐') || act.match(/^(中餐|lunch)[：:]/i))) {
+      lunchIndex = i
+    }
+    if (dinnerIndex === -1 && (act.includes('晚餐') || act.match(/^dinner[：:]/i))) {
+      dinnerIndex = i
+    }
+  }
+
+  // 分配活動
+  const morningItems: string[] = []
+  const afternoonItems: string[] = []
+  const eveningItems: string[] = []
+
+  for (let i = 0; i < activities.length; i++) {
+    const act = activities[i]
+
+    // 晚餐和住宿固定放晚上
+    if (isEveningOnly(act)) {
+      eveningItems.push(act)
+      continue
+    }
+
+    if (lunchIndex !== -1) {
+      // 有午餐的情況
+      if (i < lunchIndex) {
+        morningItems.push(act)
+      } else if (i === lunchIndex) {
+        // 午餐本身可以放午，或不放（因為有 lunch 欄位）
+        continue
+      } else if (dinnerIndex !== -1 && i >= dinnerIndex) {
+        eveningItems.push(act)
+      } else {
+        afternoonItems.push(act)
+      }
+    } else {
+      // 沒有午餐的情況：自動分配
+      if (dinnerIndex !== -1 && i >= dinnerIndex) {
+        eveningItems.push(act)
+      } else {
+        // 計算應該放在早上還是下午
+        // 晚餐前的活動，前半放早上，後半放下午
+        const beforeDinner = dinnerIndex !== -1 ? dinnerIndex : activities.length
+        const midPoint = Math.ceil(beforeDinner / 2)
+
+        if (i < midPoint) {
+          morningItems.push(act)
+        } else {
+          afternoonItems.push(act)
+        }
+      }
+    }
+  }
+
+  result.morning = morningItems.join('\n')
+  result.afternoon = afternoonItems.join('\n')
+  result.evening = eveningItems.join('\n')
+
+  return result
 }
 
 /**
@@ -152,8 +204,8 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
   const detectedYear = year || currentYear
 
   let currentDay: ParsedDay | null = null
-  let currentSection: 'morning' | 'afternoon' | 'evening' = 'morning'
   let dayRawLines: string[] = []
+  let dayActivities: string[] = [] // 收集當天所有活動
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -168,8 +220,12 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     // 檢查是否為日期行
     const dateInfo = parseDateLine(trimmedLine, detectedYear)
     if (dateInfo) {
-      // 儲存前一天
+      // 儲存前一天（先分配活動到時段）
       if (currentDay) {
+        const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
+        currentDay.morning = distributed.morning
+        currentDay.afternoon = distributed.afternoon
+        currentDay.evening = distributed.evening
         currentDay.rawText = dayRawLines.join('\n')
         days.push(currentDay)
       }
@@ -186,8 +242,8 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
         activities: [],
         rawText: '',
       }
-      currentSection = 'morning'
       dayRawLines = [line]
+      dayActivities = []
       continue
     }
 
@@ -207,18 +263,13 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     // 檢查是否為餐點行
     const meal = parseMealLine(trimmedLine)
     if (meal) {
-      if (meal.type === 'breakfast') {
-        // 早餐後還是早上
-        currentSection = 'morning'
-      } else if (meal.type === 'lunch' || meal.type === 'afternoon_tea') {
+      if (meal.type === 'lunch' || meal.type === 'afternoon_tea') {
         currentDay.lunch = meal.content
-        currentSection = 'afternoon'
       } else if (meal.type === 'dinner') {
         currentDay.dinner = meal.content
-        currentSection = 'evening'
       }
-
-      // 也加入活動列表
+      // 餐點也加入活動列表（用於分配判斷）
+      dayActivities.push(trimmedLine)
       currentDay.activities.push({ content: trimmedLine })
       continue
     }
@@ -226,51 +277,24 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     // 檢查是否為活動行
     if (isActivityLine(trimmedLine)) {
       const content = cleanActivityContent(trimmedLine)
-
-      // 根據關鍵字判斷時段
-      const detectedSlot = detectTimeSlot(content)
-      if (detectedSlot) {
-        currentSection = detectedSlot
-      }
-
-      // 加入對應時段
-      if (currentSection === 'morning') {
-        currentDay.morning += (currentDay.morning ? '\n' : '') + content
-      } else if (currentSection === 'afternoon') {
-        currentDay.afternoon += (currentDay.afternoon ? '\n' : '') + content
-      } else {
-        currentDay.evening += (currentDay.evening ? '\n' : '') + content
-      }
-
-      // 也加入活動列表（給 PDF 用）
+      dayActivities.push(content)
       currentDay.activities.push({ content })
       continue
     }
 
-    // 其他行視為備註，加到當前時段
+    // 其他行視為備註
     if (trimmedLine) {
-      // 根據關鍵字判斷時段
-      const detectedSlot = detectTimeSlot(trimmedLine)
-      if (detectedSlot) {
-        currentSection = detectedSlot
-      }
-
-      // 加入活動列表
+      dayActivities.push(trimmedLine)
       currentDay.activities.push({ content: trimmedLine })
-
-      // 也加到當前時段（作為備註）
-      if (currentSection === 'morning') {
-        currentDay.morning += (currentDay.morning ? '\n' : '') + trimmedLine
-      } else if (currentSection === 'afternoon') {
-        currentDay.afternoon += (currentDay.afternoon ? '\n' : '') + trimmedLine
-      } else {
-        currentDay.evening += (currentDay.evening ? '\n' : '') + trimmedLine
-      }
     }
   }
 
   // 儲存最後一天
   if (currentDay) {
+    const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
+    currentDay.morning = distributed.morning
+    currentDay.afternoon = distributed.afternoon
+    currentDay.evening = distributed.evening
     currentDay.rawText = dayRawLines.join('\n')
     days.push(currentDay)
   }
