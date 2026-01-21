@@ -1,7 +1,7 @@
 // src/sanity/actions/syncFromTextAction.tsx
-import { SyncIcon } from '@sanity/icons'
+import { SyncIcon, HelpCircleIcon, ChevronDownIcon, ChevronUpIcon } from '@sanity/icons'
 import { Button, Box, Text, Stack, Card, Flex, Badge } from '@sanity/ui'
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { DocumentActionProps, useDocumentOperation } from 'sanity'
 import {
   parseItineraryText,
@@ -18,6 +18,7 @@ export function syncFromTextAction(props: DocumentActionProps) {
   const { patch } = useDocumentOperation(id, type)
   const [isOpen, setIsOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
 
   // 使用 refs 來存儲 textarea 的值，避免 re-render 導致游標跳轉
   const basicTextRef = useRef<HTMLTextAreaElement>(null)
@@ -256,8 +257,41 @@ https://tdac.immigration.go.th/arrival-card/#/home
           <Stack space={4}>
             <Card padding={3} tone="primary" border>
               <Text size={1}>
-                直接編輯下方三個區塊，完成後點「同步更新」會重新解析並更新所有欄位。
+                直接編輯下方四個區塊，完成後點「同步更新」會重新解析並更新所有欄位。
               </Text>
+            </Card>
+
+            <Card
+              padding={3}
+              tone="transparent"
+              border
+              style={{ cursor: 'pointer' }}
+              onClick={() => setShowHelp(!showHelp)}
+            >
+              <Flex align="center" justify="space-between">
+                <Flex align="center" gap={2}>
+                  <HelpCircleIcon />
+                  <Text size={1} weight="semibold">編輯提示：接機/送機怎麼寫？</Text>
+                </Flex>
+                {showHelp ? <ChevronUpIcon /> : <ChevronDownIcon />}
+              </Flex>
+              {showHelp && (
+                <Box marginTop={3} style={{ fontSize: '12px', lineHeight: '1.6' }}>
+                  <Text size={1} style={{ marginBottom: '8px' }}>
+                    <strong>口訣：抵達後能吃什麼就寫什麼，起飛前能吃什麼就寫什麼，沒寫的 PDF 自動隱藏</strong>
+                  </Text>
+                  <Box marginTop={2} style={{ background: '#f5f5f5', padding: '8px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '11px' }}>
+                    <div><strong>接機日 (Day 1)</strong></div>
+                    <div>• 早班 10:30 抵達 → 寫午餐、晚餐、住宿</div>
+                    <div>• 午班 16:20 抵達 → 跳過午餐，寫晚餐、住宿</div>
+                    <div>• 晚班 21:45 抵達 → 只寫住宿</div>
+                    <div style={{ marginTop: '8px' }}><strong>送機日 (最後一天)</strong></div>
+                    <div>• 早班 11:20 起飛 → 不寫午餐/晚餐/住宿</div>
+                    <div>• 午班 17:20 起飛 → 可寫午餐</div>
+                    <div>• 紅眼 01:40 起飛 → 寫午餐、晚餐</div>
+                  </Box>
+                </Box>
+              )}
             </Card>
 
             <Box>
