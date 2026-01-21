@@ -6,7 +6,6 @@ import { structure } from './src/sanity/structure'
 import { exportPdfAction } from './src/sanity/actions/exportPdfAction'
 import { exportExcelAction } from './src/sanity/actions/exportExcelAction'
 import { exportTextAction } from './src/sanity/actions/exportTextAction'
-import { duplicateItineraryAction } from './src/sanity/actions/duplicateItineraryAction'
 import { syncFromTextAction } from './src/sanity/actions/syncFromTextAction'
 
 export default defineConfig({
@@ -23,8 +22,7 @@ export default defineConfig({
       if (context.schemaType === 'itinerary') {
         return [
           ...prev,
-          syncFromTextAction,    // 編輯行程文字（更新行程用）
-          duplicateItineraryAction, // 複製行程
+          syncFromTextAction,    // 文字編輯
           exportTextAction,      // 匯出 LINE 文字
           exportPdfAction,       // 匯出 PDF
           exportExcelAction,     // 匯出 Excel

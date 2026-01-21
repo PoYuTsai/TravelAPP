@@ -8,7 +8,6 @@ export default defineType({
   type: 'document',
   groups: [
     { name: 'basic', title: '基本資訊', default: true },
-    { name: 'rawText', title: '行程文字' },
     { name: 'days', title: '每日行程' },
     { name: 'hotels', title: '住宿安排' },
     { name: 'quotation', title: '報價明細' },
@@ -105,14 +104,12 @@ export default defineType({
       description: '例：中英泰導遊 1位',
     }),
 
-    // === 行程文字（原始記事本格式）===
+    // === 行程原始文字（隱藏欄位，供備份用）===
     defineField({
       name: 'rawItineraryText',
       title: '行程原始文字',
       type: 'text',
-      group: 'rawText',
-      rows: 20,
-      description: '貼上你的記事本格式行程，可用「匯入文字」功能自動解析到每日行程',
+      hidden: true,
     }),
 
     // === 每日行程 ===

@@ -174,14 +174,14 @@ export function syncFromTextAction(props: DocumentActionProps) {
   }, [basicText, itineraryText, quotationText, year, patch, handleClose])
 
   return {
-    label: '編輯行程文字',
+    label: '文字編輯',
     icon: SyncIcon,
     disabled: !hasDays,
-    title: hasDays ? '編輯行程文字並同步更新' : '請先用「快速建立」建立行程',
+    title: hasDays ? '用文字方式編輯所有資料' : '請先用「快速建立」建立行程',
     onHandle: handleOpen,
     dialog: isOpen && {
       type: 'dialog',
-      header: '編輯行程文字',
+      header: '文字編輯',
       content: (
         <Box padding={4} style={{ maxHeight: '80vh', overflow: 'auto' }}>
           <Stack space={4}>

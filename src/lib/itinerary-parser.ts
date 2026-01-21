@@ -613,10 +613,6 @@ export function sanityToLineText(itinerary: {
 
   const lines: string[] = []
 
-  if (itinerary.clientName) {
-    lines.push(`【${itinerary.clientName} 行程】\n`)
-  }
-
   itinerary.days.forEach((day, index) => {
     const date = new Date(day.date)
     const month = date.getMonth() + 1
