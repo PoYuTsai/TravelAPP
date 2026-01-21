@@ -1,11 +1,15 @@
 // src/app/api/itinerary/[id]/pdf/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import puppeteer from 'puppeteer'
+import puppeteerCore from 'puppeteer-core'
+import chromium from '@sparticuz/chromium'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryHTML } from '@/lib/pdf/itinerary-template'
 
 // 禁用 Next.js 路由快取，確保每次都取得最新資料
 export const dynamic = 'force-dynamic'
+
+// Vercel serverless 需要更長的執行時間
+export const maxDuration = 30
 
 export async function GET(
   request: NextRequest,
@@ -21,7 +25,6 @@ export async function GET(
     console.log('=== PDF Debug ===')
     console.log('Document ID:', id)
     console.log('Days count:', itinerary?.days?.length)
-    console.log('Days:', JSON.stringify(itinerary?.days?.map((d: any) => ({ date: d.date, title: d.title })), null, 2))
 
     if (!itinerary) {
       return NextResponse.json(
@@ -33,10 +36,12 @@ export async function GET(
     // 產生 HTML
     const html = generateItineraryHTML(itinerary)
 
-    // 使用 Puppeteer 產生 PDF
-    const browser = await puppeteer.launch({
+    // 使用 Puppeteer 產生 PDF (支援 Vercel serverless)
+    const browser = await puppeteerCore.launch({
+      args: chromium.args,
+      defaultViewport: { width: 1200, height: 800 },
+      executablePath: await chromium.executablePath(),
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     })
 
     const page = await browser.newPage()
