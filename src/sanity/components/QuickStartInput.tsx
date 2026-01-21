@@ -145,6 +145,13 @@ export function QuickStartInput(props: any) {
         evening: day.evening || '',
         lunch: day.lunch || '',
         dinner: day.dinner || '',
+        // PDF 用的詳細活動列表
+        activities: day.activities?.map((act, actIndex) => ({
+          _key: `act-${index}-${actIndex}-${Date.now()}`,
+          _type: 'activity',
+          time: act.time || '',
+          content: act.content,
+        })) || [],
       }))
 
       // 轉換報價成 Sanity 格式
