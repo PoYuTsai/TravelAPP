@@ -672,14 +672,19 @@ export function sanityToLineText(itinerary: {
       lines.push(`晚餐：${day.dinner}`)
     }
 
-    // 晚上
+    // 晚上（過濾掉住宿，因為會獨立輸出）
     if (day.evening) {
       day.evening.split('\n').forEach((line) => {
-        if (line.trim()) lines.push(`・${line.trim()}`)
+        const trimmed = line.trim()
+        // 跳過住宿相關內容
+        if (!trimmed || /^[・\-•·]?\s*(住宿|accommodation|hotel)[：:]/i.test(trimmed)) return
+        // 移除開頭的符號再加上統一符號
+        const cleaned = trimmed.replace(/^[・\-•·]\s*/, '')
+        if (cleaned) lines.push(`・${cleaned}`)
       })
     }
 
-    // 住宿
+    // 住宿（獨立輸出）
     if (day.accommodation) {
       lines.push(`・住宿: ${day.accommodation}`)
     }

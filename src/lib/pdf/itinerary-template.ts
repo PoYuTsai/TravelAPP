@@ -353,9 +353,10 @@ export function generateItineraryHTML(data: ItineraryData): string {
             ${day.activities
               .filter((act) => {
                 // 過濾掉餐點和住宿（這些會在下方摘要顯示）
-                const content = act.content.toLowerCase()
-                const isMeal = /^(午餐|晚餐|中餐|早餐|lunch|dinner|breakfast)[：:]/.test(act.content)
-                const isAccommodation = /^(住宿|accommodation|hotel)[：:]/.test(act.content)
+                // 移除開頭可能的符號再比對
+                const cleaned = act.content.replace(/^[・\-•·]\s*/, '')
+                const isMeal = /^(午餐|晚餐|中餐|早餐|lunch|dinner|breakfast)[：:]/i.test(cleaned)
+                const isAccommodation = /^(住宿|accommodation|hotel)[：:]/i.test(cleaned)
                 return !isMeal && !isAccommodation
               })
               .map((act) => `
