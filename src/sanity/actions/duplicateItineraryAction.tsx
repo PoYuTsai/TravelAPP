@@ -30,7 +30,7 @@ export function duplicateItineraryAction(props: DocumentActionProps) {
         const newId = `drafts.${crypto.randomUUID().slice(0, 8)}`
 
         // 複製文件，修改客戶名稱
-        const newDoc = {
+        const newDoc: Record<string, any> = {
           ...doc,
           _id: newId,
           _type: 'itinerary',
