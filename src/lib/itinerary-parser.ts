@@ -91,6 +91,48 @@ function isActivityLine(line: string): boolean {
 }
 
 /**
+ * 判斷活動內容應該屬於哪個時段
+ * 根據關鍵字判斷
+ */
+function detectTimeSlot(content: string): 'morning' | 'afternoon' | 'evening' | null {
+  const lower = content.toLowerCase()
+
+  // 晚上關鍵字
+  const eveningKeywords = [
+    '夜間', '夜市', '晚上', '夜景', '夜遊', '晚餐', 'dinner',
+    '日落', 'sunset', '夕陽', 'bar', 'pub', '酒吧',
+  ]
+  for (const kw of eveningKeywords) {
+    if (content.includes(kw) || lower.includes(kw)) {
+      return 'evening'
+    }
+  }
+
+  // 下午關鍵字
+  const afternoonKeywords = [
+    '下午', '午後', '下午茶', 'afternoon', 'tea time',
+  ]
+  for (const kw of afternoonKeywords) {
+    if (content.includes(kw) || lower.includes(kw)) {
+      return 'afternoon'
+    }
+  }
+
+  // 早上關鍵字
+  const morningKeywords = [
+    '早上', '早餐', '上午', '早晨', 'morning', 'breakfast',
+    '機場接機', '接機',
+  ]
+  for (const kw of morningKeywords) {
+    if (content.includes(kw) || lower.includes(kw)) {
+      return 'morning'
+    }
+  }
+
+  return null // 無法判斷
+}
+
+/**
  * 清理活動內容
  */
 function cleanActivityContent(line: string): string {
@@ -185,6 +227,12 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     if (isActivityLine(trimmedLine)) {
       const content = cleanActivityContent(trimmedLine)
 
+      // 根據關鍵字判斷時段
+      const detectedSlot = detectTimeSlot(content)
+      if (detectedSlot) {
+        currentSection = detectedSlot
+      }
+
       // 加入對應時段
       if (currentSection === 'morning') {
         currentDay.morning += (currentDay.morning ? '\n' : '') + content
@@ -201,6 +249,12 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
 
     // 其他行視為備註，加到當前時段
     if (trimmedLine) {
+      // 根據關鍵字判斷時段
+      const detectedSlot = detectTimeSlot(trimmedLine)
+      if (detectedSlot) {
+        currentSection = detectedSlot
+      }
+
       // 加入活動列表
       currentDay.activities.push({ content: trimmedLine })
 
