@@ -367,11 +367,13 @@ export function generateItineraryHTML(data: ItineraryData): string {
             `).join('')}
           </div>
         ` : ''}
+        ${(day.lunch || day.dinner || day.accommodation) ? `
         <div class="meals">
-          <div><span class="meal-label">午餐：</span>${day.lunch || ''}</div>
-          <div><span class="meal-label">晚餐：</span>${day.dinner || ''}</div>
-          <div><span class="meal-label">住宿：</span>${day.accommodation || ''}</div>
+          ${day.lunch ? `<div><span class="meal-label">午餐：</span>${day.lunch}</div>` : ''}
+          ${day.dinner ? `<div><span class="meal-label">晚餐：</span>${day.dinner}</div>` : ''}
+          ${day.accommodation ? `<div><span class="meal-label">住宿：</span>${day.accommodation}</div>` : ''}
         </div>
+        ` : ''}
       </div>
     `).join('')}
   </div>
