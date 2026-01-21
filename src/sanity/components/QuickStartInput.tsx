@@ -19,13 +19,13 @@ const ITINERARY_TEMPLATE = `2/12 (四)
 Day 1｜抵達清邁・放鬆展開旅程
 ・機場接機 (CI851 7:20-10:35)
 ・巫宗雄換匯
-午餐：Neng earthn jar roast pork (外帶一份)
+午餐：Neng earthn jar roast pork
 ・泰服拍攝體驗
-・下午茶: 順路去買 阿嬤芒果糯米飯
-按摩推薦: (Peak Spa & Beauty Salon)
+・下午茶: 阿嬤芒果糯米飯
+・按摩推薦: (Peak Spa & Beauty Salon)
 ・夜間動物園
 晚餐: 黑森林餐廳
-・住宿
+・住宿: Nimman Villa 17 Chiangmai - SHA PLUS
 
 2/13 (五)
 Day 2｜湄康蓬村一日
@@ -33,10 +33,10 @@ Day 2｜湄康蓬村一日
 ・湄康蓬村 Mae Kampong Village
 ・Mae Kampong Waterfall
 ・村內咖啡館Lung Pud Pa Peng Coffee
-午餐: Thanthong restaurant
+午餐：Thanthong restaurant
 ・可可果園Skugga Estate
-・清邁大學夜市
-・住宿
+晚餐: 清邁大學夜市
+・住宿: Nimman Villa 17 Chiangmai - SHA PLUS
 
 2/14 (六)
 Day 3｜湄林一日
@@ -46,18 +46,18 @@ Day 3｜湄林一日
 ・phoenix adventure park
 ・豬豬農場
 晚餐：River View Bar
-・住宿
+・住宿: Victoria Nimman Hotel
 
 2/15 (日)
 Day 4｜市集一日(周末限定)
 ・真心市集
 ・椰林市集
-午餐: The Chef
+午餐：The Chef
 ・下午茶: 100種冰淇淋
 ・藝術村 Baan Kang Wat
 ・瓦洛落市場
-晚餐：Sai Ping Bar & Restaurant
-・住宿
+晚餐: Sai Ping Bar & Restaurant
+・住宿: Victoria Nimman Hotel
 
 2/16 (一)
 Day 5｜清萊一日
@@ -65,20 +65,19 @@ Day 5｜清萊一日
 ・白廟
 午餐: 仙境咖啡廳
 ・長頸村
-回程
 晚餐: CHUM Northern Kitchen @Old City
-・住宿
+・住宿: Victoria Nimman Hotel
 
 2/17 (二)
 Day 6｜湄登一日
 ・大象保護營
 午餐：營區道地泰式
-・天使瀑布Dantewada
+・天使瀑布 Dantewada
 ・清邁藍廟 Wat Den Sali Sri Muang Kaen
 ・Maya百貨
 ・One 尼曼市集
 晚餐: Ekachan The Wisdom of Ethnic Thai Cuisine
-・住宿
+・住宿: Victoria Nimman Hotel
 
 2/18 (三)
 Day 7｜收心慢遊・送機回國
@@ -145,6 +144,7 @@ export function QuickStartInput(props: any) {
         evening: day.evening || '',
         lunch: day.lunch || '',
         dinner: day.dinner || '',
+        accommodation: day.accommodation || '',
         // PDF 用的詳細活動列表
         activities: day.activities?.map((act, actIndex) => ({
           _key: `act-${index}-${actIndex}-${Date.now()}`,

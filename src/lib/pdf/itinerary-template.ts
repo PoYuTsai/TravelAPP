@@ -208,21 +208,15 @@ export function generateItineraryHTML(data: ItineraryData): string {
       padding-top: 3mm;
       border-top: 1px dashed #ddd;
       display: flex;
-      gap: 15mm;
+      flex-direction: column;
+      gap: 1.5mm;
       font-size: 13px;
     }
 
     .meal-label {
       color: #666;
-    }
-
-    .accommodation {
-      margin-top: 3mm;
-      font-size: 13px;
-    }
-
-    .accommodation-label {
-      color: #666;
+      display: inline-block;
+      min-width: 12mm;
     }
 
     /* 費用說明 */
@@ -364,17 +358,11 @@ export function generateItineraryHTML(data: ItineraryData): string {
             `).join('')}
           </div>
         ` : ''}
-        ${day.lunch || day.dinner ? `
-          <div class="meals">
-            ${day.lunch ? `<div><span class="meal-label">午餐：</span>${day.lunch}</div>` : ''}
-            ${day.dinner ? `<div><span class="meal-label">晚餐：</span>${day.dinner}</div>` : ''}
-          </div>
-        ` : ''}
-        ${day.accommodation ? `
-          <div class="accommodation">
-            <span class="accommodation-label">住宿：</span>${day.accommodation}
-          </div>
-        ` : ''}
+        <div class="meals">
+          <div><span class="meal-label">午餐：</span>${day.lunch || ''}</div>
+          <div><span class="meal-label">晚餐：</span>${day.dinner || ''}</div>
+          <div><span class="meal-label">住宿：</span>${day.accommodation || ''}</div>
+        </div>
       </div>
     `).join('')}
   </div>

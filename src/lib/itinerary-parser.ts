@@ -15,6 +15,7 @@ export interface ParsedDay {
   evening: string
   lunch?: string
   dinner?: string
+  accommodation?: string // 住宿
   activities: ParsedActivity[]
   rawText: string // 保留原始文字
 }
@@ -79,6 +80,19 @@ function parseMealLine(line: string): { type: 'breakfast' | 'lunch' | 'dinner' |
     return { type: 'afternoon_tea', content: trimmed.replace(/^(下午茶|afternoon tea)[：:]\s*/i, '') }
   }
 
+  return null
+}
+
+/**
+ * 判斷是否為住宿行
+ */
+function parseAccommodationLine(line: string): string | null {
+  const trimmed = line.trim()
+  // 支援 "住宿: xxx" 或 "・住宿: xxx" 格式
+  const match = trimmed.match(/^[・\-•·]?\s*(住宿|accommodation|hotel)[：:]\s*(.+)/i)
+  if (match) {
+    return match[2].trim()
+  }
   return null
 }
 
@@ -269,6 +283,16 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
         currentDay.dinner = meal.content
       }
       // 餐點也加入活動列表（用於分配判斷）
+      dayActivities.push(trimmedLine)
+      currentDay.activities.push({ content: trimmedLine })
+      continue
+    }
+
+    // 檢查是否為住宿行
+    const accommodation = parseAccommodationLine(trimmedLine)
+    if (accommodation) {
+      currentDay.accommodation = accommodation
+      // 住宿也加入活動列表
       dayActivities.push(trimmedLine)
       currentDay.activities.push({ content: trimmedLine })
       continue
@@ -603,6 +627,7 @@ export function sanityToLineText(itinerary: {
     evening?: string
     lunch?: string
     dinner?: string
+    accommodation?: string
   }>
 }): string {
   if (!itinerary.days || itinerary.days.length === 0) {
@@ -651,6 +676,11 @@ export function sanityToLineText(itinerary: {
       day.evening.split('\n').forEach((line) => {
         if (line.trim()) lines.push(`・${line.trim()}`)
       })
+    }
+
+    // 住宿
+    if (day.accommodation) {
+      lines.push(`・住宿: ${day.accommodation}`)
     }
 
     lines.push('') // 空行分隔

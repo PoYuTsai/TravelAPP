@@ -1,7 +1,7 @@
 // src/sanity/actions/syncFromTextAction.tsx
 import { SyncIcon } from '@sanity/icons'
-import { Button, Box, Text, TextArea, Stack, Card, Flex, Badge } from '@sanity/ui'
-import { useState, useCallback } from 'react'
+import { Button, Box, Text, Stack, Card, Flex, Badge } from '@sanity/ui'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { DocumentActionProps, useDocumentOperation } from 'sanity'
 import {
   parseItineraryText,
@@ -17,9 +17,39 @@ export function syncFromTextAction(props: DocumentActionProps) {
   const { patch } = useDocumentOperation(id, type)
   const [isOpen, setIsOpen] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [basicText, setBasicText] = useState('')
-  const [itineraryText, setItineraryText] = useState('')
-  const [quotationText, setQuotationText] = useState('')
+
+  // 使用 refs 來存儲 textarea 的值，避免 re-render 導致游標跳轉
+  const basicTextRef = useRef<HTMLTextAreaElement>(null)
+  const itineraryTextRef = useRef<HTMLTextAreaElement>(null)
+  const quotationTextRef = useRef<HTMLTextAreaElement>(null)
+  const notesTextRef = useRef<HTMLTextAreaElement>(null)
+
+  // 初始值狀態（只在打開 dialog 時設定一次）
+  const [initialBasicText, setInitialBasicText] = useState('')
+  const [initialItineraryText, setInitialItineraryText] = useState('')
+  const [initialQuotationText, setInitialQuotationText] = useState('')
+  const [initialNotesText, setInitialNotesText] = useState('')
+
+  // 備註預設模板
+  const defaultNotesTemplate = `包含: 油費、停車費、過路費、外地住宿補貼、泰國旅遊保險
+用車時間: 清邁10小時; 清萊12小時，超時再麻煩補給司機200/hr
+小費看服務跟心意，不強制~ (有給的話司機跟導遊會很開心)
+
+不包含: 門票、餐費、機票跟飯店、小費、個人花費
+
+導遊會全程照顧大家，包含景點文化導覽、餐廳推薦點菜
+我們也會全程在群組線上中文協助，幫忙預訂餐廳，協助一些意外狀況
+門票費用跟餐費可以根據預算讓導遊處理
+例如: 第一天換錢後先給導遊20000泰銖，交代用餐口味偏好
+(如:不吃海鮮，牛肉，菜色不要太辣等等)
+每一筆都會請她記錄，多退少補，這樣後續大家算錢會比較簡單跟清楚
+
+**溫馨提醒**
+1.泰國入境的規定是每人至少攜帶20000塊(每組家庭40000塊)的等值泰銖(也可以是台幣或美金)，雖然不一定會被抽查，建議還是遵守相關規定!)
+2.清邁最好的巫宗雄匯率: 截至2026/1/20最新 (泰銖:台幣=1:0.98)
+3.入境要填TDAC (出國3天前先填好)
+https://tdac.immigration.go.th/arrival-card/#/home
+4.清邁12~2月早晚溫差大，建議攜帶一件薄外套`
 
   // 只在 itinerary 類型顯示
   if (type !== 'itinerary') return null
@@ -62,11 +92,17 @@ export function syncFromTextAction(props: DocumentActionProps) {
       ? sanityToQuotationText(quotationItems, doc?.quotationTotal as number)
       : ''
 
-    setBasicText(generatedBasic)
-    setItineraryText(generatedItinerary)
-    setQuotationText(generatedQuotation)
+    // 備註：從現有欄位組合，或使用預設模板
+    const existingNotes = doc?.travelRemarks as string | undefined
+    const generatedNotes = existingNotes || defaultNotesTemplate
+
+    // 設定初始值（這些值會在 dialog 渲染時設定到 textarea）
+    setInitialBasicText(generatedBasic)
+    setInitialItineraryText(generatedItinerary)
+    setInitialQuotationText(generatedQuotation)
+    setInitialNotesText(generatedNotes)
     setIsOpen(true)
-  }, [doc, hasDays, existingDays])
+  }, [doc, hasDays, existingDays, defaultNotesTemplate])
 
   const handleClose = useCallback(() => {
     setIsOpen(false)
@@ -74,6 +110,12 @@ export function syncFromTextAction(props: DocumentActionProps) {
   }, [])
 
   const handleSync = useCallback(() => {
+    // 從 refs 取得當前值
+    const basicText = basicTextRef.current?.value || ''
+    const itineraryText = itineraryTextRef.current?.value || ''
+    const quotationText = quotationTextRef.current?.value || ''
+    const notesText = notesTextRef.current?.value || ''
+
     if (!itineraryText.trim()) {
       alert('請填入行程內容')
       return
@@ -111,6 +153,7 @@ export function syncFromTextAction(props: DocumentActionProps) {
         evening: day.evening || '',
         lunch: day.lunch || '',
         dinner: day.dinner || '',
+        accommodation: day.accommodation || '',
         activities: day.activities.map((act, i) => ({
           _key: `act-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
           _type: 'activity',
@@ -160,6 +203,11 @@ export function syncFromTextAction(props: DocumentActionProps) {
         updates.endDate = itineraryResult.days[itineraryResult.days.length - 1].date
       }
 
+      // 備註
+      if (notesText.trim()) {
+        updates.travelRemarks = notesText
+      }
+
       patch.execute([{ set: updates }])
 
       setTimeout(() => {
@@ -171,7 +219,7 @@ export function syncFromTextAction(props: DocumentActionProps) {
       alert('同步失敗，請檢查文字格式')
       setIsSyncing(false)
     }
-  }, [basicText, itineraryText, quotationText, year, patch, handleClose])
+  }, [year, patch, handleClose])
 
   return {
     label: '文字編輯',
@@ -196,11 +244,19 @@ export function syncFromTextAction(props: DocumentActionProps) {
                 <Badge tone="primary">1</Badge>
                 <Text size={2} weight="semibold">基本資訊</Text>
               </Flex>
-              <TextArea
-                value={basicText}
-                onChange={(e) => setBasicText(e.currentTarget.value)}
+              <textarea
+                ref={basicTextRef}
+                defaultValue={initialBasicText}
                 rows={7}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  resize: 'vertical',
+                }}
               />
             </Box>
 
@@ -209,11 +265,19 @@ export function syncFromTextAction(props: DocumentActionProps) {
                 <Badge tone="primary">2</Badge>
                 <Text size={2} weight="semibold">行程內容</Text>
               </Flex>
-              <TextArea
-                value={itineraryText}
-                onChange={(e) => setItineraryText(e.currentTarget.value)}
+              <textarea
+                ref={itineraryTextRef}
+                defaultValue={initialItineraryText}
                 rows={20}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  resize: 'vertical',
+                }}
               />
             </Box>
 
@@ -222,11 +286,40 @@ export function syncFromTextAction(props: DocumentActionProps) {
                 <Badge tone="primary">3</Badge>
                 <Text size={2} weight="semibold">報價明細</Text>
               </Flex>
-              <TextArea
-                value={quotationText}
-                onChange={(e) => setQuotationText(e.currentTarget.value)}
+              <textarea
+                ref={quotationTextRef}
+                defaultValue={initialQuotationText}
                 rows={8}
-                style={{ fontFamily: 'monospace', fontSize: '12px' }}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  resize: 'vertical',
+                }}
+              />
+            </Box>
+
+            <Box>
+              <Flex align="center" gap={2} marginBottom={2}>
+                <Badge tone="primary">4</Badge>
+                <Text size={2} weight="semibold">備註</Text>
+              </Flex>
+              <textarea
+                ref={notesTextRef}
+                defaultValue={initialNotesText}
+                rows={15}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: '12px',
+                  width: '100%',
+                  padding: '8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  resize: 'vertical',
+                }}
               />
             </Box>
 
@@ -235,7 +328,7 @@ export function syncFromTextAction(props: DocumentActionProps) {
                 text={isSyncing ? '同步中...' : '同步更新'}
                 tone="positive"
                 onClick={handleSync}
-                disabled={!itineraryText.trim() || isSyncing}
+                disabled={isSyncing}
               />
               <Button
                 text="取消"

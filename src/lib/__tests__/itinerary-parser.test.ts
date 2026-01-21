@@ -338,7 +338,7 @@ describe('sanityToLineText', () => {
     }
 
     const result = sanityToLineText(itinerary)
-    expect(result).toContain('【王小明 行程】')
+    // 標題行已移除，直接開始行程
     expect(result).toContain('2/12 (四)')
     expect(result).toContain('Day 1｜抵達清邁')
     expect(result).toContain('・機場接機')
