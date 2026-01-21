@@ -123,7 +123,7 @@ export default defineType({
       group: 'days',
       validation: (Rule) => [
         // 錯誤檢查：日期順序和重複
-        Rule.custom((days) => {
+        Rule.custom((days: any[] | undefined) => {
           if (!days || days.length < 2) return true
 
           // 檢查日期是否按順序遞增

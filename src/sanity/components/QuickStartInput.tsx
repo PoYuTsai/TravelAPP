@@ -184,7 +184,7 @@ export function QuickStartInput(props: any) {
       }
 
       // 使用 createOrReplace 處理新文件
-      await client.createOrReplace(doc)
+      await client.createOrReplace(doc as any)
 
       setIsOpen(false)
       setIsProcessing(false)
