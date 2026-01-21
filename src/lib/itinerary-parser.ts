@@ -662,3 +662,100 @@ export function sanityToLineText(itinerary: {
 
   return lines.join('\n')
 }
+
+/**
+ * 從 Sanity 資料格式轉成基本資訊文字
+ */
+export function sanityToBasicInfoText(data: {
+  clientName?: string
+  startDate?: string
+  endDate?: string
+  adults?: number
+  children?: number
+  childrenAges?: string
+  totalPeople?: number
+  luggageNote?: string
+  vehicleNote?: string
+  guideNote?: string
+}): string {
+  const lines: string[] = []
+
+  if (data.clientName) {
+    lines.push(`客戶姓名: ${data.clientName}`)
+  }
+
+  if (data.startDate && data.endDate) {
+    const start = new Date(data.startDate)
+    const end = new Date(data.endDate)
+    const startStr = `${start.getFullYear()}/${start.getMonth() + 1}/${start.getDate()}`
+    const endStr = `${end.getMonth() + 1}/${end.getDate()}`
+    lines.push(`日期: ${startStr}~${endStr}`)
+  }
+
+  if (data.adults || data.children) {
+    let peopleStr = ''
+    if (data.adults) peopleStr += `成人${data.adults}`
+    if (data.children) {
+      peopleStr += ` 小朋友${data.children}`
+      if (data.childrenAges) peopleStr += ` (${data.childrenAges})`
+    }
+    lines.push(`人數: ${data.totalPeople || (data.adults || 0) + (data.children || 0)}人`)
+    lines.push(peopleStr)
+  }
+
+  if (data.luggageNote) {
+    lines.push(`行李: ${data.luggageNote}`)
+  }
+
+  if (data.vehicleNote) {
+    lines.push(`包車: ${data.vehicleNote}`)
+  }
+
+  if (data.guideNote) {
+    lines.push(`導遊: ${data.guideNote}`)
+  }
+
+  return lines.join('\n')
+}
+
+/**
+ * 從 Sanity 資料格式轉成報價文字
+ */
+export function sanityToQuotationText(items: Array<{
+  date?: string
+  description: string
+  unitPrice: number
+  quantity: number
+  unit?: string
+}>, total?: number): string {
+  const lines: string[] = []
+
+  items.forEach((item) => {
+    let line = ''
+
+    // 有日期的項目
+    if (item.date) {
+      const date = new Date(item.date)
+      const month = date.getMonth() + 1
+      const day = date.getDate()
+      line += `${month}/${day} `
+    }
+
+    line += item.description
+
+    // 有數量的項目
+    if (item.quantity > 1) {
+      line += ` ${item.unitPrice}*${item.quantity}${item.unit || '天'}`
+    } else {
+      line += ` ${item.unitPrice}`
+    }
+
+    lines.push(line)
+  })
+
+  if (total) {
+    lines.push(`小計: ${total}`)
+  }
+
+  return lines.join('\n')
+}
