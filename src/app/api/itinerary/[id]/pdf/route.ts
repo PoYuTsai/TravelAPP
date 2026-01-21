@@ -1,7 +1,7 @@
 // src/app/api/itinerary/[id]/pdf/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import puppeteerCore from 'puppeteer-core'
-import chromium from '@sparticuz/chromium'
+import chromium from '@sparticuz/chromium-min'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryHTML } from '@/lib/pdf/itinerary-template'
 
@@ -10,6 +10,10 @@ export const dynamic = 'force-dynamic'
 
 // Vercel serverless 需要更長的執行時間
 export const maxDuration = 60
+
+// Chromium 下載 URL (使用官方 CDN)
+const CHROMIUM_URL =
+  'https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar'
 
 export async function GET(
   request: NextRequest,
@@ -37,17 +41,13 @@ export async function GET(
     // 產生 HTML
     const html = generateItineraryHTML(itinerary)
 
-    // 取得 executablePath
-    const executablePath = await chromium.executablePath()
+    // 取得 executablePath (從外部 URL 下載)
+    const executablePath = await chromium.executablePath(CHROMIUM_URL)
     console.log('Chromium path:', executablePath)
 
     // 使用 Puppeteer 產生 PDF (支援 Vercel serverless)
     browser = await puppeteerCore.launch({
-      args: [
-        ...chromium.args,
-        '--hide-scrollbars',
-        '--disable-web-security',
-      ],
+      args: chromium.args,
       defaultViewport: { width: 1200, height: 800 },
       executablePath,
       headless: true,
