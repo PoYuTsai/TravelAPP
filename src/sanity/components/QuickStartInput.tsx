@@ -4,7 +4,7 @@ import { Card, Stack, Text, Box, Button, Dialog, TextArea, Flex, Badge } from '@
 import { AddIcon, CheckmarkIcon } from '@sanity/icons'
 import { useFormValue, useDocumentOperation, useClient } from 'sanity'
 import { useState, useCallback } from 'react'
-import { parseBasicInfoText, parseItineraryText, parseQuotationText } from '../../lib/itinerary-parser'
+import { parseBasicInfoText, parseItineraryText, parseQuotationText, generateHotelsFromDays } from '../../lib/itinerary-parser'
 
 // 範例模板
 const BASIC_INFO_TEMPLATE = `客戶姓名: 巧玲(KAI &MINNIE 媽)
@@ -165,6 +165,22 @@ export function QuickStartInput(props: any) {
         unit: item.unit || '台',
       }))
 
+      // 自動產生飯店記錄
+      const hotelsData = generateHotelsFromDays(
+        itineraryResult.days.map((day) => ({
+          date: day.date,
+          accommodation: day.accommodation,
+        }))
+      ).map((hotel, index) => ({
+        _key: `hotel-${index}-${Date.now()}`,
+        _type: 'hotelBooking',
+        hotelName: hotel.hotelName,
+        startDate: hotel.startDate,
+        endDate: hotel.endDate,
+        guests: hotel.guests,
+        color: hotel.color,
+      }))
+
       // 組合完整文件
       const doc: Record<string, any> = {
         _id: documentId,
@@ -188,6 +204,9 @@ export function QuickStartInput(props: any) {
       if (quotationItems.length > 0) {
         doc.quotationItems = quotationItems
         if (quotationResult.total) doc.quotationTotal = quotationResult.total
+      }
+      if (hotelsData.length > 0) {
+        doc.hotels = hotelsData
       }
 
       // 使用 createOrReplace 處理新文件

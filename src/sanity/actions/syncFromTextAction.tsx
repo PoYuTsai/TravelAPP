@@ -10,6 +10,7 @@ import {
   sanityToLineText,
   sanityToBasicInfoText,
   sanityToQuotationText,
+  generateHotelsFromDays,
 } from '../../lib/itinerary-parser'
 
 export function syncFromTextAction(props: DocumentActionProps) {
@@ -195,6 +196,26 @@ https://tdac.immigration.go.th/arrival-card/#/home
       if (quotationItems.length > 0) {
         updates.quotationItems = quotationItems
         if (quotationResult.total) updates.quotationTotal = quotationResult.total
+      }
+
+      // 自動產生飯店記錄
+      const hotelsData = generateHotelsFromDays(
+        itineraryResult.days.map((day) => ({
+          date: day.date,
+          accommodation: day.accommodation,
+        }))
+      ).map((hotel, index) => ({
+        _key: `hotel-${index}-${Date.now()}`,
+        _type: 'hotelBooking',
+        hotelName: hotel.hotelName,
+        startDate: hotel.startDate,
+        endDate: hotel.endDate,
+        guests: hotel.guests,
+        color: hotel.color,
+      }))
+
+      if (hotelsData.length > 0) {
+        updates.hotels = hotelsData
       }
 
       // 同時更新日期範圍（如果基本資訊沒有的話）

@@ -167,7 +167,7 @@ Day 1｜測試
     expect(result.days[0].date).toBe('2026-02-12')
   })
 
-  it('住宿固定放在晚上', () => {
+  it('住宿獨立存放在 accommodation 欄位', () => {
     const text = `2/13 (五)
 Day 2｜湄康蓬村一日
 ・Teen Tok Royal Project
@@ -176,15 +176,17 @@ Day 2｜湄康蓬村一日
 ・村內咖啡館
 ・可可果園Skugga Estate
 ・清邁大學夜市
-・住宿`
+・住宿: Nimman Villa Hotel`
 
     const result = parseItineraryText(text, 2026)
-    expect(result.days[0].evening).toContain('住宿')
+    // 住宿獨立存放，不在早/午/晚欄位
+    expect(result.days[0].accommodation).toBe('Nimman Villa Hotel')
+    expect(result.days[0].evening).not.toContain('住宿')
     expect(result.days[0].morning).not.toContain('住宿')
     expect(result.days[0].afternoon).not.toContain('住宿')
   })
 
-  it('沒有午餐時自動分配早午，住宿放晚', () => {
+  it('沒有午餐時自動分配早午', () => {
     const text = `2/21 (六)
 Day 2｜換錢・市集日
 ・換錢
@@ -193,18 +195,20 @@ Day 2｜換錢・市集日
 ・市集: 真心市集
 ・市集: 白色市集
 晚餐：周六夜市
-・住宿`
+・住宿: Victoria Hotel`
 
     const result = parseItineraryText(text, 2026)
     // 早上應該有活動
     expect(result.days[0].morning).toBeTruthy()
     // 下午應該有活動（自動分配）
     expect(result.days[0].afternoon).toBeTruthy()
-    // 晚上只有晚餐和住宿
-    expect(result.days[0].evening).toContain('住宿')
+    // 住宿獨立存放
+    expect(result.days[0].accommodation).toBe('Victoria Hotel')
+    // 晚上不包含住宿
+    expect(result.days[0].evening).not.toContain('住宿')
   })
 
-  it('有午餐時正確分配，住宿放晚', () => {
+  it('有午餐時正確分配時段', () => {
     const text = `2/23 (一)
 Day 4｜茵他儂國家公園
 ・茵他儂國家公園主峰
@@ -213,7 +217,7 @@ Day 4｜茵他儂國家公園
 ・參觀苗族市場
 ・瓦吉拉瀑布
 晚餐：Baan Landai
-・住宿`
+・住宿: Mountain Resort`
 
     const result = parseItineraryText(text, 2026)
     // 午餐前 → 早
@@ -221,8 +225,10 @@ Day 4｜茵他儂國家公園
     // 午餐後到晚餐前 → 午
     expect(result.days[0].afternoon).toContain('參觀苗族市場')
     expect(result.days[0].afternoon).toContain('瓦吉拉瀑布')
-    // 晚餐和住宿 → 晚
-    expect(result.days[0].evening).toContain('住宿')
+    // 住宿獨立存放
+    expect(result.days[0].accommodation).toBe('Mountain Resort')
+    // 晚上不包含住宿
+    expect(result.days[0].evening).not.toContain('住宿')
   })
 })
 

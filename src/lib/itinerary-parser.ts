@@ -105,10 +105,11 @@ function isActivityLine(line: string): boolean {
 }
 
 /**
- * 判斷是否為晚上專屬內容（晚餐、住宿）
+ * 判斷是否為晚上專屬內容（晚餐）
+ * 住宿已獨立處理，不再放入「晚」欄位
  */
 function isEveningOnly(content: string): boolean {
-  const eveningOnlyKeywords = ['晚餐', '住宿', 'dinner', 'hotel', 'check-in', 'checkin']
+  const eveningOnlyKeywords = ['晚餐', 'dinner']
   for (const kw of eveningOnlyKeywords) {
     if (content.includes(kw) || content.toLowerCase().includes(kw)) {
       return true
@@ -292,9 +293,9 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     const accommodation = parseAccommodationLine(trimmedLine)
     if (accommodation) {
       currentDay.accommodation = accommodation
-      // 住宿也加入活動列表
-      dayActivities.push(trimmedLine)
-      currentDay.activities.push({ content: trimmedLine })
+      // 住宿不加入早/午/晚時段分配（會用獨立的 hotels 欄位）
+      // 但仍加入 activities 供 PDF 顯示
+      currentDay.activities.push({ content: `住宿: ${accommodation}` })
       continue
     }
 
@@ -784,4 +785,85 @@ export function sanityToQuotationText(items: Array<{
   }
 
   return lines.join('\n')
+}
+
+/**
+ * 從每日住宿資料自動產生飯店記錄
+ * 將連續住同一飯店的日期合併成一筆記錄
+ */
+export function generateHotelsFromDays(days: Array<{
+  date: string
+  accommodation?: string
+}>): Array<{
+  hotelName: string
+  startDate: string
+  endDate: string
+  guests: string
+  color: string
+}> {
+  const hotels: Array<{
+    hotelName: string
+    startDate: string
+    endDate: string
+    guests: string
+    color: string
+  }> = []
+
+  // 顏色輪替
+  const colors = ['yellow', 'green', 'blue', 'orange', 'pink', 'purple']
+  let colorIndex = 0
+
+  let currentHotel: string | null = null
+  let currentStartDate: string | null = null
+  let currentEndDate: string | null = null
+
+  for (const day of days) {
+    const accommodation = day.accommodation?.trim()
+
+    if (accommodation) {
+      if (accommodation === currentHotel) {
+        // 同一間飯店，延長住宿
+        currentEndDate = day.date
+      } else {
+        // 換飯店了，儲存前一間
+        if (currentHotel && currentStartDate && currentEndDate) {
+          // 退房日是最後一晚的隔天
+          const checkoutDate = new Date(currentEndDate)
+          checkoutDate.setDate(checkoutDate.getDate() + 1)
+          const checkoutStr = checkoutDate.toISOString().split('T')[0]
+
+          hotels.push({
+            hotelName: currentHotel,
+            startDate: currentStartDate,
+            endDate: checkoutStr,
+            guests: '全團',
+            color: colors[colorIndex % colors.length],
+          })
+          colorIndex++
+        }
+
+        // 開始新飯店
+        currentHotel = accommodation
+        currentStartDate = day.date
+        currentEndDate = day.date
+      }
+    }
+  }
+
+  // 儲存最後一間飯店
+  if (currentHotel && currentStartDate && currentEndDate) {
+    const checkoutDate = new Date(currentEndDate)
+    checkoutDate.setDate(checkoutDate.getDate() + 1)
+    const checkoutStr = checkoutDate.toISOString().split('T')[0]
+
+    hotels.push({
+      hotelName: currentHotel,
+      startDate: currentStartDate,
+      endDate: checkoutStr,
+      guests: '全團',
+      color: colors[colorIndex % colors.length],
+    })
+  }
+
+  return hotels
 }
