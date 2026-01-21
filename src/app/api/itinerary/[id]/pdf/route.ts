@@ -53,7 +53,7 @@ export async function GET(
     // 回傳 PDF
     const filename = `${itinerary.clientName}-行程表.pdf`
 
-    return new NextResponse(pdf, {
+    return new NextResponse(pdf as unknown as BodyInit, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
