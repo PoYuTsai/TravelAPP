@@ -20,6 +20,77 @@ import {
   getWeekday,
 } from '../components/structured-editor'
 
+// 從備註文字中解析「包含」和「不包含」內容
+function parseIncludesExcludes(text: string): { priceIncludes: string; priceExcludes: string } {
+  const lines = text.split('\n')
+  let priceIncludes = ''
+  let priceExcludes = ''
+
+  let currentSection: 'includes' | 'excludes' | null = null
+  const includesLines: string[] = []
+  const excludesLines: string[] = []
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+
+    // 檢測「包含:」開頭（不包含「不包含」）
+    if (/^包含[：:]/i.test(trimmed) && !trimmed.startsWith('不')) {
+      currentSection = 'includes'
+      // 取冒號後面的內容
+      const content = trimmed.replace(/^包含[：:]\s*/, '').trim()
+      if (content) {
+        // 如果是逗號分隔，拆成多行
+        content.split(/[,、，]/).forEach((item) => {
+          if (item.trim()) includesLines.push(item.trim())
+        })
+      }
+      continue
+    }
+
+    // 檢測「不包含:」開頭
+    if (/^不包含[：:]/i.test(trimmed)) {
+      currentSection = 'excludes'
+      // 取冒號後面的內容
+      const content = trimmed.replace(/^不包含[：:]\s*/, '').trim()
+      if (content) {
+        content.split(/[,、，]/).forEach((item) => {
+          if (item.trim()) excludesLines.push(item.trim())
+        })
+      }
+      continue
+    }
+
+    // 檢測是否進入其他區塊（用來結束當前區塊）
+    if (/^(\*\*|##|導遊|用車|小費|備註|溫馨)/i.test(trimmed)) {
+      currentSection = null
+      continue
+    }
+
+    // 空行也結束當前區塊
+    if (!trimmed) {
+      currentSection = null
+      continue
+    }
+
+    // 收集當前區塊的內容
+    if (currentSection === 'includes' && trimmed) {
+      includesLines.push(trimmed)
+    } else if (currentSection === 'excludes' && trimmed) {
+      excludesLines.push(trimmed)
+    }
+  }
+
+  // 格式化輸出（每行一項）
+  if (includesLines.length > 0) {
+    priceIncludes = includesLines.map((item) => `- ${item}`).join('\n')
+  }
+  if (excludesLines.length > 0) {
+    priceExcludes = excludesLines.map((item) => `- ${item}`).join('\n')
+  }
+
+  return { priceIncludes, priceExcludes }
+}
+
 export function syncFromTextAction(props: DocumentActionProps) {
   const { id, type, draft, published } = props
   const { patch } = useDocumentOperation(id, type)
@@ -266,9 +337,18 @@ https://tdac.immigration.go.th/arrival-card/#/home
         updates.hotels = hotelsData
       }
 
-      // 備註
+      // 備註 - 同時解析「包含」和「不包含」
       if (notesText.trim()) {
         updates.travelRemarks = notesText
+
+        // 自動解析「包含:」和「不包含:」填入 PDF 欄位
+        const { priceIncludes, priceExcludes } = parseIncludesExcludes(notesText)
+        if (priceIncludes) {
+          updates.priceIncludes = priceIncludes
+        }
+        if (priceExcludes) {
+          updates.priceExcludes = priceExcludes
+        }
       }
 
       patch.execute([{ set: updates }])
