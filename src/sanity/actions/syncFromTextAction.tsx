@@ -269,9 +269,9 @@ https://tdac.immigration.go.th/arrival-card/#/home
           quantity: 1,
           unit: '台',
         })),
-        // 其他費用
+        // 其他費用（保險即使 0 也保存，以保留用戶選擇）
         ...otherItems
-          .filter((item) => item.unitPrice > 0)
+          .filter((item) => item.unitPrice > 0 || item.type === 'insurance')
           .map((item, index) => ({
             _key: `quot-other-${index}-${Date.now()}`,
             _type: 'quotationItem',

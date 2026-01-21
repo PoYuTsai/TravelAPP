@@ -119,9 +119,9 @@ export function StructuredQuotationTable({
       })
     }
 
-    // 保險（永遠都有）
-    const insurancePrice =
-      otherItems.find((i) => i.type === 'insurance')?.unitPrice || DEFAULT_PRICES.insurance
+    // 保險（永遠顯示，但可以設為 0 表示不需要）
+    const existingInsurance = otherItems.find((i) => i.type === 'insurance')
+    const insurancePrice = existingInsurance?.unitPrice ?? DEFAULT_PRICES.insurance
     items.push({
       type: 'insurance',
       description: '泰國旅遊保險',
