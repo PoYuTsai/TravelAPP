@@ -49,6 +49,11 @@ export const structure: StructureResolver = (S) =>
 
       S.divider(),
 
+      // 客戶行程表（新增）
+      S.documentTypeListItem('itinerary').title('客戶行程表'),
+
+      S.divider(),
+
       // 部落格文章
       S.documentTypeListItem('post').title('部落格文章'),
 
