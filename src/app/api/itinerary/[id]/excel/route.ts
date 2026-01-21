@@ -38,7 +38,7 @@ export async function GET(
     const filename = `${itinerary.clientName}-行程表-${timeStr}.xlsx`
     console.log('Generated filename:', filename)
 
-    return new NextResponse(excel, {
+    return new NextResponse(new Uint8Array(excel), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
