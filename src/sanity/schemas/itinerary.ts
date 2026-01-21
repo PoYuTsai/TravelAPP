@@ -104,6 +104,179 @@ export default defineType({
       description: '例：中英泰導遊 1位',
     }),
 
+    // === 航班資訊 ===
+    defineField({
+      name: 'arrivalFlight',
+      title: '接機航班',
+      type: 'object',
+      group: 'basic',
+      fields: [
+        defineField({
+          name: 'preset',
+          title: '常用航班',
+          type: 'string',
+          options: {
+            list: [
+              { title: '華航 CI851 (07:30-10:20)', value: 'CI851' },
+              { title: '長榮 BR257 (07:25-10:25)', value: 'BR257' },
+              { title: '星宇 JX751 (13:20-16:20)', value: 'JX751' },
+              { title: '亞航 FD243 (18:55-21:45)', value: 'FD243' },
+              { title: '其他（自訂）', value: 'custom' },
+            ],
+          },
+        }),
+        defineField({
+          name: 'custom',
+          title: '自訂航班',
+          type: 'string',
+          description: '格式：航空公司 航班號 (起飛-抵達)',
+          hidden: ({ parent }) => parent?.preset !== 'custom',
+        }),
+      ],
+    }),
+    defineField({
+      name: 'departureFlight',
+      title: '送機航班',
+      type: 'object',
+      group: 'basic',
+      fields: [
+        defineField({
+          name: 'preset',
+          title: '常用航班',
+          type: 'string',
+          options: {
+            list: [
+              { title: '華航 CI852 (11:20-16:00)', value: 'CI852' },
+              { title: '長榮 BR258 (11:35-16:35)', value: 'BR258' },
+              { title: '星宇 JX752 (17:20-22:10)', value: 'JX752' },
+              { title: '亞航 FD242 (01:40-06:35)', value: 'FD242' },
+              { title: '其他（自訂）', value: 'custom' },
+            ],
+          },
+        }),
+        defineField({
+          name: 'custom',
+          title: '自訂航班',
+          type: 'string',
+          description: '格式：航空公司 航班號 (起飛-抵達)',
+          hidden: ({ parent }) => parent?.preset !== 'custom',
+        }),
+      ],
+    }),
+
+    // === 服務選項 ===
+    defineField({
+      name: 'guideService',
+      title: '導遊服務',
+      type: 'object',
+      group: 'basic',
+      fields: [
+        defineField({
+          name: 'required',
+          title: '需要導遊',
+          type: 'boolean',
+          initialValue: true,
+        }),
+        defineField({
+          name: 'quantity',
+          title: '導遊人數',
+          type: 'number',
+          initialValue: 1,
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+        defineField({
+          name: 'days',
+          title: '導遊天數',
+          type: 'number',
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+      ],
+    }),
+    defineField({
+      name: 'childSeat',
+      title: '兒童安全座椅',
+      type: 'object',
+      group: 'basic',
+      fields: [
+        defineField({
+          name: 'required',
+          title: '需要',
+          type: 'boolean',
+          initialValue: false,
+        }),
+        defineField({
+          name: 'quantity',
+          title: '數量（張）',
+          type: 'number',
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+        defineField({
+          name: 'days',
+          title: '天數',
+          type: 'number',
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+      ],
+    }),
+    defineField({
+      name: 'extraVehicle',
+      title: '額外雙條車（行李用）',
+      type: 'object',
+      group: 'basic',
+      fields: [
+        defineField({
+          name: 'required',
+          title: '需要',
+          type: 'boolean',
+          initialValue: false,
+        }),
+        defineField({
+          name: 'quantity',
+          title: '數量（台）',
+          type: 'number',
+          initialValue: 1,
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+        defineField({
+          name: 'days',
+          title: '天數',
+          type: 'number',
+          hidden: ({ parent }) => !parent?.required,
+          validation: (Rule) => Rule.min(1),
+        }),
+      ],
+    }),
+
+    // === 車輛資訊 ===
+    defineField({
+      name: 'vehicleCount',
+      title: '包車台數',
+      type: 'number',
+      group: 'basic',
+      initialValue: 1,
+      validation: (Rule) => Rule.min(1),
+    }),
+    defineField({
+      name: 'vehicleType',
+      title: '車型',
+      type: 'string',
+      group: 'basic',
+      options: {
+        list: [
+          { title: '4人座小車', value: 'sedan' },
+          { title: '7人座休旅車', value: 'suv' },
+          { title: '10人座大車（麵包車）', value: 'van' },
+          { title: '其他', value: 'custom' },
+        ],
+      },
+      initialValue: 'van',
+    }),
+
     // === 行程原始文字（隱藏欄位，供備份用）===
     defineField({
       name: 'rawItineraryText',
