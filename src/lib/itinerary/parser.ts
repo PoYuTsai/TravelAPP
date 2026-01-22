@@ -70,10 +70,11 @@ function isActivityLine(line: string): boolean {
 }
 
 /**
- * 判斷是否為晚上專屬內容（夜市、按摩等）
+ * 判斷是否為晚上專屬內容（夜市）
+ * 注意：按摩不算，因為下午也可能去
  */
 function isEveningOnly(content: string): boolean {
-  const eveningOnlyKeywords = ['夜市', '按摩', '酒吧', 'night market', 'massage']
+  const eveningOnlyKeywords = ['夜市', 'night market']
   const lowerContent = content.toLowerCase()
   for (const kw of eveningOnlyKeywords) {
     if (lowerContent.includes(kw.toLowerCase())) {
@@ -92,6 +93,9 @@ function cleanActivityContent(line: string): string {
 
 /**
  * 分配活動到早/午/晚時段
+ * - 早：前半活動
+ * - 午：後半活動
+ * - 晚：夜市 + 晚餐
  */
 function distributeActivities(
   activities: string[],
@@ -100,12 +104,11 @@ function distributeActivities(
 ): { morning: string; afternoon: string; evening: string } {
   const result = { morning: '', afternoon: '', evening: '' }
 
-  if (activities.length === 0) return result
-
   const morningItems: string[] = []
   const afternoonItems: string[] = []
   const eveningItems: string[] = []
 
+  // 分類活動：夜市歸晚上，其他平分早午
   const regularActivities: string[] = []
   for (const act of activities) {
     if (isEveningOnly(act)) {
@@ -124,6 +127,11 @@ function distributeActivities(
       afternoonItems.push(act)
     }
   })
+
+  // 晚餐加到晚上
+  if (dinner) {
+    eveningItems.push(`晚餐：${dinner}`)
+  }
 
   result.morning = morningItems.join('\n')
   result.afternoon = afternoonItems.join('\n')
