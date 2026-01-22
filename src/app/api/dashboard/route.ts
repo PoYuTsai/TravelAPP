@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 import { fetchDashboardData } from '@/lib/notion'
 
 // Email 白名單
-const ALLOWED_EMAILS = [
+const ALLOWED_EMAILS: string[] = [
   // 在此加入允許存取的 Email
   // 'eric@example.com',
   // 'min@example.com',
