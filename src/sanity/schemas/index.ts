@@ -1,5 +1,4 @@
 import post from './post'
-// import tour from './tour' // 已被 tourPackage 取代
 import landingPage from './landingPage'
 import carCharter from './carCharter'
 import homestay from './homestay'
