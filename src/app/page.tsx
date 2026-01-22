@@ -7,6 +7,7 @@ import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import Services from '@/components/sections/Services'
 import WhyUs from '@/components/sections/WhyUs'
+import ToursPreview from '@/components/sections/ToursPreview'
 import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
 
@@ -67,6 +68,7 @@ export default async function Home() {
         sectionSubtitle={data?.whyUsSectionSubtitle}
         reasons={data?.whyUsReasons}
       />
+      <ToursPreview />
       <FeaturedArticles
         sectionTitle={data?.articlesSectionTitle}
         sectionSubtitle={data?.articlesSectionSubtitle}
