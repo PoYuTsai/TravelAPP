@@ -97,12 +97,10 @@ export function documentToEditorState(doc: any): EditorState {
   // 將現有報價分類
   quotationItems.forEach((item: any) => {
     if (item.date) {
-      // 每日包車項目
-      const date = new Date(item.date)
-      const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+      // 每日包車項目（使用 getWeekday 避免時區問題）
       dailyItems.push({
         date: item.date,
-        weekday: weekdays[date.getDay()],
+        weekday: getWeekday(item.date),
         description: item.description || '',
         price: item.unitPrice || 0,
       })
@@ -145,9 +143,9 @@ export function documentToEditorState(doc: any): EditorState {
   }
 }
 
-// 取得星期幾
+// 取得星期幾（使用 T00:00:00 避免時區問題）
 export function getWeekday(dateStr: string): string {
-  const date = new Date(dateStr)
+  const date = new Date(dateStr + 'T00:00:00')
   const weekdays = ['日', '一', '二', '三', '四', '五', '六']
   return weekdays[date.getDay()]
 }

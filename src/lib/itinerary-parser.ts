@@ -315,10 +315,11 @@ export function formatToLineText(days: ParsedDay[]): string {
   const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 
   return days.map((day) => {
-    const date = new Date(day.date)
+    // 使用 T00:00:00 避免時區問題
+    const date = new Date(day.date + 'T00:00:00')
     const month = date.getMonth() + 1
     const dayNum = date.getDate()
-    const weekday = weekdays[day.date ? new Date(day.date).getDay() : 0]
+    const weekday = weekdays[date.getDay()]
 
     let text = `${month}/${dayNum} (${weekday})\n`
     text += `Day ${day.dayNumber}｜${day.title}\n`
@@ -616,7 +617,8 @@ export function sanityToLineText(itinerary: {
   const lines: string[] = []
 
   itinerary.days.forEach((day, index) => {
-    const date = new Date(day.date)
+    // 使用 T00:00:00 避免時區問題
+    const date = new Date(day.date + 'T00:00:00')
     const month = date.getMonth() + 1
     const dayNum = date.getDate()
     const weekday = weekdays[date.getDay()]
@@ -741,9 +743,9 @@ export function sanityToQuotationText(items: Array<{
   items.forEach((item) => {
     let line = ''
 
-    // 有日期的項目
+    // 有日期的項目（使用 T00:00:00 避免時區問題）
     if (item.date) {
-      const date = new Date(item.date)
+      const date = new Date(item.date + 'T00:00:00')
       const month = date.getMonth() + 1
       const day = date.getDate()
       line += `${month}/${day} `

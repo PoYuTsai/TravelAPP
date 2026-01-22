@@ -1,4 +1,5 @@
 // src/sanity/components/structured-editor/StructuredQuotationTable.tsx
+import { Fragment } from 'react'
 import { Box, Text, Stack, Flex, Card, TextInput, Button } from '@sanity/ui'
 import { AddIcon, TrashIcon } from '@sanity/icons'
 import type { BasicInfo, DailyQuotationItem, OtherQuotationItem } from './types'
@@ -256,7 +257,8 @@ export function StructuredQuotationTable({
   }
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
+    // 使用 T00:00:00 避免時區問題
+    const d = new Date(dateStr + 'T00:00:00')
     return `${d.getMonth() + 1}/${d.getDate()}`
   }
 
@@ -301,19 +303,17 @@ export function StructuredQuotationTable({
           </Text>
 
           {currentDailyItems.map((item, index) => (
-            <>
-              <Text key={`date-${index}`} size={1}>
+            <Fragment key={`row-${index}`}>
+              <Text size={1}>
                 {formatDate(item.date)} ({item.weekday})
               </Text>
               <TextInput
-                key={`desc-${index}`}
                 value={item.description}
                 onChange={(e) => updateDailyItem(index, 'description', e.currentTarget.value)}
                 fontSize={1}
                 padding={2}
               />
               <TextInput
-                key={`price-${index}`}
                 type="number"
                 value={item.price}
                 onChange={(e) =>
@@ -324,14 +324,14 @@ export function StructuredQuotationTable({
                 style={{ textAlign: 'right' }}
               />
               {vehicleCount > 1 && (
-                <Text key={`qty-${index}`} size={1} style={{ textAlign: 'center', paddingTop: '8px' }}>
+                <Text size={1} style={{ textAlign: 'center', paddingTop: '8px' }}>
                   x{vehicleCount}
                 </Text>
               )}
-              <Text key={`subtotal-${index}`} size={1} style={{ textAlign: 'right', paddingTop: '8px' }}>
+              <Text size={1} style={{ textAlign: 'right', paddingTop: '8px' }}>
                 {(item.price * vehicleCount).toLocaleString()}
               </Text>
-            </>
+            </Fragment>
           ))}
         </Box>
         <Flex justify="flex-end" style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '8px' }}>

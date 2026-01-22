@@ -178,7 +178,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
               type="number"
               min={1}
               value={value.adults}
-              onChange={(e) => updateField('adults', parseInt(e.currentTarget.value) || 1)}
+              onChange={(e) => updateField('adults', Math.max(1, parseInt(e.currentTarget.value) || 1))}
             />
           </Box>
           <Box style={{ width: '80px' }}>
@@ -189,7 +189,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
               type="number"
               min={0}
               value={value.children}
-              onChange={(e) => updateField('children', parseInt(e.currentTarget.value) || 0)}
+              onChange={(e) => updateField('children', Math.max(0, parseInt(e.currentTarget.value) || 0))}
             />
           </Box>
           <Box style={{ flex: 1, minWidth: '150px' }}>
@@ -239,7 +239,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                     onChange={(e) =>
                       updateField('guideService', {
                         ...value.guideService,
-                        quantity: parseInt(e.currentTarget.value) || 1,
+                        quantity: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -254,7 +254,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                     onChange={(e) =>
                       updateField('guideService', {
                         ...value.guideService,
-                        days: parseInt(e.currentTarget.value) || 1,
+                        days: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -289,7 +289,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                     onChange={(e) =>
                       updateField('childSeat', {
                         ...value.childSeat,
-                        quantity: parseInt(e.currentTarget.value) || 1,
+                        quantity: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -300,11 +300,11 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                   <TextInput
                     type="number"
                     min={1}
-                    value={value.childSeat.days || totalDays}
+                    value={value.childSeat.days ?? totalDays}
                     onChange={(e) =>
                       updateField('childSeat', {
                         ...value.childSeat,
-                        days: parseInt(e.currentTarget.value) || 1,
+                        days: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -339,7 +339,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                     onChange={(e) =>
                       updateField('extraVehicle', {
                         ...value.extraVehicle,
-                        quantity: parseInt(e.currentTarget.value) || 1,
+                        quantity: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -350,11 +350,11 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                   <TextInput
                     type="number"
                     min={1}
-                    value={value.extraVehicle.days || totalDays}
+                    value={value.extraVehicle.days ?? totalDays}
                     onChange={(e) =>
                       updateField('extraVehicle', {
                         ...value.extraVehicle,
-                        days: parseInt(e.currentTarget.value) || 1,
+                        days: Math.max(1, parseInt(e.currentTarget.value) || 1),
                       })
                     }
                     style={{ width: '60px' }}
@@ -379,7 +379,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
               type="number"
               min={1}
               value={value.vehicleCount}
-              onChange={(e) => updateField('vehicleCount', parseInt(e.currentTarget.value) || 1)}
+              onChange={(e) => updateField('vehicleCount', Math.max(1, parseInt(e.currentTarget.value) || 1))}
               style={{ width: '60px' }}
             />
             <Text size={1}>台</Text>
