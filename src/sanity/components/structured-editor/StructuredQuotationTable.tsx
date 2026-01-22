@@ -65,7 +65,9 @@ export function StructuredQuotationTable({
   }
 
   const currentDailyItems = ensureDailyItems()
-  const dailyTotal = currentDailyItems.reduce((sum, item) => sum + item.price, 0)
+  const vehicleCount = basicInfo.vehicleCount || 1
+  // 每日包車費用 = 單價 x 台數
+  const dailyTotal = currentDailyItems.reduce((sum, item) => sum + item.price * vehicleCount, 0)
 
   // 自動計算其他費用
   const calculateOtherItems = (): OtherQuotationItem[] => {
@@ -262,13 +264,20 @@ export function StructuredQuotationTable({
     <Stack space={4}>
       {/* 每日包車費用 */}
       <Card padding={3} tone="transparent" border radius={2}>
-        <Text size={1} weight="semibold" style={{ marginBottom: '12px' }}>
-          每日包車費用
-        </Text>
+        <Flex align="center" gap={2} style={{ marginBottom: '12px' }}>
+          <Text size={1} weight="semibold">
+            每日包車費用
+          </Text>
+          {vehicleCount > 1 && (
+            <Text size={0} muted>
+              （{vehicleCount} 台）
+            </Text>
+          )}
+        </Flex>
         <Box
           style={{
             display: 'grid',
-            gridTemplateColumns: '80px 1fr 100px 80px',
+            gridTemplateColumns: vehicleCount > 1 ? '80px 1fr 80px 50px 80px' : '80px 1fr 100px 80px',
             gap: '8px',
             fontSize: '13px',
           }}
@@ -282,6 +291,11 @@ export function StructuredQuotationTable({
           <Text size={0} weight="semibold" muted style={{ textAlign: 'right' }}>
             單價
           </Text>
+          {vehicleCount > 1 && (
+            <Text size={0} weight="semibold" muted style={{ textAlign: 'center' }}>
+              台數
+            </Text>
+          )}
           <Text size={0} weight="semibold" muted style={{ textAlign: 'right' }}>
             小計
           </Text>
@@ -309,8 +323,13 @@ export function StructuredQuotationTable({
                 padding={2}
                 style={{ textAlign: 'right' }}
               />
+              {vehicleCount > 1 && (
+                <Text key={`qty-${index}`} size={1} style={{ textAlign: 'center', paddingTop: '8px' }}>
+                  x{vehicleCount}
+                </Text>
+              )}
               <Text key={`subtotal-${index}`} size={1} style={{ textAlign: 'right', paddingTop: '8px' }}>
-                {item.price.toLocaleString()}
+                {(item.price * vehicleCount).toLocaleString()}
               </Text>
             </>
           ))}
@@ -318,6 +337,7 @@ export function StructuredQuotationTable({
         <Flex justify="flex-end" style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
           <Text size={1}>
             包車小計：<strong>NT$ {dailyTotal.toLocaleString()}</strong>
+            {vehicleCount > 1 && <span style={{ marginLeft: '8px', color: '#666' }}>（{vehicleCount}台）</span>}
           </Text>
         </Flex>
       </Card>

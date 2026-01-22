@@ -258,15 +258,16 @@ https://tdac.immigration.go.th/arrival-card/#/home
       }))
 
       // 轉換報價成 Sanity 格式
+      const vehicleCount = basicInfo.vehicleCount || 1
       const quotationItems = [
-        // 每日包車
+        // 每日包車（數量 = 包車台數）
         ...dailyItems.map((item, index) => ({
           _key: `quot-daily-${index}-${Date.now()}`,
           _type: 'quotationItem',
           date: item.date,
           description: item.description,
           unitPrice: item.price,
-          quantity: 1,
+          quantity: vehicleCount,
           unit: '台',
         })),
         // 其他費用（保險即使 0 也保存，以保留用戶選擇）
@@ -293,8 +294,8 @@ https://tdac.immigration.go.th/arrival-card/#/home
           }),
       ]
 
-      // 計算總額
-      const dailyTotal = dailyItems.reduce((sum, item) => sum + item.price, 0)
+      // 計算總額（每日包車 x 台數）
+      const dailyTotal = dailyItems.reduce((sum, item) => sum + item.price * vehicleCount, 0)
       const otherTotal = otherItems.reduce(
         (sum, item) => sum + item.unitPrice * item.quantity * item.days,
         0
