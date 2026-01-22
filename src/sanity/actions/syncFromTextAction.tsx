@@ -272,15 +272,25 @@ https://tdac.immigration.go.th/arrival-card/#/home
         // 其他費用（保險即使 0 也保存，以保留用戶選擇）
         ...otherItems
           .filter((item) => item.unitPrice > 0 || item.type === 'insurance')
-          .map((item, index) => ({
-            _key: `quot-other-${index}-${Date.now()}`,
-            _type: 'quotationItem',
-            date: null,
-            description: item.description,
-            unitPrice: item.unitPrice,
-            quantity: item.quantity * item.days,
-            unit: item.type === 'childSeat' ? '張' : item.type === 'extraVehicle' ? '台' : item.type === 'insurance' ? '人' : '位',
-          })),
+          .map((item, index) => {
+            // 確保 description 有值（schema 要求 required）
+            const descriptionMap: Record<string, string> = {
+              guide: '導遊',
+              childSeat: '兒童座椅',
+              extraVehicle: '雙條車（行李）',
+              insurance: '泰國旅遊保險',
+              outOfTownStay: '外地住宿補貼',
+            }
+            return {
+              _key: `quot-other-${index}-${Date.now()}`,
+              _type: 'quotationItem',
+              date: null,
+              description: item.description || descriptionMap[item.type] || '其他費用',
+              unitPrice: item.unitPrice,
+              quantity: item.quantity * item.days,
+              unit: item.type === 'childSeat' ? '張' : item.type === 'extraVehicle' ? '台' : item.type === 'insurance' ? '人' : '位',
+            }
+          }),
       ]
 
       // 計算總額
