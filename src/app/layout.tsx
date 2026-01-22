@@ -3,9 +3,12 @@ import Script from 'next/script'
 import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
+import GoogleAdsConversion from '@/components/GoogleAdsConversion'
 
 // Google Analytics Measurement ID
 const GA_MEASUREMENT_ID = 'G-5180ZF5WFF'
+// Google Ads Conversion ID
+const AW_CONVERSION_ID = 'AW-17124009918'
 
 export const metadata: Metadata = {
   title: {
@@ -119,7 +122,7 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen">
-        {/* Google Analytics */}
+        {/* Google Analytics + Google Ads */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
           strategy="afterInteractive"
@@ -130,8 +133,11 @@ export default function RootLayout({
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', '${GA_MEASUREMENT_ID}');
+            gtag('config', '${AW_CONVERSION_ID}');
           `}
         </Script>
+        {/* Google Ads Conversion Tracking */}
+        <GoogleAdsConversion />
         <Header />
         <main className="flex-grow pt-20">
           {children}

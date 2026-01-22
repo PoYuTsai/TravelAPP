@@ -1,7 +1,7 @@
 # Phase 3：內部營運工具
 
 > 日期：2026-01-22
-> 狀態：🔄 進行中（行程表完成，Dashboard 待實作）
+> 狀態：✅ 核心功能完成
 
 ---
 
@@ -13,14 +13,15 @@ Phase 3 專注於內部營運效率工具，幫助業務快速建立客戶行程
 |-------|------|------|------|
 | Phase 1 | 公開網站 | 轉換率優化 | ✅ 完成 |
 | Phase 2 | SEO 優化 | 流量獲取 | ✅ 完成 |
-| **Phase 3** | **內部工具** | **營運效率** | 🔄 進行中 |
+| **Phase 3** | **內部工具** | **營運效率** | ✅ 核心完成 |
 
 ### Phase 3 功能總覽
 
 | 功能 | 說明 | 狀態 |
 |------|------|------|
 | 客戶行程表系統 | 建立、編輯、匯出行程表 | ✅ 完成 |
-| 利潤 Dashboard | Notion 資料視覺化儀表板 | ⏳ 待實作 |
+| 利潤 Dashboard | Notion 資料視覺化儀表板 | ✅ 完成 |
+| Google Ads 追蹤 | 廣告轉換追蹤 | ✅ 完成 |
 
 ---
 
@@ -155,7 +156,7 @@ playwright.config.ts       # Playwright 設定
 
 ---
 
-## 3.4 利潤 Dashboard ⏳
+## 3.4 利潤 Dashboard ✅
 
 ### 目標
 
@@ -317,16 +318,76 @@ playwright.config.ts       # Playwright 設定
 
 | 項目 | 說明 | 狀態 |
 |------|------|------|
-| Dashboard 頁面路由 | 權限驗證 | ⏳ |
-| Notion API 封裝 | 營收、利潤、訂單查詢 | ⏳ |
-| 數字解析器強化 | 支援複雜計算式 | ⏳ |
-| 頂部數字卡片 | 4 張統計卡片 | ⏳ |
-| 月度利潤趨勢圖 | 長條圖 | ⏳ |
-| 近期訂單表格 | Tab 切換 | ⏳ |
+| Dashboard Tool | Sanity Studio 頂部 Tab | ✅ |
+| Dashboard API Route | `/api/dashboard` + 權限檢查 | ✅ |
+| Notion API 封裝 | `src/lib/notion/client.ts` | ✅ |
+| 數字解析器 | `src/lib/notion/profit-parser.ts` | ✅ |
+| 頂部數字卡片 | 本月利潤 + 待收款項 | ✅ |
+| Sparkline 趨勢 | 近 6 個月利潤走勢 | ✅ |
+| 待收款清單 | 表格顯示未付款訂單 | ✅ |
+
+### 實作檔案
+
+```
+src/
+├── lib/notion/
+│   ├── types.ts          # NotionOrder, DashboardData
+│   ├── profit-parser.ts  # 智慧數字解析
+│   ├── client.ts         # Notion API 連接
+│   └── index.ts          # 匯出
+├── app/api/dashboard/
+│   └── route.ts          # API + 白名單檢查
+└── sanity/tools/dashboard/
+    ├── index.tsx         # Sanity Plugin
+    ├── DashboardTool.tsx # 主元件
+    ├── styles.css        # 深紫質感 UI
+    └── components/
+        ├── StatCard.tsx      # 數據卡片
+        └── PendingTable.tsx  # 待收款表格
+```
 
 ---
 
-## 3.5 權限架構
+## 3.5 Google Ads 轉換追蹤 ✅
+
+### 目標
+
+整合 Google Ads 轉換追蹤，量化廣告成效。
+
+### Conversion ID
+
+**AW-17124009918** (Google Ads 帳號)
+
+### 追蹤事件
+
+| 事件名稱 | 觸發條件 | Conversion Label |
+|---------|---------|------------------|
+| LINE 點擊 | 點擊任何 `line.me` 連結 | `0CrLCKj1l-obEL7PruU_` |
+| 部落格瀏覽 | 訪問 `/blog` | `dL2cCIjCo-obEL7PruU_` |
+| 包車服務 | 訪問 `/car-charter` | `tvPkCOGEmOobEL7PruU_` |
+| 芳縣民宿 | 訪問 `/homestay` | `TpB2CLeso-obEL7PruU_` |
+| 關於我們 | 訪問 `/about` | `c3BnCKexo-obEL7PruU_` |
+| 交通文章 | 訪問含 `transportation` | `82nyCMqzo-obEL7PruU_` |
+| 移居故事 | 訪問含 `eric-story-taiwan-to-chiang-mai` | `YS5PCLuBluobEL7PruU_` |
+| 非法打工文章 | 訪問含 `illegal-work` | `SYcECMG5o-obEL7PruU_` |
+
+### 實作方式
+
+```
+src/
+├── app/layout.tsx                    # gtag 載入 + Google Ads config
+└── components/GoogleAdsConversion.tsx # 轉換事件追蹤
+```
+
+**技術細節：**
+- 使用 `next/script` 載入 gtag.js
+- 同時設定 GA4 (`G-5180ZF5WFF`) 和 Google Ads (`AW-17124009918`)
+- Client Component 使用 `usePathname` 追蹤頁面瀏覽
+- 使用 Event Delegation 追蹤 LINE 連結點擊
+
+---
+
+## 3.6 權限架構
 
 ### 系統使用者
 
@@ -426,7 +487,7 @@ Notion API 沒有即時推送（WebSocket），Dashboard 需主動抓取資料�
 
 ---
 
-## 3.6 未來擴充（待定）
+## 3.7 未來擴充（待定）
 
 以下功能視業務需求決定是否實作：
 
