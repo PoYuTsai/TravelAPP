@@ -63,9 +63,11 @@ function parseDayTitle(line: string): { dayNumber: number; title: string } | nul
 
 /**
  * 判斷是否為餐點行
+ * 支援有或沒有符號開頭：午餐：xxx 或 ・午餐：xxx 或 - 午餐：xxx
  */
 function parseMealLine(line: string): { type: 'breakfast' | 'lunch' | 'dinner' | 'afternoon_tea'; content: string } | null {
-  const trimmed = line.trim()
+  // 先移除開頭的符號（・、-、•、*、·）
+  const trimmed = line.trim().replace(/^[・\-•\*·]\s*/, '')
 
   if (trimmed.match(/^(早餐|breakfast)[：:]/i)) {
     return { type: 'breakfast', content: trimmed.replace(/^(早餐|breakfast)[：:]\s*/i, '') }
