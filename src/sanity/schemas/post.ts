@@ -161,7 +161,7 @@ export default defineType({
               name: 'tours',
               title: '選擇行程',
               type: 'array',
-              of: [{ type: 'reference', to: [{ type: 'tour' }] }],
+              of: [{ type: 'reference', to: [{ type: 'tourPackage' }] }],
             }),
           ],
           preview: {

@@ -57,6 +57,8 @@ export const structure: StructureResolver = (S) =>
       // 部落格文章
       S.documentTypeListItem('post').title('部落格文章'),
 
-      // 行程
-      S.documentTypeListItem('tour').title('行程'),
+      S.divider(),
+
+      // 招牌套餐
+      S.documentTypeListItem('tourPackage').title('招牌套餐'),
     ])
