@@ -165,9 +165,11 @@ playwright.config.ts       # Playwright 設定
 ### 資料來源
 
 - **來源**：Notion 資料庫（現有訂單管理系統）
-- **Database ID**：`26037493-475d-8115-bb53-000ba2f98287`
+- **資料庫**：
+  - 2025清微旅行：`15c37493475d80a5aa89ef025244dc7b`
+  - 2026清微旅行：`26037493475d80baa727dd3323f2aad8`
 - **同步方式**：即時 API 查詢（每次開啟 Dashboard 時呼叫）
-- **現有程式碼**：`scripts/notion-profit-report.mjs`（可複用利潤解析邏輯）
+- **API 方式**：使用 Notion REST API（SDK v5 有 bug，改用直接 fetch）
 
 ### 版面配置
 
@@ -319,31 +321,45 @@ playwright.config.ts       # Playwright 設定
 | 項目 | 說明 | 狀態 |
 |------|------|------|
 | Dashboard Tool | Sanity Studio 頂部 Tab | ✅ |
-| Dashboard API Route | `/api/dashboard` + 權限檢查 | ✅ |
-| Notion API 封裝 | `src/lib/notion/client.ts` | ✅ |
+| Dashboard API Route | `/api/dashboard` + 權限檢查 + 年月參數 | ✅ |
+| Notion API 封裝 | `src/lib/notion/client.ts`（REST API） | ✅ |
 | 數字解析器 | `src/lib/notion/profit-parser.ts` | ✅ |
-| 頂部數字卡片 | 本月利潤 + 待收款項 | ✅ |
-| Sparkline 趨勢 | 近 6 個月利潤走勢 | ✅ |
+| 雙資料庫支援 | 2025 + 2026 年度切換 | ✅ |
+| 年月選擇器 | 年份 + 月份下拉選單 | ✅ |
+| 頂部數字卡片 | 當月利潤 + 待收款項 | ✅ |
+| 年度比較 | 今年 vs 去年同期累計 + 成長率 | ✅ |
+| 12個月趨勢圖 | 柱狀圖顯示全年走勢 | ✅ |
 | 待收款清單 | 表格顯示未付款訂單 | ✅ |
+| Email 白名單 | 目前設定：`eric19921204@gmail.com` | ✅ |
+
+### 技術備註
+
+**Notion SDK v5 Bug：**
+- `@notionhq/client` v5.7.0 的 `dataSources.query` API 有問題
+- 即使權限正確也回傳 404 錯誤
+- **解法**：改用標準 REST API 直接 fetch `/v1/databases/{id}/query`
 
 ### 實作檔案
 
 ```
 src/
 ├── lib/notion/
-│   ├── types.ts          # NotionOrder, DashboardData
+│   ├── types.ts          # NotionOrder, DashboardData, YearComparison
 │   ├── profit-parser.ts  # 智慧數字解析
-│   ├── client.ts         # Notion API 連接
+│   ├── client.ts         # Notion REST API 連接（直接 fetch）
 │   └── index.ts          # 匯出
 ├── app/api/dashboard/
-│   └── route.ts          # API + 白名單檢查
+│   └── route.ts          # API + 白名單檢查 + 年月參數
 └── sanity/tools/dashboard/
     ├── index.tsx         # Sanity Plugin
     ├── DashboardTool.tsx # 主元件
     ├── styles.css        # 深紫質感 UI
     └── components/
-        ├── StatCard.tsx      # 數據卡片
-        └── PendingTable.tsx  # 待收款表格
+        ├── StatCard.tsx          # 數據卡片
+        ├── PendingTable.tsx      # 待收款表格
+        ├── YearMonthSelector.tsx # 年月切換
+        ├── YearComparison.tsx    # 年度比較
+        └── YearlyTrendChart.tsx  # 12個月趨勢圖
 ```
 
 ---
@@ -412,12 +428,16 @@ Dashboard 載入流程：
 
 **白名單設定（程式碼內）：**
 ```typescript
-const DASHBOARD_ALLOWED_EMAILS = [
-  'eric@xxx.com',    // 老闆
-  'min@xxx.com',     // 老闆娘
-  // 員工不加入此名單
+// 目前設定 (2026-01-22)
+const ALLOWED_EMAILS: string[] = [
+  'eric19921204@gmail.com',  // Eric（老闆）
+  // 之後可加入：Min（老闆娘）
 ]
 ```
+
+**設定位置：**
+- `src/sanity/tools/dashboard/DashboardTool.tsx`
+- `src/app/api/dashboard/route.ts`
 
 ### 系統架構
 
@@ -509,4 +529,4 @@ Notion API 沒有即時推送（WebSocket），Dashboard 需主動抓取資料�
 
 ---
 
-*最後更新：2026-01-22*
+*最後更新：2026-01-22 23:30*
