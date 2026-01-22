@@ -1,10 +1,13 @@
 // src/sanity/tools/dashboard/DashboardTool.tsx
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useCurrentUser } from 'sanity'
 import type { DashboardData } from '@/lib/notion/types'
 import { StatCard } from './components/StatCard'
 import { PendingTable } from './components/PendingTable'
+import { YearMonthSelector } from './components/YearMonthSelector'
+import { YearComparison } from './components/YearComparison'
+import { YearlyTrendChart } from './components/YearlyTrendChart'
 import './styles.css'
 
 // Email 白名單
@@ -19,16 +22,21 @@ export function DashboardTool() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 選擇的年月
+  const now = new Date()
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
+
   const userEmail = currentUser?.email || ''
 
   // 白名單檢查
   const hasAccess = ALLOWED_EMAILS.length === 0 || ALLOWED_EMAILS.includes(userEmail)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async (year: number, month: number) => {
     setLoading(true)
     setError(null)
     try {
-      const response = await fetch('/api/dashboard', {
+      const response = await fetch(`/api/dashboard?year=${year}&month=${month}`, {
         headers: {
           'x-user-email': userEmail,
         },
@@ -43,13 +51,25 @@ export function DashboardTool() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userEmail])
 
   useEffect(() => {
     if (hasAccess) {
-      fetchData()
+      fetchData(selectedYear, selectedMonth)
     }
-  }, [hasAccess])
+  }, [hasAccess, selectedYear, selectedMonth, fetchData])
+
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year)
+  }
+
+  const handleMonthChange = (month: number) => {
+    setSelectedMonth(month)
+  }
+
+  const handleRefresh = () => {
+    fetchData(selectedYear, selectedMonth)
+  }
 
   if (!hasAccess) {
     return (
@@ -63,7 +83,7 @@ export function DashboardTool() {
     )
   }
 
-  if (loading) {
+  if (loading && !data) {
     return (
       <div className="dashboard-container">
         <div className="loading">載入中...</div>
@@ -77,7 +97,7 @@ export function DashboardTool() {
         <div className="error">
           <h2>❌ 錯誤</h2>
           <p>{error}</p>
-          <button onClick={fetchData} className="refresh-button">重試</button>
+          <button onClick={handleRefresh} className="refresh-button">重試</button>
         </div>
       </div>
     )
@@ -87,8 +107,6 @@ export function DashboardTool() {
     return null
   }
 
-  const sparklineData = data.monthlyTrend.map(m => m.profit)
-
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -97,11 +115,20 @@ export function DashboardTool() {
           <span className="last-updated">
             上次更新: {new Date(data.lastUpdated).toLocaleString('zh-TW')}
           </span>
-          <button onClick={fetchData} className="refresh-button" disabled={loading}>
-            🔄 刷新
+          <button onClick={handleRefresh} className="refresh-button" disabled={loading}>
+            {loading ? '載入中...' : '🔄 刷新'}
           </button>
         </div>
       </div>
+
+      {/* 年月選擇器 */}
+      <YearMonthSelector
+        selectedYear={selectedYear}
+        selectedMonth={selectedMonth}
+        availableYears={data.availableYears}
+        onYearChange={handleYearChange}
+        onMonthChange={handleMonthChange}
+      />
 
       {data.hasUncertainValues && (
         <div className="notice-banner">
@@ -109,12 +136,12 @@ export function DashboardTool() {
         </div>
       )}
 
+      {/* 當月統計卡片 */}
       <div className="stats-grid">
         <StatCard
-          title="本月利潤"
+          title={`${selectedMonth}月利潤`}
           value={data.monthlyProfit}
           subtext={`${data.monthlyOrderCount} 筆訂單`}
-          sparklineData={sparklineData}
         />
         <StatCard
           title="待收款項"
@@ -124,6 +151,13 @@ export function DashboardTool() {
         />
       </div>
 
+      {/* 年度比較 */}
+      <YearComparison data={data.yearComparison} upToMonth={selectedMonth} />
+
+      {/* 年度月趨勢圖 */}
+      <YearlyTrendChart data={data.yearlyTrend} year={selectedYear} />
+
+      {/* 待收款清單 */}
       <PendingTable orders={data.pendingOrders} />
     </div>
   )

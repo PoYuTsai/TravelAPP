@@ -22,17 +22,45 @@ export interface NotionOrder {
   updateStatus: '完成' | '未開始' | string
 }
 
+export interface MonthlyStats {
+  month: string
+  profit: number
+  count: number
+}
+
+export interface YearComparison {
+  currentYear: number
+  currentYearProfit: number
+  currentYearCount: number
+  lastYear: number
+  lastYearProfit: number
+  lastYearCount: number
+  growthPercent: number | null
+}
+
 export interface DashboardData {
+  // 選擇的年月
+  selectedYear: number
+  selectedMonth: number
+  // 當月數據
   monthlyProfit: number
   monthlyOrderCount: number
+  hasUncertainValues: boolean
+  // 待收款（全部）
   pendingPayment: number
   pendingPaymentCount: number
   pendingOrders: NotionOrder[]
-  monthlyTrend: Array<{
-    month: string
-    profit: number
-    count: number
-  }>
+  // 年度比較（累計到選擇月份）
+  yearComparison: YearComparison
+  // 年度月趨勢（選擇年的 12 個月）
+  yearlyTrend: MonthlyStats[]
+  // 可用年份列表
+  availableYears: number[]
+  // 更新時間
   lastUpdated: string
-  hasUncertainValues: boolean
+}
+
+export interface DashboardQuery {
+  year?: number
+  month?: number
 }

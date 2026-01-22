@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { fetchDashboardData } from '@/lib/notion'
+import type { DashboardQuery } from '@/lib/notion'
 
 // Email 白名單
 const ALLOWED_EMAILS: string[] = [
@@ -25,7 +26,20 @@ export async function GET(request: Request) {
       }
     }
 
-    const data = await fetchDashboardData()
+    // 解析查詢參數
+    const { searchParams } = new URL(request.url)
+    const yearParam = searchParams.get('year')
+    const monthParam = searchParams.get('month')
+
+    const query: DashboardQuery = {}
+    if (yearParam) {
+      query.year = parseInt(yearParam, 10)
+    }
+    if (monthParam) {
+      query.month = parseInt(monthParam, 10)
+    }
+
+    const data = await fetchDashboardData(query)
     return NextResponse.json(data)
   } catch (error) {
     console.error('Dashboard API Error:', error)
