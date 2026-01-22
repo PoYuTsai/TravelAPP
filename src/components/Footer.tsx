@@ -7,9 +7,9 @@ import { trackLineClick } from '@/lib/analytics'
 const navLinks = [
   { href: '/', label: '首頁' },
   { href: '/services/car-charter', label: '包車服務' },
+  { href: '/tours', label: '行程案例' },
   { href: '/homestay', label: '芳縣民宿' },
   { href: '/blog', label: '部落格' },
-  { href: '/about', label: '關於我們' },
 ]
 
 const socialLinks = [
