@@ -39,7 +39,11 @@ export function formatToLineText(days: ParsedDay[]): string {
 
     if (day.evening) {
       day.evening.split('\n').forEach((line) => {
-        if (line.trim()) text += `・${line.trim()}\n`
+        const trimmed = line.trim()
+        // 過濾掉晚餐（已在上面獨立輸出）
+        if (!trimmed) return
+        if (/^[・\-•·]?\s*(晚餐|dinner)[：:]/i.test(trimmed)) return
+        text += `・${trimmed}\n`
       })
     }
 
@@ -101,7 +105,10 @@ export function sanityToLineText(itinerary: {
     if (day.evening) {
       day.evening.split('\n').forEach((line) => {
         const trimmed = line.trim()
-        if (!trimmed || /^[・\-•·]?\s*(住宿|accommodation|hotel)[：:]/i.test(trimmed)) return
+        // 過濾掉住宿和晚餐（這些已在上面獨立輸出）
+        if (!trimmed) return
+        if (/^[・\-•·]?\s*(住宿|accommodation|hotel)[：:]/i.test(trimmed)) return
+        if (/^[・\-•·]?\s*(晚餐|dinner)[：:]/i.test(trimmed)) return
         const cleaned = trimmed.replace(/^[・\-•·]\s*/, '')
         if (cleaned) lines.push(`・${cleaned}`)
       })
