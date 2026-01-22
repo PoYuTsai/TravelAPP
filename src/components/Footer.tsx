@@ -10,6 +10,7 @@ const navLinks = [
   { href: '/tours', label: '行程案例' },
   { href: '/homestay', label: '芳縣民宿' },
   { href: '/blog', label: '部落格' },
+  { href: '/blog/eric-story-taiwan-to-chiang-mai', label: '我們的故事' },
 ]
 
 const socialLinks = [
