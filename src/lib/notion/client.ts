@@ -1,6 +1,5 @@
 // src/lib/notion/client.ts
 
-import { Client } from '@notionhq/client'
 import type { NotionOrder, DashboardData, DashboardQuery, MonthlyStats, YearComparison } from './types'
 import { parseNumberText } from './profit-parser'
 
@@ -9,7 +8,7 @@ const NOTION_TOKEN = process.env.NOTION_TOKEN
 // 資料庫 ID 對應表
 const DATABASE_IDS: Record<number, string> = {
   2025: '15c37493475d80a5aa89ef025244dc7b',
-  2026: '26037493475d8115bb53000ba2f98287',
+  2026: '26037493475d80baa727dd3323f2aad8',
 }
 
 // 可用年份
@@ -18,8 +17,6 @@ const AVAILABLE_YEARS = [2025, 2026]
 if (!NOTION_TOKEN) {
   console.warn('NOTION_TOKEN 未設定')
 }
-
-const notion = NOTION_TOKEN ? new Client({ auth: NOTION_TOKEN }) : null
 
 function extractYearMonth(dateValue: { start: string; end?: string | null } | null): { year: number; month: number } | null {
   if (!dateValue?.start) return null
@@ -31,11 +28,36 @@ function extractYearMonth(dateValue: { start: string; end?: string | null } | nu
 }
 
 /**
+ * 直接呼叫 Notion REST API 查詢資料庫
+ */
+async function queryNotionDatabase(databaseId: string, startCursor?: string): Promise<any> {
+  const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${NOTION_TOKEN}`,
+      'Notion-Version': '2022-06-28',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      page_size: 100,
+      ...(startCursor ? { start_cursor: startCursor } : {}),
+    }),
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || 'Notion API 錯誤')
+  }
+
+  return response.json()
+}
+
+/**
  * 從指定年份的資料庫取得訂單
  */
 export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder[]> {
-  if (!notion) {
-    throw new Error('Notion client not initialized')
+  if (!NOTION_TOKEN) {
+    throw new Error('Notion token not configured')
   }
 
   const databaseId = DATABASE_IDS[year]
@@ -44,43 +66,44 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
     return []
   }
 
-  const pages: any[] = []
-  let cursor: string | undefined = undefined
+  try {
+    const pages: any[] = []
+    let cursor: string | undefined = undefined
 
-  do {
-    const response = await notion.dataSources.query({
-      data_source_id: databaseId,
-      start_cursor: cursor,
-      page_size: 100,
+    do {
+      const response = await queryNotionDatabase(databaseId, cursor)
+      pages.push(...response.results)
+      cursor = response.has_more ? response.next_cursor : undefined
+    } while (cursor)
+
+    return pages.map((page: any) => {
+      const props = page.properties
+
+      const customerName = props['客戶名稱']?.title?.[0]?.plain_text || ''
+      const travelDate = props['旅遊日期']?.date || null
+      const travelers = props['旅遊人數']?.rich_text?.[0]?.plain_text || ''
+      const profitRaw = props['利潤']?.rich_text?.[0]?.plain_text || ''
+      const profit = parseNumberText(profitRaw)
+      const revenueRaw = props['總收入']?.rich_text?.[0]?.plain_text || ''
+      const revenue = parseNumberText(revenueRaw)
+      const paymentStatus = props['支付狀態']?.status?.name || ''
+      const updateStatus = props['更新進度']?.status?.name || ''
+
+      return {
+        id: page.id,
+        customerName,
+        travelDate,
+        travelers,
+        profit: { raw: profitRaw, ...profit },
+        revenue: { raw: revenueRaw, ...revenue },
+        paymentStatus,
+        updateStatus,
+      }
     })
-    pages.push(...response.results)
-    cursor = response.has_more ? response.next_cursor ?? undefined : undefined
-  } while (cursor)
-
-  return pages.map((page: any) => {
-    const props = page.properties
-
-    const customerName = props['客戶名稱']?.title?.[0]?.plain_text || ''
-    const travelDate = props['旅遊日期']?.date || null
-    const travelers = props['旅遊人數']?.rich_text?.[0]?.plain_text || ''
-    const profitRaw = props['利潤']?.rich_text?.[0]?.plain_text || ''
-    const profit = parseNumberText(profitRaw)
-    const revenueRaw = props['總收入']?.rich_text?.[0]?.plain_text || ''
-    const revenue = parseNumberText(revenueRaw)
-    const paymentStatus = props['支付狀態']?.status?.name || ''
-    const updateStatus = props['更新進度']?.status?.name || ''
-
-    return {
-      id: page.id,
-      customerName,
-      travelDate,
-      travelers,
-      profit: { raw: profitRaw, ...profit },
-      revenue: { raw: revenueRaw, ...revenue },
-      paymentStatus,
-      updateStatus,
-    }
-  })
+  } catch (error) {
+    console.warn(`無法取得 ${year} 年的資料:`, error)
+    return []
+  }
 }
 
 /**
