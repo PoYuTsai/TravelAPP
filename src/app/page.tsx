@@ -7,6 +7,7 @@ import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import Services from '@/components/sections/Services'
 import WhyUs from '@/components/sections/WhyUs'
+import HomestaySection from '@/components/sections/HomestaySection'
 import ToursPreview from '@/components/sections/ToursPreview'
 import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
@@ -63,6 +64,7 @@ export default async function Home() {
         sectionSubtitle={data?.servicesSectionSubtitle}
         items={data?.servicesItems}
       />
+      <HomestaySection />
       <WhyUs
         sectionTitle={data?.whyUsSectionTitle}
         sectionSubtitle={data?.whyUsSectionSubtitle}
