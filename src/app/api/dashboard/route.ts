@@ -6,9 +6,7 @@ import type { DashboardQuery } from '@/lib/notion'
 
 // Email 白名單
 const ALLOWED_EMAILS: string[] = [
-  // 在此加入允許存取的 Email
-  // 'eric@example.com',
-  // 'min@example.com',
+  'eric19921204@gmail.com',
 ]
 
 export async function GET(request: Request) {

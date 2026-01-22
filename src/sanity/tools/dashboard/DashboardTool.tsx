@@ -12,8 +12,7 @@ import './styles.css'
 
 // Email 白名單
 const ALLOWED_EMAILS: string[] = [
-  // 'eric@example.com',
-  // 'min@example.com',
+  'eric19921204@gmail.com',
 ]
 
 export function DashboardTool() {
