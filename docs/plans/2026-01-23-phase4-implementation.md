@@ -1415,37 +1415,27 @@ EOF
 - Modify: `src/components/Footer.tsx`
 - Note: Header 已在 Task 6 移除「關於我們」連結
 
-**Step 1: Check migration story blog post exists**
+**Step 1: Update Footer navLinks**
 
-確認文章已發佈到 Sanity，slug 應為 `eric-story-taiwan-to-chiang-mai`。
+文章已存在：`/blog/eric-story-taiwan-to-chiang-mai`
 
-如果文章尚未發佈：
-1. 從 `docs/articles/2026-01-13-eric-story-taiwan-to-chiang-mai.md` 取得內容
-2. 在 Sanity Studio 建立新文章
-3. 設定 slug 為 `eric-story-taiwan-to-chiang-mai`
+在 Footer navLinks 加入「我們的故事」連結：
 
-**Step 2: Update Footer navLinks**
-
-Footer navLinks 已在 Task 6 更新，移除了「關於我們」。
-
-如需保留「關於我們」連結指向移居故事，在 Footer 底部加入：
-
-```tsx
-// 在 Footer 的 navLinks 後面，或改用直接連結
-<Link href="/blog/eric-story-taiwan-to-chiang-mai" className="...">
-  關於我們的故事
-</Link>
-```
-
-或直接在 navLinks 中加入：
 ```typescript
-{ href: '/blog/eric-story-taiwan-to-chiang-mai', label: '我們的故事' },
+const navLinks = [
+  { href: '/', label: '首頁' },
+  { href: '/services/car-charter', label: '包車服務' },
+  { href: '/tours', label: '行程案例' },
+  { href: '/homestay', label: '芳縣民宿' },
+  { href: '/blog', label: '部落格' },
+  { href: '/blog/eric-story-taiwan-to-chiang-mai', label: '我們的故事' },
+]
 ```
 
-**Step 3: Verify link works**
+**Step 2: Verify link works**
 
 Visit: `http://localhost:3000/blog/eric-story-taiwan-to-chiang-mai`
-Expected: Shows migration story article (if published)
+Expected: Shows migration story article
 
 **Step 4: Commit**
 
@@ -1511,7 +1501,7 @@ EOF
 | 6 | Navigation update | Header.tsx, **Footer.tsx** |
 | 7 | Homepage tours preview | sections/ToursPreview.tsx |
 | 8 | Homepage homestay section (正確欄位) | sections/HomestaySection.tsx |
-| 9 | About Us link update | Footer.tsx (需確認文章已發佈) |
+| 9 | About Us link update | Footer.tsx (文章已存在) |
 | 10 | Final verification | - |
 
 ## 修正紀錄
@@ -1519,7 +1509,7 @@ EOF
 - **Task 2 & 4**: 新增 `availableYears` 動態返回，「114 組家庭」改為動態取得
 - **Task 6**: 新增 Footer.tsx 更新
 - **Task 8**: 修正欄位名稱 `heroMainImage`, `heroTitle`, `features`
-- **Task 9**: 明確指定文章 slug `eric-story-taiwan-to-chiang-mai`
+- **Task 9**: 文章已存在，直接使用 `/blog/eric-story-taiwan-to-chiang-mai`
 
 ---
 
