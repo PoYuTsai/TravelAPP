@@ -262,11 +262,33 @@ playwright.config.ts       # Playwright 設定
 
 ### 系統使用者
 
-| 角色 | 人員 | Sanity 權限 | 說明 |
-|------|------|-------------|------|
-| 老闆 | Eric | Administrator | 唯一最高權限，管理團隊、帳單 |
-| 老闆娘 | Min | Editor | 可操作所有內容，不能管團隊/帳單 |
-| 女兒 | - | Editor | 同上 |
+| 角色 | 人員 | Sanity 權限 | Dashboard 白名單 | 實際權限 |
+|------|------|-------------|-----------------|---------|
+| 老闆 | Eric | Administrator | ✅ | 全部權限 |
+| 老闆娘 | Min | Editor | ✅ | Dashboard + 行程操作 |
+| 女兒 | - | Editor | ✅ | Dashboard + 行程操作 |
+| 未來員工 | - | Editor | ❌ | 只能操作行程，看不到財務 |
+
+### Dashboard 白名單機制
+
+Sanity 原生 Editor 權限無法區分「可看財務」和「不可看財務」，因此 Dashboard 需要額外的白名單檢查：
+
+```
+Dashboard 載入流程：
+1. 取得目前登入者的 Email
+2. 檢查是否在白名單內
+3. 在白名單 → 顯示 Dashboard
+4. 不在白名單 → 顯示「無權限存取」
+```
+
+**白名單設定（程式碼內）：**
+```typescript
+const DASHBOARD_ALLOWED_EMAILS = [
+  'eric@xxx.com',    // 老闆
+  'min@xxx.com',     // 老闆娘
+  // 員工不加入此名單
+]
+```
 
 ### 系統架構
 
@@ -277,9 +299,10 @@ playwright.config.ts       # Playwright 設定
 │   ┌─────────────┐    ┌─────────────────────┐   │
 │   │  Dashboard  │    │  客戶行程表系統      │   │
 │   │  (財務)     │    │  (建立/編輯/匯出)   │   │
+│   │             │    │                     │   │
+│   │ 🔒 白名單   │    │  所有 Editor 可用   │   │
 │   └─────────────┘    └─────────────────────┘   │
 │                                                 │
-│   使用者：Eric (Admin), Min (Editor), 女兒      │
 └─────────────────────────────────────────────────┘
            │
            │ LINE 貼上行程文字
@@ -296,8 +319,9 @@ playwright.config.ts       # Playwright 設定
 | 決策 | 選擇 | 理由 |
 |------|------|------|
 | Dashboard 放哪 | Sanity Studio 內建 Tab | 用現有登入，不用另做權限 |
+| Dashboard 權限 | Email 白名單 | 區分家人與員工，保護財務資料 |
 | 導遊權限 | 不給系統權限 | LINE 溝通即可，維持現有流程 |
-| 密碼保護 | 不需要 | Sanity 登入已足夠 |
+| 密碼保護 | 不需要 | Sanity 登入 + 白名單已足夠 |
 
 ### 未來擴充（等有需求再做）
 
