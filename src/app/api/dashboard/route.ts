@@ -16,8 +16,8 @@ export async function GET(request: Request) {
     const userEmail = request.headers.get('x-user-email')
 
     // 白名單檢查（如果白名單為空，允許所有人）
-    if (ALLOWED_EMAILS.length > 0 && userEmail) {
-      if (!ALLOWED_EMAILS.includes(userEmail)) {
+    if (ALLOWED_EMAILS.length > 0) {
+      if (!userEmail || !ALLOWED_EMAILS.includes(userEmail)) {
         return NextResponse.json(
           { error: '無權限存取 Dashboard' },
           { status: 403 }
