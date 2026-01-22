@@ -250,7 +250,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
                   <TextInput
                     type="number"
                     min={1}
-                    value={value.guideService.days || totalDays}
+                    value={value.guideService.days ?? totalDays}
                     onChange={(e) =>
                       updateField('guideService', {
                         ...value.guideService,

@@ -107,13 +107,16 @@ function isActivityLine(line: string): boolean {
 }
 
 /**
- * 判斷是否為晚上專屬內容（晚餐）
- * 住宿已獨立處理，不再放入「晚」欄位
+ * 判斷是否為晚上專屬內容
+ * 餐點和住宿已獨立處理，不再放入「晚」欄位
+ * 這裡只處理真正只適合晚上的活動（如夜市、按摩等）
  */
 function isEveningOnly(content: string): boolean {
-  const eveningOnlyKeywords = ['晚餐', 'dinner']
+  // 夜間活動關鍵字（不包含餐點，餐點已有專門欄位）
+  const eveningOnlyKeywords = ['夜市', '按摩', '酒吧', 'night market', 'massage']
+  const lowerContent = content.toLowerCase()
   for (const kw of eveningOnlyKeywords) {
-    if (content.includes(kw) || content.toLowerCase().includes(kw)) {
+    if (lowerContent.includes(kw.toLowerCase())) {
       return true
     }
   }
@@ -130,8 +133,11 @@ function cleanActivityContent(line: string): string {
 /**
  * 分配活動到早/午/晚時段
  * 規則：
- * 1. 有午餐：午餐前→早，午餐後到晚餐前→午，晚餐和住宿→晚
- * 2. 沒午餐：自動分配讓午不為空，晚餐和住宿→晚
+ * 1. 有午餐：活動前半→早，後半→午
+ * 2. 沒午餐：活動前半→早，後半→午
+ * 3. 夜間活動（夜市、按摩等）→晚
+ *
+ * 注意：餐點（午餐、晚餐）已有專門欄位，不在此函數處理
  */
 function distributeActivities(
   activities: string[],
@@ -142,64 +148,32 @@ function distributeActivities(
 
   if (activities.length === 0) return result
 
-  // 找出午餐和晚餐的位置
-  let lunchIndex = -1
-  let dinnerIndex = -1
-
-  for (let i = 0; i < activities.length; i++) {
-    const act = activities[i]
-    if (lunchIndex === -1 && (act.includes('午餐') || act.match(/^(中餐|lunch)[：:]/i))) {
-      lunchIndex = i
-    }
-    if (dinnerIndex === -1 && (act.includes('晚餐') || act.match(/^dinner[：:]/i))) {
-      dinnerIndex = i
-    }
-  }
-
   // 分配活動
   const morningItems: string[] = []
   const afternoonItems: string[] = []
   const eveningItems: string[] = []
 
-  for (let i = 0; i < activities.length; i++) {
-    const act = activities[i]
-
-    // 晚餐和住宿固定放晚上
+  // 先過濾出晚間活動
+  const regularActivities: string[] = []
+  for (const act of activities) {
     if (isEveningOnly(act)) {
       eveningItems.push(act)
-      continue
-    }
-
-    if (lunchIndex !== -1) {
-      // 有午餐的情況
-      if (i < lunchIndex) {
-        morningItems.push(act)
-      } else if (i === lunchIndex) {
-        // 午餐本身可以放午，或不放（因為有 lunch 欄位）
-        continue
-      } else if (dinnerIndex !== -1 && i >= dinnerIndex) {
-        eveningItems.push(act)
-      } else {
-        afternoonItems.push(act)
-      }
     } else {
-      // 沒有午餐的情況：自動分配
-      if (dinnerIndex !== -1 && i >= dinnerIndex) {
-        eveningItems.push(act)
-      } else {
-        // 計算應該放在早上還是下午
-        // 晚餐前的活動，前半放早上，後半放下午
-        const beforeDinner = dinnerIndex !== -1 ? dinnerIndex : activities.length
-        const midPoint = Math.ceil(beforeDinner / 2)
-
-        if (i < midPoint) {
-          morningItems.push(act)
-        } else {
-          afternoonItems.push(act)
-        }
-      }
+      regularActivities.push(act)
     }
   }
+
+  // 把剩餘活動分配到早/午
+  // 如果有午餐，通常表示行程有分上下午
+  const midPoint = Math.ceil(regularActivities.length / 2)
+
+  regularActivities.forEach((act, i) => {
+    if (i < midPoint) {
+      morningItems.push(act)
+    } else {
+      afternoonItems.push(act)
+    }
+  })
 
   result.morning = morningItems.join('\n')
   result.afternoon = afternoonItems.join('\n')
@@ -285,8 +259,8 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
       } else if (meal.type === 'dinner') {
         currentDay.dinner = meal.content
       }
-      // 餐點也加入活動列表（用於分配判斷）
-      dayActivities.push(trimmedLine)
+      // 餐點不加入 dayActivities，避免重複分配到 morning/afternoon/evening
+      // 但仍加入 activities 供記錄（不影響時段分配）
       currentDay.activities.push({ content: trimmedLine })
       continue
     }
