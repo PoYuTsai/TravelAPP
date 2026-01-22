@@ -19,6 +19,7 @@ import {
   type OtherQuotationItem,
   getWeekday,
 } from '../components/structured-editor'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 
 // 從備註文字中解析「包含」和「不包含」內容
 function parseIncludesExcludes(text: string): { priceIncludes: string; priceExcludes: string } {
@@ -391,6 +392,7 @@ https://tdac.immigration.go.th/arrival-card/#/home
       type: 'dialog',
       header: '結構化編輯器',
       content: (
+        <ErrorBoundary fallbackMessage="結構化編輯器載入失敗">
         <Box padding={4} style={{ maxHeight: '80vh', overflow: 'auto', minWidth: '700px' }}>
           <Stack space={4}>
             {/* Tab 導航 */}
@@ -566,6 +568,7 @@ https://tdac.immigration.go.th/arrival-card/#/home
             </Flex>
           </Stack>
         </Box>
+        </ErrorBoundary>
       ),
       onClose: handleClose,
     },

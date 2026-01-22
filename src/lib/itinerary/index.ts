@@ -1,6 +1,7 @@
-// src/lib/itinerary-parser.ts
-// 此檔案保留向後相容，實際邏輯已拆分到 ./itinerary/ 模組
+// src/lib/itinerary/index.ts
+// 行程模組統一匯出
 
+// 類型
 export type {
   ParsedActivity,
   ParsedDay,
@@ -9,17 +10,24 @@ export type {
   ParsedQuotationItem,
   ParsedQuotation,
   HotelBooking,
-} from './itinerary'
+} from './types'
 
+export { WEEKDAY_MAP, WEEKDAYS } from './types'
+
+// 解析函數
 export {
-  WEEKDAY_MAP,
-  WEEKDAYS,
   parseItineraryText,
   parseBasicInfoText,
   parseQuotationText,
+} from './parser'
+
+// 格式化函數
+export {
   formatToLineText,
   sanityToLineText,
   sanityToBasicInfoText,
   sanityToQuotationText,
-  generateHotelsFromDays,
-} from './itinerary'
+} from './formatter'
+
+// 飯店處理
+export { generateHotelsFromDays } from './hotels'

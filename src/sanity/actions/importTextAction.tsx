@@ -4,6 +4,7 @@ import { Button, Dialog, Box, Text, TextArea, Stack, Card, Flex, Badge } from '@
 import { useState, useCallback } from 'react'
 import { DocumentActionProps, useDocumentOperation } from 'sanity'
 import { parseItineraryText } from '../../lib/itinerary-parser'
+import { ErrorBoundary } from '../components/ErrorBoundary'
 
 export function importTextAction(props: DocumentActionProps) {
   const { id, type, draft, published } = props
@@ -80,6 +81,7 @@ export function importTextAction(props: DocumentActionProps) {
       type: 'dialog',
       header: '匯入行程文字',
       content: (
+        <ErrorBoundary fallbackMessage="匯入功能載入失敗">
         <Box padding={4}>
           <Stack space={4}>
             <Card padding={3} tone="primary" border>
@@ -213,6 +215,7 @@ export function importTextAction(props: DocumentActionProps) {
             )}
           </Stack>
         </Box>
+        </ErrorBoundary>
       ),
       onClose: handleClose,
     },

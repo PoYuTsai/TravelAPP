@@ -29,8 +29,10 @@ interface ItineraryData {
   priceExcludes?: string
 }
 
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
+// 導出供測試使用
+export function formatDate(dateStr: string): string {
+  // 使用 T00:00:00 避免時區問題
+  const date = new Date(dateStr + 'T00:00:00')
   const month = date.getMonth() + 1
   const day = date.getDate()
   const weekdays = ['日', '一', '二', '三', '四', '五', '六']
@@ -38,9 +40,9 @@ function formatDate(dateStr: string): string {
   return `${month}/${day} (${weekday})`
 }
 
-function formatDateRange(start: string, end: string): string {
-  const startDate = new Date(start)
-  const endDate = new Date(end)
+export function formatDateRange(start: string, end: string): string {
+  const startDate = new Date(start + 'T00:00:00')
+  const endDate = new Date(end + 'T00:00:00')
   const startMonth = startDate.getMonth() + 1
   const startDay = startDate.getDate()
   const endMonth = endDate.getMonth() + 1
@@ -48,7 +50,7 @@ function formatDateRange(start: string, end: string): string {
   return `${startDate.getFullYear()}/${startMonth}/${startDay} - ${endMonth}/${endDay}`
 }
 
-function formatPeople(adults: number, children: number, childrenAges?: string): string {
+export function formatPeople(adults: number, children: number, childrenAges?: string): string {
   let result = `${adults} 大`
   if (children > 0) {
     result += ` ${children} 小`
@@ -59,7 +61,7 @@ function formatPeople(adults: number, children: number, childrenAges?: string): 
   return result
 }
 
-function parseList(text?: string): string[] {
+export function parseList(text?: string): string[] {
   if (!text) return []
   return text.split('\n').filter((line) => line.trim()).map((line) => line.replace(/^[-•]\s*/, '').trim())
 }
