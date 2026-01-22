@@ -46,7 +46,7 @@ export default async function HomestaySection() {
             <SectionTitle
               title={homestay?.heroTitle || '芳縣特色民宿'}
               subtitle="住進我們的家，體驗最道地的泰北生活"
-              align="left"
+              centered={false}
             />
             <p className="text-gray-600 mb-6">
               {homestay?.heroSubtitle || '遠離觀光區的寧靜，體驗真正的泰北在地生活'}
