@@ -146,14 +146,17 @@ Day 1｜測試
 ・早上活動2
 午餐：午餐
 ・下午活動1
+・下午活動2
 晚餐: 晚餐
-・晚上活動1`
+・夜市逛街`
 
     const result = parseItineraryText(text, 2026)
     expect(result.days[0].morning).toContain('早上活動1')
     expect(result.days[0].morning).toContain('早上活動2')
     expect(result.days[0].afternoon).toContain('下午活動1')
-    expect(result.days[0].evening).toContain('晚上活動1')
+    expect(result.days[0].afternoon).toContain('下午活動2')
+    // 晚上只放夜間活動（夜市、按摩等），一般活動放午
+    expect(result.days[0].evening).toContain('夜市逛街')
   })
 
   it('處理沒有 Day 標題的行程', () => {

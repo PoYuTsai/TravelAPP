@@ -362,7 +362,13 @@ https://tdac.immigration.go.th/arrival-card/#/home
         }
       }
 
-      patch.execute([{ set: updates }])
+      // 執行更新（Sanity patch 是非同步的）
+      try {
+        patch.execute([{ set: updates }])
+      } catch (patchError) {
+        console.error('Patch 執行失敗:', patchError)
+        throw patchError
+      }
 
       setTimeout(() => {
         setIsSyncing(false)
@@ -370,7 +376,7 @@ https://tdac.immigration.go.th/arrival-card/#/home
       }, 300)
     } catch (error) {
       console.error('同步失敗:', error)
-      alert('同步失敗，請檢查文字格式')
+      alert('同步失敗：' + (error instanceof Error ? error.message : '請檢查文字格式'))
       setIsSyncing(false)
     }
   }, [basicInfo, dailyItems, otherItems, validation, patch, handleClose])
