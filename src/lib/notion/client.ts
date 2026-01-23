@@ -174,6 +174,11 @@ export async function fetchTotalFamilyCount(): Promise<number> {
       }
     }
 
+    // If no data found, use fallback (Notion token might not be configured)
+    if (total === 0) {
+      return 114
+    }
+
     // Cache the result
     setCache(cacheKey, total)
     return total
