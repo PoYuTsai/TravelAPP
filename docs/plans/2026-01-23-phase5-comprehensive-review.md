@@ -75,20 +75,25 @@ defineField({ name: 'seoDescription', type: 'text', hidden: true }),
 // 之後: bottom-20 (避開底部導航)
 ```
 
-### 2. TrustNumbers 觸控優化
+### 2. TrustNumbers 互動優化
 **檔案**: `src/components/sections/TrustNumbers.tsx`
 
-```typescript
-// py-2 → py-3 (確保 44px+ 觸控目標)
-```
+- py-2 → py-3 (確保 44px+ 觸控目標)
+- 新增脈衝動畫 (首次載入閃爍 3 次)
+- 新增「👆 點擊探索更多」提示 (手機版)
+- 邊框改為主題色 (`border-primary/30`)
+- hover 發光陰影效果
+- 提升 hover 上移幅度 (`-translate-y-1`)
 
 ### 3. 首頁客戶見證
-**檔案**: `src/components/sections/Testimonials.tsx` (新建)
+**檔案**: `src/components/sections/Testimonials.tsx`
 
-- 3 則真實感回饋
-- 桌面版 Grid 展示
-- 手機版 Carousel 切換
-- 連結至 Facebook 評價
+- 改用 Embla Carousel 支援手機滑動
+- 真實 FB 評論 (王薪驊、Vicky Lin、Lily Chen)
+- 左右箭頭導航按鈕
+- 「← 左右滑動查看更多 →」提示
+- Facebook 來源圖示
+- 桌面版 Grid / 手機版 Carousel
 
 ### 4. 包車頁 CTA 差異化
 **檔案**: `src/app/services/car-charter/page.tsx`
@@ -103,6 +108,17 @@ defineField({ name: 'seoDescription', type: 'text', hidden: true }),
 - 標題: "不只是住宿，是在地家庭的款待"
 - 副標: "12 年來接待過上千組旅客"
 - 按鈕: "LINE 詢問房況與接送"
+
+### 6. 一日遊景點輪播優化
+**檔案**: `src/components/tours/StopsCarousel.tsx`
+
+原問題：文字疊在圖片上，難以閱讀
+
+修復方案：
+- 圖片與文字分離 (不再疊加)
+- 圖片在上方 (圓角)
+- 文字在下方白色卡片區塊
+- 左右箭頭位置調整至圖片中央
 
 ---
 
@@ -176,14 +192,33 @@ const query = `*[_type == "post" && category == $category]`
 client.fetch(query, { category })
 ```
 
+#### 4. API 驗證與速率限制 (HIGH → FIXED)
+**新增檔案**: `src/lib/api-auth.ts`
+
+集中式 API 驗證模組：
+- `validateApiKey()` - API Key 驗證
+- `validateDashboardAccess()` - Dashboard 白名單驗證
+- `checkRateLimit()` - 速率限制 (記憶體)
+- `getClientIP()` - 客戶端 IP 取得
+
+**更新 API 路由**:
+- `/api/itinerary/[id]/text` - 30 req/min
+- `/api/itinerary/[id]/pdf` - 10 req/min (資源密集)
+- `/api/itinerary/[id]/excel` - 20 req/min
+- `/api/dashboard` - 60 req/min
+
+**環境變數** (`.env.example`):
+```
+INTERNAL_API_KEY=your-secure-api-key-here
+DASHBOARD_ALLOWED_EMAILS=email1@example.com,email2@example.com
+```
+
 ### 待處理 (低優先)
 
 | 項目 | 嚴重度 | 建議 |
 |------|--------|------|
 | API tokens 在 .env.local | CRITICAL | 輪換 tokens、移出雲端同步資料夾 |
 | 依賴漏洞 (15個) | HIGH/MODERATE | 等待 Sanity 官方更新 |
-| Itinerary API 無驗證 | HIGH | 加入 API key 驗證 |
-| Dashboard 標頭驗證弱 | HIGH | 改用 JWT/Session |
 
 ---
 
@@ -243,21 +278,29 @@ videoUrl: 'https://res.cloudinary.com/.../upload/vc_h264/v.../video.mp4'
 - `src/lib/navigation.ts`
 - `src/lib/constants.ts`
 - `src/lib/types/index.ts`
+- `src/lib/api-auth.ts` - API 驗證與速率限制
 - `src/components/icons/SocialIcons.tsx`
 - `src/components/sections/Testimonials.tsx`
 - `src/components/cms/VideoPlayer.tsx`
 
 ### 修改檔案
+- `.env.example` - 新增安全環境變數
 - `next.config.js` - 安全標頭 + CSP
 - `src/components/Header.tsx` - 使用共用導航
 - `src/components/Footer.tsx` - 使用共用導航
 - `src/components/ui/FloatingLineButton.tsx` - 位置修正
 - `src/components/sections/Hero.tsx` - 品牌文案
-- `src/components/sections/TrustNumbers.tsx` - 觸控優化
+- `src/components/sections/TrustNumbers.tsx` - 互動特效 + 脈衝動畫
+- `src/components/sections/Testimonials.tsx` - Embla 滑動 + 真實 FB 評論
+- `src/components/tours/StopsCarousel.tsx` - 文字移至圖片下方
 - `src/app/page.tsx` - 加入 Testimonials
 - `src/app/blog/page.tsx` - GROQ 注入防護
 - `src/app/homestay/page.tsx` - 社會證明 + CTA + 影片
 - `src/app/services/car-charter/page.tsx` - CTA 差異化 + 影片
+- `src/app/api/dashboard/route.ts` - 速率限制 + 共用驗證
+- `src/app/api/itinerary/[id]/text/route.ts` - API Key + 速率限制
+- `src/app/api/itinerary/[id]/pdf/route.ts` - API Key + 速率限制
+- `src/app/api/itinerary/[id]/excel/route.ts` - API Key + 速率限制
 - `src/sanity/schemas/landingPage.ts` - 移除未用欄位
 - `src/sanity/schemas/carCharter.ts` - 清理欄位 + 隱藏棄用
 - `src/sanity/schemas/homestay.ts` - 清理欄位 + 隱藏棄用
