@@ -9,7 +9,7 @@ export interface TourCase {
   days: number
   startDate: string  // ISO format: 2026-02-20
   endDate: string | null  // ISO format or null for single day
-  status: 'completed' | 'upcoming'
+  status: 'completed' | 'traveling' | 'upcoming'  // 已完成 | 旅遊中 | 即將出發
 }
 
 export interface TourCasesResponse {
@@ -40,10 +40,18 @@ function orderToCase(order: NotionOrder): TourCase | null {
     days = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1
   }
 
-  // 判斷狀態：用結束日期判斷（如果行程還沒結束就是「即將出發」）
+  // 判斷狀態：
   // 如果結束日期 < 今天 → 已完成
-  // 如果開始日期 >= 今天 → 即將出發
-  const status: 'completed' | 'upcoming' = endDateObj < today ? 'completed' : 'upcoming'
+  // 如果開始日期 <= 今天 <= 結束日期 → 旅遊中
+  // 如果開始日期 > 今天 → 即將出發
+  let status: 'completed' | 'traveling' | 'upcoming'
+  if (endDateObj < today) {
+    status = 'completed'
+  } else if (startDateObj <= today && today <= endDateObj) {
+    status = 'traveling'
+  } else {
+    status = 'upcoming'
+  }
 
   return {
     id: order.id,

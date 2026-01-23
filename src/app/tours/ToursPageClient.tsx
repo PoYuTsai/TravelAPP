@@ -34,7 +34,7 @@ interface Case {
   days: number
   startDate: string
   endDate: string | null
-  status: 'completed' | 'upcoming'
+  status: 'completed' | 'traveling' | 'upcoming'
 }
 
 interface ToursPageClientProps {
@@ -50,8 +50,14 @@ export default function ToursPageClient({ packages, dayTours = [] }: ToursPageCl
   const [totalCases, setTotalCases] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
-  // Fetch initial cases (no year filter - use Notion ordering)
+  // 2025 past cases
+  const [pastCases, setPastCases] = useState<Case[]>([])
+  const [showPastCases, setShowPastCases] = useState(false)
+  const [loadingPast, setLoadingPast] = useState(false)
+
+  // Fetch initial cases for current year
   useEffect(() => {
     fetch(`/api/tours/cases?limit=${INITIAL_CASES}`)
       .then((res) => res.json())
@@ -70,10 +76,37 @@ export default function ToursPageClient({ packages, dayTours = [] }: ToursPageCl
       const res = await fetch(`/api/tours/cases?limit=${LOAD_MORE_COUNT}&offset=${cases.length}`)
       const data = await res.json()
       setCases((prev) => [...prev, ...(data.cases || [])])
+      setIsExpanded(true)
     } catch (error) {
       console.error(error)
     } finally {
       setLoadingMore(false)
+    }
+  }
+
+  // Collapse back to initial count
+  const collapse = () => {
+    setCases((prev) => prev.slice(0, INITIAL_CASES))
+    setIsExpanded(false)
+  }
+
+  // Load 2025 past cases
+  const loadPastCases = async () => {
+    if (pastCases.length > 0) {
+      setShowPastCases(!showPastCases)
+      return
+    }
+
+    setLoadingPast(true)
+    try {
+      const res = await fetch('/api/tours/cases?year=2025&limit=100')
+      const data = await res.json()
+      setPastCases(data.cases || [])
+      setShowPastCases(true)
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setLoadingPast(false)
     }
   }
 
@@ -165,9 +198,9 @@ export default function ToursPageClient({ packages, dayTours = [] }: ToursPageCl
                 ))}
               </div>
 
-              {/* Load More */}
-              {hasMore && (
-                <div className="text-center mt-8">
+              {/* Load More / Collapse */}
+              <div className="text-center mt-8 flex justify-center gap-3">
+                {hasMore && (
                   <button
                     onClick={loadMore}
                     disabled={loadingMore}
@@ -175,9 +208,56 @@ export default function ToursPageClient({ packages, dayTours = [] }: ToursPageCl
                   >
                     {loadingMore ? '載入中...' : '載入更多'}
                   </button>
-                </div>
-              )}
+                )}
+                {isExpanded && (
+                  <button
+                    onClick={collapse}
+                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 font-medium transition-colors"
+                  >
+                    收回
+                  </button>
+                )}
+              </div>
             </>
+          )}
+        </section>
+
+        {/* 2025 Past Cases Section */}
+        <section className="mb-16">
+          <div className="text-center">
+            <button
+              onClick={loadPastCases}
+              disabled={loadingPast}
+              className="inline-flex items-center gap-2 px-6 py-3 text-gray-500 hover:text-gray-700 font-medium transition-colors disabled:opacity-50"
+            >
+              <svg
+                className={`w-4 h-4 transition-transform ${showPastCases ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              {loadingPast ? '載入中...' : showPastCases ? '隱藏 2025 年案例' : '查看 2025 年過往案例'}
+            </button>
+          </div>
+
+          {showPastCases && pastCases.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-gray-600 mb-4 text-center">2025 年案例</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                {pastCases.map((c) => (
+                  <CaseCard
+                    key={c.id}
+                    name={c.name}
+                    days={c.days}
+                    startDate={c.startDate}
+                    endDate={c.endDate}
+                    status={c.status}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </section>
 

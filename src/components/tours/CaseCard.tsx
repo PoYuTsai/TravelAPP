@@ -5,7 +5,7 @@ interface CaseCardProps {
   days: number
   startDate: string  // ISO format: 2026-02-20
   endDate: string | null  // ISO format or null for single day
-  status: 'completed' | 'upcoming'
+  status: 'completed' | 'traveling' | 'upcoming'
 }
 
 /**
@@ -37,8 +37,42 @@ function formatDateRange(startDate: string, endDate: string | null): string {
 }
 
 export default function CaseCard({ name, days, startDate, endDate, status }: CaseCardProps) {
-  const isCompleted = status === 'completed'
   const dateDisplay = formatDateRange(startDate, endDate)
+
+  // Status styling
+  const statusConfig = {
+    completed: {
+      color: 'text-gray-400',
+      label: '已完成',
+      icon: (
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      ),
+    },
+    traveling: {
+      color: 'text-green-600',
+      label: '旅遊中',
+      icon: (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+        </span>
+      ),
+    },
+    upcoming: {
+      color: 'text-primary',
+      label: '即將出發',
+      icon: (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+        </span>
+      ),
+    },
+  }
+
+  const { color, label, icon } = statusConfig[status]
 
   return (
     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -51,25 +85,9 @@ export default function CaseCard({ name, days, startDate, endDate, status }: Cas
       <div className="text-sm text-gray-400 mt-1">
         {dateDisplay}
       </div>
-      <div className={`text-xs mt-2 inline-flex items-center gap-1 ${
-        isCompleted ? 'text-gray-400' : 'text-primary'
-      }`}>
-        {isCompleted ? (
-          <>
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-            已完成
-          </>
-        ) : (
-          <>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            即將出發
-          </>
-        )}
+      <div className={`text-xs mt-2 inline-flex items-center gap-1 ${color}`}>
+        {icon}
+        {label}
       </div>
     </div>
   )
