@@ -19,7 +19,6 @@ const defaultData = {
   heroCtaText: 'LINE 聊聊你的行程',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
   // Video
-  videoShow: true,
   videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163410/790057116.088289_vz6u16.mp4',
   videoTitle: '清邁包車服務介紹',
   features: [
@@ -97,11 +96,9 @@ export default async function CarCharterPage() {
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
   const faq = data?.faq?.length > 0 ? data.faq : defaultData.faq
-  // Video with fallback - show default video even if Sanity has videoShow: false
+  // Video - always use default if Sanity doesn't have one
   const videoUrl = data?.videoUrl || defaultData.videoUrl
   const videoTitle = data?.videoTitle || defaultData.videoTitle
-  // If using default video URL, always show it; otherwise respect Sanity setting
-  const videoShow = !data?.videoUrl ? defaultData.videoShow : (data?.videoShow ?? true)
 
   return (
     <>
@@ -129,16 +126,14 @@ export default async function CarCharterPage() {
           </div>
         </section>
 
-        {/* Video (if available) */}
-        {videoShow && videoUrl && (
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-            <VideoPlayer
-              videoUrl={videoUrl}
-              poster={data?.videoPoster}
-              title={videoTitle}
-            />
-          </section>
-        )}
+        {/* Video - always show with default */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
+          <VideoPlayer
+            videoUrl={videoUrl}
+            poster={data?.videoPoster}
+            title={videoTitle}
+          />
+        </section>
 
         {/* Features */}
         <section className="bg-gray-50 py-16">

@@ -21,7 +21,6 @@ const defaultData = {
   heroCtaText: 'LINE 詢問房況',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
   // Video
-  videoShow: true,
   videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163483/%E8%8A%B3%E7%B8%A3%E6%99%AF%E7%89%A9%E6%88%BF%E9%96%93%E9%9A%A8%E6%8B%8D_%E5%BD%B1%E7%89%8713_dhi0uo.mp4',
   videoTitle: '芳縣民宿環境介紹',
   features: [
@@ -71,11 +70,9 @@ export default async function HomestayPage() {
   const heroCtaText = data?.heroCtaText || defaultData.heroCtaText
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
-  // Video with fallback - show default video even if Sanity has videoShow: false
+  // Video - always use default if Sanity doesn't have one
   const videoUrl = data?.videoUrl || defaultData.videoUrl
   const videoTitle = data?.videoTitle || defaultData.videoTitle
-  // If using default video URL, always show it; otherwise respect Sanity setting
-  const videoShow = !data?.videoUrl ? defaultData.videoShow : (data?.videoShow ?? true)
 
   return (
     <div className="py-12 md:py-20">
@@ -121,16 +118,14 @@ export default async function HomestayPage() {
         </div>
       </section>
 
-      {/* Video (if available) */}
-      {videoShow && videoUrl && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-          <VideoPlayer
-            videoUrl={videoUrl}
-            poster={data?.videoPoster}
-            title={videoTitle}
-          />
-        </section>
-      )}
+      {/* Video - always show with default */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
+        <VideoPlayer
+          videoUrl={videoUrl}
+          poster={data?.videoPoster}
+          title={videoTitle}
+        />
+      </section>
 
       {/* Features */}
       <section className="bg-gray-50 py-16">

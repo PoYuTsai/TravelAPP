@@ -63,18 +63,11 @@ export default defineType({
 
     // === 形象影片 ===
     defineField({
-      name: 'videoShow',
-      title: '顯示影片',
-      type: 'boolean',
-      group: 'video',
-      initialValue: false,
-    }),
-    defineField({
       name: 'videoUrl',
       title: '影片網址 (Cloudinary)',
       type: 'url',
       group: 'video',
-      description: '貼上 Cloudinary 影片網址',
+      description: '貼上 Cloudinary 影片網址（預設會顯示內建影片）',
     }),
     defineField({
       name: 'videoPoster',
@@ -199,6 +192,28 @@ export default defineType({
           },
         }),
       ],
+    }),
+
+    // === 棄用欄位（隱藏，僅為了避免 Unknown fields 警告）===
+    defineField({
+      name: 'videoShow',
+      type: 'boolean',
+      hidden: true,
+    }),
+    defineField({
+      name: 'videoYoutubeId',
+      type: 'string',
+      hidden: true,
+    }),
+    defineField({
+      name: 'seoTitle',
+      type: 'string',
+      hidden: true,
+    }),
+    defineField({
+      name: 'seoDescription',
+      type: 'text',
+      hidden: true,
     }),
   ],
   preview: {
