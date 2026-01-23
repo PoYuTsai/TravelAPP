@@ -46,23 +46,6 @@ export default function LocationInfo({
           </div>
         </div>
       </div>
-
-      {/* Map Preview - Link to Google Maps */}
-      {googleMapUrl && (
-        <a
-          href={googleMapUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block border-t border-gray-100 bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer"
-        >
-          <div className="h-[200px] flex flex-col items-center justify-center text-gray-500">
-            <svg className="w-12 h-12 mb-2 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
-            </svg>
-            <span className="text-sm font-medium">點擊查看 Google 地圖</span>
-          </div>
-        </a>
-      )}
     </div>
   )
 }
