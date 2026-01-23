@@ -5,11 +5,12 @@
 
 ## 概述
 
-從四個角度全面審視網站，並執行所有優化建議：
+從五個角度全面審視網站，並執行所有優化建議：
 - SA 架構師
 - PM 產品經理
 - 品牌戰略顧問
 - 白帽資安測試
+- 跨裝置相容性
 
 ---
 
@@ -49,10 +50,18 @@ export const revalidate = 60
 ```
 
 ### 5. Sanity Schema 清理
-**移除未使用欄位**:
+**移除/隱藏未使用欄位**:
 - `landingPage.ts`: seoTitle, seoDescription
-- `carCharter.ts`: videoYoutubeId, seoTitle, seoDescription
-- `homestay.ts`: videoYoutubeId, seoTitle, seoDescription
+- `carCharter.ts`: videoYoutubeId, seoTitle, seoDescription, videoShow
+- `homestay.ts`: videoYoutubeId, seoTitle, seoDescription, videoShow
+
+**加入隱藏棄用欄位** (避免 Unknown fields 警告):
+```typescript
+defineField({ name: 'videoShow', type: 'boolean', hidden: true }),
+defineField({ name: 'videoYoutubeId', type: 'string', hidden: true }),
+defineField({ name: 'seoTitle', type: 'string', hidden: true }),
+defineField({ name: 'seoDescription', type: 'text', hidden: true }),
+```
 
 ---
 
@@ -146,7 +155,15 @@ headers: [
 ]
 ```
 
-#### 2. GROQ 注入防護 (MEDIUM → FIXED)
+#### 2. CSP 允許 Cloudinary 影片
+**檔案**: `next.config.js`
+
+```javascript
+"media-src 'self' https://cdn.sanity.io https://res.cloudinary.com",
+"connect-src 'self' https://www.google-analytics.com https://*.sanity.io https://res.cloudinary.com",
+```
+
+#### 3. GROQ 注入防護 (MEDIUM → FIXED)
 **檔案**: `src/app/blog/page.tsx`
 
 ```typescript
@@ -170,6 +187,56 @@ client.fetch(query, { category })
 
 ---
 
+## 跨裝置相容性 (iOS Safari)
+
+### 問題
+民宿頁面影片在 iOS Safari 無法播放，Android 正常。
+
+### 原因分析
+1. 影片檔名含中文字元 → URL 編碼問題
+2. 影片編碼非 H.264 → iOS Safari 不支援
+
+### 解決方案
+
+#### 1. 影片檔名使用純英文
+```
+❌ 芳縣景物房間隨拍_影片13_dhi0uo.mp4
+✅ hotelvideo_0123_gui5rb.mp4
+```
+
+#### 2. Cloudinary H.264 轉檔
+在 URL 加入 `vc_h264` 參數讓 Cloudinary 自動轉成 iOS 相容格式：
+
+```typescript
+// 之前
+videoUrl: 'https://res.cloudinary.com/.../upload/v.../video.mp4'
+
+// 之後
+videoUrl: 'https://res.cloudinary.com/.../upload/vc_h264/v.../video.mp4'
+                                              ^^^^^^^^
+```
+
+#### 3. VideoPlayer 簡化
+**檔案**: `src/components/cms/VideoPlayer.tsx`
+
+改用原生 HTML5 video controls，最大化瀏覽器相容性：
+```tsx
+<video
+  src={videoUrl}
+  controls
+  playsInline
+  preload="metadata"
+>
+  <source src={videoUrl} type="video/mp4" />
+</video>
+```
+
+### 影片 URL 最終版本
+- 包車: `https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769163410/790057116.088289_vz6u16.mp4`
+- 民宿: `https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769170451/hotelvideo_0123_gui5rb.mp4`
+
+---
+
 ## 檔案變更清單
 
 ### 新建檔案
@@ -178,9 +245,10 @@ client.fetch(query, { category })
 - `src/lib/types/index.ts`
 - `src/components/icons/SocialIcons.tsx`
 - `src/components/sections/Testimonials.tsx`
+- `src/components/cms/VideoPlayer.tsx`
 
 ### 修改檔案
-- `next.config.js` - 安全標頭
+- `next.config.js` - 安全標頭 + CSP
 - `src/components/Header.tsx` - 使用共用導航
 - `src/components/Footer.tsx` - 使用共用導航
 - `src/components/ui/FloatingLineButton.tsx` - 位置修正
@@ -188,11 +256,11 @@ client.fetch(query, { category })
 - `src/components/sections/TrustNumbers.tsx` - 觸控優化
 - `src/app/page.tsx` - 加入 Testimonials
 - `src/app/blog/page.tsx` - GROQ 注入防護
-- `src/app/homestay/page.tsx` - 社會證明 + CTA
-- `src/app/services/car-charter/page.tsx` - CTA 差異化
+- `src/app/homestay/page.tsx` - 社會證明 + CTA + 影片
+- `src/app/services/car-charter/page.tsx` - CTA 差異化 + 影片
 - `src/sanity/schemas/landingPage.ts` - 移除未用欄位
-- `src/sanity/schemas/carCharter.ts` - 移除未用欄位
-- `src/sanity/schemas/homestay.ts` - 移除未用欄位
+- `src/sanity/schemas/carCharter.ts` - 清理欄位 + 隱藏棄用
+- `src/sanity/schemas/homestay.ts` - 清理欄位 + 隱藏棄用
 
 ---
 
@@ -202,3 +270,15 @@ client.fetch(query, { category })
 - [x] 無 TypeScript 錯誤
 - [x] 54 個單元測試通過
 - [x] `npm audit fix` 已執行
+- [x] iOS Safari 影片播放正常
+- [x] Android 影片播放正常
+- [x] Sanity Studio 無 Unknown fields 警告
+
+---
+
+## 未來建議
+
+### Cloudinary 影片上傳注意事項
+1. **檔名使用純英文** - 避免中文或特殊字元
+2. **URL 加上 `vc_h264`** - 確保 iOS 相容
+3. **格式建議** - MP4 + H.264 視訊 + AAC 音訊
