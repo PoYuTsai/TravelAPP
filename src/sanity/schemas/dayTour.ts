@@ -116,11 +116,25 @@ export default defineType({
               type: 'text',
               rows: 2,
             }),
+            defineField({
+              name: 'image',
+              title: '景點圖片',
+              type: 'image',
+              options: { hotspot: true },
+              fields: [
+                defineField({
+                  name: 'alt',
+                  title: '圖片描述',
+                  type: 'string',
+                }),
+              ],
+            }),
           ],
           preview: {
-            select: { name: 'name', emoji: 'emoji' },
-            prepare: ({ name, emoji }) => ({
+            select: { name: 'name', emoji: 'emoji', media: 'image' },
+            prepare: ({ name, emoji, media }) => ({
               title: `${emoji || ''} ${name}`,
+              media,
             }),
           },
         }),
