@@ -55,3 +55,4 @@ temp/
 *.tmp
 *.bak
 .env*.local
+__pycache__
