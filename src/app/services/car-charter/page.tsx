@@ -97,10 +97,11 @@ export default async function CarCharterPage() {
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
   const faq = data?.faq?.length > 0 ? data.faq : defaultData.faq
-  // Video with fallback
-  const videoShow = data?.videoShow ?? defaultData.videoShow
+  // Video with fallback - show default video even if Sanity has videoShow: false
   const videoUrl = data?.videoUrl || defaultData.videoUrl
   const videoTitle = data?.videoTitle || defaultData.videoTitle
+  // If using default video URL, always show it; otherwise respect Sanity setting
+  const videoShow = !data?.videoUrl ? defaultData.videoShow : (data?.videoShow ?? true)
 
   return (
     <>

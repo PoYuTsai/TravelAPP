@@ -50,11 +50,15 @@ export default function VideoPlayer({
         poster={poster ? urlFor(poster).width(width).height(height).url() : undefined}
         className="w-full h-full object-cover"
         playsInline
+        preload="metadata"
         controls={isPlaying}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
         title={title}
+        // Mobile compatibility
+        webkit-playsinline="true"
+        x5-playsinline="true"
       />
 
       {/* Play Button Overlay */}
