@@ -18,6 +18,10 @@ const defaultData = {
   heroSubtitle: '司機 + 導遊分開服務，不是一人包辦。\n司機專心開車更安全，導遊專心照顧孩子更貼心。',
   heroCtaText: 'LINE 聊聊你的行程',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
+  // Video
+  videoShow: true,
+  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163410/790057116.088289_vz6u16.mp4',
+  videoTitle: '清邁包車服務介紹',
   features: [
     { icon: '🛡️', title: '司機 + 導遊分工', description: '司機專心開車不分心，導遊全程陪伴照顧孩子，安全又貼心' },
     { icon: '🚐', title: '舒適車輛', description: '寬敞 SUV 或 Van，空間充足放行李和嬰兒車' },
@@ -93,6 +97,10 @@ export default async function CarCharterPage() {
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
   const faq = data?.faq?.length > 0 ? data.faq : defaultData.faq
+  // Video with fallback
+  const videoShow = data?.videoShow ?? defaultData.videoShow
+  const videoUrl = data?.videoUrl || defaultData.videoUrl
+  const videoTitle = data?.videoTitle || defaultData.videoTitle
 
   return (
     <>
@@ -121,12 +129,12 @@ export default async function CarCharterPage() {
         </section>
 
         {/* Video (if available) */}
-        {data?.videoShow && data?.videoUrl && (
+        {videoShow && videoUrl && (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
             <VideoPlayer
-              videoUrl={data.videoUrl}
-              poster={data.videoPoster}
-              title={data.videoTitle}
+              videoUrl={videoUrl}
+              poster={data?.videoPoster}
+              title={videoTitle}
             />
           </section>
         )}

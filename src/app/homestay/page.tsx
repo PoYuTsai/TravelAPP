@@ -20,6 +20,10 @@ const defaultData = {
   heroSubtitle: '遠離觀光客的喧囂，在清邁芳縣體驗真正的泰北生活。\n我們自己住這裡，也邀請你來住。',
   heroCtaText: 'LINE 詢問房況',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
+  // Video
+  videoShow: true,
+  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163483/%E8%8A%B3%E7%B8%A3%E6%99%AF%E7%89%A9%E6%88%BF%E9%96%93%E9%9A%A8%E6%8B%8D_%E5%BD%B1%E7%89%8713_dhi0uo.mp4',
+  videoTitle: '芳縣民宿環境介紹',
   features: [
     { icon: '🌿', title: '遠離觀光區', description: '位於芳縣，享受真正的泰北寧靜' },
     { icon: '🏡', title: '在地生活體驗', description: '不只是住宿，更是體驗當地人的日常' },
@@ -67,6 +71,10 @@ export default async function HomestayPage() {
   const heroCtaText = data?.heroCtaText || defaultData.heroCtaText
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
+  // Video with fallback
+  const videoShow = data?.videoShow ?? defaultData.videoShow
+  const videoUrl = data?.videoUrl || defaultData.videoUrl
+  const videoTitle = data?.videoTitle || defaultData.videoTitle
 
   return (
     <div className="py-12 md:py-20">
@@ -113,12 +121,12 @@ export default async function HomestayPage() {
       </section>
 
       {/* Video (if available) */}
-      {data?.videoShow && data?.videoUrl && (
+      {videoShow && videoUrl && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
           <VideoPlayer
-            videoUrl={data.videoUrl}
-            poster={data.videoPoster}
-            title={data.videoTitle}
+            videoUrl={videoUrl}
+            poster={data?.videoPoster}
+            title={videoTitle}
           />
         </section>
       )}
