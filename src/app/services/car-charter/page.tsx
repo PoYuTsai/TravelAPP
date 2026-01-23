@@ -126,12 +126,13 @@ export default async function CarCharterPage() {
           </div>
         </section>
 
-        {/* Video - always show with default */}
+        {/* Video - responsive: portrait on mobile, landscape on desktop */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
           <VideoPlayer
             videoUrl={videoUrl}
             poster={data?.videoPoster}
             title={videoTitle}
+            aspect="responsive"
           />
         </section>
 

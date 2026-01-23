@@ -6,7 +6,7 @@ interface VideoPlayerProps {
   videoUrl: string
   poster?: any
   title?: string
-  aspect?: 'landscape' | 'portrait' | 'square'
+  aspect?: 'landscape' | 'portrait' | 'square' | 'responsive'
 }
 
 export default function VideoPlayer({
@@ -20,13 +20,25 @@ export default function VideoPlayer({
     portrait: 'aspect-[9/16]',
     landscape: 'aspect-video',
     square: 'aspect-square',
+    // Responsive: portrait on mobile, landscape on desktop
+    responsive: 'aspect-[9/16] md:aspect-video',
   }
 
-  // Poster dimensions based on aspect
+  // Container max-width classes
+  const containerClasses = {
+    portrait: 'max-w-sm',
+    landscape: 'max-w-4xl',
+    square: 'max-w-2xl',
+    // Responsive: smaller on mobile (portrait), wider on desktop (landscape)
+    responsive: 'max-w-sm md:max-w-4xl',
+  }
+
+  // Poster dimensions based on aspect (use landscape for responsive)
   const posterDimensions = {
     portrait: { width: 640, height: 1136 },
     landscape: { width: 1280, height: 720 },
     square: { width: 800, height: 800 },
+    responsive: { width: 1280, height: 720 },
   }
 
   const { width, height } = posterDimensions[aspect]
@@ -34,7 +46,7 @@ export default function VideoPlayer({
 
   // Use native video controls for maximum iOS compatibility
   return (
-    <div className={`relative ${aspectClasses[aspect]} w-full max-w-4xl mx-auto rounded-xl overflow-hidden shadow-lg bg-gray-900`}>
+    <div className={`relative ${aspectClasses[aspect]} w-full ${containerClasses[aspect]} mx-auto rounded-xl overflow-hidden shadow-lg bg-gray-900`}>
       <video
         src={videoUrl}
         poster={posterUrl}
