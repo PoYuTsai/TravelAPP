@@ -97,19 +97,21 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
                       <span className="text-6xl">{stop.emoji || '🌿'}</span>
                     </div>
                   )}
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  {/* Gradient overlay - stronger for better readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
                   {/* Stop info overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6 text-white">
-                    <div className="flex items-center gap-2 mb-1">
-                      {stop.emoji && <span className="text-2xl">{stop.emoji}</span>}
-                      <h3 className="text-xl md:text-2xl font-bold">{stop.name}</h3>
+                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
+                    <div className="bg-black/30 backdrop-blur-sm rounded-lg p-3 md:p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        {stop.emoji && <span className="text-2xl drop-shadow-lg">{stop.emoji}</span>}
+                        <h3 className="text-xl md:text-2xl font-bold text-white drop-shadow-lg">{stop.name}</h3>
+                      </div>
+                      {stop.description && (
+                        <p className="text-sm md:text-base text-white/95 line-clamp-2 drop-shadow">
+                          {stop.description}
+                        </p>
+                      )}
                     </div>
-                    {stop.description && (
-                      <p className="text-sm md:text-base text-white/90 line-clamp-2">
-                        {stop.description}
-                      </p>
-                    )}
                   </div>
                 </div>
               </div>

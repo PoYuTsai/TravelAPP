@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import useEmblaCarousel from 'embla-carousel-react'
 import SectionTitle from '@/components/ui/SectionTitle'
 
 // Star icon
@@ -23,34 +24,35 @@ function QuoteIcon({ className }: { className?: string }) {
 
 interface Testimonial {
   name: string
-  location: string
+  location?: string
   kids?: string
   content: string
   highlight: string
+  source?: 'facebook' | 'google'
 }
 
-// Default testimonials - real-feeling reviews
+// Real Facebook reviews - actual customer feedback from FB page
 const defaultTestimonials: Testimonial[] = [
   {
-    name: '張媽媽',
-    location: '台北',
-    kids: '7歲 + 4歲',
-    content: '原本很擔心帶兩個小孩出國會很累，結果完全不會！導遊姐姐超會照顧小孩，司機大哥開車也很穩。小孩吵著要上廁所或想休息，馬上就能調整行程，這是跟團完全做不到的。',
-    highlight: '司機導遊分開服務真的差很多',
+    name: '王薪驊',
+    location: '台灣',
+    content: '地陪跟司機人都超好的，親力親為，也超有耐心，真心推薦！',
+    highlight: '親力親為，超有耐心',
+    source: 'facebook',
   },
   {
-    name: 'Kevin 爸',
-    location: '新竹',
-    kids: '5歲',
-    content: 'Eric 幫我們規劃的行程很適合小孩，不會一直拉車。大象營、叢林飛索都有安排，兒子玩到不想回家。重點是有中文導遊，溝通完全沒問題。',
-    highlight: '行程客製化，小孩體力為主',
+    name: 'Vicky Lin',
+    location: '台灣',
+    content: '從行前的討論安排，都很細心，都能中文溝通完全不用擔心，還有中文解說的導遊，很盡責喔！全程陪伴走完解說不會到點了就把大家放生，超 nice，推推～',
+    highlight: '中文溝通完全不用擔心',
+    source: 'facebook',
   },
   {
-    name: '林小姐',
-    location: '高雄',
-    kids: '3歲 + 1歲',
-    content: '帶一歲多的寶寶出國本來很猶豫，但 Min 說他們自己也有小孩，會準備安全座椅。實際體驗下來，車子很乾淨、冷氣舒服，寶寶在車上睡得很好。',
-    highlight: '準備安全座椅，車子乾淨舒適',
+    name: 'Lily Chen',
+    location: '台灣',
+    content: '行前很有耐心的討論行程，老闆和老闆娘還邀約我們吃飯，很貼心的服務，值得推薦哦！',
+    highlight: '貼心服務，值得推薦',
+    source: 'facebook',
   },
 ]
 
@@ -59,7 +61,80 @@ interface TestimonialsProps {
 }
 
 export default function Testimonials({ testimonials = defaultTestimonials }: TestimonialsProps) {
-  const [activeIndex, setActiveIndex] = useState(0)
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: true,
+    align: 'center',
+  })
+  const [selectedIndex, setSelectedIndex] = useState(0)
+
+  const scrollTo = useCallback(
+    (index: number) => emblaApi && emblaApi.scrollTo(index),
+    [emblaApi]
+  )
+
+  const onSelect = useCallback(() => {
+    if (!emblaApi) return
+    setSelectedIndex(emblaApi.selectedScrollSnap())
+  }, [emblaApi])
+
+  useEffect(() => {
+    if (!emblaApi) return
+    onSelect()
+    emblaApi.on('select', onSelect)
+    return () => {
+      emblaApi.off('select', onSelect)
+    }
+  }, [emblaApi, onSelect])
+
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev()
+  }, [emblaApi])
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext()
+  }, [emblaApi])
+
+  // Testimonial card component
+  const TestimonialCard = ({ testimonial }: { testimonial: Testimonial }) => (
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative h-full">
+      <QuoteIcon className="absolute top-4 right-4 w-8 h-8 text-primary/20" />
+
+      {/* Stars */}
+      <div className="flex gap-0.5 mb-4">
+        {[...Array(5)].map((_, i) => (
+          <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
+        ))}
+      </div>
+
+      {/* Highlight */}
+      <p className="font-medium text-gray-900 mb-3">
+        「{testimonial.highlight}」
+      </p>
+
+      {/* Content */}
+      <p className="text-gray-600 text-sm leading-relaxed mb-4">
+        {testimonial.content}
+      </p>
+
+      {/* Author */}
+      <div className="border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-gray-900">{testimonial.name}</p>
+            <p className="text-sm text-gray-500">
+              {testimonial.location}
+              {testimonial.kids && ` · ${testimonial.kids}`}
+            </p>
+          </div>
+          {testimonial.source === 'facebook' && (
+            <svg className="w-5 h-5 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <section className="py-16 bg-gray-50">
@@ -72,86 +147,60 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
         {/* Desktop: Grid view */}
         <div className="hidden md:grid md:grid-cols-3 gap-6">
           {testimonials.map((testimonial, index) => (
-            <div
-              key={index}
-              className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative"
-            >
-              <QuoteIcon className="absolute top-4 right-4 w-8 h-8 text-primary/20" />
-
-              {/* Stars */}
-              <div className="flex gap-0.5 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
-                ))}
-              </div>
-
-              {/* Highlight */}
-              <p className="font-medium text-gray-900 mb-3">
-                「{testimonial.highlight}」
-              </p>
-
-              {/* Content */}
-              <p className="text-gray-600 text-sm leading-relaxed mb-4">
-                {testimonial.content}
-              </p>
-
-              {/* Author */}
-              <div className="border-t border-gray-100 pt-4">
-                <p className="font-medium text-gray-900">{testimonial.name}</p>
-                <p className="text-sm text-gray-500">
-                  {testimonial.location}
-                  {testimonial.kids && ` · 孩子 ${testimonial.kids}`}
-                </p>
-              </div>
-            </div>
+            <TestimonialCard key={index} testimonial={testimonial} />
           ))}
         </div>
 
-        {/* Mobile: Carousel */}
+        {/* Mobile: Embla Carousel with swipe */}
         <div className="md:hidden">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative">
-            <QuoteIcon className="absolute top-4 right-4 w-8 h-8 text-primary/20" />
-
-            {/* Stars */}
-            <div className="flex gap-0.5 mb-4">
-              {[...Array(5)].map((_, i) => (
-                <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
+          <div className="overflow-hidden" ref={emblaRef}>
+            <div className="flex">
+              {testimonials.map((testimonial, index) => (
+                <div key={index} className="flex-[0_0_100%] min-w-0 px-2">
+                  <TestimonialCard testimonial={testimonial} />
+                </div>
               ))}
-            </div>
-
-            {/* Highlight */}
-            <p className="font-medium text-gray-900 mb-3">
-              「{testimonials[activeIndex].highlight}」
-            </p>
-
-            {/* Content */}
-            <p className="text-gray-600 text-sm leading-relaxed mb-4">
-              {testimonials[activeIndex].content}
-            </p>
-
-            {/* Author */}
-            <div className="border-t border-gray-100 pt-4">
-              <p className="font-medium text-gray-900">{testimonials[activeIndex].name}</p>
-              <p className="text-sm text-gray-500">
-                {testimonials[activeIndex].location}
-                {testimonials[activeIndex].kids && ` · 孩子 ${testimonials[activeIndex].kids}`}
-              </p>
             </div>
           </div>
 
-          {/* Dots navigation */}
-          <div className="flex justify-center gap-2 mt-4">
+          {/* Navigation arrows (mobile) */}
+          <div className="flex justify-center gap-4 mt-4">
+            <button
+              onClick={scrollPrev}
+              className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
+              aria-label="上一則"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={scrollNext}
+              className="w-10 h-10 bg-white border border-gray-200 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 active:scale-95 transition-all"
+              aria-label="下一則"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Dots navigation with swipe hint */}
+          <div className="flex justify-center items-center gap-2 mt-3">
             {testimonials.map((_, index) => (
               <button
                 key={index}
-                onClick={() => setActiveIndex(index)}
-                className={`w-2 h-2 rounded-full transition-colors ${
-                  index === activeIndex ? 'bg-primary' : 'bg-gray-300'
+                onClick={() => scrollTo(index)}
+                className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  index === selectedIndex
+                    ? 'bg-primary w-6'
+                    : 'bg-gray-300 hover:bg-gray-400'
                 }`}
                 aria-label={`查看第 ${index + 1} 則評價`}
               />
             ))}
           </div>
+          <p className="text-center text-xs text-gray-400 mt-2">← 左右滑動查看更多 →</p>
         </div>
 
         {/* Link to more reviews */}

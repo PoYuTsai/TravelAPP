@@ -4,6 +4,7 @@ import puppeteerCore from 'puppeteer-core'
 import chromium from '@sparticuz/chromium-min'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryHTML } from '@/lib/pdf/itinerary-template'
+import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
 
 // 禁用 Next.js 路由快取，確保每次都取得最新資料
 export const dynamic = 'force-dynamic'
@@ -19,6 +20,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limiting (stricter for PDF generation - resource intensive)
+  const clientIP = getClientIP(request)
+  const rateLimitError = checkRateLimit(clientIP, 10, 60000) // 10 requests per minute
+  if (rateLimitError) return rateLimitError
+
+  // API key validation
+  const authError = validateApiKey(request)
+  if (authError) return authError
+
   let browser = null
 
   try {

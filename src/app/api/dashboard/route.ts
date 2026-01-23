@@ -3,27 +3,19 @@
 import { NextResponse } from 'next/server'
 import { fetchDashboardData } from '@/lib/notion'
 import type { DashboardQuery } from '@/lib/notion'
-
-// Email 白名單
-const ALLOWED_EMAILS: string[] = [
-  'eric19921204@gmail.com',
-]
+import { validateDashboardAccess, checkRateLimit, getClientIP } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
+  // Rate limiting
+  const clientIP = getClientIP(request)
+  const rateLimitError = checkRateLimit(clientIP, 60, 60000) // 60 requests per minute
+  if (rateLimitError) return rateLimitError
+
+  // Dashboard access validation (email whitelist)
+  const authError = validateDashboardAccess(request)
+  if (authError) return authError
+
   try {
-    // 從 header 取得使用者 email（由 Sanity 傳入）
-    const userEmail = request.headers.get('x-user-email')
-
-    // 白名單檢查（如果白名單為空，允許所有人）
-    if (ALLOWED_EMAILS.length > 0) {
-      if (!userEmail || !ALLOWED_EMAILS.includes(userEmail)) {
-        return NextResponse.json(
-          { error: '無權限存取 Dashboard' },
-          { status: 403 }
-        )
-      }
-    }
-
     // 解析查詢參數
     const { searchParams } = new URL(request.url)
     const yearParam = searchParams.get('year')

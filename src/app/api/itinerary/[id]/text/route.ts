@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { client } from '@/sanity/client'
 import { sanityToLineText } from '@/lib/itinerary-parser'
+import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
 
 const query = `*[_type == "itinerary" && _id == $id][0]{
   _id,
@@ -31,6 +32,15 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limiting
+  const clientIP = getClientIP(request)
+  const rateLimitError = checkRateLimit(clientIP, 30, 60000) // 30 requests per minute
+  if (rateLimitError) return rateLimitError
+
+  // API key validation
+  const authError = validateApiKey(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
 
