@@ -12,7 +12,6 @@ export default defineType({
     { name: 'gallery', title: '環境照片' },
     { name: 'location', title: '位置資訊' },
     { name: 'faq', title: '常見問題' },
-    { name: 'seo', title: 'SEO 設定' },
   ],
   fields: [
     // === Hero 區塊 ===
@@ -71,11 +70,19 @@ export default defineType({
       initialValue: false,
     }),
     defineField({
-      name: 'videoYoutubeId',
-      title: 'YouTube 影片 ID',
-      type: 'string',
+      name: 'videoUrl',
+      title: '影片網址 (Cloudinary)',
+      type: 'url',
       group: 'video',
-      description: '例如: dQw4w9WgXcQ（從 YouTube 網址取得）',
+      description: '貼上 Cloudinary 影片網址',
+    }),
+    defineField({
+      name: 'videoPoster',
+      title: '影片封面圖',
+      type: 'image',
+      group: 'video',
+      options: { hotspot: true },
+      description: '可選：影片載入前顯示的封面',
     }),
     defineField({
       name: 'videoTitle',
@@ -192,22 +199,6 @@ export default defineType({
           },
         }),
       ],
-    }),
-
-    // === SEO ===
-    defineField({
-      name: 'seoTitle',
-      title: 'Meta Title',
-      type: 'string',
-      group: 'seo',
-    }),
-    defineField({
-      name: 'seoDescription',
-      title: 'Meta Description',
-      type: 'text',
-      group: 'seo',
-      rows: 2,
-      validation: (Rule) => Rule.max(160).warning('建議不超過 160 字'),
     }),
   ],
   preview: {

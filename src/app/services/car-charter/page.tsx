@@ -2,29 +2,29 @@ import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
-import { FeatureGrid, PricingTable, FAQSection, YouTubeEmbed, ImageGallery, ProcessSteps } from '@/components/cms'
+import { FeatureGrid, PricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
 
-// Disable caching for this page
-export const revalidate = 0
+// ISR: Revalidate every 60 seconds
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: '清邁親子包車服務 | 清微旅行',
   description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。清邁一日 NT$ 3,200 起。',
 }
 
-// Default data
+// Default data - Brand: 強調司機導遊分工差異化
 const defaultData = {
   heroTitle: '清邁親子包車服務',
-  heroSubtitle: '司機導遊專業分工，兒童安全座椅準備好，行程彈性不趕路。\n讓在地爸媽帶你玩清邁。',
-  heroCtaText: 'LINE 免費諮詢',
+  heroSubtitle: '司機 + 導遊分開服務，不是一人包辦。\n司機專心開車更安全，導遊專心照顧孩子更貼心。',
+  heroCtaText: 'LINE 聊聊你的行程',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
   features: [
+    { icon: '🛡️', title: '司機 + 導遊分工', description: '司機專心開車不分心，導遊全程陪伴照顧孩子，安全又貼心' },
     { icon: '🚐', title: '舒適車輛', description: '寬敞 SUV 或 Van，空間充足放行李和嬰兒車' },
-    { icon: '👨‍✈️', title: '司機 + 導遊分工', description: '司機專心開車，導遊專心服務，不是一人包辦' },
     { icon: '🧒', title: '兒童安全座椅', description: '提供各年齡適用的安全座椅，事先告知即可準備' },
-    { icon: '🗓️', title: '行程彈性', description: '不跑固定路線，依孩子狀況隨時調整，不趕路' },
+    { icon: '🗓️', title: '完全客製行程', description: '沒有固定路線，依孩子狀況隨時調整，不趕路' },
     { icon: '✈️', title: '接送機服務', description: '機場接送，讓你一落地就開始輕鬆旅程' },
-    { icon: '💬', title: '全程中文', description: '從諮詢到結束都用中文，溝通無障礙' },
+    { icon: '💬', title: '全程中文溝通', description: '從諮詢到結束都用中文，完全無障礙' },
   ],
   faq: [
     { question: '價格包含什麼？', answer: '包含車輛、司機、油資、過路費。導遊服務另計，依行程複雜度報價。' },
@@ -64,7 +64,8 @@ const carCharterQuery = `*[_type == "carCharter"][0]{
   heroCtaText,
   heroCtaLink,
   videoShow,
-  videoYoutubeId,
+  videoUrl,
+  videoPoster,
   videoTitle,
   features,
   pricingSectionTitle,
@@ -120,9 +121,13 @@ export default async function CarCharterPage() {
         </section>
 
         {/* Video (if available) */}
-        {data?.videoShow && data?.videoYoutubeId && (
+        {data?.videoShow && data?.videoUrl && (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-            <YouTubeEmbed videoId={data.videoYoutubeId} title={data.videoTitle} />
+            <VideoPlayer
+              videoUrl={data.videoUrl}
+              poster={data.videoPoster}
+              title={data.videoTitle}
+            />
           </section>
         )}
 
@@ -178,17 +183,20 @@ export default async function CarCharterPage() {
           </div>
         </section>
 
-        {/* CTA */}
-        <section className="py-16">
+        {/* CTA - 差異化：強調客製化 */}
+        <section className="py-16 bg-primary/10">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
-              準備好預訂了嗎？
+              每個家庭的清邁之旅都不一樣
             </h2>
-            <p className="text-gray-600 mb-6">
-              告訴我們你的旅行日期和需求，我們會盡快回覆報價
+            <p className="text-gray-600 mb-2">
+              告訴我們孩子年齡、興趣、體力，我們根據 114+ 組家庭的經驗幫你規劃
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              平均 2 小時內回覆
             </p>
             <Button href={heroCtaLink} external={heroCtaLink.startsWith('http')} size="lg">
-              {heroCtaText}
+              LINE 分享你的行程需求
             </Button>
           </div>
         </section>

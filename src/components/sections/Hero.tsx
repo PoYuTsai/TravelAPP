@@ -6,13 +6,13 @@ import type { SanityImageSource } from '@sanity/image-url'
 // Simple blur placeholder (light golden gradient matching brand)
 const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBQYSIRMxQWH/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8AotuXM19qN5cXEhmWOdkjQnpFXrgA/PtZpSlIr//Z'
 
-// Default values
+// Default values - Brand: Eric & Min 強調家庭定位
 const defaults = {
-  title: '清邁親子自由行',
-  subtitle: '在地家庭經營，專為爸媽設計的旅程',
-  description: 'Eric & Min，住在清邁的台泰夫妻，我們也有女兒，懂爸媽帶小孩出遊的需求',
-  primaryCta: { text: 'LINE 免費諮詢', link: 'https://line.me/R/ti/p/@037nyuwk' },
-  secondaryCta: { text: '瀏覽服務', link: '/services/car-charter' },
+  title: '清邁親子自由行，交給 Eric & Min',
+  subtitle: '台灣爸爸 × 在地 30 年泰國媽媽，住在清邁的真實家庭',
+  description: '司機導遊分開服務，不趕路、不跟團，專為爸媽設計的包車旅程',
+  primaryCta: { text: 'LINE 聊聊你的清邁計畫', link: 'https://line.me/R/ti/p/@037nyuwk' },
+  secondaryCta: { text: '看行程案例', link: '/tours' },
 }
 
 interface HeroProps {

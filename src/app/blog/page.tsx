@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import CategoryFilter from '@/components/blog/CategoryFilter'
+import { CATEGORY_NAMES, getCategoryName } from '@/lib/constants'
 
 export const metadata: Metadata = {
   title: '部落格 | 清邁旅遊攻略',
@@ -30,36 +31,40 @@ interface Post {
   publishedAt?: string
 }
 
-// 分類名稱對照
-const categoryNames: Record<string, string> = {
-  guide: '攻略',
-  attraction: '景點',
-  food: '美食',
-  accommodation: '住宿',
-  transportation: '交通',
-  itinerary: '行程',
-  story: '故事',
-}
+// Use shared category names from constants
 
-// 取得文章
+// Valid categories for security (prevent injection)
+const VALID_CATEGORIES = Object.keys(CATEGORY_NAMES)
+
+// 取得文章 - using parameterized queries for security
 async function getPosts(category?: string): Promise<Post[]> {
-  const categoryFilter = category && category !== 'all'
-    ? ` && category == "${category}"`
-    : ''
+  // Validate category against whitelist to prevent GROQ injection
+  const isValidCategory = category && category !== 'all' && VALID_CATEGORIES.includes(category)
 
-  const query = `*[_type == "post"${categoryFilter}] | order(featured desc, publishedAt desc) {
-    _id,
-    title,
-    slug,
-    excerpt,
-    mainImage,
-    category,
-    featured,
-    publishedAt
-  }`
+  const query = isValidCategory
+    ? `*[_type == "post" && category == $category] | order(featured desc, publishedAt desc) {
+        _id,
+        title,
+        slug,
+        excerpt,
+        mainImage,
+        category,
+        featured,
+        publishedAt
+      }`
+    : `*[_type == "post"] | order(featured desc, publishedAt desc) {
+        _id,
+        title,
+        slug,
+        excerpt,
+        mainImage,
+        category,
+        featured,
+        publishedAt
+      }`
 
   try {
-    const posts = await client.fetch<Post[]>(query)
+    const posts = await client.fetch<Post[]>(query, isValidCategory ? { category } : {})
     return posts
   } catch {
     return []
@@ -96,7 +101,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
           <div className="text-center py-16">
             <p className="text-gray-500 mb-4">
-              {category ? `「${categoryNames[category] || category}」分類暫無文章` : '文章正在準備中...'}
+              {category ? `「${getCategoryName(category)}」分類暫無文章` : '文章正在準備中...'}
             </p>
             {category && (
               <Link href="/blog" className="text-primary hover:underline">
@@ -149,7 +154,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
                 <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-center">
                   <div className="flex items-center gap-2 mb-3">
                     <span className="text-xs bg-primary/20 text-primary-dark px-2 py-1 rounded-full font-medium">
-                      {featuredPost.category ? (categoryNames[featuredPost.category] || featuredPost.category) : '文章'}
+                      {featuredPost.category ? (getCategoryName(featuredPost.category)) : '文章'}
                     </span>
                     {featuredPost.publishedAt && (
                       <span className="text-xs text-gray-400">
@@ -193,7 +198,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
                   <div className="p-6 flex-1 flex flex-col">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs bg-primary/20 text-primary-dark px-2 py-1 rounded-full font-medium">
-                        {post.category ? (categoryNames[post.category] || post.category) : '文章'}
+                        {post.category ? (getCategoryName(post.category)) : '文章'}
                       </span>
                       {post.publishedAt && (
                         <span className="text-xs text-gray-400">

@@ -1,5 +1,6 @@
 // Shared components
 export { default as YouTubeEmbed } from './YouTubeEmbed'
+export { default as VideoPlayer } from './VideoPlayer'
 export { default as FeatureGrid } from './FeatureGrid'
 export { default as ImageGallery } from './ImageGallery'
 export { default as FAQSection } from './FAQSection'

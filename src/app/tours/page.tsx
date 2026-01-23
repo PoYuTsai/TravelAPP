@@ -8,8 +8,8 @@ export const metadata: Metadata = {
   description: '114 組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
 }
 
-// Disable caching for this page
-export const revalidate = 0
+// ISR: Revalidate every 60 seconds
+export const revalidate = 60
 
 // Sanity query for tour packages (multi-day)
 const packagesQuery = `*[_type == "tourPackage"] | order(order asc) {

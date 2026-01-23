@@ -8,6 +8,7 @@ import AuthorCard from '@/components/blog/AuthorCard'
 import ArticleSchema from '@/components/blog/ArticleSchema'
 import PortableTextRenderer from '@/components/blog/PortableTextRenderer'
 import Button from '@/components/ui/Button'
+import { getCategoryName } from '@/lib/constants'
 
 // Sanity 查詢 - 取得單篇文章
 const postQuery = `*[_type == "post" && slug.current == $slug][0] {
@@ -36,16 +37,6 @@ const postQuery = `*[_type == "post" && slug.current == $slug][0] {
 
 // Sanity 查詢 - 取得所有 slug
 const slugsQuery = `*[_type == "post" && defined(slug.current)][].slug.current`
-
-// 分類名稱對照
-const categoryNames: Record<string, string> = {
-  guide: '攻略',
-  attraction: '景點',
-  food: '美食',
-  accommodation: '住宿',
-  transportation: '交通',
-  itinerary: '行程',
-}
 
 // 取得文章
 async function getPost(slug: string) {
@@ -135,7 +126,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <header className="mb-8">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-sm bg-primary/20 text-primary-dark px-3 py-1 rounded-full font-medium">
-                {categoryNames[post.category] || post.category}
+                {getCategoryName(post.category)}
               </span>
               {post.publishedAt && (
                 <time className="text-sm text-gray-500" dateTime={post.publishedAt}>

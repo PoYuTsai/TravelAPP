@@ -9,7 +9,6 @@ export default defineType({
     { name: 'whoWeAre', title: '關於我們' },
     { name: 'articles', title: '精選文章' },
     { name: 'cta', title: 'CTA 區塊' },
-    { name: 'seo', title: 'SEO 設定' },
   ],
   fields: [
     // === Hero 區塊 ===
@@ -215,23 +214,6 @@ export default defineType({
         defineField({ name: 'text', title: '按鈕文字', type: 'string' }),
         defineField({ name: 'link', title: '連結', type: 'string' }),
       ],
-    }),
-
-    // === SEO ===
-    defineField({
-      name: 'seoTitle',
-      title: 'Meta Title',
-      type: 'string',
-      group: 'seo',
-      description: '留空則使用預設標題',
-    }),
-    defineField({
-      name: 'seoDescription',
-      title: 'Meta Description',
-      type: 'text',
-      group: 'seo',
-      rows: 2,
-      validation: (Rule) => Rule.max(160).warning('建議不超過 160 字'),
     }),
   ],
   preview: {

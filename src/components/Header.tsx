@@ -5,13 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useCallback } from 'react'
 import { trackLineClick } from '@/lib/analytics'
-
-const navLinks = [
-  { href: '/', label: '首頁' },
-  { href: '/services/car-charter', label: '包車服務' },
-  { href: '/tours', label: '行程案例' },
-  { href: '/blog', label: '部落格' },
-]
+import { headerNavLinks, LINE_URL } from '@/lib/navigation'
 
 export default function Header() {
   const pathname = usePathname()
@@ -69,7 +63,7 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
+            {headerNavLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -83,7 +77,7 @@ export default function Header() {
               </Link>
             ))}
             <a
-              href="https://line.me/R/ti/p/@037nyuwk"
+              href={LINE_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors"
@@ -130,7 +124,7 @@ export default function Header() {
         {isMenuOpen && (
           <div id="mobile-menu" className="md:hidden py-4 border-t">
             <nav className="flex flex-col space-y-4">
-              {navLinks.map((link) => (
+              {headerNavLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -145,7 +139,7 @@ export default function Header() {
                 </Link>
               ))}
               <a
-                href="https://line.me/R/ti/p/@037nyuwk"
+                href={LINE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors text-center"

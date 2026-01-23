@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
+import { getCategoryName } from '@/lib/constants'
 
 interface Post {
   _id: string
@@ -13,15 +14,6 @@ interface Post {
     alt?: string
   }
   category: string
-}
-
-const categoryNames: Record<string, string> = {
-  guide: '攻略',
-  attraction: '景點',
-  food: '美食',
-  accommodation: '住宿',
-  transportation: '交通',
-  itinerary: '行程',
 }
 
 async function getFeaturedPosts(count: number = 3) {
@@ -89,7 +81,7 @@ export default async function FeaturedArticles({
                 </div>
                 <div className="p-5 flex-1 flex flex-col">
                   <span className="text-xs bg-primary/20 text-primary-dark px-2 py-1 rounded-full font-medium w-fit mb-2">
-                    {categoryNames[post.category] || post.category}
+                    {getCategoryName(post.category)}
                   </span>
                   <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors line-clamp-2">
                     {post.title}

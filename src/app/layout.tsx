@@ -4,7 +4,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import GoogleAdsConversion from '@/components/GoogleAdsConversion'
-import StickyMobileCTA from '@/components/StickyMobileCTA'
+import FloatingLineButton from '@/components/ui/FloatingLineButton'
 
 // Google Analytics Measurement ID
 const GA_MEASUREMENT_ID = 'G-5180ZF5WFF'
@@ -140,11 +140,11 @@ export default function RootLayout({
         {/* Google Ads Conversion Tracking */}
         <GoogleAdsConversion />
         <Header />
-        <main className="flex-grow pt-20 pb-20 md:pb-0">
+        <main className="flex-grow pt-20">
           {children}
         </main>
         <Footer />
-        <StickyMobileCTA />
+        <FloatingLineButton />
       </body>
     </html>
   )

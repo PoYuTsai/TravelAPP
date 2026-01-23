@@ -1,12 +1,13 @@
 import { client } from '@/sanity/client'
 
-// Disable caching for this page
-export const revalidate = 0
+// ISR: Revalidate every 60 seconds
+export const revalidate = 60
 
 import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import WhoWeAre from '@/components/sections/WhoWeAre'
 import ToursPreview from '@/components/sections/ToursPreview'
+import Testimonials from '@/components/sections/Testimonials'
 import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
 
@@ -69,6 +70,7 @@ export default async function Home() {
         storyLinkText={data?.whoWeAreStoryLinkText}
       />
       <ToursPreview />
+      <Testimonials />
       <FeaturedArticles
         sectionTitle={data?.articlesSectionTitle}
         sectionSubtitle={data?.articlesSectionSubtitle}

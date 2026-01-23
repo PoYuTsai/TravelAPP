@@ -3,10 +3,10 @@ import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
-import { FeatureGrid, FAQSection, YouTubeEmbed, RoomCards, ImageGallery, LocationInfo } from '@/components/cms'
+import { FeatureGrid, FAQSection, VideoPlayer, RoomCards, ImageGallery, LocationInfo } from '@/components/cms'
 
-// Disable caching for this page
-export const revalidate = 0
+// ISR: Revalidate every 60 seconds
+export const revalidate = 60
 
 export const metadata: Metadata = {
   title: '芳縣特色民宿 | Huen San Fang Hotel | 清微旅行',
@@ -38,7 +38,8 @@ const homestayQuery = `*[_type == "homestay"][0]{
   heroCtaLink,
   heroMainImage,
   videoShow,
-  videoYoutubeId,
+  videoUrl,
+  videoPoster,
   videoTitle,
   features,
   roomCards,
@@ -112,9 +113,13 @@ export default async function HomestayPage() {
       </section>
 
       {/* Video (if available) */}
-      {data?.videoShow && data?.videoYoutubeId && (
+      {data?.videoShow && data?.videoUrl && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-          <YouTubeEmbed videoId={data.videoYoutubeId} title={data.videoTitle} />
+          <VideoPlayer
+            videoUrl={data.videoUrl}
+            poster={data.videoPoster}
+            title={data.videoTitle}
+          />
         </section>
       )}
 
@@ -158,6 +163,70 @@ export default async function HomestayPage() {
         </div>
       </section>
 
+      {/* Social Proof - 社會證明 */}
+      <section className="py-16">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionTitle title="為什麼選擇我們" subtitle="12 年在地經營" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+            <div className="text-center p-4">
+              <div className="text-3xl md:text-4xl font-bold text-primary mb-2">12</div>
+              <div className="text-sm text-gray-600">年在地經營</div>
+            </div>
+            <div className="text-center p-4">
+              <div className="text-3xl md:text-4xl font-bold text-primary mb-2">1000+</div>
+              <div className="text-sm text-gray-600">外國與泰國旅客</div>
+            </div>
+            <div className="text-center p-4">
+              <a
+                href="https://share.google/na5VNjxNGGNlHbRdL"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block hover:opacity-80 transition-opacity"
+              >
+                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">134</div>
+                <div className="text-sm text-gray-600">Google 評論</div>
+                <div className="flex justify-center mt-1">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} className="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+              </a>
+            </div>
+            <div className="text-center p-4">
+              <div className="text-3xl md:text-4xl font-bold text-primary mb-2">2</div>
+              <div className="text-sm text-gray-600">特色季節團</div>
+            </div>
+          </div>
+
+          {/* Special Tours */}
+          <div className="bg-gray-50 rounded-xl p-6 md:p-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">季節限定活動</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg p-4 border border-gray-100">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🌸</span>
+                  <div>
+                    <div className="font-medium text-gray-900">賞櫻團</div>
+                    <div className="text-sm text-gray-600">每年 1-2 月，芳縣櫻花盛開</div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-gray-100">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🦅</span>
+                  <div>
+                    <div className="font-medium text-gray-900">賞鳥團</div>
+                    <div className="text-sm text-gray-600">泰北豐富鳥類生態觀察</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       {data?.faq?.length > 0 && (
         <section className="bg-gray-50 py-16">
@@ -168,17 +237,20 @@ export default async function HomestayPage() {
         </section>
       )}
 
-      {/* CTA */}
+      {/* CTA - 差異化：強調在地經營 */}
       <section className="bg-primary py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
-            想來住住看嗎？
+            不只是住宿，是在地家庭的款待
           </h2>
-          <p className="text-gray-800 mb-6">
-            告訴我們你的旅行日期，我們幫你安排
+          <p className="text-gray-800 mb-2">
+            12 年來接待過上千組旅客，我們知道什麼是真正的泰北體驗
+          </p>
+          <p className="text-sm text-gray-700 mb-6">
+            告訴我們你的旅行日期，我們幫你安排從清邁到芳縣的一切
           </p>
           <Button href={heroCtaLink} external={heroCtaLink.startsWith('http')} variant="secondary" size="lg">
-            {heroCtaText}
+            LINE 詢問房況與接送
           </Button>
         </div>
       </section>

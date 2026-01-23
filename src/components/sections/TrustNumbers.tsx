@@ -70,6 +70,26 @@ function ArrowIcon({ className }: { className?: string }) {
   )
 }
 
+// External link icon
+function ExternalLinkIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+      />
+    </svg>
+  )
+}
+
 interface TrustNumbersProps {
   // Keep for backwards compatibility with Sanity CMS
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,34 +123,53 @@ export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
 
   const familyCount = useCountAnimation(114, 1500, isVisible)
 
+  // Badge base classes - py-3 for better mobile touch target (44px+)
+  const badgeBase = "flex items-center gap-2 px-4 py-3 bg-white border rounded-full transition-all duration-300"
+
+  // Animation classes for scroll reveal
+  const animationClass = isVisible
+    ? "opacity-100 translate-y-0 scale-100"
+    : "opacity-0 translate-y-4 scale-95"
+
   const badges = (
     <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
       {/* Badge 1: 114+ 家庭 */}
       <Link
         href="/tours"
-        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
+        className={`group ${badgeBase} border-gray-200 cursor-pointer hover:border-primary hover:bg-primary/5 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 ${animationClass}`}
+        style={{ transitionDelay: '0ms' }}
       >
         <span className="text-base md:text-lg font-bold text-gray-900">
           {familyCount}+
         </span>
         <span className="text-sm text-gray-600">家庭</span>
         <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
+        {/* Pulse ring for mobile hint */}
+        <span className="absolute -inset-1 rounded-full bg-primary/20 animate-ping opacity-0 group-hover:opacity-0 md:hidden" style={{ animationDuration: '2s' }} />
       </Link>
 
-      {/* Badge 2: 5.0 Stars (display only, no link until Google Business restored) */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full">
+      {/* Badge 2: 5.0 Stars - Link to Facebook Reviews */}
+      <a
+        href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`group ${badgeBase} border-gray-200 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 ${animationClass}`}
+        style={{ transitionDelay: '100ms' }}
+      >
         <div className="flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
             <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
           ))}
         </div>
         <span className="text-base md:text-lg font-bold text-gray-900">5.0</span>
-      </div>
+        <ExternalLinkIcon className="w-4 h-4 text-gray-400 transition-all duration-200 group-hover:text-yellow-500" />
+      </a>
 
       {/* Badge 3: 在地家庭 */}
       <Link
         href="/homestay"
-        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
+        className={`group ${badgeBase} border-gray-200 cursor-pointer hover:border-primary hover:bg-primary/5 hover:shadow-lg hover:-translate-y-0.5 active:scale-95 ${animationClass}`}
+        style={{ transitionDelay: '200ms' }}
       >
         <span className="text-base md:text-lg font-bold text-gray-900">在地</span>
         <span className="text-sm text-gray-600">家庭</span>
