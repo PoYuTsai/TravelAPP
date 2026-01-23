@@ -5,11 +5,8 @@ export const revalidate = 0
 
 import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
-import Services from '@/components/sections/Services'
-import WhyUs from '@/components/sections/WhyUs'
-import HomestaySection from '@/components/sections/HomestaySection'
+import WhoWeAre from '@/components/sections/WhoWeAre'
 import ToursPreview from '@/components/sections/ToursPreview'
-import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
 
 const landingPageQuery = `*[_type == "landingPage"][0]{
@@ -19,18 +16,6 @@ const landingPageQuery = `*[_type == "landingPage"][0]{
   heroDescription,
   heroPrimaryCta,
   heroSecondaryCta,
-  trustNumbers,
-  servicesSectionTitle,
-  servicesSectionSubtitle,
-  servicesItems,
-  whyUsSectionTitle,
-  whyUsSectionSubtitle,
-  whyUsReasons,
-  articlesSectionTitle,
-  articlesSectionSubtitle,
-  articlesShowCount,
-  articlesCtaText,
-  articlesCtaLink,
   ctaTitle,
   ctaDescription,
   ctaPrimaryCta,
@@ -52,35 +37,18 @@ export default async function Home() {
     <>
       <Hero
         backgroundImage={data?.heroBackgroundImage}
-        title={data?.heroTitle}
-        subtitle={data?.heroSubtitle}
+        title={data?.heroTitle || '清邁親子自由行，交給在地家庭'}
+        subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
         description={data?.heroDescription}
         primaryCta={data?.heroPrimaryCta}
         secondaryCta={data?.heroSecondaryCta}
       />
-      <TrustNumbers items={data?.trustNumbers} />
-      <Services
-        sectionTitle={data?.servicesSectionTitle}
-        sectionSubtitle={data?.servicesSectionSubtitle}
-        items={data?.servicesItems}
-      />
-      <HomestaySection />
-      <WhyUs
-        sectionTitle={data?.whyUsSectionTitle}
-        sectionSubtitle={data?.whyUsSectionSubtitle}
-        reasons={data?.whyUsReasons}
-      />
+      <TrustNumbers />
+      <WhoWeAre />
       <ToursPreview />
-      <FeaturedArticles
-        sectionTitle={data?.articlesSectionTitle}
-        sectionSubtitle={data?.articlesSectionSubtitle}
-        showCount={data?.articlesShowCount}
-        ctaText={data?.articlesCtaText}
-        ctaLink={data?.articlesCtaLink}
-      />
       <CTA
-        title={data?.ctaTitle}
-        description={data?.ctaDescription}
+        title={data?.ctaTitle || '每個家庭都不一樣'}
+        description={data?.ctaDescription || '聊聊你們的想法，我們幫你規劃'}
         primaryCta={data?.ctaPrimaryCta}
         secondaryCta={data?.ctaSecondaryCta}
       />
