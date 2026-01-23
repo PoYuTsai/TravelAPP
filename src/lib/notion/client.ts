@@ -108,10 +108,8 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
     let cursor: string | undefined = undefined
 
     do {
-      // Sort by created_time ascending to preserve Notion's manual order
-      const response = await queryNotionDatabase(databaseId, cursor, [
-        { timestamp: 'created_time', direction: 'ascending' }
-      ])
+      // Don't specify sort - let Notion return in its default/manual order
+      const response = await queryNotionDatabase(databaseId, cursor)
       pages.push(...response.results)
       cursor = response.has_more ? response.next_cursor : undefined
     } while (cursor)
