@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   description: '114 組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
 }
 
-// Sanity query for tour packages
+// Disable caching for this page
+export const revalidate = 0
+
+// Sanity query for tour packages (multi-day)
 const packagesQuery = `*[_type == "tourPackage"] | order(order asc) {
   title,
   "slug": slug.current,
@@ -16,6 +19,17 @@ const packagesQuery = `*[_type == "tourPackage"] | order(order asc) {
   coverImage,
   duration,
   highlights
+}`
+
+// Sanity query for day tours
+const dayToursQuery = `*[_type == "dayTour"] | order(order asc) {
+  title,
+  "slug": slug.current,
+  subtitle,
+  location,
+  coverImage,
+  highlights,
+  basePrice
 }`
 
 async function getPackages() {
@@ -26,8 +40,19 @@ async function getPackages() {
   }
 }
 
-export default async function ToursPage() {
-  const packages = await getPackages()
+async function getDayTours() {
+  try {
+    return await client.fetch(dayToursQuery)
+  } catch {
+    return []
+  }
+}
 
-  return <ToursPageClient packages={packages} />
+export default async function ToursPage() {
+  const [packages, dayTours] = await Promise.all([
+    getPackages(),
+    getDayTours(),
+  ])
+
+  return <ToursPageClient packages={packages} dayTours={dayTours} />
 }

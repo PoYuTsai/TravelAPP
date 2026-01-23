@@ -21,10 +21,11 @@ interface Package {
 interface DayTour {
   title: string
   slug: string
+  subtitle?: string
   location?: string
   coverImage?: any
   highlights?: string[]
-  priceFrom?: number
+  basePrice?: number
 }
 
 interface Case {
@@ -44,17 +45,7 @@ interface ToursPageClientProps {
 const INITIAL_CASES = 8
 const LOAD_MORE_COUNT = 10
 
-// Default day tours (placeholder until CMS data is available)
-const defaultDayTours: DayTour[] = [
-  { title: '大象保護營', slug: 'elephant-day', location: '清邁', highlights: ['餵大象', '黏黏瀑布'], priceFrom: 2800 },
-  { title: '夜間動物園', slug: 'night-safari', location: '清邁', highlights: ['近距離餵食', '夜間探險'], priceFrom: 1800 },
-  { title: '古城文化遊', slug: 'old-city', location: '清邁', highlights: ['寺廟巡禮', '傳統市場'], priceFrom: 1500 },
-  { title: '南邦一日遊', slug: 'lampang', location: '南邦', highlights: ['馬車遊城', '陶瓷村'], priceFrom: 2500 },
-  { title: '清萊一日遊', slug: 'chiang-rai', location: '清萊', highlights: ['白廟', '藍廟', '黑屋'], priceFrom: 2200 },
-  { title: '茵他儂一日遊', slug: 'doi-inthanon', location: '茵他儂', highlights: ['泰國最高峰', '雙塔'], priceFrom: 2000 },
-]
-
-export default function ToursPageClient({ packages, dayTours = defaultDayTours }: ToursPageClientProps) {
+export default function ToursPageClient({ packages, dayTours = [] }: ToursPageClientProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [totalCases, setTotalCases] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -126,25 +117,27 @@ export default function ToursPageClient({ packages, dayTours = defaultDayTours }
         )}
 
         {/* Day Tours Section */}
-        <section className="mb-20">
-          <SectionTitle
-            title="想自己排行程？"
-            subtitle="這些一日遊隨你搭"
-          />
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-            {dayTours.map((tour) => (
-              <DayTourCard
-                key={tour.slug}
-                title={tour.title}
-                slug={tour.slug}
-                location={tour.location}
-                coverImage={tour.coverImage}
-                highlights={tour.highlights}
-                priceFrom={tour.priceFrom}
-              />
-            ))}
-          </div>
-        </section>
+        {dayTours.length > 0 && (
+          <section className="mb-20">
+            <SectionTitle
+              title="想自己排行程？"
+              subtitle="這些一日遊隨你搭"
+            />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+              {dayTours.map((tour) => (
+                <DayTourCard
+                  key={tour.slug}
+                  title={tour.title}
+                  slug={tour.slug}
+                  location={tour.location}
+                  coverImage={tour.coverImage}
+                  highlights={tour.highlights}
+                  priceFrom={tour.basePrice}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Past Cases Section */}
         <section className="mb-16">

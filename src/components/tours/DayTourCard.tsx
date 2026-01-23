@@ -5,6 +5,15 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/client'
 
+// Map location codes to Chinese names
+const locationNames: Record<string, string> = {
+  'doi-inthanon': '茵他儂',
+  'chiang-rai': '清萊',
+  'lampang': '南邦',
+  'lamphun': '南奔',
+  'chiang-mai': '清邁',
+}
+
 interface DayTourCardProps {
   title: string
   slug: string
@@ -17,11 +26,12 @@ interface DayTourCardProps {
 export default function DayTourCard({
   title,
   slug,
-  location = '清邁',
+  location = 'chiang-mai',
   coverImage,
   highlights,
   priceFrom,
 }: DayTourCardProps) {
+  const locationDisplay = locationNames[location] || location || '清邁'
   return (
     <Link
       href={`/tours/${slug}`}
@@ -47,7 +57,7 @@ export default function DayTourCard({
           <svg className="w-3 h-3 text-primary" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
           </svg>
-          {location}
+          {locationDisplay}
         </div>
       </div>
 
@@ -60,7 +70,7 @@ export default function DayTourCard({
         {/* Highlights */}
         {highlights && highlights.length > 0 && (
           <p className="text-sm text-gray-500 mt-2 line-clamp-1">
-            {highlights.join(' · ')}
+            {highlights.slice(0, 3).join(' · ')}
           </p>
         )}
 
@@ -68,9 +78,9 @@ export default function DayTourCard({
         {priceFrom && (
           <div className="mt-3 flex items-baseline gap-1">
             <span className="text-lg font-bold text-primary">
-              NT$ {priceFrom.toLocaleString()}
+              ${priceFrom.toLocaleString()}
             </span>
-            <span className="text-sm text-gray-400">起/人</span>
+            <span className="text-sm text-gray-400">起/團</span>
           </div>
         )}
 
