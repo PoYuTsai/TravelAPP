@@ -61,4 +61,7 @@ export const structure: StructureResolver = (S) =>
 
       // 招牌套餐
       S.documentTypeListItem('tourPackage').title('招牌套餐'),
+
+      // 一日遊
+      S.documentTypeListItem('dayTour').title('一日遊'),
     ])
