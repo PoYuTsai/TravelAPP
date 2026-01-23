@@ -162,7 +162,7 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
       </p>
 
       <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
-        {/* Badge 1: 114+ 家庭 */}
+        {/* Badge 1: 服務 N+ 家庭 */}
         <Link
           href="/tours"
           className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
@@ -171,6 +171,7 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
           {/* Animated pulse ring on mobile */}
           {showPulse && <PulseRing delay={0} />}
 
+          <span className="text-sm text-gray-700 font-medium">服務</span>
           <span className="text-base md:text-lg font-bold text-primary">
             {familyCount}+
           </span>
@@ -178,36 +179,37 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
           <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
         </Link>
 
-        {/* Badge 2: 5.0 Stars - Link to Facebook Reviews */}
+        {/* Badge 2: 5.0 滿分好評 - Link to Facebook Reviews */}
         <a
           href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
           target="_blank"
           rel="noopener noreferrer"
-          className={`group ${badgeBase} border-yellow-300 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-[0_4px_20px_-2px_rgba(250,204,21,0.4)] hover:-translate-y-1 active:scale-95 ${animationClass}`}
+          className={`group ${badgeBase} border-yellow-300 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-[0_8px_30px_-4px_rgba(250,204,21,0.5)] hover:-translate-y-1 active:scale-95 ${animationClass}`}
           style={{ transitionDelay: '100ms' }}
         >
           {/* Animated pulse ring on mobile */}
           {showPulse && <PulseRing delay={200} />}
 
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5 group-hover:drop-shadow-[0_0_8px_rgba(250,204,21,0.6)] transition-all duration-300">
             {[...Array(5)].map((_, i) => (
-              <StarIcon key={i} className="w-4 h-4 text-yellow-400 drop-shadow-sm" />
+              <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
             ))}
           </div>
           <span className="text-base md:text-lg font-bold text-gray-900">5.0</span>
+          <span className="text-sm text-gray-600 font-medium hidden sm:inline">滿分好評</span>
           <ExternalLinkIcon className="w-4 h-4 text-yellow-500/60 transition-all duration-300 group-hover:text-yellow-600 group-hover:scale-110" />
         </a>
 
-        {/* Badge 3: 在地家庭 */}
+        {/* Badge 3: 在地台泰家庭 */}
         <Link
-          href="/homestay"
+          href="/about"
           className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
           style={{ transitionDelay: '200ms' }}
         >
           {/* Animated pulse ring on mobile */}
           {showPulse && <PulseRing delay={400} />}
 
-          <span className="text-base md:text-lg font-bold text-primary">在地</span>
+          <span className="text-base md:text-lg font-bold text-primary">在地台泰</span>
           <span className="text-sm text-gray-700 font-medium">家庭</span>
           <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
         </Link>
