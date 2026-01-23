@@ -18,8 +18,8 @@ const defaultData = {
   heroSubtitle: '司機 + 導遊分開服務，不是一人包辦。\n司機專心開車更安全，導遊專心照顧孩子更貼心。',
   heroCtaText: 'LINE 聊聊你的行程',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
-  // Video
-  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163410/790057116.088289_vz6u16.mp4',
+  // Video (vc_h264 for iOS compatibility)
+  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769163410/790057116.088289_vz6u16.mp4',
   videoTitle: '清邁包車服務介紹',
   features: [
     { icon: '🛡️', title: '司機 + 導遊分工', description: '司機專心開車不分心，導遊全程陪伴照顧孩子，安全又貼心' },
