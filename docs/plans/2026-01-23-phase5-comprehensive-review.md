@@ -266,6 +266,27 @@ videoUrl: 'https://res.cloudinary.com/.../upload/vc_h264/v.../video.mp4'
 </video>
 ```
 
+#### 4. 響應式影片比例
+**檔案**: `src/components/cms/VideoPlayer.tsx`, `src/components/sections/WhoWeAre.tsx`
+
+新增 `responsive` aspect 選項，自動切換直式/橫式：
+
+```typescript
+// 手機：直式 (9:16)，桌機：橫式 (16:9)
+aspect="responsive"
+
+// VideoPlayer
+responsive: 'aspect-[9/16] md:aspect-video max-w-sm md:max-w-4xl'
+
+// WhoWeAre
+responsive: 'aspect-[9/16] md:aspect-video max-w-[280px] md:max-w-[500px]'
+```
+
+**套用頁面**:
+- 首頁 WhoWeAre 區塊
+- 包車服務頁面
+- 民宿頁面
+
 ### 影片 URL 最終版本
 - 包車: `https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769163410/790057116.088289_vz6u16.mp4`
 - 民宿: `https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769170451/hotelvideo_0123_gui5rb.mp4`
@@ -290,9 +311,11 @@ videoUrl: 'https://res.cloudinary.com/.../upload/vc_h264/v.../video.mp4'
 - `src/components/Footer.tsx` - 使用共用導航
 - `src/components/ui/FloatingLineButton.tsx` - 位置修正
 - `src/components/sections/Hero.tsx` - 品牌文案
-- `src/components/sections/TrustNumbers.tsx` - 互動特效 + 脈衝動畫
+- `src/components/sections/TrustNumbers.tsx` - 互動特效 + 永久脈衝動畫
 - `src/components/sections/Testimonials.tsx` - Embla 滑動 + 真實 FB 評論
+- `src/components/sections/WhoWeAre.tsx` - 響應式影片比例
 - `src/components/tours/StopsCarousel.tsx` - 文字移至圖片下方
+- `src/components/cms/VideoPlayer.tsx` - 響應式影片比例
 - `src/app/page.tsx` - 加入 Testimonials
 - `src/app/blog/page.tsx` - GROQ 注入防護
 - `src/app/homestay/page.tsx` - 社會證明 + CTA + 影片
