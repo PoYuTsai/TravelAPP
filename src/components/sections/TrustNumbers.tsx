@@ -94,9 +94,11 @@ interface TrustNumbersProps {
   // Keep for backwards compatibility with Sanity CMS
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items?: any[]
+  // Compact mode for inline display (no section wrapper)
+  compact?: boolean
 }
 
-export default function TrustNumbers(_props: TrustNumbersProps) {
+export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
   const [isVisible, setIsVisible] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -121,48 +123,57 @@ export default function TrustNumbers(_props: TrustNumbersProps) {
 
   const familyCount = useCountAnimation(114, 1500, isVisible)
 
+  const badges = (
+    <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
+      {/* Badge 1: 114+ 家庭 */}
+      <Link
+        href="/tours"
+        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
+      >
+        <span className="text-base md:text-lg font-bold text-gray-900">
+          {familyCount}+
+        </span>
+        <span className="text-sm text-gray-600">家庭</span>
+        <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
+      </Link>
+
+      {/* Badge 2: 5.0 Stars */}
+      <a
+        href="https://maps.app.goo.gl/YOUR_GOOGLE_LINK"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-md"
+      >
+        <div className="flex items-center gap-0.5">
+          {[...Array(5)].map((_, i) => (
+            <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
+          ))}
+        </div>
+        <span className="text-base md:text-lg font-bold text-gray-900">5.0</span>
+        <ExternalLinkIcon className="w-4 h-4 text-gray-400 transition-colors duration-200 group-hover:text-yellow-500" />
+      </a>
+
+      {/* Badge 3: 在地家庭 */}
+      <Link
+        href="/homestay"
+        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
+      >
+        <span className="text-base md:text-lg font-bold text-gray-900">在地</span>
+        <span className="text-sm text-gray-600">家庭</span>
+        <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
+      </Link>
+    </div>
+  )
+
+  // Compact mode: render badges directly without section wrapper
+  if (compact) {
+    return <div ref={sectionRef as React.RefObject<HTMLDivElement>}>{badges}</div>
+  }
+
   return (
     <section ref={sectionRef} className="py-8 bg-gray-50 border-y border-gray-100">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap justify-center items-center gap-4 md:gap-8">
-          {/* Badge 1: 114+ 家庭 */}
-          <Link
-            href="/tours"
-            className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
-          >
-            <span className="text-lg md:text-xl font-bold text-gray-900">
-              {familyCount}+
-            </span>
-            <span className="text-sm text-gray-600">家庭</span>
-            <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
-          </Link>
-
-          {/* Badge 2: 5.0 Stars */}
-          <a
-            href="https://maps.app.goo.gl/YOUR_GOOGLE_LINK"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-md"
-          >
-            <div className="flex items-center gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
-              ))}
-            </div>
-            <span className="text-lg md:text-xl font-bold text-gray-900">5.0</span>
-            <ExternalLinkIcon className="w-4 h-4 text-gray-400 transition-colors duration-200 group-hover:text-yellow-500" />
-          </a>
-
-          {/* Badge 3: 在地家庭 */}
-          <Link
-            href="/homestay"
-            className="group flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-primary hover:bg-primary/5 hover:shadow-md"
-          >
-            <span className="text-lg md:text-xl font-bold text-gray-900">在地</span>
-            <span className="text-sm text-gray-600">家庭</span>
-            <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
-          </Link>
-        </div>
+        {badges}
       </div>
     </section>
   )
