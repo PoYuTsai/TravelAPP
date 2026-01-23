@@ -20,8 +20,9 @@ interface Package {
 interface Case {
   id: string
   name: string
-  month: string
   days: number
+  startDate: string  // ISO format: 2026-02-20
+  endDate: string | null  // ISO format or null for single day
   status: 'completed' | 'upcoming'
 }
 
@@ -151,7 +152,8 @@ export default function ToursPageClient({ packages }: ToursPageClientProps) {
                     key={c.id}
                     name={c.name}
                     days={c.days}
-                    month={c.month}
+                    startDate={c.startDate}
+                    endDate={c.endDate}
                     status={c.status}
                   />
                 ))}

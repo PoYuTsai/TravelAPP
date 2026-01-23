@@ -6,8 +6,9 @@ import { fetchNotionOrdersByYear } from './client'
 export interface TourCase {
   id: string
   name: string
-  month: string
   days: number
+  startDate: string  // ISO format: 2026-02-20
+  endDate: string | null  // ISO format or null for single day
   status: 'completed' | 'upcoming'
 }
 
@@ -26,29 +27,25 @@ function orderToCase(order: NotionOrder): TourCase | null {
     return null
   }
 
-  const startDate = new Date(order.travelDate.start)
+  const startDateObj = new Date(order.travelDate.start)
   const now = new Date()
 
   // 計算天數
   let days = 1
   if (order.travelDate.end) {
-    const endDate = new Date(order.travelDate.end)
-    days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
+    const endDateObj = new Date(order.travelDate.end)
+    days = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1
   }
 
   // 判斷狀態
-  const status: 'completed' | 'upcoming' = startDate < now ? 'completed' : 'upcoming'
-
-  // 格式化月份
-  const year = startDate.getFullYear()
-  const month = startDate.getMonth() + 1
-  const monthStr = `${year}/${month}`
+  const status: 'completed' | 'upcoming' = startDateObj < now ? 'completed' : 'upcoming'
 
   return {
     id: order.id,
     name: order.customerName,
-    month: monthStr,
     days,
+    startDate: order.travelDate.start,  // ISO format from Notion
+    endDate: order.travelDate.end || null,  // ISO format or null
     status,
   }
 }
@@ -63,16 +60,10 @@ export async function fetchTourCases(
 ): Promise<TourCasesResponse> {
   const orders = await fetchNotionOrdersByYear(year)
 
-  // 轉換並過濾有效案例
+  // 轉換並過濾有效案例（保留 Notion 的手動排序）
   const allCases = orders
     .map(orderToCase)
     .filter((c): c is TourCase => c !== null)
-    // 按日期排序（新的在前）
-    .sort((a, b) => {
-      const dateA = new Date(a.month.replace('/', '-') + '-01')
-      const dateB = new Date(b.month.replace('/', '-') + '-01')
-      return dateB.getTime() - dateA.getTime()
-    })
 
   const total = allCases.length
   const cases = allCases.slice(offset, offset + limit)
