@@ -258,6 +258,23 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
                   />
                 ))}
               </div>
+              {/* 收回按鈕 */}
+              <div className="text-center mt-6">
+                <button
+                  onClick={() => setShowPastCases(false)}
+                  className="inline-flex items-center gap-2 px-6 py-3 text-gray-500 hover:text-gray-700 font-medium transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4 rotate-180"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  收回 2025 年案例
+                </button>
+              </div>
             </div>
           )}
         </section>

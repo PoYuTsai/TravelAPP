@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { trackLineClick } from '@/lib/analytics'
-import { footerNavLinks, legalLinks, socialLinks, LINE_URL } from '@/lib/navigation'
+import { footerNavLinks, legalLinks, socialLinks } from '@/lib/navigation'
 import { CATEGORY_NAMES } from '@/lib/constants'
 import { LineIcon, InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/SocialIcons'
 
@@ -88,15 +88,6 @@ export default function Footer() {
                 </a>
               ))}
             </div>
-            <a
-              href={LINE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors text-sm"
-              onClick={() => trackLineClick('Footer - CTA Button')}
-            >
-              LINE 立即諮詢
-            </a>
           </div>
         </div>
 
