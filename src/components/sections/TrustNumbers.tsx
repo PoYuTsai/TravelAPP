@@ -36,15 +36,15 @@ function useCountAnimation(end: number, duration: number = 1500, startCounting: 
   return count
 }
 
-// Pulsing ring animation component for mobile hint
+// Pulsing ring animation component - continuous glow effect
 function PulseRing({ delay = 0 }: { delay?: number }) {
   return (
     <span
-      className="absolute inset-0 rounded-full border-2 border-primary/40 animate-ping"
+      className="absolute inset-0 rounded-full border-2 border-primary/50 animate-ping"
       style={{
         animationDuration: '2s',
         animationDelay: `${delay}ms`,
-        animationIterationCount: '3', // Only pulse 3 times then stop
+        animationIterationCount: 'infinite', // Keep pulsing forever
       }}
     />
   )
@@ -136,15 +136,9 @@ export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
   }, [])
 
   const familyCount = useCountAnimation(114, 1500, isVisible)
-  const [showPulse, setShowPulse] = useState(true)
 
-  // Stop pulse animation after 6 seconds
-  useEffect(() => {
-    if (isVisible) {
-      const timer = setTimeout(() => setShowPulse(false), 6000)
-      return () => clearTimeout(timer)
-    }
-  }, [isVisible])
+  // Pulse animation always shows when section is visible
+  const showPulse = isVisible
 
   // Badge base classes - py-3 for better mobile touch target (44px+)
   const badgeBase = "relative flex items-center gap-2 px-4 py-3 bg-white border-2 rounded-full transition-all duration-300 ease-out"
@@ -160,8 +154,8 @@ export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
 
   const badges = (
     <div className="flex flex-col items-center gap-4">
-      {/* Mobile hint text */}
-      <p className="text-xs text-gray-500 md:hidden animate-pulse">
+      {/* Mobile hint text - larger and more visible */}
+      <p className="text-sm font-medium text-primary/80 md:hidden animate-pulse">
         👆 點擊探索更多
       </p>
 
