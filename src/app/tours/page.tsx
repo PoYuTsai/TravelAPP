@@ -1,11 +1,12 @@
 // src/app/tours/page.tsx
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
+import { fetchTotalFamilyCount } from '@/lib/notion'
 import ToursPageClient from './ToursPageClient'
 
 export const metadata: Metadata = {
   title: '行程案例 | 清微旅行',
-  description: '114 組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
+  description: '超過百組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
 }
 
 // ISR: Revalidate every 60 seconds
@@ -49,10 +50,11 @@ async function getDayTours() {
 }
 
 export default async function ToursPage() {
-  const [packages, dayTours] = await Promise.all([
+  const [packages, dayTours, familyCount] = await Promise.all([
     getPackages(),
     getDayTours(),
+    fetchTotalFamilyCount(),
   ])
 
-  return <ToursPageClient packages={packages} dayTours={dayTours} />
+  return <ToursPageClient packages={packages} dayTours={dayTours} familyCount={familyCount} />
 }

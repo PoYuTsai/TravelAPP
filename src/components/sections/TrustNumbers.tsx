@@ -40,7 +40,7 @@ function useCountAnimation(end: number, duration: number = 1500, startCounting: 
 function PulseRing({ delay = 0 }: { delay?: number }) {
   return (
     <span
-      className="absolute inset-0 rounded-full border-2 border-primary/50 animate-ping"
+      className="absolute inset-0 rounded-full border-2 border-primary/50 animate-ping pointer-events-none"
       style={{
         animationDuration: '2s',
         animationDelay: `${delay}ms`,
@@ -161,7 +161,7 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
         👆 點擊探索更多
       </p>
 
-      <div className="flex flex-wrap justify-center items-center gap-3 md:gap-6">
+      <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
         {/* Badge 1: 服務 N+ 家庭 */}
         <Link
           href="/tours"

@@ -40,12 +40,13 @@ interface Case {
 interface ToursPageClientProps {
   packages: Package[]
   dayTours?: DayTour[]
+  familyCount?: number
 }
 
 const INITIAL_CASES = 8
 const LOAD_MORE_COUNT = 10
 
-export default function ToursPageClient({ packages, dayTours = [] }: ToursPageClientProps) {
+export default function ToursPageClient({ packages, dayTours = [], familyCount }: ToursPageClientProps) {
   const [cases, setCases] = useState<Case[]>([])
   const [totalCases, setTotalCases] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -123,7 +124,7 @@ export default function ToursPageClient({ packages, dayTours = [] }: ToursPageCl
           <p className="text-lg md:text-xl text-gray-600 mb-8">
             專為爸媽設計的包車旅程
           </p>
-          <TrustNumbers compact />
+          <TrustNumbers compact familyCountValue={familyCount} />
         </section>
 
         {/* Signature Packages Section */}
