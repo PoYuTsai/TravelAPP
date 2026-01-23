@@ -44,7 +44,7 @@ export default function Hero({
           src={heroImageSrc}
           alt={backgroundImage?.alt || '清微旅行 - 清邁親子包車自由行'}
           fill
-          className="object-cover object-top"
+          className="object-cover object-center"
           priority
           placeholder="blur"
           blurDataURL={blurDataURL}
