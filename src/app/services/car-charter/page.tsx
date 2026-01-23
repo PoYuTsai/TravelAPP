@@ -61,6 +61,22 @@ const serviceSchema = {
   },
 }
 
+// FAQ Schema for SEO
+function generateFaqSchema(faqItems: Array<{ question: string; answer: string }>) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  }
+}
+
 const carCharterQuery = `*[_type == "carCharter"][0]{
   heroTitle,
   heroSubtitle,
@@ -100,12 +116,18 @@ export default async function CarCharterPage() {
   const videoUrl = data?.videoUrl || defaultData.videoUrl
   const videoTitle = data?.videoTitle || defaultData.videoTitle
 
+  const faqSchema = generateFaqSchema(faq)
+
   return (
     <>
       {/* SEO Schema Markup */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(serviceSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
 
       <div className="py-12 md:py-20">

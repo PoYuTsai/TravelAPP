@@ -1,6 +1,13 @@
 // src/lib/excel/itinerary-template.ts
 import ExcelJS from 'exceljs'
 
+// 只在開發環境輸出 debug log
+const isDev = process.env.NODE_ENV !== 'production'
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const debugLog = (...args: any[]): void => {
+  if (isDev) console.log(...args)
+}
+
 interface DayItem {
   date: string
   title: string
@@ -72,7 +79,7 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
     views: [{ showGridLines: true }],
   })
 
-  console.log(`=== Excel Generated at ${timestamp} ===`)
+  debugLog(`=== Excel Generated at ${timestamp} ===`)
 
   // 取得所有日期
   const dates = data.days.map((d) => d.date).sort()
@@ -165,10 +172,6 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
 
   // === Row 5+: Hotels（按客人分組，同組放同一行）===
   if (data.hotels && data.hotels.length > 0) {
-    // Debug: 印出日期陣列
-    console.log('=== Hotel Debug ===')
-    console.log('Dates array:', dates)
-
     // 按 guests 分組
     const hotelGroups: Map<string, HotelBooking[]> = new Map()
     data.hotels.forEach((hotel) => {
@@ -185,7 +188,7 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
       hotels: hotels.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()),
     }))
 
-    console.log(`Found ${groupsArray.length} hotel groups:`, groupsArray.map((g) => g.groupName))
+    debugLog(`Found ${groupsArray.length} hotel groups:`, groupsArray.map((g) => g.groupName))
 
     // 每個分組一行
     groupsArray.forEach((group, groupIndex) => {
@@ -221,17 +224,17 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
         let startIdx = getDateIndex(dates, hotel.startDate)
         let endIdx = getDateIndex(dates, hotel.endDate)
 
-        console.log(`Hotel: ${hotel.hotelName} [${group.groupName}]`)
-        console.log(`  startDate: ${hotel.startDate}, endDate: ${hotel.endDate}`)
-        console.log(`  startIdx: ${startIdx}, endIdx: ${endIdx}`)
+        debugLog(`Hotel: ${hotel.hotelName} [${group.groupName}]`)
+        debugLog(`  startDate: ${hotel.startDate}, endDate: ${hotel.endDate}`)
+        debugLog(`  startIdx: ${startIdx}, endIdx: ${endIdx}`)
 
         // 處理入住日在行程範圍外的情況
         if (startIdx === -1) {
           if (hotel.startDate < dates[0]) {
             startIdx = 0
-            console.log(`  startDate before first day, using index 0`)
+            debugLog(`  startDate before first day, using index 0`)
           } else {
-            console.log(`  SKIPPED: startDate not found in days array`)
+            debugLog(`  SKIPPED: startDate not found in days array`)
             return
           }
         }
@@ -241,9 +244,9 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
           if (hotel.endDate > dates[dates.length - 1]) {
             // 退房日超出範圍，色塊延伸到最後一天
             endIdx = dates.length
-            console.log(`  endDate after last day, extending to last column (index ${endIdx})`)
+            debugLog(`  endDate after last day, extending to last column (index ${endIdx})`)
           } else {
-            console.log(`  SKIPPED: endDate not found in days array`)
+            debugLog(`  SKIPPED: endDate not found in days array`)
             return
           }
         }
@@ -251,7 +254,7 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
         // 色塊範圍：入住日到退房前一天
         const startCol = startIdx + 2
         const endCol = endIdx + 1
-        console.log(`  startCol: ${startCol}, endCol: ${endCol}`)
+        debugLog(`  startCol: ${startCol}, endCol: ${endCol}`)
 
         // 顯示文字
         let displayText = hotel.hotelName
@@ -263,7 +266,7 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
         const bgColor = colorMap[hotel.color || 'yellow'] || colorMap.yellow
 
         if (endCol >= startCol) {
-          console.log(`  Filling row ${rowNum}, cols ${startCol}-${endCol} for ${hotel.hotelName}`)
+          debugLog(`  Filling row ${rowNum}, cols ${startCol}-${endCol} for ${hotel.hotelName}`)
 
           // 1. 先對所有儲存格填色
           for (let col = startCol; col <= endCol; col++) {
@@ -286,7 +289,7 @@ export async function generateItineraryExcel(data: ItineraryData): Promise<Buffe
             const startLetter = String.fromCharCode(64 + startCol)
             const endLetter = String.fromCharCode(64 + endCol)
             const mergeRange = `${startLetter}${rowNum}:${endLetter}${rowNum}`
-            console.log(`  Merging: ${mergeRange}`)
+            debugLog(`  Merging: ${mergeRange}`)
             worksheet.mergeCells(mergeRange)
           }
 

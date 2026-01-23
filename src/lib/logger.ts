@@ -76,6 +76,7 @@ export const apiLogger = new Logger('API')
 export const dbLogger = new Logger('DB')
 export const authLogger = new Logger('AUTH')
 export const sanityLogger = new Logger('SANITY')
+export const pdfLogger = new Logger('PDF')
 
 // Export Logger class for custom loggers
 export { Logger }

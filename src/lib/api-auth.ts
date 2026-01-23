@@ -5,18 +5,30 @@ import { NextRequest, NextResponse } from 'next/server'
 
 // API Key for internal services (itinerary export, etc.)
 const API_KEY = process.env.INTERNAL_API_KEY
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
-// Dashboard allowed emails
-const DASHBOARD_ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS || 'eric19921204@gmail.com').split(',')
+// Dashboard allowed emails (trim spaces from each email)
+const DASHBOARD_ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim())
+  .filter(Boolean)
 
 /**
  * Validate API key from request headers
  * Returns error response if invalid, null if valid
  */
 export function validateApiKey(request: NextRequest): NextResponse | null {
-  // Skip validation if no API key is configured (development mode)
+  // In production, API key is mandatory
   if (!API_KEY) {
-    console.warn('Warning: INTERNAL_API_KEY not configured, API validation disabled')
+    if (IS_PRODUCTION) {
+      console.error('CRITICAL: INTERNAL_API_KEY not configured in production')
+      return NextResponse.json(
+        { error: '伺服器設定錯誤', code: 'SERVER_CONFIG_ERROR' },
+        { status: 500 }
+      )
+    }
+    // Development mode only - warn but allow
+    console.warn('Warning: INTERNAL_API_KEY not configured, API validation disabled in development')
     return null
   }
 
@@ -48,6 +60,19 @@ export function validateApiKey(request: NextRequest): NextResponse | null {
  * Returns error response if invalid, null if valid
  */
 export function validateDashboardAccess(request: Request): NextResponse | null {
+  // Check if whitelist is configured
+  if (DASHBOARD_ALLOWED_EMAILS.length === 0) {
+    if (IS_PRODUCTION) {
+      console.error('CRITICAL: DASHBOARD_ALLOWED_EMAILS not configured in production')
+      return NextResponse.json(
+        { error: '伺服器設定錯誤', code: 'SERVER_CONFIG_ERROR' },
+        { status: 500 }
+      )
+    }
+    // Development mode - allow without email check
+    return null
+  }
+
   const userEmail = request.headers.get('x-user-email')
 
   if (!userEmail) {
@@ -57,7 +82,7 @@ export function validateDashboardAccess(request: Request): NextResponse | null {
     )
   }
 
-  if (!DASHBOARD_ALLOWED_EMAILS.includes(userEmail)) {
+  if (!DASHBOARD_ALLOWED_EMAILS.includes(userEmail.toLowerCase().trim())) {
     return NextResponse.json(
       { error: '無權限存取 Dashboard', code: 'UNAUTHORIZED_EMAIL' },
       { status: 403 }

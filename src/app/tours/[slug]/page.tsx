@@ -126,9 +126,27 @@ export async function generateMetadata({
     return { title: '找不到頁面' }
   }
 
+  const description = tour.subtitle || `${tour.title} - 清微旅行精選行程`
+  const imageUrl = tour.coverImage ? urlFor(tour.coverImage).width(1200).height(630).url() : undefined
+
   return {
     title: `${tour.title} | 清微旅行`,
-    description: tour.subtitle || `${tour.title} - 清微旅行精選行程`,
+    description,
+    alternates: {
+      canonical: `/tours/${slug}`,
+    },
+    openGraph: {
+      title: tour.title,
+      description,
+      type: 'website',
+      images: imageUrl ? [imageUrl] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: tour.title,
+      description,
+      images: imageUrl ? [imageUrl] : undefined,
+    },
   }
 }
 

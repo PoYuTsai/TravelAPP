@@ -53,16 +53,5 @@ export async function getItineraryById(id: string) {
   })
 
   const data = await response.json()
-
-  // Debug: 顯示完整資料
-  console.log('=== Sanity Query Debug ===')
-  console.log('Query ID:', id)
-  console.log('Updated at:', data.result?._updatedAt)
-  console.log('Client:', data.result?.clientName)
-  console.log('Start Date:', data.result?.startDate)
-  console.log('End Date:', data.result?.endDate)
-  console.log('Days:', JSON.stringify(data.result?.days?.map((d: any) => ({ date: d.date, title: d.title })), null, 2))
-  console.log('Hotels:', JSON.stringify(data.result?.hotels, null, 2))
-
   return data.result
 }

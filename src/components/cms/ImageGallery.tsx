@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
@@ -18,6 +18,25 @@ interface ImageGalleryProps {
 
 export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null)
+
+  // 鍵盤支援：Esc 關閉 Lightbox
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setSelectedImage(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedImage) {
+      document.addEventListener('keydown', handleKeyDown)
+      // 防止背景滾動
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [selectedImage, handleKeyDown])
 
   if (!images || images.length === 0) return null
 

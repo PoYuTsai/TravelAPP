@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
+import { trackFormSubmit, trackLineClick } from '@/lib/analytics'
 
 interface FormData {
   name: string
@@ -58,6 +59,10 @@ ${formData.message}`
       // 開啟 LINE 並帶入訊息
       const lineUrl = `https://line.me/R/oaMessage/@037nyuwk/?${encodeURIComponent(message)}`
       window.open(lineUrl, '_blank')
+
+      // 追蹤表單提交和 LINE 點擊
+      trackFormSubmit('contact_inquiry')
+      trackLineClick('Contact Form Submit')
 
       setSubmitStatus('success')
       setFormData(initialFormData)

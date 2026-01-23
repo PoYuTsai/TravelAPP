@@ -44,6 +44,8 @@ const nextConfig = {
         headers: [
           // Prevent clickjacking
           { key: 'X-Frame-Options', value: 'DENY' },
+          // Force HTTPS (HSTS)
+          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
           // Prevent MIME type sniffing
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           // XSS protection for older browsers

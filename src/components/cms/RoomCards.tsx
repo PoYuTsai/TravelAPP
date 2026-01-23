@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
@@ -16,6 +16,24 @@ interface RoomCardsProps {
 
 export default function RoomCards({ cards }: RoomCardsProps) {
   const [selectedCard, setSelectedCard] = useState<RoomCard | null>(null)
+
+  // 鍵盤支援：Esc 關閉 Lightbox
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setSelectedCard(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (selectedCard) {
+      document.addEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [selectedCard, handleKeyDown])
 
   if (!cards || cards.length === 0) return null
 

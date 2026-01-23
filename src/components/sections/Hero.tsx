@@ -33,13 +33,13 @@ export default function Hero({
   secondaryCta,
 }: HeroProps) {
   const heroImageSrc = backgroundImage?.asset
-    ? urlFor(backgroundImage.asset).width(1920).height(823).url()
+    ? urlFor(backgroundImage.asset).width(1920).height(960).url()
     : '/images/hero-bg.webp'
 
   return (
     <section className="relative">
       {/* Hero Image */}
-      <div className="relative w-full aspect-[21/9] bg-primary-light">
+      <div className="relative w-full aspect-[2/1] bg-primary-light">
         <Image
           src={heroImageSrc}
           alt={backgroundImage?.alt || '清微旅行 - 清邁親子包車自由行'}
