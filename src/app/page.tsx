@@ -7,6 +7,7 @@ import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import WhoWeAre from '@/components/sections/WhoWeAre'
 import ToursPreview from '@/components/sections/ToursPreview'
+import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
 
 const landingPageQuery = `*[_type == "landingPage"][0]{
@@ -16,6 +17,18 @@ const landingPageQuery = `*[_type == "landingPage"][0]{
   heroDescription,
   heroPrimaryCta,
   heroSecondaryCta,
+  whoWeAreVideoUrl,
+  whoWeAreVideoPoster,
+  whoWeAreVideoAspect,
+  whoWeAreTitle,
+  whoWeAreSubtitle,
+  whoWeAreDescription,
+  whoWeAreTrustPoints,
+  whoWeAreStoryLink,
+  whoWeAreStoryLinkText,
+  articlesSectionTitle,
+  articlesSectionSubtitle,
+  articlesShowCount,
   ctaTitle,
   ctaDescription,
   ctaPrimaryCta,
@@ -44,8 +57,23 @@ export default async function Home() {
         secondaryCta={data?.heroSecondaryCta}
       />
       <TrustNumbers />
-      <WhoWeAre />
+      <WhoWeAre
+        videoUrl={data?.whoWeAreVideoUrl}
+        videoPoster={data?.whoWeAreVideoPoster}
+        videoAspect={data?.whoWeAreVideoAspect}
+        title={data?.whoWeAreTitle}
+        subtitle={data?.whoWeAreSubtitle}
+        description={data?.whoWeAreDescription}
+        trustPoints={data?.whoWeAreTrustPoints?.map((text: string) => ({ text }))}
+        storyLink={data?.whoWeAreStoryLink}
+        storyLinkText={data?.whoWeAreStoryLinkText}
+      />
       <ToursPreview />
+      <FeaturedArticles
+        sectionTitle={data?.articlesSectionTitle}
+        sectionSubtitle={data?.articlesSectionSubtitle}
+        showCount={data?.articlesShowCount}
+      />
       <CTA
         title={data?.ctaTitle || '每個家庭都不一樣'}
         description={data?.ctaDescription || '聊聊你們的想法，我們幫你規劃'}

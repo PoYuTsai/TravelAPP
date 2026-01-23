@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
+import StopsCarousel from '@/components/tours/StopsCarousel'
 
 // === Types ===
 
@@ -243,40 +244,11 @@ export default async function TourDetailPage({
           </section>
         )}
 
-        {/* Stops Section (Day Tour only) */}
+        {/* Stops Section (Day Tour only) - Carousel */}
         {isDayTour && (tour as DayTour).stops && (tour as DayTour).stops!.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">行程景點</h2>
-            <div className="space-y-6">
-              {(tour as DayTour).stops!.map((stop, i) => (
-                <div
-                  key={i}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100"
-                >
-                  {stop.image && (
-                    <div className="relative h-48 md:h-56">
-                      <Image
-                        src={urlFor(stop.image).width(800).height(400).url()}
-                        alt={stop.image.alt || stop.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="p-6">
-                    <div className="flex items-center gap-3 mb-2">
-                      {stop.emoji && <span className="text-2xl">{stop.emoji}</span>}
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {stop.name}
-                      </h3>
-                    </div>
-                    {stop.description && (
-                      <p className="text-gray-600">{stop.description}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+            <StopsCarousel stops={(tour as DayTour).stops!} />
           </section>
         )}
 
