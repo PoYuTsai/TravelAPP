@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
+import { CaseGridSkeleton } from '@/components/ui/LoadingSkeleton'
 import TrustNumbers from '@/components/sections/TrustNumbers'
 import PackageCard from '@/components/tours/PackageCard'
 import DayTourCard from '@/components/tours/DayTourCard'
@@ -181,7 +182,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
           />
 
           {loading ? (
-            <div className="text-center py-12 text-gray-500">載入中...</div>
+            <CaseGridSkeleton count={8} />
           ) : cases.length === 0 ? (
             <div className="text-center py-12 text-gray-500">尚無案例</div>
           ) : (

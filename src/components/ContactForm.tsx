@@ -14,6 +14,12 @@ interface FormData {
   message: string
 }
 
+interface FormErrors {
+  name?: string
+  email?: string
+  message?: string
+}
+
 const initialFormData: FormData = {
   name: '',
   email: '',
@@ -24,20 +30,75 @@ const initialFormData: FormData = {
   message: '',
 }
 
+// Email 驗證正則表達式
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 export default function ContactForm() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
+  const [errors, setErrors] = useState<FormErrors>({})
+  const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+
+  // 驗證單一欄位
+  const validateField = (name: string, value: string): string | undefined => {
+    switch (name) {
+      case 'name':
+        if (!value.trim()) return '請輸入姓名'
+        if (value.trim().length < 2) return '姓名至少需要 2 個字'
+        return undefined
+      case 'email':
+        if (!value.trim()) return '請輸入 Email'
+        if (!emailRegex.test(value)) return '請輸入有效的 Email 格式'
+        return undefined
+      case 'message':
+        if (!value.trim()) return '請輸入詢問內容'
+        if (value.trim().length < 10) return '詢問內容至少需要 10 個字'
+        return undefined
+      default:
+        return undefined
+    }
+  }
+
+  // 驗證所有欄位
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {
+      name: validateField('name', formData.name),
+      email: validateField('email', formData.email),
+      message: validateField('message', formData.message),
+    }
+    setErrors(newErrors)
+    return !Object.values(newErrors).some(Boolean)
+  }
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
+
+    // 如果已經 touched 過，即時驗證
+    if (touched[name]) {
+      setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }))
+    }
+  }
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setTouched((prev) => ({ ...prev, [name]: true }))
+    setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // 標記所有必填欄位為 touched
+    setTouched({ name: true, email: true, message: true })
+
+    if (!validateForm()) {
+      return
+    }
+
     setIsSubmitting(true)
     setSubmitStatus('idle')
 
@@ -66,6 +127,8 @@ ${formData.message}`
 
       setSubmitStatus('success')
       setFormData(initialFormData)
+      setTouched({})
+      setErrors({})
     } catch {
       setSubmitStatus('error')
     } finally {
@@ -73,8 +136,15 @@ ${formData.message}`
     }
   }
 
+  // 輸入框樣式（根據錯誤狀態）
+  const getInputClassName = (fieldName: keyof FormErrors) => {
+    const baseClass = 'w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-colors'
+    const hasError = touched[fieldName] && errors[fieldName]
+    return `${baseClass} ${hasError ? 'border-red-500 bg-red-50' : 'border-gray-300'}`
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" noValidate>
       {/* 姓名 */}
       <div>
         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -87,9 +157,17 @@ ${formData.message}`
           required
           value={formData.name}
           onChange={handleChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+          onBlur={handleBlur}
+          aria-invalid={touched.name && !!errors.name}
+          aria-describedby={errors.name ? 'name-error' : undefined}
+          className={getInputClassName('name')}
           placeholder="請輸入您的姓名"
         />
+        {touched.name && errors.name && (
+          <p id="name-error" className="mt-1 text-sm text-red-600" role="alert">
+            {errors.name}
+          </p>
+        )}
       </div>
 
       {/* Email */}
@@ -104,9 +182,17 @@ ${formData.message}`
           required
           value={formData.email}
           onChange={handleChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+          onBlur={handleBlur}
+          aria-invalid={touched.email && !!errors.email}
+          aria-describedby={errors.email ? 'email-error' : undefined}
+          className={getInputClassName('email')}
           placeholder="example@email.com"
         />
+        {touched.email && errors.email && (
+          <p id="email-error" className="mt-1 text-sm text-red-600" role="alert">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       {/* 電話 */}
@@ -187,9 +273,17 @@ ${formData.message}`
           rows={4}
           value={formData.message}
           onChange={handleChange}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+          onBlur={handleBlur}
+          aria-invalid={touched.message && !!errors.message}
+          aria-describedby={errors.message ? 'message-error' : undefined}
+          className={`${getInputClassName('message')} resize-none`}
           placeholder="請描述您的需求，例如：想去的景點、特殊需求等..."
         />
+        {touched.message && errors.message && (
+          <p id="message-error" className="mt-1 text-sm text-red-600" role="alert">
+            {errors.message}
+          </p>
+        )}
       </div>
 
       {/* 提交按鈕 */}

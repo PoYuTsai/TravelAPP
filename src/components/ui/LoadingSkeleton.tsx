@@ -85,4 +85,29 @@ export function PageLoadingSkeleton() {
   )
 }
 
+// Small case card skeleton for tours page
+export function CaseSkeleton() {
+  return (
+    <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <Skeleton className="h-5 w-20" />
+        <Skeleton className="h-4 w-12 rounded-full" />
+      </div>
+      <Skeleton className="h-4 w-24 mb-1" />
+      <Skeleton className="h-3 w-16" />
+    </div>
+  )
+}
+
+// Grid of case skeletons
+export function CaseGridSkeleton({ count = 8 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <CaseSkeleton key={i} />
+      ))}
+    </div>
+  )
+}
+
 export default Skeleton
