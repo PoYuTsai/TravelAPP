@@ -21,6 +21,24 @@
 | `docs/plans/2026-01-15-seo-content-strategy.md` | SEO 內容策略與文章清單 |
 | `docs/plans/2026-01-13-landing-page-redesign.md` | 網站設計規範 |
 
+## 自訂 Skills
+
+| Skill | 觸發方式 | 用途 |
+|-------|----------|------|
+| `comprehensive-review` | `/comprehensive-review` | 10 角色全面審查網站（架構、UX、SEO、資安等）|
+
+### 全面審查 Skill 使用方式
+
+```
+觸發: /comprehensive-review 或 "請執行全面性審查"
+
+此 Skill 會:
+1. 從 10 個專業角度審查網站
+2. 產出結構化報告（含嚴重程度）
+3. 自動更新歷史記錄
+4. 詢問你要優化哪些項目
+```
+
 ## 工作流程
 
 ### 寫 SEO 文章時
