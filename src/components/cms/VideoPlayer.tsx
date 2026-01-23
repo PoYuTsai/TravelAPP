@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { urlFor } from '@/sanity/client'
 
 interface VideoPlayerProps {
@@ -17,12 +17,30 @@ export default function VideoPlayer({
   aspect = 'landscape',
 }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // iOS Safari fix: ensure video element is properly initialized
+  useEffect(() => {
+    if (videoRef.current) {
+      // Force load on iOS
+      videoRef.current.load()
+    }
+  }, [videoUrl])
 
   const handlePlayClick = () => {
     if (videoRef.current) {
-      videoRef.current.play()
-      setIsPlaying(true)
+      // iOS requires play() to be called from user interaction
+      const playPromise = videoRef.current.play()
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch((error) => {
+            console.log('Play failed:', error)
+            // Fallback: show controls and let user click native play
+            setIsPlaying(true)
+          })
+      }
     }
   }
 
@@ -41,24 +59,26 @@ export default function VideoPlayer({
   }
 
   const { width, height } = posterDimensions[aspect]
+  const posterUrl = poster ? urlFor(poster).width(width).height(height).url() : undefined
 
   return (
     <div className={`relative ${aspectClasses[aspect]} w-full max-w-4xl mx-auto rounded-xl overflow-hidden shadow-lg bg-gray-900`}>
       <video
         ref={videoRef}
         src={videoUrl}
-        poster={poster ? urlFor(poster).width(width).height(height).url() : undefined}
+        poster={posterUrl}
         className="w-full h-full object-cover"
         playsInline
-        preload="metadata"
+        webkit-playsinline=""
+        preload="auto"
         controls={isPlaying}
+        onLoadedData={() => setIsLoaded(true)}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
         onEnded={() => setIsPlaying(false)}
         title={title}
-        // Mobile compatibility
-        webkit-playsinline="true"
-        x5-playsinline="true"
+        // iOS compatibility
+        muted={false}
       />
 
       {/* Play Button Overlay */}
@@ -77,6 +97,12 @@ export default function VideoPlayer({
               <path d="M8 5v14l11-7z" />
             </svg>
           </div>
+          {/* Loading indicator */}
+          {!isLoaded && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+              <span className="text-white/70 text-sm">載入中...</span>
+            </div>
+          )}
         </button>
       )}
     </div>
