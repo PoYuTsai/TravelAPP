@@ -20,8 +20,8 @@ const defaultData = {
   heroSubtitle: '遠離觀光客的喧囂，在清邁芳縣體驗真正的泰北生活。\n我們自己住這裡，也邀請你來住。',
   heroCtaText: 'LINE 詢問房況',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
-  // Video (使用解碼 URL)
-  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769163483/芳縣景物房間隨拍_影片13_dhi0uo.mp4',
+  // Video
+  videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/v1769170451/hotelvideo_0123_gui5rb.mp4',
   videoTitle: '芳縣民宿環境介紹',
   features: [
     { icon: '🌿', title: '遠離觀光區', description: '位於芳縣，享受真正的泰北寧靜' },
@@ -120,9 +120,6 @@ export default async function HomestayPage() {
 
       {/* Video - always show with default */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
-        <div className="text-center mb-4">
-          <p className="text-sm text-gray-500">民宿環境影片</p>
-        </div>
         <VideoPlayer
           videoUrl={videoUrl}
           poster={data?.videoPoster}
