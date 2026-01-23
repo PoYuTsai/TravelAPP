@@ -113,6 +113,18 @@ export default function Footer() {
             ))}
           </div>
           <p>&copy; {currentYear} 清微旅行 Chiangway Travel. All rights reserved.</p>
+          <p className="mt-2 text-gray-600">
+            由 Eric 與{' '}
+            <a
+              href="https://claude.ai/claude-code"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-400 hover:text-primary transition-colors"
+            >
+              Claude Code
+            </a>
+            {' '}協作開發 · 歡迎建議
+          </p>
         </div>
       </div>
     </footer>

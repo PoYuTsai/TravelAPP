@@ -110,9 +110,11 @@ interface TrustNumbersProps {
   items?: any[]
   // Compact mode for inline display (no section wrapper)
   compact?: boolean
+  // Dynamic family count from Notion (defaults to 114 if not provided)
+  familyCountValue?: number
 }
 
-export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
+export default function TrustNumbers({ compact = false, familyCountValue = 114 }: TrustNumbersProps) {
   const [isVisible, setIsVisible] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -135,7 +137,7 @@ export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
     return () => observer.disconnect()
   }, [])
 
-  const familyCount = useCountAnimation(114, 1500, isVisible)
+  const familyCount = useCountAnimation(familyCountValue, 1500, isVisible)
 
   // Pulse animation always shows when section is visible
   const showPulse = isVisible

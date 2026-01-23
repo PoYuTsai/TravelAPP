@@ -27,10 +27,38 @@ function extractYearMonth(dateValue: { start: string; end?: string | null } | nu
   return null
 }
 
+// In-memory cache for Notion data
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+const cache: Record<string, CacheEntry<unknown>> = {}
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes cache
+
+function getCached<T>(key: string): T | null {
+  const entry = cache[key]
+  if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
+    return entry.data as T
+  }
+  return null
+}
+
+function setCache<T>(key: string, data: T): void {
+  cache[key] = { data, timestamp: Date.now() }
+}
+
 /**
  * 直接呼叫 Notion REST API 查詢資料庫
+ * @param databaseId - Notion 資料庫 ID
+ * @param startCursor - 分頁游標
+ * @param sorts - 排序設定 (保留 Notion 手動排序)
  */
-async function queryNotionDatabase(databaseId: string, startCursor?: string): Promise<any> {
+async function queryNotionDatabase(
+  databaseId: string,
+  startCursor?: string,
+  sorts?: Array<{ timestamp: string; direction: 'ascending' | 'descending' }>
+): Promise<any> {
   const response = await fetch(`https://api.notion.com/v1/databases/${databaseId}/query`, {
     method: 'POST',
     headers: {
@@ -41,6 +69,8 @@ async function queryNotionDatabase(databaseId: string, startCursor?: string): Pr
     body: JSON.stringify({
       page_size: 100,
       ...(startCursor ? { start_cursor: startCursor } : {}),
+      // Sort by created_time ascending to preserve manual order in Notion
+      ...(sorts ? { sorts } : {}),
     }),
   })
 
@@ -53,7 +83,7 @@ async function queryNotionDatabase(databaseId: string, startCursor?: string): Pr
 }
 
 /**
- * 從指定年份的資料庫取得訂單
+ * 從指定年份的資料庫取得訂單 (with caching)
  */
 export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder[]> {
   if (!NOTION_TOKEN) {
@@ -66,17 +96,27 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
     return []
   }
 
+  // Check cache first
+  const cacheKey = `orders_${year}`
+  const cached = getCached<NotionOrder[]>(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   try {
     const pages: any[] = []
     let cursor: string | undefined = undefined
 
     do {
-      const response = await queryNotionDatabase(databaseId, cursor)
+      // Sort by created_time ascending to preserve Notion's manual order
+      const response = await queryNotionDatabase(databaseId, cursor, [
+        { timestamp: 'created_time', direction: 'ascending' }
+      ])
       pages.push(...response.results)
       cursor = response.has_more ? response.next_cursor : undefined
     } while (cursor)
 
-    return pages.map((page: any) => {
+    const orders = pages.map((page: any) => {
       const props = page.properties
 
       const customerName = props['客戶名稱']?.title?.[0]?.plain_text || ''
@@ -100,9 +140,46 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
         updateStatus,
       }
     })
+
+    // Cache the result
+    setCache(cacheKey, orders)
+    return orders
   } catch (error) {
     console.warn(`無法取得 ${year} 年的資料:`, error)
     return []
+  }
+}
+
+/**
+ * 取得所有年份的家庭總數 (for 114+ families display)
+ */
+export async function fetchTotalFamilyCount(): Promise<number> {
+  // Check cache first
+  const cacheKey = 'total_family_count'
+  const cached = getCached<number>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  try {
+    const allYearData = await fetchAllOrders()
+    let total = 0
+
+    for (const { orders } of allYearData) {
+      // Count unique customers with valid names and travel dates
+      for (const order of orders) {
+        if (order.customerName && order.travelDate?.start) {
+          total++
+        }
+      }
+    }
+
+    // Cache the result
+    setCache(cacheKey, total)
+    return total
+  } catch (error) {
+    console.warn('無法取得家庭總數:', error)
+    return 114 // Fallback to default
   }
 }
 

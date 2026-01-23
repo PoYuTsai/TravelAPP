@@ -1,4 +1,5 @@
 import { client } from '@/sanity/client'
+import { fetchTotalFamilyCount } from '@/lib/notion'
 
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60
@@ -45,7 +46,11 @@ async function getLandingPageData() {
 }
 
 export default async function Home() {
-  const data = await getLandingPageData()
+  // Fetch data in parallel
+  const [data, familyCount] = await Promise.all([
+    getLandingPageData(),
+    fetchTotalFamilyCount(),
+  ])
 
   return (
     <>
@@ -57,7 +62,7 @@ export default async function Home() {
         primaryCta={data?.heroPrimaryCta}
         secondaryCta={data?.heroSecondaryCta}
       />
-      <TrustNumbers />
+      <TrustNumbers familyCountValue={familyCount} />
       <WhoWeAre
         videoUrl={data?.whoWeAreVideoUrl}
         videoPoster={data?.whoWeAreVideoPoster}
