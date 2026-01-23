@@ -79,11 +79,12 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
       {/* Carousel */}
       <div className="relative">
         {/* Main Carousel */}
-        <div className="overflow-hidden rounded-2xl" ref={emblaRef}>
+        <div className="overflow-hidden" ref={emblaRef}>
           <div className="flex">
             {stops.map((stop, i) => (
               <div key={i} className="flex-[0_0_100%] min-w-0">
-                <div className="relative aspect-[16/10] bg-gray-100">
+                {/* Image only - no overlay */}
+                <div className="relative aspect-[16/10] bg-gray-100 rounded-t-2xl overflow-hidden">
                   {stop.image ? (
                     <Image
                       src={urlFor(stop.image).width(1200).height(750).url()}
@@ -97,32 +98,28 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
                       <span className="text-6xl">{stop.emoji || '🌿'}</span>
                     </div>
                   )}
-                  {/* Gradient overlay - stronger for better readability */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-                  {/* Stop info overlay */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
-                    <div className="bg-black/30 backdrop-blur-sm rounded-lg p-3 md:p-4">
-                      <div className="flex items-center gap-2 mb-1">
-                        {stop.emoji && <span className="text-2xl drop-shadow-lg">{stop.emoji}</span>}
-                        <h3 className="text-xl md:text-2xl font-bold text-white drop-shadow-lg">{stop.name}</h3>
-                      </div>
-                      {stop.description && (
-                        <p className="text-sm md:text-base text-white/95 line-clamp-2 drop-shadow">
-                          {stop.description}
-                        </p>
-                      )}
-                    </div>
+                </div>
+                {/* Text below image */}
+                <div className="bg-white border border-t-0 border-gray-100 rounded-b-2xl p-4 md:p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    {stop.emoji && <span className="text-2xl">{stop.emoji}</span>}
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900">{stop.name}</h3>
                   </div>
+                  {stop.description && (
+                    <p className="text-sm md:text-base text-gray-600 leading-relaxed">
+                      {stop.description}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Navigation Arrows */}
+        {/* Navigation Arrows - positioned on image area only (top-[28%] to center on 16:10 image) */}
         <button
           onClick={scrollPrev}
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+          className="absolute left-3 top-[28%] -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
           aria-label="上一張"
         >
           <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -131,7 +128,7 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
         </button>
         <button
           onClick={scrollNext}
-          className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors"
+          className="absolute right-3 top-[28%] -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
           aria-label="下一張"
         >
           <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
