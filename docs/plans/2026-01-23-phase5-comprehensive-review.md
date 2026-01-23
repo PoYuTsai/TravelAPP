@@ -486,6 +486,108 @@ export const sanityLogger = new Logger('SANITY')
 
 基於實際使用回饋的細節優化。
 
+---
+
+## Phase 5.2: 10 角色全面審查 (2026-01-24)
+
+基於 10 個專業角度的全面審查與優化：SA 架構師、PM 產品經理、UI/UX 設計師、後端工程師、QA 測試、品牌顧問、SEO 顧問、行銷顧問、資安工程師、目標用戶。
+
+### SA 架構師優化
+
+1. **Sanity CDN 啟用**
+   - `src/sanity/client.ts`: `useCdn: process.env.NODE_ENV === 'production'`
+   - 生產環境自動啟用 CDN 快取
+
+2. **Logger 整合**
+   - 移除 `src/lib/logger/index.ts` 重複實作
+   - 統一使用 `src/lib/logger.ts`
+   - 新增 `pdfLogger` 專用 logger
+
+### 後端優化
+
+1. **API Key 生產環境強制**
+   - `src/lib/api-auth.ts`: 生產環境無 API Key 回傳 500 錯誤
+   - 開發環境僅警告但允許存取
+
+2. **Email Whitelist 修復**
+   - `.split(',').map(email => email.trim())` 處理空格
+
+3. **輸入驗證強化**
+   - `src/app/api/tours/cases/route.ts`: NaN 檢查、邊界值限制
+   - `limit`: 1-100, `offset`: ≥0
+
+### QA 測試修復
+
+1. **鍵盤支援**
+   - `src/components/cms/ImageGallery.tsx`: Esc 關閉 lightbox
+   - `src/components/homestay/RoomCards.tsx`: Esc 關閉 lightbox
+   - 背景滾動防止: `body.style.overflow = 'hidden'`
+
+### SEO 優化
+
+1. **Canonical URLs**
+   - `src/app/blog/[slug]/page.tsx`: 文章頁 canonical
+   - `src/app/tours/[slug]/page.tsx`: 行程頁 canonical
+
+2. **Sitemap 完善**
+   - `src/app/sitemap.ts`: 加入 tours、categories 頁面
+
+3. **FAQ Schema**
+   - `src/app/services/car-charter/page.tsx`: 結構化資料
+
+4. **OG Image**
+   - `src/app/tours/[slug]/page.tsx`: 行程頁社群圖片
+
+### 行銷追蹤
+
+1. **文章閱讀追蹤**
+   - 新建 `src/components/blog/ArticleViewTracker.tsx`
+   - GA4 事件: `article_view`
+
+2. **表單提交追蹤**
+   - `src/components/ContactForm.tsx`: `trackFormSubmit('contact_inquiry')`
+
+### 資安強化
+
+1. **CORS 修復**
+   - `src/app/api/openapi/route.ts`: 移除 `*`，使用 allowedOrigins
+
+2. **Debug Log 清理**
+   - `src/sanity/queries.ts`: 移除 console.log
+   - `src/lib/excel/itinerary-template.ts`: debugLog wrapper
+
+3. **HSTS Header**
+   - `next.config.js`: `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+
+### UI/UX 優化
+
+1. **Hero 圖片裁切修復**
+   - `src/components/sections/Hero.tsx`: 21:9 → 2:1 比例
+   - `object-top` → `object-center`
+
+2. **表單驗證完善**
+   - `src/components/ContactForm.tsx`: 完整即時驗證
+   - `aria-invalid`、`aria-describedby` 無障礙屬性
+   - 紅色邊框 + 錯誤訊息 (`role="alert"`)
+
+3. **Loading Skeleton**
+   - `src/components/ui/LoadingSkeleton.tsx`: 新增 CaseSkeleton
+   - `src/app/tours/ToursPageClient.tsx`: 使用 CaseGridSkeleton
+
+### 開發者體驗
+
+1. **Skill 文件**
+   - 新建 `.claude/skills/comprehensive-review.md`
+   - 10 角色審查流程、歷史記錄、自學習機制
+
+### Token 安全確認
+
+- `.env.local` 在 `.gitignore` 中，從未提交至 git
+- Vercel 環境變數已設定所有必要 tokens
+- 建議：定期輪換 tokens
+
+---
+
 ### Notion 整合強化
 
 1. **動態家庭數量**
