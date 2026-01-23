@@ -20,6 +20,28 @@ export interface TourCasesResponse {
 }
 
 /**
+ * 取得泰國時區 (GMT+7) 的今天日期
+ * 用於狀態判斷，確保不管 server 在哪個時區都用泰國時間
+ */
+function getThailandToday(): Date {
+  const now = new Date()
+  // 泰國時區 GMT+7，轉換為泰國當地時間
+  const thailandOffset = 7 * 60 // 分鐘
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000)
+  const thailandTime = new Date(utcTime + (thailandOffset * 60 * 1000))
+  // 回傳泰國時間的日期部分（年月日）
+  return new Date(thailandTime.getFullYear(), thailandTime.getMonth(), thailandTime.getDate())
+}
+
+/**
+ * 解析日期字串為日期物件（只取年月日，忽略時區）
+ */
+function parseDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+/**
  * 從 Notion 訂單轉換為行程案例（公開顯示用）
  */
 function orderToCase(order: NotionOrder): TourCase | null {
@@ -27,20 +49,19 @@ function orderToCase(order: NotionOrder): TourCase | null {
     return null
   }
 
-  const startDateObj = new Date(order.travelDate.start)
-  const now = new Date()
-  // 設定為今天的開始時間（0:00:00）以便正確比較日期
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  // 解析日期（避免時區問題）
+  const startDateObj = parseDate(order.travelDate.start)
+  const today = getThailandToday()
 
   // 計算天數
   let days = 1
   let endDateObj = startDateObj
   if (order.travelDate.end) {
-    endDateObj = new Date(order.travelDate.end)
+    endDateObj = parseDate(order.travelDate.end)
     days = Math.ceil((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1
   }
 
-  // 判斷狀態：
+  // 判斷狀態（使用泰國時間）：
   // 如果結束日期 < 今天 → 已完成
   // 如果開始日期 <= 今天 <= 結束日期 → 旅遊中
   // 如果開始日期 > 今天 → 即將出發
