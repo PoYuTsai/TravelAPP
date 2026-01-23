@@ -71,8 +71,8 @@ export default async function Home() {
         subtitle={data?.whoWeAreSubtitle}
         description={data?.whoWeAreDescription}
         trustPoints={data?.whoWeAreTrustPoints?.map((text: string) => ({ text }))}
-        storyLink={data?.whoWeAreStoryLink}
-        storyLinkText={data?.whoWeAreStoryLinkText}
+        storyLink={data?.whoWeAreStoryLink || '/blog/eric-story-taiwan-to-chiang-mai'}
+        storyLinkText={data?.whoWeAreStoryLinkText || '閱讀我們的故事'}
       />
       <ToursPreview />
       <Testimonials />
