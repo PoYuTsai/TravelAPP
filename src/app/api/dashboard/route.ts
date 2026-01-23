@@ -4,6 +4,9 @@ import { NextResponse } from 'next/server'
 import { fetchDashboardData } from '@/lib/notion'
 import type { DashboardQuery } from '@/lib/notion'
 import { validateDashboardAccess, checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { apiLogger } from '@/lib/logger'
+
+const log = apiLogger.child('dashboard')
 
 export async function GET(request: Request) {
   // Rate limiting
@@ -29,10 +32,11 @@ export async function GET(request: Request) {
       query.month = parseInt(monthParam, 10)
     }
 
+    log.debug('Fetching dashboard data', { query, clientIP })
     const data = await fetchDashboardData(query)
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Dashboard API Error:', error)
+    log.error('Failed to fetch dashboard data', error, { clientIP })
     return NextResponse.json(
       { error: '無法取得資料' },
       { status: 500 }

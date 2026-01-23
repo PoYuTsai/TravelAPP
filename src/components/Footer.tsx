@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { trackLineClick } from '@/lib/analytics'
 import { footerNavLinks, legalLinks, socialLinks, LINE_URL } from '@/lib/navigation'
+import { CATEGORY_NAMES } from '@/lib/constants'
 import { LineIcon, InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/SocialIcons'
 
 // Map social link labels to icons
@@ -20,7 +21,7 @@ export default function Footer() {
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div>
             <div className="mb-4">
@@ -48,6 +49,22 @@ export default function Footer() {
                   className="text-gray-400 hover:text-primary transition-colors text-sm"
                 >
                   {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          {/* Blog Categories */}
+          <div>
+            <h3 className="font-bold text-lg mb-4">部落格分類</h3>
+            <nav className="flex flex-col space-y-2">
+              {Object.entries(CATEGORY_NAMES).map(([key, label]) => (
+                <Link
+                  key={key}
+                  href={`/blog/category/${key}`}
+                  className="text-gray-400 hover:text-primary transition-colors text-sm"
+                >
+                  {label}
                 </Link>
               ))}
             </nav>

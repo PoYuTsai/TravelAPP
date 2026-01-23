@@ -342,9 +342,140 @@ responsive: 'aspect-[9/16] md:aspect-video max-w-[280px] md:max-w-[500px]'
 
 ---
 
+## Phase 5.1: 十角度審視後優化 (2026-01-23)
+
+基於 SA、PM、UI/UX、Backend、QA、Brand、SEO、Marketing、Security、TA 十角度全面審視後執行的優化。
+
+### 1. CORS 設定 (Security)
+**檔案**: `next.config.js`
+
+```javascript
+// API 路由 CORS 設定
+{
+  source: '/api/:path*',
+  headers: [
+    { key: 'Access-Control-Allow-Origin', value: allowedOrigins },
+    { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+    { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, X-API-Key' },
+    { key: 'Access-Control-Max-Age', value: '86400' },
+  ],
+}
+```
+
+### 2. 搜尋功能 + 分類頁面 (SEO)
+**新建檔案**:
+- `src/components/blog/SearchBox.tsx` - 搜尋元件
+- `src/app/blog/category/[slug]/page.tsx` - SEO 友善分類頁
+
+**修改檔案**:
+- `src/app/blog/page.tsx` - 加入搜尋功能
+- `src/components/blog/CategoryFilter.tsx` - 使用 SEO 友善 URL
+
+功能：
+- 文章標題、摘要全文搜尋
+- 各分類獨立頁面 (`/blog/category/guide` 等)
+- 搜尋結果計數顯示
+
+### 3. 404 頁面優化 (UI/UX)
+**檔案**: `src/app/not-found.tsx`
+
+- 移除 emoji 圖示，改用 SVG 地圖圖示
+- 加入 404 錯誤代碼
+- 加入快速導航連結區塊
+- 改善視覺層次
+
+### 4. Loading 狀態 (QA)
+**新建檔案**:
+- `src/components/ui/LoadingSkeleton.tsx` - 通用骨架屏元件
+- `src/app/blog/loading.tsx`
+- `src/app/tours/loading.tsx`
+- `src/app/homestay/loading.tsx`
+- `src/app/services/car-charter/loading.tsx`
+
+元件：
+- `Skeleton` - 基礎脈衝動畫
+- `CardSkeleton` - 卡片骨架
+- `CardGridSkeleton` - 卡片網格
+- `SectionTitleSkeleton` - 標題骨架
+- `HeroSkeleton` - Hero 區塊骨架
+- `PageLoadingSkeleton` - 完整頁面骨架
+
+### 5. OpenAPI/Swagger 文件 (Backend)
+**新建檔案**:
+- `src/lib/openapi.ts` - OpenAPI 3.0 規格定義
+- `src/app/api/openapi/route.ts` - JSON 規格端點
+- `src/app/api-docs/page.tsx` - Swagger UI 文件頁面
+
+文件內容：
+- 行程匯出 API (text, pdf, excel)
+- Dashboard API
+- Tours API
+- 安全認證說明
+- 速率限制說明
+
+### 6. 集中式 Logger (Backend)
+**新建檔案**: `src/lib/logger.ts`
+
+```typescript
+// Logger 類別
+class Logger {
+  debug(message: string, context?: LogContext): void
+  info(message: string, context?: LogContext): void
+  warn(message: string, context?: LogContext): void
+  error(message: string, error?: Error, context?: LogContext): void
+}
+
+// 預建 Logger
+export const logger = new Logger('APP')
+export const apiLogger = new Logger('API')
+export const dbLogger = new Logger('DB')
+export const authLogger = new Logger('AUTH')
+export const sanityLogger = new Logger('SANITY')
+```
+
+**更新 API 路由使用 Logger**:
+- `src/app/api/dashboard/route.ts`
+- `src/app/api/itinerary/[id]/text/route.ts`
+- `src/app/api/itinerary/[id]/pdf/route.ts`
+- `src/app/api/itinerary/[id]/excel/route.ts`
+
+### 7. SEO 內部連結優化 (SEO)
+**新建檔案**: `src/components/blog/RelatedPosts.tsx`
+
+功能：
+- 同分類相關文章推薦 (最多 3 篇)
+- 不足時補充其他分類文章
+
+**修改檔案**:
+- `src/app/blog/[slug]/page.tsx` - 加入相關文章、分類連結可點擊
+- `src/components/Footer.tsx` - 加入部落格分類連結區塊 (4 欄 footer)
+
+---
+
+## 新增檔案清單 (Phase 5.1)
+
+- `src/components/blog/SearchBox.tsx`
+- `src/components/blog/RelatedPosts.tsx`
+- `src/components/ui/LoadingSkeleton.tsx`
+- `src/app/blog/category/[slug]/page.tsx`
+- `src/app/blog/loading.tsx`
+- `src/app/tours/loading.tsx`
+- `src/app/homestay/loading.tsx`
+- `src/app/services/car-charter/loading.tsx`
+- `src/lib/openapi.ts`
+- `src/lib/logger.ts`
+- `src/app/api/openapi/route.ts`
+- `src/app/api-docs/page.tsx`
+
+---
+
 ## 未來建議
 
 ### Cloudinary 影片上傳注意事項
 1. **檔名使用純英文** - 避免中文或特殊字元
 2. **URL 加上 `vc_h264`** - 確保 iOS 相容
 3. **格式建議** - MP4 + H.264 視訊 + AAC 音訊
+
+### 待處理項目
+- 將 .env.local 移出 OneDrive 同步資料夾
+- 等待 Sanity 官方更新依賴套件漏洞修復

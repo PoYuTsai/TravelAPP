@@ -5,6 +5,7 @@ import { Suspense } from 'react'
 import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import CategoryFilter from '@/components/blog/CategoryFilter'
+import SearchBox from '@/components/blog/SearchBox'
 import { CATEGORY_NAMES, getCategoryName } from '@/lib/constants'
 
 export const metadata: Metadata = {
@@ -37,12 +38,20 @@ interface Post {
 const VALID_CATEGORIES = Object.keys(CATEGORY_NAMES)
 
 // 取得文章 - using parameterized queries for security
-async function getPosts(category?: string): Promise<Post[]> {
+async function getPosts(category?: string, searchQuery?: string): Promise<Post[]> {
   // Validate category against whitelist to prevent GROQ injection
   const isValidCategory = category && category !== 'all' && VALID_CATEGORIES.includes(category)
+  // Sanitize search query (max 100 chars, remove special chars)
+  const sanitizedSearch = searchQuery
+    ? searchQuery.slice(0, 100).replace(/[*\[\]{}()]/g, '')
+    : null
 
-  const query = isValidCategory
-    ? `*[_type == "post" && category == $category] | order(featured desc, publishedAt desc) {
+  let query: string
+  let params: Record<string, string> = {}
+
+  if (sanitizedSearch) {
+    // Search query - search in title and excerpt
+    query = `*[_type == "post" && (title match $search || excerpt match $search)] | order(featured desc, publishedAt desc) {
         _id,
         title,
         slug,
@@ -52,7 +61,9 @@ async function getPosts(category?: string): Promise<Post[]> {
         featured,
         publishedAt
       }`
-    : `*[_type == "post"] | order(featured desc, publishedAt desc) {
+    params = { search: `*${sanitizedSearch}*` }
+  } else if (isValidCategory) {
+    query = `*[_type == "post" && category == $category] | order(featured desc, publishedAt desc) {
         _id,
         title,
         slug,
@@ -62,9 +73,22 @@ async function getPosts(category?: string): Promise<Post[]> {
         featured,
         publishedAt
       }`
+    params = { category }
+  } else {
+    query = `*[_type == "post"] | order(featured desc, publishedAt desc) {
+        _id,
+        title,
+        slug,
+        excerpt,
+        mainImage,
+        category,
+        featured,
+        publishedAt
+      }`
+  }
 
   try {
-    const posts = await client.fetch<Post[]>(query, isValidCategory ? { category } : {})
+    const posts = await client.fetch<Post[]>(query, params)
     return posts
   } catch {
     return []
@@ -74,13 +98,14 @@ async function getPosts(category?: string): Promise<Post[]> {
 export const revalidate = 60 // 每 60 秒重新驗證
 
 interface BlogPageProps {
-  searchParams: Promise<{ category?: string }>
+  searchParams: Promise<{ category?: string; q?: string }>
 }
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
   const params = await searchParams
   const category = params.category
-  const posts = await getPosts(category)
+  const searchQuery = params.q
+  const posts = await getPosts(category, searchQuery)
 
   const featuredPost = posts.find((p) => p.featured)
   const otherPosts = posts.filter((p) => p._id !== featuredPost?._id)
@@ -95,15 +120,24 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             subtitle="清邁旅遊資訊、親子攻略、在地推薦"
           />
 
+          {/* 搜尋框 */}
+          <Suspense fallback={<div className="h-12 mb-6" />}>
+            <SearchBox />
+          </Suspense>
+
           <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
             <CategoryFilter />
           </Suspense>
 
           <div className="text-center py-16">
             <p className="text-gray-500 mb-4">
-              {category ? `「${getCategoryName(category)}」分類暫無文章` : '文章正在準備中...'}
+              {searchQuery
+                ? `找不到包含「${searchQuery}」的文章`
+                : category
+                  ? `「${getCategoryName(category)}」分類暫無文章`
+                  : '文章正在準備中...'}
             </p>
-            {category && (
+            {(category || searchQuery) && (
               <Link href="/blog" className="text-primary hover:underline">
                 ← 查看所有文章
               </Link>
@@ -122,10 +156,27 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
           subtitle="清邁旅遊資訊、親子攻略、在地推薦"
         />
 
+        {/* 搜尋框 */}
+        <Suspense fallback={<div className="h-12 mb-6" />}>
+          <SearchBox />
+        </Suspense>
+
         {/* 分類篩選 */}
         <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
           <CategoryFilter />
         </Suspense>
+
+        {/* 搜尋結果提示 */}
+        {searchQuery && (
+          <div className="text-center mb-8">
+            <p className="text-gray-600">
+              搜尋「<span className="font-medium text-primary">{searchQuery}</span>」找到 {posts.length} 篇文章
+            </p>
+            <Link href="/blog" className="text-sm text-gray-500 hover:text-primary">
+              清除搜尋
+            </Link>
+          </div>
+        )}
 
         {/* 精選文章 */}
         {featuredPost && !category && (

@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { client } from '@/sanity/client'
 import { sanityToLineText } from '@/lib/itinerary-parser'
 import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { apiLogger } from '@/lib/logger'
+
+const log = apiLogger.child('itinerary:text')
 
 const query = `*[_type == "itinerary" && _id == $id][0]{
   _id,
@@ -162,7 +165,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('匯出文字失敗:', error)
+    log.error('Failed to export itinerary as text', error)
     return new NextResponse('匯出失敗', { status: 500 })
   }
 }

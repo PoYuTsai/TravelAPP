@@ -20,7 +20,25 @@ const nextConfig = {
 
   // Security Headers
   async headers() {
+    // Allowed origins for CORS (production domain + localhost for dev)
+    const allowedOrigins = [
+      'https://chiangway-travel.com',
+      'https://www.chiangway-travel.com',
+      process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,
+    ].filter(Boolean).join(', ')
+
     return [
+      // CORS headers for API routes
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: allowedOrigins },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization, X-API-Key' },
+          { key: 'Access-Control-Max-Age', value: '86400' }, // 24 hours preflight cache
+        ],
+      },
+      // Security headers for all routes
       {
         source: '/(.*)',
         headers: [

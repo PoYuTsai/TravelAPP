@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryExcel } from '@/lib/excel/itinerary-template'
 import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { apiLogger } from '@/lib/logger'
+
+const log = apiLogger.child('itinerary:excel')
 
 // 禁用 Next.js 路由快取
 export const dynamic = 'force-dynamic'
@@ -33,11 +36,11 @@ export async function GET(
       )
     }
 
-    // Debug log
-    console.log('=== Excel Debug ===')
-    console.log('Document ID:', id)
-    console.log('Days count:', itinerary?.days?.length)
-    console.log('Hotels count:', itinerary?.hotels?.length)
+    log.debug('Generating Excel', {
+      id,
+      daysCount: itinerary?.days?.length,
+      hotelsCount: itinerary?.hotels?.length,
+    })
 
     // 產生 Excel
     const excel = await generateItineraryExcel(itinerary)
@@ -46,7 +49,7 @@ export async function GET(
     const now = new Date()
     const timeStr = `${now.getHours()}h${now.getMinutes()}m${now.getSeconds()}s`
     const filename = `${itinerary.clientName}-行程表-${timeStr}.xlsx`
-    console.log('Generated filename:', filename)
+    log.debug('Excel generated', { filename })
 
     return new NextResponse(new Uint8Array(excel), {
       headers: {
@@ -57,7 +60,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('Excel generation error:', error)
+    log.error('Excel generation failed', error)
     return NextResponse.json(
       { error: 'Failed to generate Excel' },
       { status: 500 }

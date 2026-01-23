@@ -5,6 +5,9 @@ import chromium from '@sparticuz/chromium-min'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryHTML } from '@/lib/pdf/itinerary-template'
 import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { apiLogger } from '@/lib/logger'
+
+const log = apiLogger.child('itinerary:pdf')
 
 // 禁用 Next.js 路由快取，確保每次都取得最新資料
 export const dynamic = 'force-dynamic'
@@ -37,9 +40,7 @@ export async function GET(
     // 從 Sanity 取得資料
     const itinerary = await getItineraryById(id)
 
-    console.log('=== PDF Debug ===')
-    console.log('Document ID:', id)
-    console.log('Days count:', itinerary?.days?.length)
+    log.debug('Generating PDF', { id, daysCount: itinerary?.days?.length })
 
     if (!itinerary) {
       return NextResponse.json(
@@ -53,7 +54,7 @@ export async function GET(
 
     // 取得 executablePath (從外部 URL 下載)
     const executablePath = await chromium.executablePath(CHROMIUM_URL)
-    console.log('Chromium path:', executablePath)
+    log.debug('Chromium executable path resolved', { executablePath })
 
     // 使用 Puppeteer 產生 PDF (支援 Vercel serverless)
     browser = await puppeteerCore.launch({
@@ -87,8 +88,7 @@ export async function GET(
       },
     })
   } catch (error) {
-    console.error('PDF generation error:', error)
-    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
+    log.error('PDF generation failed', error)
 
     return NextResponse.json(
       {

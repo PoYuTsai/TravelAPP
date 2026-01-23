@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
+import Link from 'next/link'
+import { Suspense } from 'react'
 import { notFound } from 'next/navigation'
 import { client, urlFor } from '@/sanity/client'
 import TableOfContents from '@/components/blog/TableOfContents'
@@ -7,6 +9,7 @@ import Breadcrumb from '@/components/blog/Breadcrumb'
 import AuthorCard from '@/components/blog/AuthorCard'
 import ArticleSchema from '@/components/blog/ArticleSchema'
 import PortableTextRenderer from '@/components/blog/PortableTextRenderer'
+import RelatedPosts from '@/components/blog/RelatedPosts'
 import Button from '@/components/ui/Button'
 import { getCategoryName } from '@/lib/constants'
 
@@ -125,9 +128,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {/* 文章標頭 */}
           <header className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <span className="text-sm bg-primary/20 text-primary-dark px-3 py-1 rounded-full font-medium">
+              <Link
+                href={`/blog/category/${post.category}`}
+                className="text-sm bg-primary/20 text-primary-dark px-3 py-1 rounded-full font-medium hover:bg-primary/30 transition-colors"
+              >
                 {getCategoryName(post.category)}
-              </span>
+              </Link>
               {post.publishedAt && (
                 <time className="text-sm text-gray-500" dateTime={post.publishedAt}>
                   {new Date(post.publishedAt).toLocaleDateString('zh-TW', {
@@ -199,6 +205,11 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           <div className="mt-12">
             <AuthorCard />
           </div>
+
+          {/* 相關文章 */}
+          <Suspense fallback={<div className="mt-16 pt-12 border-t border-gray-200 text-center text-gray-500">載入相關文章...</div>}>
+            <RelatedPosts currentPostId={post._id} category={post.category} />
+          </Suspense>
         </div>
       </article>
     </>

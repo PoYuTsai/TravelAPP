@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 const categories = [
   { key: 'all', label: '全部' },
@@ -15,14 +15,23 @@ const categories = [
 ]
 
 export default function CategoryFilter() {
+  const pathname = usePathname()
   const searchParams = useSearchParams()
-  const currentCategory = searchParams.get('category') || 'all'
+
+  // Determine current category from URL
+  // Support both /blog?category=xxx and /blog/category/xxx
+  const pathCategory = pathname.startsWith('/blog/category/')
+    ? pathname.split('/').pop()
+    : null
+  const queryCategory = searchParams.get('category')
+  const currentCategory = pathCategory || queryCategory || 'all'
 
   return (
     <div className="flex flex-wrap justify-center gap-2 mb-8">
       {categories.map((cat) => {
         const isActive = currentCategory === cat.key
-        const href = cat.key === 'all' ? '/blog' : `/blog?category=${cat.key}`
+        // Use SEO-friendly URLs for categories
+        const href = cat.key === 'all' ? '/blog' : `/blog/category/${cat.key}`
 
         return (
           <Link
