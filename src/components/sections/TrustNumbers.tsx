@@ -70,26 +70,6 @@ function ArrowIcon({ className }: { className?: string }) {
   )
 }
 
-// External link icon component
-function ExternalLinkIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-      />
-    </svg>
-  )
-}
-
 interface TrustNumbersProps {
   // Keep for backwards compatibility with Sanity CMS
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,21 +117,15 @@ export default function TrustNumbers({ compact = false }: TrustNumbersProps) {
         <ArrowIcon className="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-primary" />
       </Link>
 
-      {/* Badge 2: 5.0 Stars */}
-      <a
-        href="https://maps.app.goo.gl/YOUR_GOOGLE_LINK"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="group flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full cursor-pointer transition-all duration-200 hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-md"
-      >
+      {/* Badge 2: 5.0 Stars (display only, no link until Google Business restored) */}
+      <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full">
         <div className="flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
             <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
           ))}
         </div>
         <span className="text-base md:text-lg font-bold text-gray-900">5.0</span>
-        <ExternalLinkIcon className="w-4 h-4 text-gray-400 transition-colors duration-200 group-hover:text-yellow-500" />
-      </a>
+      </div>
 
       {/* Badge 3: 在地家庭 */}
       <Link
