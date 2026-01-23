@@ -11,7 +11,7 @@ interface TrustPoint {
 interface WhoWeAreProps {
   videoUrl?: string
   videoPoster?: any
-  videoAspect?: 'portrait' | 'landscape' | 'square'
+  videoAspect?: 'portrait' | 'landscape' | 'square' | 'responsive'
   title?: string
   subtitle?: string
   description?: string
@@ -29,7 +29,7 @@ const defaultTrustPoints: TrustPoint[] = [
 export default function WhoWeAre({
   videoUrl,
   videoPoster,
-  videoAspect = 'portrait',
+  videoAspect = 'responsive',
   title = '嗨，我們是 Eric & Min',
   subtitle = '台灣爸爸 × 在地 30 年泰國媽媽',
   description = '帶著女兒 Miya，為親子家庭設計清邁旅程。',
@@ -52,6 +52,8 @@ export default function WhoWeAre({
     portrait: 'aspect-[9/16] max-w-[260px] sm:max-w-[280px] md:max-w-[300px]',
     landscape: 'aspect-[16/9] max-w-[500px]',
     square: 'aspect-square max-w-[350px]',
+    // Responsive: portrait on mobile, landscape on desktop
+    responsive: 'aspect-[9/16] md:aspect-video max-w-[280px] md:max-w-[500px]',
   }
 
   return (
