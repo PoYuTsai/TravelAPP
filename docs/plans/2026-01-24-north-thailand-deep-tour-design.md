@@ -15,6 +15,10 @@
 | www 重導向 | www → non-www 301 redirect |
 | 內部連結優化 | 行程頁加入 RelatedTours、RelatedBlogPosts、Breadcrumb |
 | 技術債清理 | Breadcrumb 移至共用、刪除 7 個一次性腳本 |
+| 台泰家庭連結修正 | /about → /homestay |
+| Revalidate bug 修復 | dayTour 路徑錯誤、post 缺少首頁/分類頁 |
+| Sanity Webhook 修正 | 加入 Projection `{_type, _id}` |
+| 刪除 /about 頁面 | 內容重複，改用 Blog 故事文章 |
 
 ### 等待中
 
@@ -22,6 +26,12 @@
 |------|------|
 | Google 重新索引 | 3-14 天 |
 | Google 商家檔案申訴 | 1/20 提交 |
+
+### 進行中
+
+| 項目 | 狀態 |
+|------|------|
+| /internal 快速回覆資料庫 | 設計中 |
 
 ---
 
