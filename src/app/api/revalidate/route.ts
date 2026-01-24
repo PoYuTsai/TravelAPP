@@ -72,7 +72,9 @@ export async function POST(request: NextRequest) {
         case 'post':
           revalidatePath('/blog')
           revalidatePath('/blog/[slug]', 'page')
-          revalidatedPaths.push('/blog', '/blog/[slug]')
+          revalidatePath('/blog/category/[slug]', 'page')
+          revalidatePath('/', 'page') // 首頁有精選文章
+          revalidatedPaths.push('/blog', '/blog/[slug]', '/blog/category/[slug]', '/')
           break
 
         case 'itinerary':
