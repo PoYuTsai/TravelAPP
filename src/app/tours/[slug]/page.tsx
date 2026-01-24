@@ -8,7 +8,7 @@ import StopsCarousel from '@/components/tours/StopsCarousel'
 import TourViewTracker from '@/components/tours/TourViewTracker'
 import RelatedTours from '@/components/tours/RelatedTours'
 import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
-import Breadcrumb from '@/components/blog/Breadcrumb'
+import Breadcrumb from '@/components/ui/Breadcrumb'
 
 // === Types ===
 
