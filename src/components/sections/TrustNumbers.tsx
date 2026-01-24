@@ -202,7 +202,7 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
 
         {/* Badge 3: 在地台泰家庭 */}
         <Link
-          href="/about"
+          href="/homestay"
           className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
           style={{ transitionDelay: '200ms' }}
         >
