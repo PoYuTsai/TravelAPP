@@ -382,7 +382,23 @@ Sanity 改資料 → Webhook 自動觸發 → Next.js 清緩存 → 前台即時
 
 ---
 
+### www 重定向設定
+
+解決 Google 將 `www` 與 `non-www` 視為重複網頁的問題：
+
+| 設定 | 狀態 |
+|------|------|
+| next.config.js 301 重定向 | ✅ 已加入 |
+| Vercel Domain 設定 | ⏳ 需手動加入 www 並設定 redirect |
+
+```javascript
+// www.chiangway-travel.com → chiangway-travel.com (301)
+```
+
+---
+
 *設計完成：2026-01-24*
 *上架完成：2026-01-24*
 *Phase 5.3 審查完成：2026-01-24*
 *SEO 優化：2026-01-24*
+*www 重定向：2026-01-24*
