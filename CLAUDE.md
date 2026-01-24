@@ -47,6 +47,7 @@
 
 1. **Phase 文件** (`docs/plans/...`) - 記錄當次修改項目
 2. **comprehensive-review.md** (`.claude/skills/comprehensive-review.md`) - 更新歷史審查記錄
+3. **README.md** - GitHub 專案說明（如有重大功能變更）
 
 流程：
 ```
