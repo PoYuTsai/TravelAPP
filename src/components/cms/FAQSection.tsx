@@ -53,6 +53,7 @@ export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSection
               onClick={() => toggle(index)}
               className="w-full flex items-center justify-between p-4 md:p-5 text-left bg-white hover:bg-gray-50 transition-colors"
               aria-expanded={openIndex === index}
+              aria-controls={`faq-answer-${index}`}
             >
               <span className="font-medium text-gray-900 pr-4">
                 {item.question}
@@ -74,7 +75,10 @@ export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSection
               </svg>
             </button>
             {openIndex === index && (
-              <div className="p-4 md:p-5 pt-0 md:pt-0 bg-white">
+              <div
+                id={`faq-answer-${index}`}
+                className="p-4 md:p-5 pt-0 md:pt-0 bg-white"
+              >
                 <p className="text-gray-600 leading-relaxed whitespace-pre-line">
                   {item.answer}
                 </p>

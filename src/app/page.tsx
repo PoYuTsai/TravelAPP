@@ -1,8 +1,15 @@
+import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: 'https://chiangway-travel.com',
+  },
+}
 
 import Hero from '@/components/sections/Hero'
 import TrustNumbers from '@/components/sections/TrustNumbers'

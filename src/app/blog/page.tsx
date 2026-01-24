@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     title: '部落格 | 清微旅行',
     description: '清邁親子旅遊攻略、景點推薦、美食分享，在地人的第一手資訊。',
   },
+  alternates: {
+    canonical: 'https://chiangway-travel.com/blog',
+  },
 }
 
 // Post 類型定義

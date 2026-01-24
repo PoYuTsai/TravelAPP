@@ -34,6 +34,7 @@ export default function SearchBox() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="搜尋文章..."
+          aria-label="搜尋部落格文章"
           className="w-full px-4 py-3 pl-12 pr-20 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
         />
         {/* Search icon */}
@@ -55,6 +56,7 @@ export default function SearchBox() {
           <button
             type="button"
             onClick={handleClear}
+            aria-label="清除搜尋"
             className="absolute right-16 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

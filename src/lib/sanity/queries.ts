@@ -41,7 +41,8 @@ export async function getItineraryById(id: string) {
   }`
 
   // 使用 apicdn=false 強制繞過 Sanity CDN 快取
-  const url = `https://${projectId}.api.sanity.io/v${apiVersion}/data/query/${dataset}?query=${encodeURIComponent(query)}&$id="${id}"`
+  // 安全：使用 encodeURIComponent 防止 query injection
+  const url = `https://${projectId}.api.sanity.io/v${apiVersion}/data/query/${dataset}?query=${encodeURIComponent(query)}&$id=${encodeURIComponent(JSON.stringify(id))}`
 
   const response = await fetch(url, {
     method: 'GET',

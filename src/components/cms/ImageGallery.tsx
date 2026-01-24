@@ -73,6 +73,9 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
       {/* Lightbox */}
       {selectedImage && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="圖片檢視器"
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
           onClick={() => setSelectedImage(null)}
         >

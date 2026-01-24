@@ -152,7 +152,7 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
         </div>
 
         {/* Mobile: Embla Carousel with swipe */}
-        <div className="md:hidden">
+        <div className="md:hidden" role="region" aria-label="客戶評價輪播">
           <div className="overflow-hidden" ref={emblaRef}>
             <div className="flex">
               {testimonials.map((testimonial, index) => (

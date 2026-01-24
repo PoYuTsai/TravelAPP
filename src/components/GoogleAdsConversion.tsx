@@ -40,9 +40,17 @@ export default function GoogleAdsConversion() {
   useEffect(() => {
     if (typeof window === 'undefined' || !window.gtag) return
 
-    // 檢查當前路徑是否匹配任何轉換事件
+    // 使用更精確的匹配：檢查路徑段落
+    const pathSegments = pathname.split('/').filter(Boolean)
+
     for (const [keyword, conversionId] of Object.entries(PAGE_CONVERSIONS)) {
-      if (pathname.includes(keyword)) {
+      // 完整路徑比對（如 'eric-story-taiwan-to-chiang-mai'）
+      // 或首段路徑比對（如 'blog', 'car-charter'）
+      const isExactMatch = pathSegments.includes(keyword) ||
+        pathname === `/${keyword}` ||
+        pathname.startsWith(`/${keyword}/`)
+
+      if (isExactMatch) {
         window.gtag('event', 'conversion', {
           'send_to': `${AW_CONVERSION_ID}/${conversionId}`
         })

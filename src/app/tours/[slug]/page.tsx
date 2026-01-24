@@ -168,8 +168,43 @@ export default async function TourDetailPage({
   const isPackage = tour._type === 'tourPackage'
   const isDayTour = tour._type === 'dayTour'
 
+  // Generate TourPackage/Product Schema for SEO
+  const tourSchema = {
+    '@context': 'https://schema.org',
+    '@type': isPackage ? 'TouristTrip' : 'Product',
+    name: tour.title,
+    description: tour.subtitle || `${tour.title} - 清微旅行精選行程`,
+    ...(tour.coverImage && {
+      image: urlFor(tour.coverImage).width(1200).height(630).url(),
+    }),
+    provider: {
+      '@type': 'TravelAgency',
+      name: '清微旅行 Chiangway Travel',
+      url: 'https://chiangway-travel.com',
+    },
+    ...(isPackage && (tour as TourPackage).duration && {
+      itinerary: {
+        '@type': 'ItemList',
+        numberOfItems: (tour as TourPackage).dailySchedule?.length || 0,
+      },
+    }),
+    ...(isDayTour && (tour as DayTour).basePrice && {
+      offers: {
+        '@type': 'Offer',
+        price: (tour as DayTour).basePrice,
+        priceCurrency: 'THB',
+        availability: 'https://schema.org/InStock',
+      },
+    }),
+  }
+
   return (
     <div className="py-20">
+      {/* Tour Schema for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(tourSchema) }}
+      />
       <TourViewTracker
         title={tour.title}
         slug={tour.slug}

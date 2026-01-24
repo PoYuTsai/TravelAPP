@@ -51,6 +51,9 @@ export async function generateMetadata({
       title: `${categoryName} | 清邁旅遊部落格`,
       description: `清邁${categoryName}相關文章，在地人的第一手資訊。`,
     },
+    alternates: {
+      canonical: `https://chiangway-travel.com/blog/category/${slug}`,
+    },
   }
 }
 
