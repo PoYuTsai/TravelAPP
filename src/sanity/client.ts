@@ -7,7 +7,7 @@ export const client = createClient({
   projectId,
   dataset,
   apiVersion,
-  useCdn: process.env.NODE_ENV === 'production', // 生產環境啟用 CDN 快取
+  useCdn: false, // 關閉 CDN 以配合 on-demand revalidation
 })
 
 const builder = createImageUrlBuilder({ projectId, dataset })
