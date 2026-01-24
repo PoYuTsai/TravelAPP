@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import { trackFormSubmit, trackLineClick } from '@/lib/analytics'
+import { trackGoogleAdsFormSubmit } from '@/components/GoogleAdsConversion'
 
 interface FormData {
   name: string
@@ -30,8 +31,20 @@ const initialFormData: FormData = {
   message: '',
 }
 
-// Email 驗證正則表達式
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// Email 驗證正則表達式 (改進版：檢查 TLD 長度和更多格式)
+const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/
+
+// LINE URL 最大長度限制 (LINE 建議不超過 2000 字元)
+const LINE_URL_MAX_LENGTH = 2000
+
+// 表單欄位最大長度
+const MAX_LENGTHS = {
+  name: 100,
+  email: 254, // RFC 5321 標準
+  phone: 30,
+  travelers: 50,
+  message: 1000,
+}
 
 export default function ContactForm() {
   const [formData, setFormData] = useState<FormData>(initialFormData)
@@ -46,14 +59,17 @@ export default function ContactForm() {
       case 'name':
         if (!value.trim()) return '請輸入姓名'
         if (value.trim().length < 2) return '姓名至少需要 2 個字'
+        if (value.length > MAX_LENGTHS.name) return `姓名不可超過 ${MAX_LENGTHS.name} 個字`
         return undefined
       case 'email':
         if (!value.trim()) return '請輸入 Email'
+        if (value.length > MAX_LENGTHS.email) return 'Email 格式無效'
         if (!emailRegex.test(value)) return '請輸入有效的 Email 格式'
         return undefined
       case 'message':
         if (!value.trim()) return '請輸入詢問內容'
         if (value.trim().length < 10) return '詢問內容至少需要 10 個字'
+        if (value.length > MAX_LENGTHS.message) return `詢問內容不可超過 ${MAX_LENGTHS.message} 個字`
         return undefined
       default:
         return undefined
@@ -107,7 +123,7 @@ export default function ContactForm() {
       const serviceText = formData.service === 'car-charter' ? '包車服務' :
                          formData.service === 'homestay' ? '民宿住宿' : '其他諮詢'
 
-      const message = `【網站諮詢表單】
+      let message = `【網站諮詢表單】
 姓名：${formData.name}
 Email：${formData.email}
 電話：${formData.phone || '未填寫'}
@@ -117,13 +133,26 @@ Email：${formData.email}
 詢問內容：
 ${formData.message}`
 
+      // 計算 LINE URL 長度並截斷訊息（如需要）
+      const baseUrl = 'https://line.me/R/oaMessage/@037nyuwk/?'
+      const encodedMessage = encodeURIComponent(message)
+      const fullUrl = baseUrl + encodedMessage
+
+      if (fullUrl.length > LINE_URL_MAX_LENGTH) {
+        // 估算可用字元數並截斷訊息
+        const availableLength = LINE_URL_MAX_LENGTH - baseUrl.length - 100 // 保留緩衝
+        const truncatedMessage = message.slice(0, Math.floor(availableLength / 3)) + '\n...(訊息過長已截斷，請在 LINE 中補充)'
+        message = truncatedMessage
+      }
+
       // 開啟 LINE 並帶入訊息
-      const lineUrl = `https://line.me/R/oaMessage/@037nyuwk/?${encodeURIComponent(message)}`
+      const lineUrl = `${baseUrl}${encodeURIComponent(message)}`
       window.open(lineUrl, '_blank')
 
-      // 追蹤表單提交和 LINE 點擊
+      // 追蹤表單提交和 LINE 點擊 (GA4 + Google Ads)
       trackFormSubmit('contact_inquiry')
       trackLineClick('Contact Form Submit')
+      trackGoogleAdsFormSubmit()
 
       setSubmitStatus('success')
       setFormData(initialFormData)
@@ -155,6 +184,7 @@ ${formData.message}`
           id="name"
           name="name"
           required
+          maxLength={MAX_LENGTHS.name}
           value={formData.name}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -180,6 +210,7 @@ ${formData.message}`
           id="email"
           name="email"
           required
+          maxLength={MAX_LENGTHS.email}
           value={formData.email}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -204,6 +235,7 @@ ${formData.message}`
           type="tel"
           id="phone"
           name="phone"
+          maxLength={MAX_LENGTHS.phone}
           value={formData.phone}
           onChange={handleChange}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -235,6 +267,7 @@ ${formData.message}`
           type="text"
           id="travelers"
           name="travelers"
+          maxLength={MAX_LENGTHS.travelers}
           value={formData.travelers}
           onChange={handleChange}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -271,6 +304,7 @@ ${formData.message}`
           name="message"
           required
           rows={4}
+          maxLength={MAX_LENGTHS.message}
           value={formData.message}
           onChange={handleChange}
           onBlur={handleBlur}

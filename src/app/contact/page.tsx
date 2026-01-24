@@ -7,6 +7,21 @@ import { FAQSection } from '@/components/cms'
 export const metadata: Metadata = {
   title: '聯繫我們',
   description: '透過 LINE 或社群媒體聯繫清微旅行，免費諮詢清邁親子旅遊行程。',
+  alternates: {
+    canonical: 'https://chiangway-travel.com/contact',
+  },
+  openGraph: {
+    title: '聯繫我們 | 清微旅行',
+    description: '透過 LINE 或社群媒體聯繫清微旅行，免費諮詢清邁親子旅遊行程。',
+    url: 'https://chiangway-travel.com/contact',
+    images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '清微旅行 - 聯繫我們' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '聯繫我們 | 清微旅行',
+    description: '透過 LINE 或社群媒體聯繫清微旅行，免費諮詢清邁親子旅遊行程。',
+    images: ['/images/og-image.png'],
+  },
 }
 
 const contactMethods = [

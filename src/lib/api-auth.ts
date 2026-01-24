@@ -2,6 +2,7 @@
 // API Authentication utilities
 
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 
 // API Key for internal services (itinerary export, etc.)
 const API_KEY = process.env.INTERNAL_API_KEY
@@ -45,7 +46,17 @@ export function validateApiKey(request: NextRequest): NextResponse | null {
     )
   }
 
-  if (providedKey !== API_KEY) {
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    const keyBuffer = Buffer.from(API_KEY)
+    const providedBuffer = Buffer.from(providedKey)
+    if (keyBuffer.length !== providedBuffer.length || !timingSafeEqual(keyBuffer, providedBuffer)) {
+      return NextResponse.json(
+        { error: 'API 金鑰無效', code: 'INVALID_API_KEY' },
+        { status: 403 }
+      )
+    }
+  } catch {
     return NextResponse.json(
       { error: 'API 金鑰無效', code: 'INVALID_API_KEY' },
       { status: 403 }

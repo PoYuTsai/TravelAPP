@@ -6,6 +6,21 @@ import Button from '@/components/ui/Button'
 export const metadata: Metadata = {
   title: '關於我們',
   description: '清微旅行是住在清邁的台泰夫妻 Eric 和 Min 創立。我們也有女兒，懂爸媽帶小孩出遊的需求。',
+  alternates: {
+    canonical: 'https://chiangway-travel.com/about',
+  },
+  openGraph: {
+    title: '關於我們 | 清微旅行',
+    description: '清微旅行是住在清邁的台泰夫妻 Eric 和 Min 創立。我們也有女兒，懂爸媽帶小孩出遊的需求。',
+    url: 'https://chiangway-travel.com/about',
+    images: [{ url: '/images/eric-min.jpg', width: 1200, height: 630, alt: 'Eric 與 Min - 清微旅行創辦人' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '關於我們 | 清微旅行',
+    description: '清微旅行是住在清邁的台泰夫妻 Eric 和 Min 創立。',
+    images: ['/images/eric-min.jpg'],
+  },
 }
 
 // Blur placeholder for founders photo

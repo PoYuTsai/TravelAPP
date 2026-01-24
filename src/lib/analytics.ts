@@ -45,3 +45,13 @@ export function trackFormSubmit(formName: string) {
     form_name: formName,
   })
 }
+
+// 追蹤行程查看
+export function trackTourView(tourTitle: string, tourSlug: string, tourType: 'package' | 'dayTour') {
+  trackEvent('tour_view', {
+    event_category: 'content',
+    tour_title: tourTitle,
+    tour_slug: tourSlug,
+    tour_type: tourType,
+  })
+}

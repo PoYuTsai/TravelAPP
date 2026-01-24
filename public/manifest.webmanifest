@@ -1,0 +1,32 @@
+{
+  "name": "清微旅行 Chiangway Travel",
+  "short_name": "清微旅行",
+  "description": "清邁親子自由行首選！專業中文導遊、安全舒適包車服務。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFD700",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["travel", "tourism"],
+  "lang": "zh-TW",
+  "dir": "ltr"
+}

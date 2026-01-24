@@ -7,6 +7,21 @@ import ToursPageClient from './ToursPageClient'
 export const metadata: Metadata = {
   title: '行程案例 | 清微旅行',
   description: '超過百組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
+  alternates: {
+    canonical: 'https://chiangway-travel.com/tours',
+  },
+  openGraph: {
+    title: '行程案例 | 清微旅行',
+    description: '超過百組家庭的清邁回憶，每趟旅程都是獨一無二的故事。查看我們的招牌套餐和過去服務案例。',
+    url: 'https://chiangway-travel.com/tours',
+    images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '清微旅行 - 行程案例' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '行程案例 | 清微旅行',
+    description: '超過百組家庭的清邁回憶，每趟旅程都是獨一無二的故事。',
+    images: ['/images/og-image.png'],
+  },
 }
 
 // ISR: Revalidate every 60 seconds

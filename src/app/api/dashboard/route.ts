@@ -26,10 +26,24 @@ export async function GET(request: Request) {
 
     const query: DashboardQuery = {}
     if (yearParam) {
-      query.year = parseInt(yearParam, 10)
+      const year = parseInt(yearParam, 10)
+      if (isNaN(year) || year < 2020 || year > 2100) {
+        return NextResponse.json(
+          { error: '無效的年份參數', code: 'INVALID_YEAR' },
+          { status: 400 }
+        )
+      }
+      query.year = year
     }
     if (monthParam) {
-      query.month = parseInt(monthParam, 10)
+      const month = parseInt(monthParam, 10)
+      if (isNaN(month) || month < 1 || month > 12) {
+        return NextResponse.json(
+          { error: '無效的月份參數', code: 'INVALID_MONTH' },
+          { status: 400 }
+        )
+      }
+      query.month = month
     }
 
     log.debug('Fetching dashboard data', { query, clientIP })

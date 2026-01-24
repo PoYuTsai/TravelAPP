@@ -123,6 +123,13 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen">
+        {/* Skip Link for accessibility */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-lg focus:outline-none"
+        >
+          跳到主要內容
+        </a>
         {/* Google Analytics + Google Ads */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
@@ -140,7 +147,7 @@ export default function RootLayout({
         {/* Google Ads Conversion Tracking */}
         <GoogleAdsConversion />
         <Header />
-        <main className="flex-grow pt-20">
+        <main id="main-content" className="flex-grow pt-20">
           {children}
         </main>
         <Footer />

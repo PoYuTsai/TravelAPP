@@ -20,6 +20,19 @@ const PAGE_CONVERSIONS: Record<string, string> = {
 // LINE 點擊轉換 ID
 const LINE_CLICK_CONVERSION = '0CrLCKj1l-obEL7PruU_'
 
+// 表單提交轉換 ID (contact form)
+const FORM_SUBMIT_CONVERSION = 'form_submit_conversion'
+
+// 導出追蹤函數供其他組件使用
+export function trackGoogleAdsFormSubmit() {
+  if (typeof window === 'undefined' || !window.gtag) return
+  window.gtag('event', 'conversion', {
+    'send_to': `${AW_CONVERSION_ID}/${LINE_CLICK_CONVERSION}`,
+    'event_category': 'form',
+    'event_label': 'contact_form_submit'
+  })
+}
+
 export default function GoogleAdsConversion() {
   const pathname = usePathname()
 

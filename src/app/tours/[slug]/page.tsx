@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 import StopsCarousel from '@/components/tours/StopsCarousel'
+import TourViewTracker from '@/components/tours/TourViewTracker'
 
 // === Types ===
 
@@ -169,6 +170,11 @@ export default async function TourDetailPage({
 
   return (
     <div className="py-20">
+      <TourViewTracker
+        title={tour.title}
+        slug={tour.slug}
+        type={isPackage ? 'package' : 'dayTour'}
+      />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Hero Section */}
         <div className="relative rounded-2xl overflow-hidden mb-12">
