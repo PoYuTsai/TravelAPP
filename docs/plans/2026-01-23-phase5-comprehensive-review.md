@@ -629,3 +629,79 @@ export const sanityLogger = new Logger('SANITY')
 1. **Google Maps 區塊** - 移除壞掉的 iframe，保留連結按鈕
 2. **時區問題** - 使用泰國時區判斷旅遊狀態
 3. **動態數量** - Tours 頁面也傳入 familyCountValue
+
+---
+
+## Phase 5.3: 安全性與無障礙優化 (2026-01-24)
+
+基於 10 角色全面審查的後續優化，聚焦安全性、SEO、無障礙性。
+
+### 🔴 高優先級
+
+1. **Dashboard API NaN 驗證**
+   - `src/app/api/dashboard/route.ts`: 新增 year/month 參數邊界檢查
+   - 拒絕 NaN、無效範圍 (year: 2020-2100, month: 1-12)
+
+2. **API 金鑰時間攻擊防護**
+   - `src/lib/api-auth.ts`: 使用 `crypto.timingSafeEqual` 比對金鑰
+   - 防止透過回應時間推測金鑰
+
+3. **LINE URL 長度限制**
+   - `src/components/ContactForm.tsx`: 檢測 URL 長度 > 2000
+   - 自動截斷訊息並提示用戶
+
+4. **Skip Link 無障礙**
+   - `src/app/layout.tsx`: 新增「跳到主要內容」連結
+   - `sr-only focus:not-sr-only` 鍵盤可見
+
+5. **行程查看追蹤**
+   - 新建 `src/components/tours/TourViewTracker.tsx`
+   - `src/lib/analytics.ts`: 新增 `trackTourView()` 函數
+   - GA4 事件: `tour_view`
+
+6. **表單 Google Ads 轉換**
+   - `src/components/GoogleAdsConversion.tsx`: 新增 `trackGoogleAdsFormSubmit()`
+   - `src/components/ContactForm.tsx`: 調用轉換追蹤
+
+7. **靜態頁面 SEO**
+   - 8 個頁面新增 OG/Twitter Cards + Canonical URLs
+   - about, contact, tours, homestay, car-charter, privacy, terms, cancellation
+
+8. **PWA Manifest**
+   - 新建 `public/manifest.webmanifest`
+   - 包含圖示、主題色、啟動設定
+
+### 🟡 中優先級
+
+1. **prefers-reduced-motion**
+   - `src/app/globals.css`: 尊重用戶減少動畫偏好
+   - 禁用所有動畫/過渡效果
+
+2. **HSTS Preload**
+   - `next.config.js`: 新增 `preload` 指令
+   - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+
+3. **BreadcrumbList Schema**
+   - 已存在於 `src/components/blog/Breadcrumb.tsx`
+   - JSON-LD 結構化資料完整
+
+### 🟢 低優先級
+
+1. **Email 正則改進**
+   - `src/components/ContactForm.tsx`: RFC 5321 相容驗證
+   - 檢查 TLD 長度和格式
+
+2. **表單最大長度**
+   - 所有輸入框新增 `maxLength` 屬性
+   - name: 100, email: 254, phone: 30, travelers: 50, message: 1000
+
+### 新建檔案
+
+- `public/manifest.webmanifest`
+- `src/components/tours/TourViewTracker.tsx`
+
+### Commit
+
+```
+1545a53 fix: comprehensive review optimizations (security, SEO, a11y)
+```
