@@ -308,21 +308,20 @@ D1｜接機                    ฿600
 | 親子經典 6天5夜 | NT$ 20,000 - 32,000 起 | 包車＋全程導遊 |
 | 泰北深度遊 7天6夜 | NT$ 35,000 - 45,000 | 包車＋導遊＋芳縣民宿1晚 |
 
-### On-demand Revalidation 機制
+### On-demand Revalidation 機制 ✅
 
 解決 Sanity 後台更新後前台緩存問題：
 
-1. **新增 API**：`/api/revalidate`
-2. **Sanity Webhook**：內容更新時自動觸發
-3. **關閉 Sanity CDN**：`useCdn: false` 確保即時更新
-
-設定：
-- Vercel 環境變數：`REVALIDATE_SECRET`
-- Sanity Webhook URL：`https://chiangway-travel.com/api/revalidate?secret=xxx`
+| 項目 | 狀態 |
+|------|------|
+| API `/api/revalidate` | ✅ 已建立 |
+| Sanity Webhook | ✅ 已設定 (Revalidate Next.js) |
+| `useCdn: false` | ✅ 已設定 |
+| Vercel `REVALIDATE_SECRET` | ✅ 已設定 |
 
 流程：
 ```
-Sanity 改資料 → Webhook 觸發 → Next.js 清緩存 → 重新整理看到更新
+Sanity 改資料 → Webhook 自動觸發 → Next.js 清緩存 → 前台即時更新
 ```
 
 ---
