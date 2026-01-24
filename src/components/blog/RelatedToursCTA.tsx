@@ -39,7 +39,7 @@ export default function RelatedToursCTA({ tours = defaultTours }: RelatedToursCT
         {tours.map((tour) => (
           <Link
             key={tour.slug}
-            href={`/tours#${tour.slug}`}
+            href={`/tours/${tour.slug}`}
             className="block p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
           >
             <h4 className="font-medium text-gray-900">{tour.title}</h4>

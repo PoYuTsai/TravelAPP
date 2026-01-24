@@ -6,6 +6,9 @@ import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 import StopsCarousel from '@/components/tours/StopsCarousel'
 import TourViewTracker from '@/components/tours/TourViewTracker'
+import RelatedTours from '@/components/tours/RelatedTours'
+import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
+import Breadcrumb from '@/components/blog/Breadcrumb'
 
 // === Types ===
 
@@ -211,6 +214,15 @@ export default async function TourDetailPage({
         type={isPackage ? 'package' : 'dayTour'}
       />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
+        <Breadcrumb
+          items={[
+            { label: '首頁', href: '/' },
+            { label: '行程', href: '/tours' },
+            { label: tour.title },
+          ]}
+        />
+
         {/* Hero Section */}
         <div className="relative rounded-2xl overflow-hidden mb-12">
           {tour.coverImage ? (
@@ -411,6 +423,18 @@ export default async function TourDetailPage({
             LINE 聊聊
           </Button>
         </section>
+
+        {/* Related Tours */}
+        <RelatedTours
+          currentSlug={tour.slug}
+          currentType={tour._type}
+        />
+
+        {/* Related Blog Posts */}
+        <RelatedBlogPosts
+          tourTitle={tour.title}
+          tourHighlights={tour.highlights}
+        />
       </div>
     </div>
   )
