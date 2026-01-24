@@ -208,6 +208,38 @@
 
 ## 歷史審查記錄
 
+### 審查 #3 - 2026-01-24 (Phase 5.3 安全與 A11y 優化)
+
+**執行範圍**: 安全性、SEO、無障礙 全面優化
+
+**發現問題與處理**:
+
+| 角色 | 問題 | 嚴重度 | 處理結果 |
+|------|------|--------|----------|
+| 資安 | Sanity Query 參數注入 | 🔴 緊急 | ✅ 加入 encodeURIComponent |
+| 資安 | CSP unsafe-eval | 🔴 緊急 | ✅ 已移除 |
+| 資安 | Revalidate 無 Rate Limit | 🟠 高 | ✅ 加入簡易 Rate Limit |
+| 資安 | Google Ads config 競衝 | 🟡 中 | ✅ 移除重複 config |
+| SEO | 首頁缺少 Canonical | 🟠 高 | ✅ 已加入 |
+| SEO | Blog 列表缺少 Canonical | 🟠 高 | ✅ 已加入 |
+| SEO | Blog 分類缺少 Canonical | 🟡 中 | ✅ 已加入 |
+| SEO | Tour 頁面缺少 Schema | 🟡 中 | ✅ 加入 TouristTrip/Product Schema |
+| A11y | FAQSection 缺少 aria-controls | 🟠 高 | ✅ 已加入 |
+| A11y | Testimonials 缺少 role | 🟡 中 | ✅ 加入 role="region" |
+| A11y | ImageGallery 缺少 role | 🟡 中 | ✅ 加入 role="dialog" |
+| A11y | SearchBox 缺少 aria-label | 🟡 中 | ✅ 已加入 |
+
+**保留項目（可接受/低優先）**:
+- Rate Limiting in-memory（目前規模可接受，大流量需 Redis）
+- Dashboard email header 認證（內部工具可接受）
+- CSP unsafe-inline（Google Analytics 需要）
+
+**改善項目**:
+- Sanity useCdn: false（配合 on-demand revalidation）
+- Google Ads 轉換追蹤邏輯優化（更精確的路徑匹配）
+
+---
+
 ### 審查 #2 - 2026-01-24 (Phase 5.2 完整優化)
 
 **執行範圍**: UI/UX 完整優化 + Token 安全確認
