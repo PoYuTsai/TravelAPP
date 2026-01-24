@@ -1,5 +1,17 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // www to non-www redirect (SEO: 統一網域)
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.chiangway-travel.com' }],
+        destination: 'https://chiangway-travel.com/:path*',
+        permanent: true, // 301 redirect
+      },
+    ]
+  },
+
   images: {
     // 啟用 AVIF 和 WebP 格式自動優化
     formats: ['image/avif', 'image/webp'],
