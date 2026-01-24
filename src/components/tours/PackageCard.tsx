@@ -28,7 +28,7 @@ export default function PackageCard({
       className="group block bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-xl transition-shadow"
     >
       {/* Cover Image */}
-      <div className="relative h-48 sm:h-56 bg-gradient-to-br from-primary-light to-primary/20">
+      <div className="relative aspect-[3/2] bg-gradient-to-br from-primary-light to-primary/20">
         {coverImage ? (
           <Image
             src={urlFor(coverImage).width(600).height(400).url()}
