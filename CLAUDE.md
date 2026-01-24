@@ -41,6 +41,18 @@
 
 ## 工作流程
 
+### Commit/Push 後自動更新文件
+
+每次完成 commit → push → deploy 後，**自動**更新以下文件：
+
+1. **Phase 文件** (`docs/plans/...`) - 記錄當次修改項目
+2. **comprehensive-review.md** (`.claude/skills/comprehensive-review.md`) - 更新歷史審查記錄
+
+流程：
+```
+修改代碼 → commit → push → 更新文件 → commit 文件更新 → push
+```
+
 ### 寫 SEO 文章時
 
 1. 先讀取 `docs/prompts/seo-article-prompt.md`
