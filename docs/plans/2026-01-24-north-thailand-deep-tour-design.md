@@ -327,5 +327,50 @@ Sanity 改資料 → Webhook 觸發 → Next.js 清緩存 → 重新整理看到
 
 ---
 
+## Phase 5.3 全面性審查與優化
+
+執行日期：2026-01-24
+
+### 安全性修復 (Security)
+
+| 問題 | 嚴重度 | 處理 |
+|------|--------|------|
+| Sanity Query 參數注入風險 | 🔴 緊急 | ✅ 加入 `encodeURIComponent` |
+| CSP `unsafe-eval` | 🔴 緊急 | ✅ 已從 next.config.js 移除 |
+| Revalidate API 無 Rate Limit | 🟠 高 | ✅ 加入簡易 Rate Limiting |
+| Google Ads config 重複 | 🟡 中 | ✅ 移除 layout.tsx 重複設定 |
+
+### SEO 修復
+
+| 問題 | 嚴重度 | 處理 |
+|------|--------|------|
+| 首頁缺少 Canonical URL | 🟠 高 | ✅ 已加入 |
+| Blog 列表缺少 Canonical | 🟠 高 | ✅ 已加入 |
+| Blog 分類缺少 Canonical | 🟡 中 | ✅ 已加入 |
+| Tour 頁面缺少 Schema | 🟡 中 | ✅ 加入 TouristTrip/Product Schema |
+
+### 無障礙修復 (Accessibility)
+
+| 問題 | 嚴重度 | 處理 |
+|------|--------|------|
+| FAQSection 缺少 aria-controls | 🟠 高 | ✅ 已加入 |
+| Testimonials 缺少 role | 🟡 中 | ✅ 加入 `role="region"` |
+| ImageGallery 缺少 role | 🟡 中 | ✅ 加入 `role="dialog"` |
+| SearchBox 缺少 aria-label | 🟡 中 | ✅ 已加入 |
+
+### 其他優化
+
+- Google Ads 轉換追蹤路徑匹配邏輯優化（更精確的 segment 比對）
+- Sanity `useCdn: false` 配合 on-demand revalidation
+
+### 保留項目（可接受/低優先）
+
+- Rate Limiting in-memory（目前規模可接受，大流量需 Redis）
+- Dashboard email header 認證（內部工具可接受）
+- CSP `unsafe-inline`（Google Analytics 需要）
+
+---
+
 *設計完成：2026-01-24*
 *上架完成：2026-01-24*
+*Phase 5.3 審查完成：2026-01-24*
