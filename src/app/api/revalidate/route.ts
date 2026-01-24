@@ -64,8 +64,9 @@ export async function POST(request: NextRequest) {
 
         case 'dayTour':
           revalidatePath('/tours')
-          revalidatePath('/day-tours/[slug]', 'page')
-          revalidatedPaths.push('/tours', '/day-tours/[slug]')
+          revalidatePath('/tours/[slug]', 'page')
+          revalidatePath('/', 'page')
+          revalidatedPaths.push('/tours', '/tours/[slug]', '/')
           break
 
         case 'post':
