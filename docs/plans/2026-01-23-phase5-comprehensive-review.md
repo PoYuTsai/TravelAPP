@@ -790,3 +790,85 @@ export const sanityLogger = new Logger('SANITY')
 ```
 b1f78a1 fix: comprehensive review optimizations (security, SEO, a11y)
 ```
+
+---
+
+## Phase 5.4: 綜合審查後續優化 (2026-01-25)
+
+延續 10 角色全面審查，針對發現的關鍵問題進行修復。
+
+### 🔴 緊急問題修復
+
+1. **SEO: Canonical URLs 格式統一**
+   - `src/app/blog/[slug]/page.tsx`: 改為絕對路徑
+   - `src/app/tours/[slug]/page.tsx`: 改為絕對路徑
+   - 原本使用相對路徑 `/blog/${slug}`，現改為 `https://chiangway-travel.com/blog/${slug}`
+   - 符合 Google SEO 最佳實踐
+
+2. **安全性: HTML 轉義（XSS 防護）**
+   - `src/lib/pdf/itinerary-template.ts`: 新增 `escapeHtml()` 函數
+   - 對所有用戶輸入進行 HTML 轉義：
+     - `clientName`
+     - `day.title`
+     - `activity.content`
+     - `day.lunch`, `day.dinner`, `day.accommodation`
+   - `src/app/api/itinerary/[id]/text/route.ts`: 引用 `escapeHtml()` 轉義 title 和 h1
+
+3. **日誌系統: 統一使用 Logger**
+   - `src/lib/notion/client.ts`: 移除 4 處 `console.warn()`
+   - 改用集中式 logger：`log.warn()` 和 `log.error()`
+   - 新增 `dbLogger.child('notion')` 子 logger
+
+### 🟠 高優先級修復
+
+4. **安全性: 移除 URL 參數認證**
+   - `src/app/api/revalidate/route.ts`: 移除 query param 支援
+   - 只保留 Authorization header 認證（更安全）
+   - 避免 secret 被記錄在日誌中
+
+5. **配置完善: .env.example 更新**
+   - 新增遺漏的環境變數：
+     - `SANITY_API_TOKEN`
+     - `NOTION_TOKEN`
+     - `REVALIDATE_SECRET`
+   - 改善開發者體驗
+
+6. **表單驗證: ContactForm 電話欄位**
+   - `src/components/ContactForm.tsx`: 新增 `phone` 欄位驗證
+   - 檢查長度不超過 30 字元
+   - 選填欄位，有值時才驗證
+
+### 🟡 中優先級優化
+
+7. **UX 改善: SearchBox 觸控目標**
+   - `src/components/blog/SearchBox.tsx`: 清除按鈕增大
+   - `p-1` → `p-2` (36px → 44px+)
+   - `w-4 h-4` → `w-5 h-5` (圖示也放大)
+   - 符合無障礙標準 (44px 最小觸控目標)
+
+### 修改檔案清單
+
+- `.env.example` - 新增環境變數
+- `src/app/api/itinerary/[id]/text/route.ts` - HTML 轉義
+- `src/app/api/revalidate/route.ts` - 移除 URL 參數
+- `src/app/blog/[slug]/page.tsx` - Canonical URL
+- `src/app/tours/[slug]/page.tsx` - Canonical URL
+- `src/components/ContactForm.tsx` - 電話驗證
+- `src/components/blog/SearchBox.tsx` - 觸控優化
+- `src/lib/notion/client.ts` - Logger 統一
+- `src/lib/pdf/itinerary-template.ts` - HTML 轉義
+
+### Commit
+
+```
+6390118 fix: comprehensive review optimizations (Phase 5.4)
+```
+
+### 驗證
+
+- [x] `npm run build` 成功
+- [x] 無 TypeScript 錯誤
+- [x] Git commit 成功
+- [x] Git push 成功
+- [x] README.md 已更新
+- [x] 文件記錄已更新

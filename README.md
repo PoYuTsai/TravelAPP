@@ -21,6 +21,7 @@
 | Phase 5.1 | UX 精緻化 | ✅ 完成 |
 | Phase 5.2 | 10 角色全面審查 | ✅ 完成 |
 | Phase 5.3 | 安全性與無障礙優化 | ✅ 完成 |
+| Phase 5.4 | 綜合審查後續優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -85,6 +86,16 @@
 - **程式碼品質**：API 路由統一使用集中式 Logger
 - **防索引**：/api-docs noindex 設定
 
+### Phase 5.4：綜合審查後續優化
+10 角色全面審查後的關鍵問題修復：
+
+- **SEO**：Canonical URLs 統一為絕對路徑（blog + tours 頁面）
+- **安全性**：PDF/Excel 模板 HTML 轉義（XSS 防護）、移除 REVALIDATE_SECRET URL 參數
+- **日誌系統**：Notion client 統一使用集中式 Logger
+- **配置完善**：.env.example 補齊遺漏環境變數
+- **表單驗證**：ContactForm 電話欄位長度驗證
+- **UX 改善**：SearchBox 觸控目標增大至 44px+
+
 ## 技術架構
 
 ```
@@ -137,4 +148,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-25 Phase 5.3 -->
+<!-- Last build trigger: 2026-01-25 Phase 5.4 -->
