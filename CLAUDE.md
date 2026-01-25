@@ -43,16 +43,28 @@
 
 ### Commit/Push 後自動更新文件
 
-每次完成 commit → push → deploy 後，**自動**更新以下文件：
+每次完成 commit → push 後，**必須**更新以下文件：
 
-1. **Phase 文件** (`docs/plans/...`) - 記錄當次修改項目
-2. **comprehensive-review.md** (`.claude/skills/comprehensive-review.md`) - 更新歷史審查記錄
-3. **README.md** - GitHub 專案說明（如有重大功能變更）
+| 文件 | 更新時機 | 內容 |
+|------|----------|------|
+| `docs/plans/...` | 每次 | 記錄當次修改項目、新增檔案、commit hash |
+| `README.md` | 每次 | 更新開發狀態表格、Phase 說明、build trigger 日期 |
+| `.claude/skills/comprehensive-review.md` | 審查後 | 更新歷史審查記錄 |
 
-流程：
+**標準流程**：
 ```
-修改代碼 → commit → push → 更新文件 → commit 文件更新 → push
+1. 修改代碼
+2. git add && commit (功能)
+3. git push
+4. 更新 docs/plans + README.md
+5. git add && commit (文件更新)
+6. git push
 ```
+
+**README.md 更新重點**：
+- Phase 狀態表格（新增/更新狀態）
+- Phase 說明區塊（重點功能）
+- `<!-- Last build trigger: YYYY-MM-DD Phase X.X -->` 註解
 
 ### 寫 SEO 文章時
 
