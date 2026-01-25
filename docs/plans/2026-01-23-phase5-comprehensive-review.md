@@ -932,10 +932,33 @@ img, video, iframe, pre {
 a98f7bc fix: prevent horizontal scroll on mobile devices
 ```
 
+### Commit
+
+```
+a98f7bc fix: prevent horizontal scroll on mobile devices
+fa7f4d3 fix: prevent CSS override of Header logo size on mobile (bug fix)
+```
+
 ### 驗證
 
 - [x] `npm run build` 成功（30/30 靜態頁面生成）
 - [x] 無 TypeScript 錯誤
 - [x] 無破壞性變更
 - [x] Git commit 成功
+- [x] Logo 尺寸 bug 修復（精確化 CSS 規則）
 - [ ] 實機測試（待用戶確認）
+
+### Bug 修復記錄
+
+**問題**：初次修復水平滾動時，全域 CSS 規則 `img { height: auto }` 意外覆蓋了 Header logo 的高度控制（`h-10`/`h-14`），導致 logo 在手機上過大。
+
+**解決方案**：精確化 CSS 選擇器，只在文章內容區域（`article` 標籤內）套用 `height: auto`，保留 UI 組件的明確尺寸控制。
+
+```css
+/* Before: 影響所有圖片 */
+img { max-width: 100%; height: auto; }
+
+/* After: 只影響內容區域 */
+img { max-width: 100%; }
+article img { height: auto; }
+```
