@@ -14,25 +14,22 @@ async function getBlogSlugs() {
   }
 }
 
-async function getTourSlugs() {
-  const query = `*[_type == "tour" && defined(slug.current)]{
+// 合併查詢所有 tour 類型（tourPackage + dayTour），避免 sitemap 中的重複 URL
+async function getAllTourSlugs() {
+  const query = `*[(_type == "tourPackage" || _type == "dayTour") && defined(slug.current)]{
     "slug": slug.current,
     _updatedAt
-  }`
+  } | order(_updatedAt desc)`
   try {
-    return await client.fetch(query)
-  } catch {
-    return []
-  }
-}
-
-async function getDayTourSlugs() {
-  const query = `*[_type == "dayTour" && defined(slug.current)]{
-    "slug": slug.current,
-    _updatedAt
-  }`
-  try {
-    return await client.fetch(query)
+    const results = await client.fetch(query)
+    // 使用 Map 去除重複的 slug，保留最新的 _updatedAt
+    const uniqueSlugs = new Map<string, { slug: string; _updatedAt: string }>()
+    results.forEach((item: { slug: string; _updatedAt: string }) => {
+      if (!uniqueSlugs.has(item.slug) || new Date(item._updatedAt) > new Date(uniqueSlugs.get(item.slug)!._updatedAt)) {
+        uniqueSlugs.set(item.slug, item)
+      }
+    })
+    return Array.from(uniqueSlugs.values())
   } catch {
     return []
   }
@@ -71,8 +68,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }))
 
-  // 動態行程套餐
-  const tours = await getTourSlugs()
+  // 動態行程（合併 tourPackage + dayTour，避免重複 URL）
+  const tours = await getAllTourSlugs()
   const tourPages: MetadataRoute.Sitemap = tours.map((tour: { slug: string; _updatedAt: string }) => ({
     url: `${baseUrl}/tours/${tour.slug}`,
     lastModified: new Date(tour._updatedAt),
@@ -80,14 +77,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }))
 
-  // 動態一日遊
-  const dayTours = await getDayTourSlugs()
-  const dayTourPages: MetadataRoute.Sitemap = dayTours.map((tour: { slug: string; _updatedAt: string }) => ({
-    url: `${baseUrl}/tours/${tour.slug}`,
-    lastModified: new Date(tour._updatedAt),
-    changeFrequency: 'weekly' as const,
-    priority: 0.7,
-  }))
-
-  return [...staticPages, ...categoryPages, ...blogPages, ...tourPages, ...dayTourPages]
+  return [...staticPages, ...categoryPages, ...blogPages, ...tourPages]
 }
