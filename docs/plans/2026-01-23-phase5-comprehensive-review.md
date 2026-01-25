@@ -872,3 +872,70 @@ b1f78a1 fix: comprehensive review optimizations (security, SEO, a11y)
 - [x] Git push 成功
 - [x] README.md 已更新
 - [x] 文件記錄已更新
+
+---
+
+## Phase 5.5: 手機 UX 優化 (2026-01-25)
+
+### 問題描述
+
+用戶在手機端測試時發現畫面可以往右滑動，導致內容左移，影響瀏覽體驗。
+
+### 根本原因
+
+某些元素（可能是圖片、影片、iframe 或內容區塊）寬度超出視窗，導致 viewport 產生水平滾動條。
+
+### 修復方案
+
+#### 1. 防止水平滾動
+**檔案**: `src/app/globals.css`
+
+```css
+html,
+body {
+  font-family: var(--font-family-sans);
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  position: relative;
+}
+```
+
+- 在 `html` 和 `body` 加入 `overflow-x: hidden`
+- 設定 `width: 100%` 確保容器不超出視窗
+- `body` 加入 `position: relative` 作為定位參考
+
+#### 2. 響應式媒體約束
+**檔案**: `src/app/globals.css`
+
+```css
+/* Prevent horizontal scroll */
+img, video, iframe, pre {
+  max-width: 100%;
+  height: auto;
+}
+```
+
+- 所有媒體元素統一加入 `max-width: 100%`
+- `height: auto` 保持比例
+- 涵蓋圖片、影片、嵌入內容、程式碼區塊
+
+### 修改檔案清單
+
+- `src/app/globals.css` - 新增水平滾動防止規則
+
+### Commit
+
+```
+a98f7bc fix: prevent horizontal scroll on mobile devices
+```
+
+### 驗證
+
+- [x] `npm run build` 成功（30/30 靜態頁面生成）
+- [x] 無 TypeScript 錯誤
+- [x] 無破壞性變更
+- [x] Git commit 成功
+- [ ] 實機測試（待用戶確認）

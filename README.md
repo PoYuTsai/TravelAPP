@@ -22,6 +22,7 @@
 | Phase 5.2 | 10 角色全面審查 | ✅ 完成 |
 | Phase 5.3 | 安全性與無障礙優化 | ✅ 完成 |
 | Phase 5.4 | 綜合審查後續優化 | ✅ 完成 |
+| Phase 5.5 | 手機 UX 優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -96,6 +97,13 @@
 - **表單驗證**：ContactForm 電話欄位長度驗證
 - **UX 改善**：SearchBox 觸控目標增大至 44px+
 
+### Phase 5.5：手機 UX 優化
+修復手機端水平滾動問題，提升移動裝置瀏覽體驗：
+
+- **水平滾動防止**：html/body 加入 `overflow-x: hidden`
+- **響應式媒體**：img/video/iframe/pre 統一加入 `max-width: 100%` 約束
+- **測試驗證**：production build 通過，確保無破壞性變更
+
 ## 技術架構
 
 ```
@@ -148,4 +156,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-25 Phase 5.4 -->
+<!-- Last build trigger: 2026-01-25 Phase 5.5 -->
