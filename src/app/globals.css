@@ -32,9 +32,16 @@ a:focus-visible {
   border-radius: 4px;
 }
 
-/* Prevent horizontal scroll */
+/* Prevent horizontal scroll - max-width for all media elements */
 img, video, iframe, pre {
   max-width: 100%;
+}
+
+/* Auto height only for content areas (not UI components like Header logo) */
+article img,
+article video,
+article iframe,
+article pre {
   height: auto;
 }
 
