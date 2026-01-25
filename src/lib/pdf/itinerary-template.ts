@@ -29,6 +29,16 @@ interface ItineraryData {
   priceExcludes?: string
 }
 
+// HTML 轉義函數，防止 XSS 攻擊
+export function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
 // 導出供測試使用
 export function formatDate(dateStr: string): string {
   // 使用 T00:00:00 避免時區問題
@@ -336,7 +346,7 @@ export function generateItineraryHTML(data: ItineraryData): string {
     <div class="cover-logo">清微旅行</div>
     <div class="cover-title">清邁親子包車行程</div>
     <div class="cover-dates">${formatDateRange(startDate, endDate)}</div>
-    <div class="cover-client">${clientName}</div>
+    <div class="cover-client">${escapeHtml(clientName)}</div>
     <div class="cover-people">${formatPeople(adults, children, childrenAges)}</div>
     <div class="cover-subtitle">專屬行程規劃</div>
   </div>
@@ -349,7 +359,7 @@ export function generateItineraryHTML(data: ItineraryData): string {
           <span class="day-number">Day ${index + 1}</span>
           <span class="day-date">${formatDate(day.date)}</span>
         </div>
-        <div class="day-title">${day.title}</div>
+        <div class="day-title">${escapeHtml(day.title)}</div>
         ${day.activities && day.activities.length > 0 ? `
           <div class="activities">
             ${day.activities
@@ -363,17 +373,17 @@ export function generateItineraryHTML(data: ItineraryData): string {
               })
               .map((act) => `
               <div class="activity">
-                <span class="activity-time">${act.time || ''}</span>
-                <span class="activity-content">${act.content}</span>
+                <span class="activity-time">${escapeHtml(act.time || '')}</span>
+                <span class="activity-content">${escapeHtml(act.content)}</span>
               </div>
             `).join('')}
           </div>
         ` : ''}
         ${(day.lunch || day.dinner || day.accommodation) ? `
         <div class="meals">
-          ${day.lunch ? `<div><span class="meal-label">午餐：</span>${day.lunch}</div>` : ''}
-          ${day.dinner ? `<div><span class="meal-label">晚餐：</span>${day.dinner}</div>` : ''}
-          ${day.accommodation ? `<div><span class="meal-label">住宿：</span>${day.accommodation}</div>` : ''}
+          ${day.lunch ? `<div><span class="meal-label">午餐：</span>${escapeHtml(day.lunch)}</div>` : ''}
+          ${day.dinner ? `<div><span class="meal-label">晚餐：</span>${escapeHtml(day.dinner)}</div>` : ''}
+          ${day.accommodation ? `<div><span class="meal-label">住宿：</span>${escapeHtml(day.accommodation)}</div>` : ''}
         </div>
         ` : ''}
       </div>

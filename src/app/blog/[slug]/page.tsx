@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     title: post.title,
     description,
     alternates: {
-      canonical: `/blog/${params.slug}`,
+      canonical: `https://chiangway-travel.com/blog/${params.slug}`,
     },
     openGraph: {
       title: post.title,

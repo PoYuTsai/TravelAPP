@@ -2,6 +2,9 @@
 
 import type { NotionOrder, DashboardData, DashboardQuery, MonthlyStats, YearComparison } from './types'
 import { parseNumberText } from './profit-parser'
+import { dbLogger } from '@/lib/logger'
+
+const log = dbLogger.child('notion')
 
 const NOTION_TOKEN = process.env.NOTION_TOKEN
 
@@ -15,7 +18,7 @@ const DATABASE_IDS: Record<number, string> = {
 const AVAILABLE_YEARS = [2025, 2026]
 
 if (!NOTION_TOKEN) {
-  console.warn('NOTION_TOKEN 未設定')
+  log.warn('NOTION_TOKEN 未設定')
 }
 
 function extractYearMonth(dateValue: { start: string; end?: string | null } | null): { year: number; month: number } | null {
@@ -92,7 +95,7 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
 
   const databaseId = DATABASE_IDS[year]
   if (!databaseId) {
-    console.warn(`找不到 ${year} 年的資料庫`)
+    log.warn(`找不到 ${year} 年的資料庫`, { year })
     return []
   }
 
@@ -143,7 +146,7 @@ export async function fetchNotionOrdersByYear(year: number): Promise<NotionOrder
     setCache(cacheKey, orders)
     return orders
   } catch (error) {
-    console.warn(`無法取得 ${year} 年的資料:`, error)
+    log.error(`無法取得 ${year} 年的資料`, error instanceof Error ? error : new Error(String(error)), { year })
     return []
   }
 }
@@ -181,7 +184,7 @@ export async function fetchTotalFamilyCount(): Promise<number> {
     setCache(cacheKey, total)
     return total
   } catch (error) {
-    console.warn('無法取得家庭總數:', error)
+    log.error('無法取得家庭總數', error instanceof Error ? error : new Error(String(error)))
     return 114 // Fallback to default
   }
 }

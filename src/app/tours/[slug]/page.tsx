@@ -137,7 +137,7 @@ export async function generateMetadata({
     title: `${tour.title} | 清微旅行`,
     description,
     alternates: {
-      canonical: `/tours/${slug}`,
+      canonical: `https://chiangway-travel.com/tours/${slug}`,
     },
     openGraph: {
       title: tour.title,

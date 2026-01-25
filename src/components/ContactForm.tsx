@@ -66,6 +66,10 @@ export default function ContactForm() {
         if (value.length > MAX_LENGTHS.email) return 'Email 格式無效'
         if (!emailRegex.test(value)) return '請輸入有效的 Email 格式'
         return undefined
+      case 'phone':
+        // 電話為選填，有值時才驗證
+        if (value && value.length > MAX_LENGTHS.phone) return `電話不可超過 ${MAX_LENGTHS.phone} 個字`
+        return undefined
       case 'message':
         if (!value.trim()) return '請輸入詢問內容'
         if (value.trim().length < 10) return '詢問內容至少需要 10 個字'

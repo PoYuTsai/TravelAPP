@@ -4,6 +4,7 @@ import { client } from '@/sanity/client'
 import { sanityToLineText } from '@/lib/itinerary-parser'
 import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
 import { apiLogger } from '@/lib/logger'
+import { escapeHtml } from '@/lib/pdf/itinerary-template'
 
 const log = apiLogger.child('itinerary:text')
 
@@ -83,7 +84,7 @@ export async function GET(
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>${itinerary.clientName || '行程'} - LINE 文字</title>
+  <title>${escapeHtml(itinerary.clientName || '行程')} - LINE 文字</title>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -136,7 +137,7 @@ export async function GET(
 </head>
 <body>
   <div class="header">
-    <h1>📋 ${itinerary.clientName || '行程'} - LINE 格式</h1>
+    <h1>📋 ${escapeHtml(itinerary.clientName || '行程')} - LINE 格式</h1>
     <button onclick="copyText()" id="copyBtn">複製全部</button>
   </div>
   <pre id="content">${fullText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>

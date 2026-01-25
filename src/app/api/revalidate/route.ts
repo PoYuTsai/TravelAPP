@@ -54,12 +54,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 驗證 secret（支援 query param 或 Authorization header）
-    const querySecret = request.nextUrl.searchParams.get('secret')
+    // 驗證 secret（僅支援 Authorization header，安全性更高）
     const headerSecret = request.headers.get('authorization')?.replace('Bearer ', '') ?? null
-    const secret = querySecret || headerSecret
 
-    if (!isValidSecret(secret)) {
+    if (!isValidSecret(headerSecret)) {
       return NextResponse.json({ message: 'Invalid secret' }, { status: 401 })
     }
 
