@@ -705,3 +705,88 @@ export const sanityLogger = new Logger('SANITY')
 ```
 1545a53 fix: comprehensive review optimizations (security, SEO, a11y)
 ```
+
+---
+
+## Phase 5.3 續集: 安全性與無障礙優化 (2026-01-25)
+
+延續 10 角色審查，完成剩餘優化項目。
+
+### 🔴 高優先級
+
+1. **Revalidate API 時間攻擊防護**
+   - `src/app/api/revalidate/route.ts`: 使用 `crypto.timingSafeEqual`
+   - 支援 Authorization header (Bearer token) 和 query param
+   - 修正 TypeScript 類型錯誤
+
+2. **Blog 分類頁 Schema**
+   - 新建 `src/components/blog/CollectionPageSchema.tsx`
+   - `CollectionPage` + `BreadcrumbList` JSON-LD
+   - `src/app/blog/category/[slug]/page.tsx`: 引用新元件
+
+### 🟡 中優先級
+
+1. **API 文件 noindex**
+   - 新建 `src/app/api-docs/layout.tsx`
+   - 設定 `robots: { index: false, follow: false }`
+
+2. **ToursPageClient 無障礙**
+   - 新增 `aria-expanded` 到 2025 年案例 toggle
+   - 新增 `aria-controls="past-cases-2025"`
+
+3. **YearFilter 無障礙**
+   - 新增 `aria-current="true"` 到選中年份
+
+4. **Lightbox Focus Trap**
+   - `src/components/cms/ImageGallery.tsx`: 實作焦點陷阱
+   - `src/components/cms/RoomCards.tsx`: 實作焦點陷阱
+   - 開啟時聚焦關閉按鈕，關閉後返回觸發元素
+   - Tab 鍵循環在彈窗內
+
+5. **Touch Target 增大**
+   - Header 手機選單按鈕: `p-2` → `p-3` (44x44px+)
+   - 手機選單連結: 增加 `py-2`
+   - Lightbox 關閉按鈕: `w-11 h-11` + hover 效果
+
+### 🟢 低優先級
+
+1. **統一 Logger**
+   - `src/lib/api-auth.ts`: 改用 `authLogger`
+   - `src/app/api/tours/cases/route.ts`: 改用 `apiLogger`
+   - `src/app/api/itinerary/[id]/pdf/route.ts`: 改用 `log` 子 logger
+
+### Sanity Studio Bug 調查
+
+**問題**: 後台點擊上一頁/下一頁時出現 "an error occurred, sanity studio was unable to recover from form"
+
+**可能原因**:
+1. 快速導航導致 form 狀態不一致
+2. 自訂元件在特定情況下報錯
+3. Schema 驗證與資料不符
+
+**建議排查**:
+1. 清除瀏覽器快取和 localStorage
+2. 檢查 Sanity Console 的 schema 錯誤
+3. 確認是否特定文件類型才會出錯
+4. 嘗試更新 Sanity 版本
+
+### 新建/修改檔案
+
+- 新建 `src/app/api-docs/layout.tsx`
+- 新建 `src/components/blog/CollectionPageSchema.tsx`
+- 修改 `src/app/api/revalidate/route.ts`
+- 修改 `src/app/blog/category/[slug]/page.tsx`
+- 修改 `src/app/tours/ToursPageClient.tsx`
+- 修改 `src/components/tours/YearFilter.tsx`
+- 修改 `src/components/cms/ImageGallery.tsx`
+- 修改 `src/components/cms/RoomCards.tsx`
+- 修改 `src/components/Header.tsx`
+- 修改 `src/lib/api-auth.ts`
+- 修改 `src/app/api/tours/cases/route.ts`
+- 修改 `src/app/api/itinerary/[id]/pdf/route.ts`
+
+### Commit
+
+```
+b1f78a1 fix: comprehensive review optimizations (security, SEO, a11y)
+```
