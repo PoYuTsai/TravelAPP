@@ -230,6 +230,8 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
             <button
               onClick={loadPastCases}
               disabled={loadingPast}
+              aria-expanded={showPastCases}
+              aria-controls="past-cases-2025"
               className="inline-flex items-center gap-2 px-6 py-3 text-gray-500 hover:text-gray-700 font-medium transition-colors disabled:opacity-50"
             >
               <svg
@@ -245,7 +247,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
           </div>
 
           {showPastCases && pastCases.length > 0 && (
-            <div className="mt-6">
+            <div id="past-cases-2025" className="mt-6">
               <h3 className="text-lg font-semibold text-gray-600 mb-4 text-center">2025 年案例</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
                 {pastCases.map((c) => (

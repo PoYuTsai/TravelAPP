@@ -3,6 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'crypto'
 
 // 設定一個 secret 來驗證 webhook 請求
 const REVALIDATE_SECRET = process.env.REVALIDATE_SECRET
@@ -26,6 +27,20 @@ function checkRateLimit(): boolean {
   return true
 }
 
+// Timing-safe secret 比較，防止 timing attack
+function isValidSecret(provided: string | null): boolean {
+  if (!REVALIDATE_SECRET || !provided) return false
+  if (provided.length !== REVALIDATE_SECRET.length) return false
+  try {
+    return timingSafeEqual(
+      Buffer.from(provided),
+      Buffer.from(REVALIDATE_SECRET)
+    )
+  } catch {
+    return false
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate Limit 檢查
@@ -39,9 +54,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 驗證 secret（必須設定）
-    const secret = request.nextUrl.searchParams.get('secret')
-    if (!REVALIDATE_SECRET || secret !== REVALIDATE_SECRET) {
+    // 驗證 secret（支援 query param 或 Authorization header）
+    const querySecret = request.nextUrl.searchParams.get('secret')
+    const headerSecret = request.headers.get('authorization')?.replace('Bearer ', '') ?? null
+    const secret = querySecret || headerSecret
+
+    if (!isValidSecret(secret)) {
       return NextResponse.json({ message: 'Invalid secret' }, { status: 401 })
     }
 
@@ -115,9 +133,12 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const secret = request.nextUrl.searchParams.get('secret')
+  // 驗證 secret（支援 query param 或 Authorization header）
+  const querySecret = request.nextUrl.searchParams.get('secret')
+  const headerSecret = request.headers.get('authorization')?.replace('Bearer ', '') ?? null
+  const secret = querySecret || headerSecret
 
-  if (!REVALIDATE_SECRET || secret !== REVALIDATE_SECRET) {
+  if (!isValidSecret(secret)) {
     return NextResponse.json({ message: 'Invalid secret' }, { status: 401 })
   }
 

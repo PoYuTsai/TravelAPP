@@ -99,7 +99,7 @@ export async function GET(
     )
   } finally {
     if (browser) {
-      await browser.close().catch(console.error)
+      await browser.close().catch((err) => log.error('Failed to close browser', err))
     }
   }
 }

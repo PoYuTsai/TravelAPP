@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 import { fetchTourCases } from '@/lib/notion'
+import { apiLogger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   try {
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data)
   } catch (error) {
-    console.error('Tours Cases API Error:', error)
+    apiLogger.error('Tours Cases API Error', error)
     return NextResponse.json(
       { error: '無法取得資料' },
       { status: 500 }

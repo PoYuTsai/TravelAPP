@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
+import CollectionPageSchema from '@/components/blog/CollectionPageSchema'
 import { CATEGORY_NAMES, getCategoryName } from '@/lib/constants'
 
 export const revalidate = 60
@@ -97,9 +98,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   const categoryName = getCategoryName(slug)
 
   return (
-    <div className="py-12 md:py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Breadcrumb */}
+    <>
+      <CollectionPageSchema
+        categoryName={categoryName}
+        categorySlug={slug}
+        postCount={posts.length}
+      />
+      <div className="py-12 md:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Breadcrumb */}
         <nav className="mb-6 text-sm">
           <ol className="flex items-center gap-2 text-gray-500">
             <li>
@@ -212,14 +219,15 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           </>
         )}
 
-        {/* SEO text */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-500 mb-4">更多清邁{categoryName}資訊持續更新中...</p>
-          <Link href="/blog" className="text-primary hover:underline">
-            ← 返回部落格首頁
-          </Link>
+          {/* SEO text */}
+          <div className="mt-16 text-center">
+            <p className="text-gray-500 mb-4">更多清邁{categoryName}資訊持續更新中...</p>
+            <Link href="/blog" className="text-primary hover:underline">
+              ← 返回部落格首頁
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

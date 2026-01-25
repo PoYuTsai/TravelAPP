@@ -87,10 +87,10 @@ export default function Header() {
             </a>
           </nav>
 
-          {/* Mobile Menu Button */}
+          {/* Mobile Menu Button - min 44x44px touch target */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="md:hidden p-2 text-gray-600"
+            className="md:hidden p-3 -mr-2 text-gray-600"
             aria-label={isMenuOpen ? '關閉選單' : '開啟選單'}
             aria-expanded={isMenuOpen}
             aria-controls="mobile-menu"
@@ -128,7 +128,7 @@ export default function Header() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`transition-colors font-medium ${
+                  className={`py-2 transition-colors font-medium ${
                     pathname === link.href
                       ? 'text-primary'
                       : 'text-gray-600 hover:text-primary'

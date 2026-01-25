@@ -14,6 +14,7 @@ export default function YearFilter({ years, selectedYear, onChange }: YearFilter
         <button
           key={year}
           onClick={() => onChange(year)}
+          aria-current={selectedYear === year ? 'true' : undefined}
           className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
             selectedYear === year
               ? 'bg-primary text-black'

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
+import { authLogger } from './logger'
 
 // API Key for internal services (itinerary export, etc.)
 const API_KEY = process.env.INTERNAL_API_KEY
@@ -22,14 +23,14 @@ export function validateApiKey(request: NextRequest): NextResponse | null {
   // In production, API key is mandatory
   if (!API_KEY) {
     if (IS_PRODUCTION) {
-      console.error('CRITICAL: INTERNAL_API_KEY not configured in production')
+      authLogger.error('CRITICAL: INTERNAL_API_KEY not configured in production')
       return NextResponse.json(
         { error: '伺服器設定錯誤', code: 'SERVER_CONFIG_ERROR' },
         { status: 500 }
       )
     }
     // Development mode only - warn but allow
-    console.warn('Warning: INTERNAL_API_KEY not configured, API validation disabled in development')
+    authLogger.warn('INTERNAL_API_KEY not configured, API validation disabled in development')
     return null
   }
 
@@ -74,7 +75,7 @@ export function validateDashboardAccess(request: Request): NextResponse | null {
   // Check if whitelist is configured
   if (DASHBOARD_ALLOWED_EMAILS.length === 0) {
     if (IS_PRODUCTION) {
-      console.error('CRITICAL: DASHBOARD_ALLOWED_EMAILS not configured in production')
+      authLogger.error('CRITICAL: DASHBOARD_ALLOWED_EMAILS not configured in production')
       return NextResponse.json(
         { error: '伺服器設定錯誤', code: 'SERVER_CONFIG_ERROR' },
         { status: 500 }

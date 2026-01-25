@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
@@ -18,11 +18,18 @@ interface ImageGalleryProps {
 
 export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps) {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  // 鍵盤支援：Esc 關閉 Lightbox
+  // 鍵盤支援：Esc 關閉 Lightbox，Tab 循環焦點
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       setSelectedImage(null)
+    }
+    // Focus trap: 只有一個可聚焦元素（關閉按鈕），所以 Tab 就保持在那
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      closeButtonRef.current?.focus()
     }
   }, [])
 
@@ -31,6 +38,11 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
       document.addEventListener('keydown', handleKeyDown)
       // 防止背景滾動
       document.body.style.overflow = 'hidden'
+      // Focus trap：開啟時聚焦到關閉按鈕
+      setTimeout(() => closeButtonRef.current?.focus(), 0)
+    } else {
+      // 關閉時返回原觸發元素
+      triggerRef.current?.focus()
     }
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
@@ -52,7 +64,10 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
         {images.map((image, index) => (
           <button
             key={index}
-            onClick={() => setSelectedImage(image)}
+            onClick={(e) => {
+              triggerRef.current = e.currentTarget
+              setSelectedImage(image)
+            }}
             className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer"
           >
             <Image
@@ -80,7 +95,8 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
           onClick={() => setSelectedImage(null)}
         >
           <button
-            className="absolute top-4 right-4 text-white text-4xl hover:text-gray-300"
+            ref={closeButtonRef}
+            className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-white text-4xl hover:text-gray-300 hover:bg-white/10 rounded-full transition-colors"
             onClick={() => setSelectedImage(null)}
             aria-label="關閉"
           >
