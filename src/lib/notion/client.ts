@@ -36,19 +36,31 @@ interface CacheEntry<T> {
   timestamp: number
 }
 
-const cache: Record<string, CacheEntry<unknown>> = {}
+const cache = new Map<string, CacheEntry<unknown>>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes cache
+const MAX_CACHE_SIZE = 50 // 最多快取 50 筆，避免記憶體無限增長
 
 function getCached<T>(key: string): T | null {
-  const entry = cache[key]
+  const entry = cache.get(key)
   if (entry && Date.now() - entry.timestamp < CACHE_TTL) {
     return entry.data as T
+  }
+  // 清除過期的快取
+  if (entry) {
+    cache.delete(key)
   }
   return null
 }
 
 function setCache<T>(key: string, data: T): void {
-  cache[key] = { data, timestamp: Date.now() }
+  // 如果達到上限，移除最舊的項目（Map 保持插入順序）
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = cache.keys().next().value
+    if (oldestKey) {
+      cache.delete(oldestKey)
+    }
+  }
+  cache.set(key, { data, timestamp: Date.now() })
 }
 
 /**

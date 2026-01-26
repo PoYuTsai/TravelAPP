@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import './globals.css'
 import Header from '@/components/Header'
@@ -8,6 +8,15 @@ import FloatingLineButton from '@/components/ui/FloatingLineButton'
 
 // Google Analytics Measurement ID
 const GA_MEASUREMENT_ID = 'G-5180ZF5WFF'
+
+// Viewport 設定（Next.js 14 推薦方式）
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: '#FFD700',
+}
 // Google Ads Conversion ID
 const AW_CONVERSION_ID = 'AW-17124009918'
 
@@ -116,7 +125,6 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
-        <meta name="theme-color" content="#FFD700" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}

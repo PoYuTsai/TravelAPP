@@ -289,6 +289,7 @@
 - In-memory 快取（目前規模可接受，大流量需 Redis）
 - Rate Limit in-memory（同上）
 - Dashboard 使用 email header 認證（內部工具可接受）
+- `.env.local` 密鑰安全（**已確認在 .gitignore 中，未被追蹤，此為誤報**）
 
 ---
 
