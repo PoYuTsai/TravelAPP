@@ -8,6 +8,7 @@ import { exportExcelAction } from './src/sanity/actions/exportExcelAction'
 import { exportTextAction } from './src/sanity/actions/exportTextAction'
 import { syncFromTextAction } from './src/sanity/actions/syncFromTextAction'
 import { dashboardTool } from './src/sanity/tools/dashboard'
+import { accountingTool } from './src/sanity/tools/accounting'
 
 export default defineConfig({
   name: 'chiangway-travel',
@@ -15,7 +16,7 @@ export default defineConfig({
   projectId,
   dataset,
   basePath: '/studio',
-  plugins: [structureTool({ structure }), dashboardTool()],
+  plugins: [structureTool({ structure }), dashboardTool(), accountingTool()],
   schema: { types: schemaTypes },
   document: {
     actions: (prev, context) => {

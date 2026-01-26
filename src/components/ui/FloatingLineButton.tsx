@@ -20,12 +20,21 @@ interface FloatingLineButtonProps {
 export default function FloatingLineButton({
   lineUrl = LINE_URL
 }: FloatingLineButtonProps) {
-  const [hasScrolled, setHasScrolled] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
+      const scrollY = window.scrollY
+      const windowHeight = window.innerHeight
+      const documentHeight = document.documentElement.scrollHeight
+
       // Show button after scrolling 300px
-      setHasScrolled(window.scrollY > 300)
+      const hasScrolledEnough = scrollY > 300
+
+      // Hide when near bottom (within 200px of footer)
+      const isNearBottom = scrollY + windowHeight > documentHeight - 200
+
+      setIsVisible(hasScrolledEnough && !isNearBottom)
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
@@ -52,7 +61,7 @@ export default function FloatingLineButton({
         px-4 py-3 rounded-full
         shadow-lg hover:shadow-xl
         transition-all duration-300 ease-out
-        ${hasScrolled ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-16 opacity-0 scale-90 pointer-events-none'}
+        ${isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-16 opacity-0 scale-90 pointer-events-none'}
         active:scale-95
         md:bottom-8 md:right-6
       `}
