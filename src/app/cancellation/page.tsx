@@ -53,6 +53,11 @@ export default function CancellationPage() {
                 <h3 className="font-semibold text-gray-900 mb-2">🚗 連續用車要求</h3>
                 <p className="text-gray-700">包車服務需 <strong>連續天數</strong> 使用，不接受「跳天」預訂。</p>
                 <p className="text-gray-600 text-sm mt-1">例如：可預訂 1/10-1/12 連續三天；但不接受 1/10 包車、1/11 休息、1/12 再包車的方式。</p>
+                <div className="mt-3 p-3 bg-amber-50 rounded-lg">
+                  <p className="text-amber-800 text-sm">
+                    <strong>旺季期間（2月春節、4月潑水節、11月水燈節、12-1月跨年）</strong>為司機/導遊最繁忙的檔期，一律不接受跳天預訂。淡季月份如有特殊需求，請先與我們確認。
+                  </p>
+                </div>
               </div>
             </div>
           </section>
@@ -157,10 +162,31 @@ export default function CancellationPage() {
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li><strong>航班取消或延誤：</strong>提供航空公司證明，可全額退款或改期</li>
-              <li><strong>簽證問題：</strong>提供相關證明，可協商退款比例</li>
               <li><strong>突發疾病：</strong>提供醫療證明，可協商退款或改期</li>
               <li><strong>天災等不可抗力：</strong>可全額退款或改期</li>
             </ul>
+          </section>
+
+          <section className="mb-8 not-prose">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">不予退費情況</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+              <p className="text-gray-700 mb-4">
+                以下情況屬旅客自身責任，恕無法退費：
+              </p>
+              <ul className="list-disc pl-6 text-gray-700 space-y-2">
+                <li>
+                  <strong>未填寫 TDAC（泰國入境卡）：</strong>
+                  入境泰國前需完成線上申報，未填寫可能導致無法順利入境
+                </li>
+                <li>
+                  <strong>攜帶現金不足：</strong>
+                  泰國海關可能抽查旅客是否攜帶等值 20,000 泰銖（約台幣 18,000 元）的現金或旅行支票，不足者可能被拒絕入境
+                </li>
+              </ul>
+              <p className="text-gray-500 text-sm mt-4">
+                以上情況導致無法入境，訂金將不予退還。建議出發前確認相關入境規定。
+              </p>
+            </div>
           </section>
 
           <section className="mb-8">
@@ -214,7 +240,7 @@ export default function CancellationPage() {
                 <strong>原則上，支付訂金後日期即確定，不接受改期。</strong>
               </p>
               <p className="text-gray-600 mt-2 text-sm">
-                若遇不可抗力因素（航班取消、簽證問題等），請提供證明文件，我們會協助處理。特殊情況請直接與我們聯繫討論。
+                若遇不可抗力因素（航班取消、突發疾病等），請提供證明文件，我們會協助處理。特殊情況請直接與我們聯繫討論。
               </p>
             </div>
           </section>
