@@ -120,7 +120,7 @@
 
 - **個人記帳**：Sanity Studio 記帳工具、Notion 業務成本串接
 - **成本解析器**：Notion 自由格式文字解析（規則式 + LLM 備援）
-- **知識庫系統**：Notion 資料庫已建立（餐廳 13 筆、門票 22 筆、飯店 11 筆）
+- **知識庫系統**：Notion 資料庫已建立（餐廳 28 筆、咖啡廳 10 筆、飯店 19 筆、景點 8 筆、門票 22 筆）
 - **傳承準備**：為女兒未來接手建立完整文件
 
 ## 技術架構
@@ -175,4 +175,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-26 Phase 6 Google Maps URL 修復 -->
+<!-- Last build trigger: 2026-01-26 Phase 6 知識庫大規模擴充 -->

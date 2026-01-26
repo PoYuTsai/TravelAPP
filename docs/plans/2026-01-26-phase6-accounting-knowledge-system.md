@@ -23,9 +23,11 @@
 | 飯店 | +11 | 清邁 7 筆、清萊 4 筆（美平洲際、U Nimman 等）|
 
 **目前資料庫總覽：**
-- 餐廳：13 筆（5 原有 + 8 新增）
+- 餐廳：28 筆（含素食、Mae Rim、湄登）
+- 咖啡廳：10 筆（獨立資料庫）
 - 門票：22 筆（14 原有 + 8 新增）
-- 飯店：11 筆（新建資料庫）
+- 飯店：19 筆（清邁 11 + 清萊 8）
+- 景點：8 筆（清萊景點）
 - 話術：0 筆（待填充）
 
 **環境變數更新：**
@@ -62,6 +64,31 @@ NOTION_HOTEL_DB=2f437493-475d-8132-8c3b-dce5b0b832b7
 - `scripts/fix-google-maps-urls.mjs` - 修復 Google Maps 短連結
 - `scripts/fix-notion-urls.mjs` - 修復 placeholder URL
 - `scripts/validate-notion-urls.mjs` - 驗證所有 URL
+
+### 2026-01-26 知識庫大規模擴充
+
+**Commit:** `0d5f0f5` feat: expand knowledge base with cafes, attractions, and regional data
+
+**新建資料庫：**
+1. **咖啡廳推薦** (`NOTION_CAFE_DB`) - 從餐廳分離獨立
+2. **景點推薦** (`NOTION_ATTRACTION_DB`) - 新建
+
+**新增資料（41 筆）：**
+| 類別 | 筆數 | 內容 |
+|------|------|------|
+| 素食餐廳 | 5 | Sukjai, Chada, Begin Vegan, Reform Kafé, Payod Shan |
+| Mae Rim | 5 | Mai Heun 60, Kad Farang, Krua Lawng Khao, Gong Kham, Khong Khao |
+| 湄登 | 5 | Khao Soy Mae Nai, Guay Tiew, Pang Pao, Air Diamond, Saiyut |
+| 咖啡廳 | 10 | HAAN, Versailles, Ristr8to, Akha Ama, Roast8ry 等 |
+| 清邁飯店 | 4 | K Maison, Sensai, Burirattana, ANA Park |
+| 清萊飯店 | 4 | Riva Vista, Lavanda, Sann, Clay Bed |
+| 清萊景點 | 8 | 玻璃寺, 翠峰茶園, Singha Park, 皇太后行宮 等 |
+
+**環境變數新增：**
+```env
+NOTION_CAFE_DB=2f437493-475d-8153-b3c9-fcd32601a82a
+NOTION_ATTRACTION_DB=2f437493-475d-81f3-8cd3-eff452764b2c
+```
 
 ---
 
