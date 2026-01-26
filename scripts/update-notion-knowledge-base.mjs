@@ -199,20 +199,12 @@ const cafes = [
 // ====================================
 const restaurants = [
   {
-    name: '新大象旁邊餐廳',
-    category: '泰式熱炒',
-    url: 'https://maps.app.goo.gl/abc123', // placeholder
-    note: '大象營附近，方便午餐',
-    rating: '⭐⭐⭐⭐',
-    price: '便宜',
-  },
-  {
     name: 'Vegan Heaven',
     category: '其他',
-    url: 'https://maps.app.goo.gl/vegetarian1',
-    note: '素食餐廳推薦，多國料理',
-    rating: '⭐⭐⭐⭐',
-    price: '中等',
+    url: 'https://veganheavencnx.com/',
+    note: '清邁第一家100%純素餐廳，泰式西式皆有',
+    rating: '⭐⭐⭐⭐⭐',
+    price: '便宜',
   },
 ]
 
@@ -301,16 +293,16 @@ const chiangRaiHotels = [
   {
     name: 'The Riverie by Katathani',
     location: '清萊河畔',
-    url: 'https://maps.app.goo.gl/cr_riverie',
-    note: '河景度假村，環境清幽',
+    url: 'https://www.theriverie.com/',
+    note: '河景度假村，環境清幽，泰國旅遊獎得主',
     stars: 5,
     priceRange: '高價位',
   },
   {
     name: 'Le Patta Hotel',
     location: '清萊市區',
-    url: 'https://maps.app.goo.gl/cr_lepatta',
-    note: '市區便利位置',
+    url: 'https://www.lepattachiangrai.com/',
+    note: '近鐘塔步行街，TripAdvisor 清萊 #4',
     stars: 4,
     priceRange: '中價位',
   },
