@@ -33,6 +33,36 @@
 NOTION_HOTEL_DB=2f437493-475d-8132-8c3b-dce5b0b832b7
 ```
 
+### 2026-01-26 Google Maps 連結修復
+
+**Commit:** `18361a5` fix: convert maps.app.goo.gl short URLs to full Google Maps URLs
+
+**問題：**
+- `maps.app.goo.gl` 短連結出現 "Dynamic Link Not Found" 錯誤
+- 短連結可能過期或被 Google 停用
+
+**解決方案：**
+1. 建立 `scripts/fix-google-maps-urls.mjs` 修復腳本
+2. 將所有 `maps.app.goo.gl` 轉換為完整 Google Maps 搜尋 URL
+
+**修復項目（9 筆）：**
+| 店家名稱 | 新 URL 格式 |
+|----------|------------|
+| HAAN Studio | `https://www.google.com/maps/search/HAAN+Studio+Chiang+Mai` |
+| Versailles de Flore | `https://www.google.com/maps/search/Versailles+de+Flore+Chiang+Mai` |
+| No.39 Cafe | `https://www.google.com/maps/search/No.39+Cafe+Chiang+Mai` |
+| Ginger Farm Kitchen | `https://www.google.com/maps/search/Ginger+Farm+Kitchen+Chiang+Mai` |
+| Monsoon Tea | 含 Place ID 格式 |
+| Ristr8to Lab | `https://www.google.com/maps/search/Ristr8to+Lab+Nimmanhaemin+Chiang+Mai` |
+| Doi Chaang Coffee | `https://www.google.com/maps/search/Doi+Chaang+Coffee+Chiang+Mai` |
+| Akha Ama Coffee | 含 Place ID 格式 |
+| 海鮮燒烤369吃到飽 | `https://www.google.com/maps/search/369+Seafood+BBQ+Buffet+Chiang+Mai` |
+
+**相關腳本：**
+- `scripts/fix-google-maps-urls.mjs` - 修復 Google Maps 短連結
+- `scripts/fix-notion-urls.mjs` - 修復 placeholder URL
+- `scripts/validate-notion-urls.mjs` - 驗證所有 URL
+
 ---
 
 ## 概述
