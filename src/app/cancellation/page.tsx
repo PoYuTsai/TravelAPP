@@ -76,7 +76,7 @@ export default function CancellationPage() {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">⏱️ 景點停留時間</h3>
-                <p className="text-gray-700">客人需<strong>自行控制各景點的停留時間</strong>。導遊會提醒建議時間，但最終由您決定何時離開。請留意用車時數，避免超時。</p>
+                <p className="text-gray-700">客人需<strong>自行控制各景點的停留時間</strong>，並留意用車時數避免超時。司機會在約定地點等候，逛完後請在 LINE 群組通知即可。</p>
               </div>
             </div>
           </section>
