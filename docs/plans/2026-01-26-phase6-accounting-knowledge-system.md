@@ -7,6 +7,34 @@
 
 ## 開發進度
 
+### 2026-01-26 知識庫連結審計與修正
+
+**Commit:** `4afa686` feat: add knowledge base link audit and fix scripts
+
+**狀態：** ✅ 已完成
+
+**新增腳本：**
+| 檔案 | 用途 |
+|------|------|
+| `scripts/audit-knowledge-base-links.mjs` | 審計所有 Google Maps 連結 |
+| `scripts/fix-notion-links.mjs` | 批次修正錯誤連結 |
+| `scripts/check-db-schema.mjs` | 檢查 Notion 資料庫欄位 |
+| `docs/knowledge-base-audit-checklist.md` | 人工驗證清單 |
+
+**審計結果（58 筆 Google Maps 連結）：**
+| 狀態 | 筆數 |
+|------|------|
+| ✅ 完全匹配 | 7 |
+| 🟡 部分匹配 | 30 |
+| 🟠 關鍵字匹配 | 21 |
+| ❌ 不匹配 | 0 |
+
+**已修正連結：**
+- `115 Burirattana Hotel`: 搜尋詞從 `115 The Residence` → `Burirattana 115 Hotel`
+- `Sukjai by Pata Obasan`: 搜尋詞從 `Sukjai Vegetarian` → `Sukjai by Pata Obasan`
+
+---
+
 ### 2026-01-26 話術資料庫完成
 
 **Commit:** `9b0aff5` feat: add Notion replies database setup script
@@ -664,4 +692,4 @@ main
 
 ---
 
-*最後更新：2026-01-26（話術資料庫完成，知識庫共 96 筆）*
+*最後更新：2026-01-26（知識庫連結審計完成）*

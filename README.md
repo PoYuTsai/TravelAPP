@@ -184,4 +184,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-26 Phase 6 話術資料庫完成 -->
+<!-- Last build trigger: 2026-01-26 Phase 6 知識庫連結審計完成 -->
