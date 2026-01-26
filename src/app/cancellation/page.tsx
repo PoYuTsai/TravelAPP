@@ -62,6 +62,52 @@ export default function CancellationPage() {
             </div>
           </section>
 
+          {/* 服務方式說明 */}
+          <section className="mb-8 not-prose">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">服務方式</h2>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">👥 泰文司機 + 中文導遊</h3>
+                <p className="text-gray-700">我們採用<strong>專業分工模式</strong>：泰文司機負責駕駛，中文導遊負責溝通與照顧。司機不會說中文，行程中的溝通請透過導遊或 LINE 群組。</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">📋 行程事先確定</h3>
+                <p className="text-gray-700">為避免行程當下的溝通成本，<strong>出發前會先排好完整行程</strong>，貼在 LINE 群組記事本供隨時查看。行程確定後，司機會照表走。</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-2">⏱️ 景點停留時間</h3>
+                <p className="text-gray-700">客人需<strong>自行控制各景點的停留時間</strong>。導遊會提醒建議時間，但最終由您決定何時離開。請留意用車時數，避免超時。</p>
+              </div>
+            </div>
+          </section>
+
+          {/* 超時費用說明 */}
+          <section className="mb-8 not-prose">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">超時費用</h2>
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-6">
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-900 mb-2">⏰ 用車時數限制</h3>
+                <ul className="list-disc pl-6 text-gray-700 space-y-1">
+                  <li><strong>清邁用車：</strong>10 小時</li>
+                  <li><strong>清萊用車：</strong>12 小時</li>
+                </ul>
+              </div>
+              <div className="mb-4">
+                <h3 className="font-semibold text-gray-900 mb-2">💵 超時費計算</h3>
+                <p className="text-gray-700">超過用車時數後，需支付司機與導遊<strong>各 200 泰銖/小時</strong>的超時費。</p>
+              </div>
+              <div className="p-4 bg-white rounded-lg border border-orange-100">
+                <p className="text-gray-700 text-sm">
+                  <strong>範例：</strong>清萊一日遊（12 小時）8:00 出發 → 20:00 結束
+                </p>
+                <ul className="text-gray-600 text-sm mt-2 space-y-1">
+                  <li>• 20:30 前結束：<span className="text-green-600 font-medium">不收超時費</span>（彈性 30 分鐘）</li>
+                  <li>• 20:40 後結束：需支付司機 200 泰銖 + 導遊 200 泰銖 = 400 泰銖/小時</li>
+                </ul>
+              </div>
+            </div>
+          </section>
+
           <section className="mb-8 not-prose">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">包車服務取消政策</h2>
             <p className="text-gray-600 mb-4 text-sm">
