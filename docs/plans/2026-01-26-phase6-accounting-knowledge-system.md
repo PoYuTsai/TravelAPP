@@ -7,6 +7,33 @@
 
 ## 開發進度
 
+### 2026-01-26 記帳系統完成確認
+
+**狀態：** ✅ 已完成
+
+**實作位置：** Sanity Studio 工具（`/studio` → 💰 記帳）
+
+**已完成功能：**
+| 功能 | 檔案 |
+|------|------|
+| 記帳 UI 元件 | `src/sanity/tools/accounting/AccountingTool.tsx` |
+| 計算邏輯 | `src/lib/accounting/calculator.ts` |
+| 型別定義 | `src/lib/accounting/types.ts` |
+| API 端點 | `src/app/api/accounting/route.ts` |
+| 工具註冊 | `sanity.config.ts` |
+
+**功能清單：**
+- 日期區間選擇（2025/01/01 起）
+- 起始/結束餘額輸入
+- 入金記錄 CRUD + 自動匯率計算
+- Notion 業務成本自動撈取
+- 總支出 / 生活開銷 / 日均支出計算
+- 40 萬門檻警示（安全/注意/警告三級）
+- 訂單明細顯示（含不確定值 ⚠️ 標記）
+- 權限控制（僅 eric19921204@gmail.com）
+
+---
+
 ### 2026-01-26 知識庫資料更新
 
 **Commit:** `0c81032` feat: add Notion knowledge base update script with hotel database
@@ -565,17 +592,18 @@ main
 
 ### 驗收標準
 
-**記帳系統：**
-- [ ] 可選擇日期區間並輸入餘額
-- [ ] 可新增/刪除入金記錄
-- [ ] 計算結果正確（含 Notion 成本）
-- [ ] 40 萬門檻警示正常顯示
-- [ ] 只有 Owner 可存取
+**記帳系統：** ✅ 已完成
+- [x] 可選擇日期區間並輸入餘額
+- [x] 可新增/刪除入金記錄
+- [x] 計算結果正確（含 Notion 成本）
+- [x] 40 萬門檻警示正常顯示
+- [x] 只有 Owner 可存取
+- [x] 整合於 Sanity Studio（/studio → 💰 記帳）
 
-**成本解析器：**
-- [ ] 6 個範例全部正確解析
-- [ ] 不確定值有 ⚠️ 標記
-- [ ] Dashboard 數字更準確
+**成本解析器：** ✅ 已完成
+- [x] 6 個範例全部正確解析
+- [x] 不確定值有 ⚠️ 標記
+- [x] Dashboard 數字更準確
 
 **知識庫：**
 - [x] Notion 資料庫結構正確
@@ -612,4 +640,4 @@ main
 
 ---
 
-*最後更新：2026-01-26*
+*最後更新：2026-01-26（記帳系統確認完成）*
