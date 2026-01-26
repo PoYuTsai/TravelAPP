@@ -180,7 +180,7 @@ export default function CancellationPage() {
                 </li>
                 <li>
                   <strong>攜帶現金不足：</strong>
-                  泰國海關可能抽查旅客是否攜帶等值 20,000 泰銖（約台幣 18,000 元）的現金或旅行支票，不足者可能被拒絕入境
+                  泰國海關可能抽查旅客是否攜帶等值 20,000 泰銖的現金或旅行支票，不足者可能被拒絕入境
                 </li>
               </ul>
               <p className="text-gray-500 text-sm mt-4">
