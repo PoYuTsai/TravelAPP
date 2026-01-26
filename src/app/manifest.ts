@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: '清微旅行 Chiangway Travel',
     short_name: '清微旅行',
-    description: '清邁親子自由行首選！專業中文導遊、安全舒適的包車服務。',
+    description: '清邁親子包車首選！台灣爸爸 Eric ＋ 泰國媽媽 Min 在地經營。',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

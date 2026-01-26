@@ -120,7 +120,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
         {/* Hero Section with TrustNumbers */}
         <section className="text-center mb-16">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-3">
-            清邁親子自由行，交給在地家庭
+            清邁親子包車，交給 Eric & Min
           </h1>
           <p className="text-lg md:text-xl text-gray-600 mb-8">
             專為爸媽設計的包車旅程

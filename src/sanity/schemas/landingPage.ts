@@ -32,7 +32,7 @@ export default defineType({
       title: '主標題',
       type: 'string',
       group: 'hero',
-      initialValue: '清邁親子自由行，交給在地家庭',
+      initialValue: '清邁親子包車，交給 Eric & Min',
     }),
     defineField({
       name: 'heroSubtitle',

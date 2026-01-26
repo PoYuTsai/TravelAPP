@@ -34,7 +34,7 @@ export default function Footer() {
               />
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
-              清邁親子自由行首選！我們是住在清邁的台泰夫妻，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。
+              清邁親子包車首選！我們是台灣爸爸 Eric ＋ 泰國媽媽 Min，住在清邁的在地家庭，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。
             </p>
           </div>
 

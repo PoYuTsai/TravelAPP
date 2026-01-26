@@ -63,7 +63,7 @@ export default async function Home() {
     <>
       <Hero
         backgroundImage={data?.heroBackgroundImage}
-        title={data?.heroTitle || '清邁親子自由行，交給在地家庭'}
+        title={data?.heroTitle || '清邁親子包車，交給 Eric & Min'}
         subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
         description={data?.heroDescription}
         primaryCta={data?.heroPrimaryCta}

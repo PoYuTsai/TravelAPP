@@ -22,10 +22,10 @@ const AW_CONVERSION_ID = 'AW-17124009918'
 
 export const metadata: Metadata = {
   title: {
-    default: '清微旅行 Chiangway Travel | 清邁親子包車自由行',
+    default: '清微旅行 Chiangway Travel | 清邁親子包車',
     template: '%s | 清微旅行',
   },
-  description: '清邁親子自由行首選！台灣爸爸＋泰國媽媽在地經營，專業中文導遊＋安全舒適包車，客製化親子行程規劃。老虎王國、大象互動、夜間動物園⋯帶孩子玩遍清邁！超過 100 組家庭好評推薦，LINE 免費諮詢。',
+  description: '清邁親子包車首選！台灣爸爸 Eric ＋ 泰國媽媽 Min 在地經營，專業中文導遊＋安全舒適包車，客製化親子行程規劃。老虎王國、大象互動、夜間動物園⋯帶孩子玩遍清邁！超過 100 組家庭好評推薦，LINE 免費諮詢。',
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
   metadataBase: new URL('https://chiangway-travel.com'),
@@ -56,13 +56,13 @@ export const metadata: Metadata = {
         url: '/images/og-image.png',
         width: 1200,
         height: 630,
-        alt: '清微旅行 - 清邁親子包車自由行',
+        alt: '清微旅行 - 清邁親子包車',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '清微旅行 Chiangway Travel | 清邁親子包車自由行',
+    title: '清微旅行 Chiangway Travel | 清邁親子包車',
     description: '台灣爸爸＋泰國媽媽在地經營，專業中文導遊＋安全舒適包車，客製化親子行程。超過 100 組家庭好評推薦！',
     images: ['/images/og-image.png'],
   },
@@ -74,7 +74,7 @@ const localBusinessSchema = {
   '@type': 'LocalBusiness',
   '@id': 'https://chiangway-travel.com/#business',
   name: '清微旅行 Chiangway Travel',
-  description: '清邁親子自由行首選！台泰夫妻在地經營，專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
+  description: '清邁親子包車首選！台灣爸爸 Eric ＋ 泰國媽媽 Min 在地經營，專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
   url: 'https://chiangway-travel.com',
   telephone: '+66-63-790-0666',
   email: 'eric19921204@gmail.com',
