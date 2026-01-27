@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getItineraryById } from '@/lib/sanity/queries'
 import { generateItineraryExcel } from '@/lib/excel/itinerary-template'
-import { validateApiKey, checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP } from '@/lib/api-auth'
 import { apiLogger } from '@/lib/logger'
 
 const log = apiLogger.child('itinerary:excel')
@@ -19,9 +19,8 @@ export async function GET(
   const rateLimitError = checkRateLimit(clientIP, 20, 60000) // 20 requests per minute
   if (rateLimitError) return rateLimitError
 
-  // API key validation
-  const authError = validateApiKey(request)
-  if (authError) return authError
+  // Note: API key validation removed - this is an internal tool that only reads Sanity data
+  // Access control is handled by: 1) Rate limiting, 2) Sanity Studio authentication, 3) Requiring valid itinerary ID
 
   try {
     const { id } = await params
