@@ -25,6 +25,7 @@
 | Phase 5.5 | 手機 UX 優化 | ✅ 完成 |
 | Phase 5.6 | 政策與 FAQ 優化 | ✅ 完成 |
 | Phase 6 | 記帳系統 + 知識庫 | ✅ 完成 |
+| Phase 6.1 | 審查 #5 系統優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -130,6 +131,23 @@
   - 🎫 門票資訊：22 筆
   - 💬 話術範本：16 筆
 
+### Phase 6.1：審查 #5 系統優化
+全面系統審查與優化（10 個問題修復）：
+
+- **資安強化**：
+  - 移除 Revalidate API query param secret 支援（僅 header）
+  - 成本解析器加入 2000 字元長度限制（ReDoS 防護）
+- **行銷追蹤修復**：
+  - 修正 Form 轉換追蹤 ID、移除 LINE 點擊雙重追蹤
+  - 新增 Video 播放追蹤（start/25%/50%/75%/complete）
+  - 新增 Scroll Depth 追蹤（25/50/75/90%）
+- **SEO 強化**：
+  - 新增 4 個頁面 Schema（/tours、/blog、/contact、/homestay）
+  - Tour 詳情頁加入 BreadcrumbList Schema
+- **無障礙改善**：
+  - Testimonial dots 觸控目標增大至 44px（WCAG）
+  - Lightbox 加入方向鍵導航 + 圖片計數
+
 ## 技術架構
 
 ```
@@ -182,4 +200,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-28 審查 #5 全面系統優化 -->
+<!-- Last build trigger: 2026-01-28 Phase 6.1 審查 #5 系統優化 -->
