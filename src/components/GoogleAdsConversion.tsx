@@ -17,21 +17,8 @@ const PAGE_CONVERSIONS: Record<string, string> = {
   'illegal-work': 'SYcECMG5o-obEL7PruU_',   // 非法打工文章
 }
 
-// LINE 點擊轉換 ID
-const LINE_CLICK_CONVERSION = '0CrLCKj1l-obEL7PruU_'
-
-// 表單提交轉換 ID (contact form)
-const FORM_SUBMIT_CONVERSION = 'form_submit_conversion'
-
-// 導出追蹤函數供其他組件使用
-export function trackGoogleAdsFormSubmit() {
-  if (typeof window === 'undefined' || !window.gtag) return
-  window.gtag('event', 'conversion', {
-    'send_to': `${AW_CONVERSION_ID}/${LINE_CLICK_CONVERSION}`,
-    'event_category': 'form',
-    'event_label': 'contact_form_submit'
-  })
-}
+// LINE 點擊追蹤已移至 analytics.ts 統一處理
+// 避免重複追蹤（Button 組件 + 全局監聽會造成雙重計算）
 
 export default function GoogleAdsConversion() {
   const pathname = usePathname()
@@ -58,24 +45,6 @@ export default function GoogleAdsConversion() {
       }
     }
   }, [pathname])
-
-  // LINE 連結點擊追蹤
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.gtag) return
-
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      const link = target.closest('a[href*="line.me"]')
-      if (link) {
-        window.gtag('event', 'conversion', {
-          'send_to': `${AW_CONVERSION_ID}/${LINE_CLICK_CONVERSION}`
-        })
-      }
-    }
-
-    document.addEventListener('click', handleClick)
-    return () => document.removeEventListener('click', handleClick)
-  }, [])
 
   return null
 }

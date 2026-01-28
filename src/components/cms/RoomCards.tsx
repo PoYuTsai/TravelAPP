@@ -15,24 +15,45 @@ interface RoomCardsProps {
 }
 
 export default function RoomCards({ cards }: RoomCardsProps) {
-  const [selectedCard, setSelectedCard] = useState<RoomCard | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  // 鍵盤支援：Esc 關閉 Lightbox，Tab 循環焦點
+  const selectedCard = selectedIndex !== null ? cards[selectedIndex] : null
+
+  // 導航函數
+  const goToPrev = useCallback(() => {
+    if (selectedIndex === null || cards.length <= 1) return
+    setSelectedIndex((selectedIndex - 1 + cards.length) % cards.length)
+  }, [selectedIndex, cards.length])
+
+  const goToNext = useCallback(() => {
+    if (selectedIndex === null || cards.length <= 1) return
+    setSelectedIndex((selectedIndex + 1) % cards.length)
+  }, [selectedIndex, cards.length])
+
+  // 鍵盤支援：Esc 關閉，左右方向鍵導航，Tab 循環焦點
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      setSelectedCard(null)
+      setSelectedIndex(null)
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      goToPrev()
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      goToNext()
     }
     // Focus trap
     if (e.key === 'Tab') {
       e.preventDefault()
       closeButtonRef.current?.focus()
     }
-  }, [])
+  }, [goToPrev, goToNext])
 
   useEffect(() => {
-    if (selectedCard) {
+    if (selectedIndex !== null) {
       document.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
       setTimeout(() => closeButtonRef.current?.focus(), 0)
@@ -43,7 +64,7 @@ export default function RoomCards({ cards }: RoomCardsProps) {
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
     }
-  }, [selectedCard, handleKeyDown])
+  }, [selectedIndex, handleKeyDown])
 
   if (!cards || cards.length === 0) return null
 
@@ -55,7 +76,7 @@ export default function RoomCards({ cards }: RoomCardsProps) {
             key={index}
             onClick={(e) => {
               triggerRef.current = e.currentTarget
-              setSelectedCard(card)
+              setSelectedIndex(index)
             }}
             className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow cursor-pointer group"
           >
@@ -76,17 +97,38 @@ export default function RoomCards({ cards }: RoomCardsProps) {
           aria-modal="true"
           aria-label="房型圖片檢視器"
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedCard(null)}
+          onClick={() => setSelectedIndex(null)}
         >
           <button
             ref={closeButtonRef}
             className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-white text-4xl hover:text-gray-300 hover:bg-white/10 rounded-full transition-colors"
-            onClick={() => setSelectedCard(null)}
+            onClick={() => setSelectedIndex(null)}
             aria-label="關閉"
           >
             &times;
           </button>
-          <div className="relative max-w-2xl max-h-[90vh] w-full">
+
+          {/* 左右導航按鈕 */}
+          {cards.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToPrev() }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-white text-2xl hover:bg-white/10 rounded-full transition-colors"
+                aria-label="上一張"
+              >
+                ‹
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToNext() }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-white text-2xl hover:bg-white/10 rounded-full transition-colors"
+                aria-label="下一張"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <div className="relative max-w-2xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
             <Image
               src={urlFor(selectedCard.asset).width(800).url()}
               alt={selectedCard.alt || '房型圖片'}
@@ -95,6 +137,12 @@ export default function RoomCards({ cards }: RoomCardsProps) {
               className="object-contain mx-auto"
             />
           </div>
+          {/* 圖片計數 */}
+          {cards.length > 1 && (
+            <p className="absolute bottom-4 left-0 right-0 text-center text-white/70 text-sm">
+              {(selectedIndex ?? 0) + 1} / {cards.length}
+            </p>
+          )}
         </div>
       )}
     </>

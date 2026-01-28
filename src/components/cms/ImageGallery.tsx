@@ -17,24 +17,45 @@ interface ImageGalleryProps {
 }
 
 export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps) {
-  const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null)
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
 
-  // 鍵盤支援：Esc 關閉 Lightbox，Tab 循環焦點
+  const selectedImage = selectedIndex !== null ? images[selectedIndex] : null
+
+  // 導航函數
+  const goToPrev = useCallback(() => {
+    if (selectedIndex === null || images.length <= 1) return
+    setSelectedIndex((selectedIndex - 1 + images.length) % images.length)
+  }, [selectedIndex, images.length])
+
+  const goToNext = useCallback(() => {
+    if (selectedIndex === null || images.length <= 1) return
+    setSelectedIndex((selectedIndex + 1) % images.length)
+  }, [selectedIndex, images.length])
+
+  // 鍵盤支援：Esc 關閉，左右方向鍵導航，Tab 循環焦點
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      setSelectedImage(null)
+      setSelectedIndex(null)
+    }
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault()
+      goToPrev()
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault()
+      goToNext()
     }
     // Focus trap: 只有一個可聚焦元素（關閉按鈕），所以 Tab 就保持在那
     if (e.key === 'Tab') {
       e.preventDefault()
       closeButtonRef.current?.focus()
     }
-  }, [])
+  }, [goToPrev, goToNext])
 
   useEffect(() => {
-    if (selectedImage) {
+    if (selectedIndex !== null) {
       document.addEventListener('keydown', handleKeyDown)
       // 防止背景滾動
       document.body.style.overflow = 'hidden'
@@ -48,7 +69,7 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
       document.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
     }
-  }, [selectedImage, handleKeyDown])
+  }, [selectedIndex, handleKeyDown])
 
   if (!images || images.length === 0) return null
 
@@ -66,7 +87,7 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
             key={index}
             onClick={(e) => {
               triggerRef.current = e.currentTarget
-              setSelectedImage(image)
+              setSelectedIndex(index)
             }}
             className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer"
           >
@@ -92,17 +113,38 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
           aria-modal="true"
           aria-label="圖片檢視器"
           className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => setSelectedIndex(null)}
         >
           <button
             ref={closeButtonRef}
             className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center text-white text-4xl hover:text-gray-300 hover:bg-white/10 rounded-full transition-colors"
-            onClick={() => setSelectedImage(null)}
+            onClick={() => setSelectedIndex(null)}
             aria-label="關閉"
           >
             &times;
           </button>
-          <div className="relative max-w-5xl max-h-[90vh] w-full h-full">
+
+          {/* 左右導航按鈕 */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToPrev() }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-white text-2xl hover:bg-white/10 rounded-full transition-colors"
+                aria-label="上一張"
+              >
+                ‹
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); goToNext() }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-white text-2xl hover:bg-white/10 rounded-full transition-colors"
+                aria-label="下一張"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <div className="relative max-w-5xl max-h-[90vh] w-full h-full" onClick={(e) => e.stopPropagation()}>
             <Image
               src={urlFor(selectedImage.asset).width(1200).url()}
               alt={selectedImage.alt || '照片'}
@@ -113,6 +155,12 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
           {selectedImage.caption && (
             <p className="absolute bottom-4 left-0 right-0 text-center text-white">
               {selectedImage.caption}
+            </p>
+          )}
+          {/* 圖片計數 */}
+          {images.length > 1 && (
+            <p className="absolute bottom-12 left-0 right-0 text-center text-white/70 text-sm">
+              {(selectedIndex ?? 0) + 1} / {images.length}
             </p>
           )}
         </div>

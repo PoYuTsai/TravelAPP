@@ -185,19 +185,23 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
             </button>
           </div>
 
-          {/* Dots navigation with swipe hint */}
-          <div className="flex justify-center items-center gap-2 mt-3">
+          {/* Dots navigation with swipe hint - 44px touch target per WCAG */}
+          <div className="flex justify-center items-center gap-0 mt-3">
             {testimonials.map((_, index) => (
               <button
                 key={index}
                 onClick={() => scrollTo(index)}
-                className={`w-2.5 h-2.5 rounded-full transition-all ${
-                  index === selectedIndex
-                    ? 'bg-primary w-6'
-                    : 'bg-gray-300 hover:bg-gray-400'
-                }`}
+                className="w-11 h-11 flex items-center justify-center"
                 aria-label={`查看第 ${index + 1} 則評價`}
-              />
+              >
+                <span
+                  className={`rounded-full transition-all ${
+                    index === selectedIndex
+                      ? 'bg-primary w-6 h-2.5'
+                      : 'bg-gray-300 hover:bg-gray-400 w-2.5 h-2.5'
+                  }`}
+                />
+              </button>
             ))}
           </div>
           <p className="text-center text-xs text-gray-400 mt-2">← 左右滑動查看更多 →</p>

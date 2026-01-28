@@ -1,6 +1,8 @@
 'use client'
 
+import { useRef, useCallback } from 'react'
 import { urlFor } from '@/sanity/client'
+import { trackVideoPlay, trackVideoProgress, trackVideoComplete } from '@/lib/analytics'
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -15,6 +17,35 @@ export default function VideoPlayer({
   title,
   aspect = 'landscape',
 }: VideoPlayerProps) {
+  // 追蹤已記錄的里程碑，避免重複觸發
+  const trackedMilestones = useRef<Set<25 | 50 | 75>>(new Set())
+  const hasStarted = useRef(false)
+
+  const handlePlay = useCallback(() => {
+    if (!hasStarted.current) {
+      hasStarted.current = true
+      trackVideoPlay(title || '未命名影片', videoUrl)
+    }
+  }, [title, videoUrl])
+
+  const handleTimeUpdate = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget
+    if (!video.duration) return
+
+    const percent = (video.currentTime / video.duration) * 100
+    const milestones: (25 | 50 | 75)[] = [25, 50, 75]
+
+    for (const milestone of milestones) {
+      if (percent >= milestone && !trackedMilestones.current.has(milestone)) {
+        trackedMilestones.current.add(milestone)
+        trackVideoProgress(title || '未命名影片', milestone)
+      }
+    }
+  }, [title])
+
+  const handleEnded = useCallback(() => {
+    trackVideoComplete(title || '未命名影片')
+  }, [title])
   // Aspect ratio classes
   const aspectClasses = {
     portrait: 'aspect-[9/16]',
@@ -55,6 +86,9 @@ export default function VideoPlayer({
         playsInline
         preload="metadata"
         title={title}
+        onPlay={handlePlay}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
       >
         <source src={videoUrl} type="video/mp4" />
         您的瀏覽器不支援影片播放

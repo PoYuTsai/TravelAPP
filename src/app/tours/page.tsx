@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 import ToursPageClient from './ToursPageClient'
+import ToursPageSchema from '@/components/schema/ToursPageSchema'
 
 export const metadata: Metadata = {
   title: '行程案例 | 清微旅行',
@@ -71,5 +72,10 @@ export default async function ToursPage() {
     fetchTotalFamilyCount(),
   ])
 
-  return <ToursPageClient packages={packages} dayTours={dayTours} familyCount={familyCount} />
+  return (
+    <>
+      <ToursPageSchema packages={packages} dayTours={dayTours} />
+      <ToursPageClient packages={packages} dayTours={dayTours} familyCount={familyCount} />
+    </>
+  )
 }

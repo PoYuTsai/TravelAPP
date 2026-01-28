@@ -9,6 +9,7 @@ import Breadcrumb from '@/components/ui/Breadcrumb'
 import AuthorCard from '@/components/blog/AuthorCard'
 import ArticleSchema from '@/components/blog/ArticleSchema'
 import ArticleViewTracker from '@/components/analytics/ArticleViewTracker'
+import ScrollDepthTracker from '@/components/analytics/ScrollDepthTracker'
 import PortableTextRenderer from '@/components/blog/PortableTextRenderer'
 import RelatedPosts from '@/components/blog/RelatedPosts'
 import Button from '@/components/ui/Button'
@@ -125,6 +126,7 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
         image={post.mainImage ? urlFor(post.mainImage).width(1200).url() : undefined}
       />
       <ArticleViewTracker title={post.title} slug={params.slug} />
+      <ScrollDepthTracker pageTitle={post.title} />
 
       <article className="py-12 md:py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">

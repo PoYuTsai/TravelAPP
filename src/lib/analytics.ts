@@ -20,13 +20,25 @@ export function trackEvent(
   }
 }
 
-// 追蹤 LINE 點擊
+// Google Ads Conversion ID
+const AW_CONVERSION_ID = 'AW-17124009918'
+const LINE_CLICK_CONVERSION = '0CrLCKj1l-obEL7PruU_'
+
+// 追蹤 LINE 點擊 (GA4 + Google Ads 轉換)
 export function trackLineClick(location: string) {
+  // GA4 事件
   trackEvent('line_click', {
     event_category: 'engagement',
     event_label: location,
     link_url: 'https://line.me/R/ti/p/@037nyuwk',
   })
+
+  // Google Ads 轉換
+  if (typeof window !== 'undefined' && window.gtag) {
+    window.gtag('event', 'conversion', {
+      send_to: `${AW_CONVERSION_ID}/${LINE_CLICK_CONVERSION}`,
+    })
+  }
 }
 
 // 追蹤文章閱讀
@@ -53,5 +65,40 @@ export function trackTourView(tourTitle: string, tourSlug: string, tourType: 'pa
     tour_title: tourTitle,
     tour_slug: tourSlug,
     tour_type: tourType,
+  })
+}
+
+// 追蹤影片播放
+export function trackVideoPlay(videoTitle: string, videoUrl: string) {
+  trackEvent('video_start', {
+    event_category: 'video',
+    video_title: videoTitle,
+    video_url: videoUrl,
+  })
+}
+
+// 追蹤影片進度 (25%, 50%, 75%)
+export function trackVideoProgress(videoTitle: string, milestone: 25 | 50 | 75) {
+  trackEvent('video_progress', {
+    event_category: 'video',
+    video_title: videoTitle,
+    video_percent: milestone,
+  })
+}
+
+// 追蹤影片完成
+export function trackVideoComplete(videoTitle: string) {
+  trackEvent('video_complete', {
+    event_category: 'video',
+    video_title: videoTitle,
+  })
+}
+
+// 追蹤頁面捲動深度
+export function trackScrollDepth(milestone: 25 | 50 | 75 | 90, pageTitle: string) {
+  trackEvent('scroll_depth', {
+    event_category: 'engagement',
+    scroll_percent: milestone,
+    page_title: pageTitle,
   })
 }

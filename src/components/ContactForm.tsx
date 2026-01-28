@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import { trackFormSubmit, trackLineClick } from '@/lib/analytics'
-import { trackGoogleAdsFormSubmit } from '@/components/GoogleAdsConversion'
 
 interface FormData {
   name: string
@@ -153,10 +152,9 @@ ${formData.message}`
       const lineUrl = `${baseUrl}${encodeURIComponent(message)}`
       window.open(lineUrl, '_blank')
 
-      // 追蹤表單提交和 LINE 點擊 (GA4 + Google Ads)
+      // 追蹤表單提交和 LINE 點擊 (GA4 + Google Ads 轉換)
       trackFormSubmit('contact_inquiry')
       trackLineClick('Contact Form Submit')
-      trackGoogleAdsFormSubmit()
 
       setSubmitStatus('success')
       setFormData(initialFormData)

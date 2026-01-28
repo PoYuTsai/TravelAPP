@@ -15,6 +15,9 @@ const DATABASE_IDS: Record<number, string> = {
   2026: '26037493475d80baa727dd3323f2aad8',
 }
 
+// 成本文字最大長度（防止 ReDoS）
+const MAX_COST_TEXT_LENGTH = 2000
+
 /**
  * 解析成本文字
  * 優先找明確的總計，否則嘗試計算
@@ -22,6 +25,15 @@ const DATABASE_IDS: Record<number, string> = {
 function parseCostText(text: string): { value: number; confident: boolean; warning?: string } {
   if (!text || text.trim() === '') {
     return { value: 0, confident: true }
+  }
+
+  // 長度檢查防止 ReDoS
+  if (text.length > MAX_COST_TEXT_LENGTH) {
+    return {
+      value: 0,
+      confident: false,
+      warning: '文字過長無法解析',
+    }
   }
 
   const cleanText = text.trim()

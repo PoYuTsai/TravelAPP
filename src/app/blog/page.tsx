@@ -6,6 +6,7 @@ import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import CategoryFilter from '@/components/blog/CategoryFilter'
 import SearchBox from '@/components/blog/SearchBox'
+import BlogPageSchema from '@/components/schema/BlogPageSchema'
 import { CATEGORY_NAMES, getCategoryName } from '@/lib/constants'
 
 export const metadata: Metadata = {
@@ -152,25 +153,27 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   }
 
   return (
-    <div className="py-12 md:py-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SectionTitle
-          title="部落格"
-          subtitle="清邁旅遊資訊、親子攻略、在地推薦"
-        />
+    <>
+      <BlogPageSchema postCount={posts.length} />
+      <div className="py-12 md:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SectionTitle
+            title="部落格"
+            subtitle="清邁旅遊資訊、親子攻略、在地推薦"
+          />
 
-        {/* 搜尋框 */}
-        <Suspense fallback={<div className="h-12 mb-6" />}>
-          <SearchBox />
-        </Suspense>
+          {/* 搜尋框 */}
+          <Suspense fallback={<div className="h-12 mb-6" />}>
+            <SearchBox />
+          </Suspense>
 
-        {/* 分類篩選 */}
-        <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
-          <CategoryFilter />
-        </Suspense>
+          {/* 分類篩選 */}
+          <Suspense fallback={<div className="flex justify-center gap-2 mb-8">{/* Loading */}</div>}>
+            <CategoryFilter />
+          </Suspense>
 
-        {/* 搜尋結果提示 */}
-        {searchQuery && (
+          {/* 搜尋結果提示 */}
+          {searchQuery && (
           <div className="text-center mb-8">
             <p className="text-gray-600">
               搜尋「<span className="font-medium text-primary">{searchQuery}</span>」找到 {posts.length} 篇文章
@@ -274,14 +277,15 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
           </div>
         )}
 
-        {/* SEO 說明文字 */}
-        <div className="mt-16 text-center">
-          <p className="text-gray-500 mb-4">更多清邁旅遊攻略持續更新中...</p>
-          <p className="text-sm text-gray-400">
-            所有文章由住在清邁的台灣人 Eric 親自撰寫，提供最真實的在地資訊
-          </p>
+          {/* SEO 說明文字 */}
+          <div className="mt-16 text-center">
+            <p className="text-gray-500 mb-4">更多清邁旅遊攻略持續更新中...</p>
+            <p className="text-sm text-gray-400">
+              所有文章由住在清邁的台灣人 Eric 親自撰寫，提供最真實的在地資訊
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

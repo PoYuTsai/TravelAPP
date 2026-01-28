@@ -201,12 +201,43 @@ export default async function TourDetailPage({
     }),
   }
 
+  // BreadcrumbList Schema for SEO
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: '首頁',
+        item: 'https://chiangway-travel.com',
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: '行程',
+        item: 'https://chiangway-travel.com/tours',
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: tour.title,
+        item: `https://chiangway-travel.com/tours/${slug}`,
+      },
+    ],
+  }
+
   return (
     <div className="py-20">
       {/* Tour Schema for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(tourSchema) }}
+      />
+      {/* BreadcrumbList Schema for SEO - safe usage, JSON.stringify of our own object */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
       <TourViewTracker
         title={tour.title}

@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
+import HomestayPageSchema from '@/components/schema/HomestayPageSchema'
 import { FeatureGrid, FAQSection, VideoPlayer, RoomCards, ImageGallery, LocationInfo } from '@/components/cms'
 
 // ISR: Revalidate every 60 seconds
@@ -90,8 +91,14 @@ export default async function HomestayPage() {
   const videoTitle = data?.videoTitle || defaultData.videoTitle
 
   return (
-    <div className="py-12 md:py-20">
-      {/* Hero */}
+    <>
+      <HomestayPageSchema
+        name={heroName}
+        description={heroSubtitle}
+        faqItems={data?.faq}
+      />
+      <div className="py-12 md:py-20">
+        {/* Hero */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16">
         <div className="text-center mb-8">
           <p className="text-primary font-medium mb-2">{heroName}</p>
@@ -274,6 +281,7 @@ export default async function HomestayPage() {
           </Button>
         </div>
       </section>
-    </div>
+      </div>
+    </>
   )
 }

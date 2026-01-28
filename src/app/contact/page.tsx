@@ -2,10 +2,11 @@ import type { Metadata } from 'next'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 import ContactForm from '@/components/ContactForm'
+import ContactPageSchema from '@/components/schema/ContactPageSchema'
 import { FAQSection } from '@/components/cms'
 
 export const metadata: Metadata = {
-  title: '聯繫我們',
+  title: '聯繫我們 | 清微旅行',
   description: '透過 LINE 或社群媒體聯繫清微旅行，免費諮詢清邁親子旅遊行程。',
   alternates: {
     canonical: 'https://chiangway-travel.com/contact',
@@ -72,7 +73,9 @@ const faqItems = [
 
 export default function ContactPage() {
   return (
-    <div className="py-20">
+    <>
+      <ContactPageSchema faqItems={faqItems} />
+      <div className="py-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionTitle
           title="聯繫我們"
@@ -124,5 +127,6 @@ export default function ContactPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
