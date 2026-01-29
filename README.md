@@ -200,4 +200,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-30 Fix duplicate brand name in page titles -->
+<!-- Last build trigger: 2026-01-30 Fix tour detail page duplicate title -->
