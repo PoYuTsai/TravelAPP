@@ -9,6 +9,7 @@ import TourViewTracker from '@/components/tours/TourViewTracker'
 import RelatedTours from '@/components/tours/RelatedTours'
 import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
 import Breadcrumb from '@/components/ui/Breadcrumb'
+import OverviewVideo from '@/components/tours/OverviewVideo'
 
 // === Types ===
 
@@ -40,6 +41,7 @@ interface TourPackage {
   excludes?: string[]
   priceRange?: string
   priceNote?: string
+  overviewVideo?: string
 }
 
 interface DayTour {
@@ -78,7 +80,8 @@ const packageQuery = `*[_type == "tourPackage" && slug.current == $slug][0]{
   includes,
   excludes,
   priceRange,
-  priceNote
+  priceNote,
+  overviewVideo
 }`
 
 const dayTourQuery = `*[_type == "dayTour" && slug.current == $slug][0]{
@@ -325,10 +328,15 @@ export default async function TourDetailPage({
           </section>
         )}
 
+        {/* Overview Video Section (Package only) */}
+        {isPackage && (tour as TourPackage).overviewVideo && (
+          <OverviewVideo src={(tour as TourPackage).overviewVideo!} />
+        )}
+
         {/* Daily Schedule Section (Package only) */}
         {isPackage && (tour as TourPackage).dailySchedule && (tour as TourPackage).dailySchedule!.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">行程概覽</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">每日行程</h2>
             <div className="space-y-4">
               {(tour as TourPackage).dailySchedule!.map((day) => (
                 <div

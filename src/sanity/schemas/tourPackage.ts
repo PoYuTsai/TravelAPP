@@ -72,6 +72,13 @@ export default defineType({
       group: 'basic',
       initialValue: 0,
     }),
+    defineField({
+      name: 'overviewVideo',
+      title: '行程總覽影片',
+      type: 'string',
+      group: 'basic',
+      description: '影片路徑，例：/videos/family-tour.mp4（放在 public 資料夾）',
+    }),
 
     // === 行程內容 ===
     defineField({
