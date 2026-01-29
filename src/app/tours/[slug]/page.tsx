@@ -137,7 +137,7 @@ export async function generateMetadata({
   const imageUrl = tour.coverImage ? urlFor(tour.coverImage).width(1200).height(630).url() : undefined
 
   return {
-    title: `${tour.title} | 清微旅行`,
+    title: tour.title,
     description,
     alternates: {
       canonical: `https://chiangway-travel.com/tours/${slug}`,
