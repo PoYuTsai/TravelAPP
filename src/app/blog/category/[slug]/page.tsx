@@ -42,11 +42,11 @@ export async function generateMetadata({
   const categoryName = getCategoryName(slug)
 
   if (!VALID_CATEGORIES.includes(slug)) {
-    return { title: '分類不存在 | 清微旅行' }
+    return { title: '分類不存在' }
   }
 
   return {
-    title: `${categoryName} | 清邁旅遊部落格 | 清微旅行`,
+    title: `${categoryName} | 清邁旅遊部落格`,
     description: `清邁${categoryName}相關文章，由住在清邁的台灣人親自撰寫的第一手資訊。`,
     openGraph: {
       title: `${categoryName} | 清邁旅遊部落格`,

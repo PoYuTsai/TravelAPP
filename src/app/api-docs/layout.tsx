@@ -1,7 +1,7 @@
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'API 文件 | 清微旅行',
+  title: 'API 文件',
   robots: {
     index: false,
     follow: false,

@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: '隱私權政策 | 清微旅行',
+  title: '隱私權政策',
   description: '清微旅行的隱私權政策，說明我們如何收集、使用和保護您的個人資料。',
   alternates: {
     canonical: 'https://chiangway-travel.com/privacy',
   },
   openGraph: {
-    title: '隱私權政策 | 清微旅行',
+    title: '隱私權政策',
     description: '清微旅行的隱私權政策，說明我們如何收集、使用和保護您的個人資料。',
     url: 'https://chiangway-travel.com/privacy',
   },
   twitter: {
     card: 'summary',
-    title: '隱私權政策 | 清微旅行',
+    title: '隱私權政策',
     description: '清微旅行的隱私權政策。',
   },
 }

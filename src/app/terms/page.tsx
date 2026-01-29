@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: '服務條款 | 清微旅行',
+  title: '服務條款',
   description: '清微旅行的服務條款，包含預訂、付款、取消等相關規定。',
   alternates: {
     canonical: 'https://chiangway-travel.com/terms',
   },
   openGraph: {
-    title: '服務條款 | 清微旅行',
+    title: '服務條款',
     description: '清微旅行的服務條款，包含預訂、付款、取消等相關規定。',
     url: 'https://chiangway-travel.com/terms',
   },
   twitter: {
     card: 'summary',
-    title: '服務條款 | 清微旅行',
+    title: '服務條款',
     description: '清微旅行的服務條款。',
   },
 }

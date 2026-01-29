@@ -1,19 +1,19 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: '取消與退款政策 | 清微旅行',
+  title: '取消與退款政策',
   description: '清微旅行的取消與退款政策，包含取消時程、退款比例等說明。',
   alternates: {
     canonical: 'https://chiangway-travel.com/cancellation',
   },
   openGraph: {
-    title: '取消與退款政策 | 清微旅行',
+    title: '取消與退款政策',
     description: '清微旅行的取消與退款政策，包含取消時程、退款比例等說明。',
     url: 'https://chiangway-travel.com/cancellation',
   },
   twitter: {
     card: 'summary',
-    title: '取消與退款政策 | 清微旅行',
+    title: '取消與退款政策',
     description: '清微旅行的取消與退款政策。',
   },
 }

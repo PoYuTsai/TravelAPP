@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: '部落格 | 清邁旅遊攻略',
   description: '清邁親子旅遊攻略、景點推薦、美食分享、行程規劃，由住在清邁的台灣人親自撰寫的第一手資訊。',
   openGraph: {
-    title: '部落格 | 清微旅行',
+    title: '部落格 | 清邁旅遊攻略',
     description: '清邁親子旅遊攻略、景點推薦、美食分享，在地人的第一手資訊。',
   },
   alternates: {

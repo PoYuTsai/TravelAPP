@@ -10,13 +10,13 @@ import { FeatureGrid, FAQSection, VideoPlayer, RoomCards, ImageGallery, Location
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: '芳縣特色民宿 | Huen San Fang Hotel | 清微旅行',
+  title: '芳縣特色民宿 | Huen San Fang Hotel',
   description: '遠離觀光區的寧靜民宿，體驗泰北在地生活。適合長住深度旅遊，民宿主人親自接待。',
   alternates: {
     canonical: 'https://chiangway-travel.com/homestay',
   },
   openGraph: {
-    title: '芳縣特色民宿 | Huen San Fang Hotel | 清微旅行',
+    title: '芳縣特色民宿 | Huen San Fang Hotel',
     description: '遠離觀光區的寧靜民宿，體驗泰北在地生活。適合長住深度旅遊，民宿主人親自接待。',
     url: 'https://chiangway-travel.com/homestay',
     images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '芳縣特色民宿 - 清微旅行' }],
