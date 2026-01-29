@@ -256,7 +256,8 @@ export default async function TourDetailPage({
 
         {/* Hero Section */}
         <div className="mb-8">
-          <div className="relative rounded-2xl overflow-hidden">
+          {/* Cover Image - Full Display */}
+          <div className="rounded-2xl overflow-hidden">
             {tour.coverImage ? (
               <Image
                 src={urlFor(tour.coverImage).width(1200).height(600).url()}
@@ -270,16 +271,17 @@ export default async function TourDetailPage({
                 <span className="text-8xl">{isDayTour ? '🌿' : '🌴'}</span>
               </div>
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 text-white">
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">{tour.title}</h1>
-              {tour.subtitle && (
-                <p className="text-lg md:text-xl opacity-90">{tour.subtitle}</p>
-              )}
-            </div>
           </div>
 
-          {/* Highlights Tags - Below Hero */}
+          {/* Title & Subtitle - Below Image */}
+          <div className="mt-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{tour.title}</h1>
+            {tour.subtitle && (
+              <p className="text-lg md:text-xl text-gray-600">{tour.subtitle}</p>
+            )}
+          </div>
+
+          {/* Highlights Tags - Below Title */}
           {tour.highlights && tour.highlights.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
               {tour.highlights.map((h) => (
