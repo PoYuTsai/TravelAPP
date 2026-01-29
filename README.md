@@ -26,6 +26,7 @@
 | Phase 5.6 | 政策與 FAQ 優化 | ✅ 完成 |
 | Phase 6 | 記帳系統 + 知識庫 | ✅ 完成 |
 | Phase 6.1 | 審查 #5 系統優化 | ✅ 完成 |
+| Phase 6.2 | 審查 #6 SEO/A11y 優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -200,4 +201,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-30 Fix tour detail page duplicate title -->
+<!-- Last build trigger: 2026-01-30 Comprehensive review #6 SEO/A11y fixes -->

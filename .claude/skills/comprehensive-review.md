@@ -208,6 +208,36 @@
 
 ## 歷史審查記錄
 
+### 審查 #6 - 2026-01-30 (SEO、A11y、文件一致性優化)
+
+**執行範圍**: 架構、前端 UX、SEO、資安、行銷追蹤 全面掃描
+
+**發現問題與處理**:
+
+| 角色 | 問題 | 嚴重度 | 處理結果 |
+|------|------|--------|----------|
+| SEO | Tour 頁面缺少 generateStaticParams | 🟠 高 | ✅ 加入 SSG 預渲染支援 |
+| 資安 | console.error 殘留在 client 端 | 🟠 高 | ✅ 移除，避免錯誤細節外洩 |
+| A11y | StopsCarousel dots 觸控目標過小 | 🟡 中 | ✅ 增大至 44px (WCAG) |
+| A11y | SearchBox 清除按鈕觸控目標過小 | 🟡 中 | ✅ 增大至 44px (WCAG) |
+| A11y | Header 手機選單無 focus trap | 🟡 中 | ✅ 實作 focus trap |
+| SEO | Studio 頁面無 noindex | 🟡 中 | ✅ 新增 layout 並設定 robots |
+| A11y | FAQSection 缺少唯一 aria-label | 🟡 中 | ✅ 加入問題描述 |
+| A11y | WhoWeAre 影片按鈕缺鍵盤支援 | 🟡 中 | ✅ 加入 Enter/Space 處理 |
+| 文件 | OpenAPI spec 與實作不一致 | 🟡 中 | ✅ 移除 itinerary routes 的 auth 要求 |
+
+**確認正常項目**:
+- LINE 追蹤無重複（各元件獨立追蹤，Button 內建追蹤）
+- Title template 正確運作（無品牌名稱重複）
+- .env.local 未被提交到 Git（誤報）
+
+**新增檔案**:
+- `src/app/studio/layout.tsx`
+
+**Commit**: `360b5fb`
+
+---
+
 ### 審查 #5 - 2026-01-28 (全面系統優化)
 
 **執行範圍**: SEO、資安、行銷追蹤、無障礙 全面掃描與修復
@@ -394,5 +424,5 @@
 
 ---
 
-*最後更新: 2026-01-28*
-*版本: 1.2*
+*最後更新: 2026-01-30*
+*版本: 1.3*
