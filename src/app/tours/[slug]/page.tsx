@@ -256,18 +256,19 @@ export default async function TourDetailPage({
 
         {/* Hero Section */}
         <div className="mb-8">
-          {/* Cover Image - Full Display */}
+          {/* Cover Image - Full Display (preserves original aspect ratio) */}
           <div className="rounded-2xl overflow-hidden">
             {tour.coverImage ? (
               <Image
-                src={urlFor(tour.coverImage).width(1200).height(600).url()}
+                src={urlFor(tour.coverImage).width(1200).auto('format').url()}
                 alt={tour.coverImage.alt || tour.title}
                 width={1200}
-                height={600}
-                className="w-full h-64 md:h-96 object-cover"
+                height={800}
+                className="w-full h-auto"
+                sizes="(max-width: 768px) 100vw, 1200px"
               />
             ) : (
-              <div className="w-full h-64 md:h-96 bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
+              <div className="w-full aspect-video bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
                 <span className="text-8xl">{isDayTour ? '🌿' : '🌴'}</span>
               </div>
             )}
