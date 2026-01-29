@@ -70,3 +70,9 @@ article pre {
     scroll-behavior: auto !important;
   }
 }
+
+/* Hide floating LINE button when lightbox is open */
+body[data-lightbox-open] #floating-line-button {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

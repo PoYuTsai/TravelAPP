@@ -53,6 +53,7 @@ export default function FloatingLineButton({
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
+      id="floating-line-button"
       className={`
         fixed bottom-20 right-4 z-50
         flex items-center gap-2

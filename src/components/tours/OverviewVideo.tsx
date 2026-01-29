@@ -11,6 +11,17 @@ interface OverviewVideoProps {
 export default function OverviewVideo({ src, title = '行程總覽' }: OverviewVideoProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
 
+  // Hide floating LINE button when lightbox is open
+  const openFullscreen = () => {
+    setIsFullscreen(true)
+    document.body.setAttribute('data-lightbox-open', 'true')
+  }
+
+  const closeFullscreen = () => {
+    setIsFullscreen(false)
+    document.body.removeAttribute('data-lightbox-open')
+  }
+
   return (
     <>
       {/* Video Section */}
@@ -19,7 +30,7 @@ export default function OverviewVideo({ src, title = '行程總覽' }: OverviewV
         <p className="text-gray-600 mb-4 text-sm">點擊影片可全螢幕觀看</p>
         <div
           className="relative rounded-2xl overflow-hidden bg-gray-100 cursor-pointer group"
-          onClick={() => setIsFullscreen(true)}
+          onClick={openFullscreen}
         >
           <video
             src={src}
@@ -44,12 +55,12 @@ export default function OverviewVideo({ src, title = '行程總覽' }: OverviewV
       {isFullscreen && (
         <div
           className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-          onClick={() => setIsFullscreen(false)}
+          onClick={closeFullscreen}
         >
           {/* Close button */}
           <button
             className="absolute top-4 right-4 text-white/80 hover:text-white p-2 z-10"
-            onClick={() => setIsFullscreen(false)}
+            onClick={closeFullscreen}
           >
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
