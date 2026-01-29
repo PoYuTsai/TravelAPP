@@ -78,7 +78,7 @@ export function importTextAction(props: DocumentActionProps) {
     icon: UploadIcon,
     onHandle: handleOpen,
     dialog: isOpen && {
-      type: 'dialog',
+      type: 'dialog' as const,
       header: '匯入行程文字',
       content: (
         <ErrorBoundary fallbackMessage="匯入功能載入失敗">

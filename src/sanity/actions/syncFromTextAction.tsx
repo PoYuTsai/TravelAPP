@@ -389,7 +389,7 @@ https://tdac.immigration.go.th/arrival-card/#/home
     title: hasDays ? '用表單方式編輯所有資料' : '請先用「快速建立」建立行程',
     onHandle: handleOpen,
     dialog: isOpen && {
-      type: 'dialog',
+      type: 'dialog' as const,
       header: '結構化編輯器',
       content: (
         <ErrorBoundary fallbackMessage="結構化編輯器載入失敗">

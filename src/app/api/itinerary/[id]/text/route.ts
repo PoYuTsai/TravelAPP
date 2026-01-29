@@ -5,6 +5,7 @@ import { sanityToLineText } from '@/lib/itinerary-parser'
 import { checkRateLimit, getClientIP } from '@/lib/api-auth'
 import { apiLogger } from '@/lib/logger'
 import { escapeHtml } from '@/lib/pdf/itinerary-template'
+import { verifySignedToken, getSigningSecret } from '@/lib/signed-url'
 
 const log = apiLogger.child('itinerary:text')
 
@@ -41,11 +42,24 @@ export async function GET(
   const rateLimitError = checkRateLimit(clientIP, 30, 60000) // 30 requests per minute
   if (rateLimitError) return rateLimitError
 
-  // Note: API key validation removed - this is an internal tool that only reads Sanity data
-  // Access control is handled by: 1) Rate limiting, 2) Sanity Studio authentication, 3) Requiring valid itinerary ID
-
   try {
     const { id } = await params
+
+    // Verify signed URL token
+    const { searchParams } = new URL(request.url)
+    const token = searchParams.get('token')
+    const expires = searchParams.get('expires')
+
+    if (!token || !expires) {
+      return new NextResponse('缺少授權參數', { status: 401 })
+    }
+
+    const secret = getSigningSecret()
+    const verification = verifySignedToken(id, 'text', token, expires, secret)
+    if (!verification.valid) {
+      log.warn('Invalid token attempt', { id, error: verification.error })
+      return new NextResponse(verification.error || '授權無效', { status: 401 })
+    }
 
     const itinerary = await client.fetch(query, { id }, { cache: 'no-store' })
 
