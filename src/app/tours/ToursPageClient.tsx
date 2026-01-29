@@ -67,7 +67,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
         setCases(data.cases || [])
         setTotalCases(data.total || 0)
       })
-      .catch(console.error)
+      .catch(() => { /* Silent fail for public data */ })
       .finally(() => setLoading(false))
   }, [])
 
@@ -79,8 +79,8 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
       const data = await res.json()
       setCases((prev) => [...prev, ...(data.cases || [])])
       setIsExpanded(true)
-    } catch (error) {
-      console.error(error)
+    } catch {
+      // Silent fail for public data
     } finally {
       setLoadingMore(false)
     }
@@ -105,8 +105,8 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
       const data = await res.json()
       setPastCases(data.cases || [])
       setShowPastCases(true)
-    } catch (error) {
-      console.error(error)
+    } catch {
+      // Silent fail for public data
     } finally {
       setLoadingPast(false)
     }

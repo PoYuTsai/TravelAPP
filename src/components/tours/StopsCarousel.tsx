@@ -167,17 +167,21 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
         ))}
       </div>
 
-      {/* Dots Indicator (mobile) */}
-      <div className="flex justify-center gap-2 md:hidden">
+      {/* Dots Indicator (mobile) - 44px touch target for WCAG */}
+      <div className="flex justify-center gap-1 md:hidden">
         {stops.map((_, i) => (
           <button
             key={i}
             onClick={() => scrollTo(i)}
-            className={`w-2 h-2 rounded-full transition-colors ${
-              selectedIndex === i ? 'bg-primary' : 'bg-gray-300'
-            }`}
+            className="w-11 h-11 flex items-center justify-center"
             aria-label={`前往第 ${i + 1} 張`}
-          />
+          >
+            <span
+              className={`w-2 h-2 rounded-full transition-colors ${
+                selectedIndex === i ? 'bg-primary' : 'bg-gray-300'
+              }`}
+            />
+          </button>
         ))}
       </div>
     </div>

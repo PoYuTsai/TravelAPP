@@ -51,13 +51,13 @@ export default function SearchBox() {
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-        {/* Clear button (when there's text) */}
+        {/* Clear button (when there's text) - 44px touch target for WCAG */}
         {query && (
           <button
             type="button"
             onClick={handleClear}
             aria-label="清除搜尋"
-            className="absolute right-16 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+            className="absolute right-14 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

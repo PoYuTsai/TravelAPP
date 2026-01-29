@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { trackLineClick } from '@/lib/analytics'
 import { headerNavLinks, LINE_URL } from '@/lib/navigation'
 
@@ -11,6 +11,8 @@ export default function Header() {
   const pathname = usePathname()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
 
   const closeMenu = useCallback(() => setIsMenuOpen(false), [])
 
@@ -28,12 +30,47 @@ export default function Header() {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMenuOpen) {
         closeMenu()
+        menuButtonRef.current?.focus()
       }
     }
 
     document.addEventListener('keydown', handleEscape)
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isMenuOpen, closeMenu])
+
+  // Focus trap for mobile menu
+  useEffect(() => {
+    if (!isMenuOpen || !menuRef.current) return
+
+    const menu = menuRef.current
+    const focusableElements = menu.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0]
+    const lastElement = focusableElements[focusableElements.length - 1]
+
+    const handleTabKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          e.preventDefault()
+          lastElement?.focus()
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          e.preventDefault()
+          firstElement?.focus()
+        }
+      }
+    }
+
+    // Focus first element when menu opens
+    firstElement?.focus()
+
+    document.addEventListener('keydown', handleTabKey)
+    return () => document.removeEventListener('keydown', handleTabKey)
+  }, [isMenuOpen])
 
   return (
     <header
@@ -89,6 +126,7 @@ export default function Header() {
 
           {/* Mobile Menu Button - min 44x44px touch target */}
           <button
+            ref={menuButtonRef}
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="md:hidden p-3 -mr-2 text-gray-600"
             aria-label={isMenuOpen ? '關閉選單' : '開啟選單'}
@@ -122,7 +160,7 @@ export default function Header() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div id="mobile-menu" className="md:hidden py-4 border-t">
+          <div ref={menuRef} id="mobile-menu" className="md:hidden py-4 border-t">
             <nav className="flex flex-col space-y-4">
               {headerNavLinks.map((link) => (
                 <Link

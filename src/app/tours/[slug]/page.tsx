@@ -119,6 +119,22 @@ async function getTourData(slug: string): Promise<TourData | null> {
   }
 }
 
+// Generate static params for SSG
+const allSlugsQuery = `{
+  "packages": *[_type == "tourPackage" && defined(slug.current)][].slug.current,
+  "dayTours": *[_type == "dayTour" && defined(slug.current)][].slug.current
+}`
+
+export async function generateStaticParams() {
+  try {
+    const { packages, dayTours } = await client.fetch(allSlugsQuery)
+    const allSlugs = [...(packages || []), ...(dayTours || [])]
+    return allSlugs.map((slug: string) => ({ slug }))
+  } catch {
+    return []
+  }
+}
+
 // === Metadata ===
 
 export async function generateMetadata({

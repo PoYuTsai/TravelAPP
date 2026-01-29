@@ -54,6 +54,7 @@ export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSection
               className="w-full flex items-center justify-between p-4 md:p-5 text-left bg-white hover:bg-gray-50 transition-colors"
               aria-expanded={openIndex === index}
               aria-controls={`faq-answer-${index}`}
+              aria-label={`${openIndex === index ? '收合' : '展開'}問題：${item.question}`}
             >
               <span className="font-medium text-gray-900 pr-4">
                 {item.question}

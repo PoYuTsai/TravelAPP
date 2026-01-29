@@ -42,7 +42,7 @@ export const openApiSpec = {
       get: {
         tags: ['Itinerary'],
         summary: '匯出行程為 LINE 文字格式',
-        description: '將指定行程匯出為適合 LINE 記事本的純文字 HTML 頁面，方便複製貼上。',
+        description: '將指定行程匯出為適合 LINE 記事本的純文字 HTML 頁面。存取控制：Rate limiting + 需要有效的 Sanity 文件 ID。',
         operationId: 'getItineraryText',
         parameters: [
           {
@@ -53,21 +53,12 @@ export const openApiSpec = {
             description: 'Sanity 行程文件 ID',
           },
         ],
-        security: [{ ApiKeyAuth: [] }],
         responses: {
           '200': {
             description: '成功回傳 HTML 頁面',
             content: {
               'text/html': {
                 schema: { type: 'string' },
-              },
-            },
-          },
-          '401': {
-            description: '未授權 - 缺少或無效的 API Key',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },
@@ -89,7 +80,7 @@ export const openApiSpec = {
       get: {
         tags: ['Itinerary'],
         summary: '匯出行程為 PDF',
-        description: '將指定行程匯出為 PDF 檔案，使用 Puppeteer 生成。資源密集，有較嚴格的速率限制。',
+        description: '將指定行程匯出為 PDF 檔案，使用 Puppeteer 生成。資源密集，有較嚴格的速率限制 (10 req/min)。',
         operationId: 'getItineraryPdf',
         parameters: [
           {
@@ -100,7 +91,6 @@ export const openApiSpec = {
             description: 'Sanity 行程文件 ID',
           },
         ],
-        security: [{ ApiKeyAuth: [] }],
         responses: {
           '200': {
             description: '成功回傳 PDF 檔案',
@@ -110,14 +100,6 @@ export const openApiSpec = {
                   type: 'string',
                   format: 'binary',
                 },
-              },
-            },
-          },
-          '401': {
-            description: '未授權',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },
@@ -152,7 +134,7 @@ export const openApiSpec = {
       get: {
         tags: ['Itinerary'],
         summary: '匯出行程為 Excel',
-        description: '將指定行程匯出為 Excel (.xlsx) 檔案。',
+        description: '將指定行程匯出為 Excel (.xlsx) 檔案。速率限制 20 req/min。',
         operationId: 'getItineraryExcel',
         parameters: [
           {
@@ -163,7 +145,6 @@ export const openApiSpec = {
             description: 'Sanity 行程文件 ID',
           },
         ],
-        security: [{ ApiKeyAuth: [] }],
         responses: {
           '200': {
             description: '成功回傳 Excel 檔案',
@@ -173,14 +154,6 @@ export const openApiSpec = {
                   type: 'string',
                   format: 'binary',
                 },
-              },
-            },
-          },
-          '401': {
-            description: '未授權',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/Error' },
               },
             },
           },

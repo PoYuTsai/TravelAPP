@@ -47,6 +47,13 @@ export default function WhoWeAre({
     }
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handlePlayClick()
+    }
+  }
+
   // Aspect ratio classes based on video type
   const aspectClasses = {
     portrait: 'aspect-[9/16] max-w-[260px] sm:max-w-[280px] md:max-w-[300px]',
@@ -83,6 +90,7 @@ export default function WhoWeAre({
             {!isPlaying && (
               <button
                 onClick={handlePlayClick}
+                onKeyDown={handleKeyDown}
                 className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors group cursor-pointer"
                 aria-label="播放影片"
               >
