@@ -27,6 +27,7 @@
 | Phase 6 | 記帳系統 + 知識庫 | ✅ 完成 |
 | Phase 6.1 | 審查 #5 系統優化 | ✅ 完成 |
 | Phase 6.2 | 審查 #6 SEO/A11y 優化 | ✅ 完成 |
+| Phase 6.3 | API 安全性強化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -149,6 +150,21 @@
   - Testimonial dots 觸控目標增大至 44px（WCAG）
   - Lightbox 加入方向鍵導航 + 圖片計數
 
+### Phase 6.2：審查 #6 SEO/A11y 優化
+10 角色審查後的 SEO 與無障礙改善：
+
+- **SSG 優化**：Tour 詳情頁 generateStaticParams
+- **無障礙**：44px 觸控目標（Carousel dots、SearchBox）、Mobile menu focus trap
+- **A11y**：Unique aria-labels、Video 鍵盤支援
+- **SEO**：Studio noindex metadata
+
+### Phase 6.3：API 安全性強化
+Itinerary API 存取控制強化：
+
+- **Signed URL**：時效性 Token 驗證（5 分鐘過期）
+- **API 保護**：PDF/Excel/Text 匯出 API 需驗證 token
+- **流程整合**：Sanity Actions 先取得 signed URL 再開啟匯出連結
+
 ## 技術架構
 
 ```
@@ -201,4 +217,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-30 Comprehensive review #6 SEO/A11y fixes -->
+<!-- Last build trigger: 2026-01-30 Phase 6.3 API security signed URL -->
