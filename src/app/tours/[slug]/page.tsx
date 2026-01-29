@@ -255,39 +255,43 @@ export default async function TourDetailPage({
         />
 
         {/* Hero Section */}
-        <div className="relative rounded-2xl overflow-hidden mb-12">
-          {tour.coverImage ? (
-            <Image
-              src={urlFor(tour.coverImage).width(1200).height(600).url()}
-              alt={tour.coverImage.alt || tour.title}
-              width={1200}
-              height={600}
-              className="w-full h-64 md:h-96 object-cover"
-            />
-          ) : (
-            <div className="w-full h-64 md:h-96 bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
-              <span className="text-8xl">{isDayTour ? '🌿' : '🌴'}</span>
-            </div>
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 text-white">
-            <h1 className="text-3xl md:text-4xl font-bold mb-2">{tour.title}</h1>
-            {tour.subtitle && (
-              <p className="text-lg md:text-xl opacity-90">{tour.subtitle}</p>
-            )}
-            {tour.highlights && tour.highlights.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-4">
-                {tour.highlights.map((h) => (
-                  <span
-                    key={h}
-                    className="text-sm bg-white/20 backdrop-blur px-3 py-1 rounded-full"
-                  >
-                    #{h}
-                  </span>
-                ))}
+        <div className="mb-8">
+          <div className="relative rounded-2xl overflow-hidden">
+            {tour.coverImage ? (
+              <Image
+                src={urlFor(tour.coverImage).width(1200).height(600).url()}
+                alt={tour.coverImage.alt || tour.title}
+                width={1200}
+                height={600}
+                className="w-full h-64 md:h-96 object-cover"
+              />
+            ) : (
+              <div className="w-full h-64 md:h-96 bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
+                <span className="text-8xl">{isDayTour ? '🌿' : '🌴'}</span>
               </div>
             )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8 text-white">
+              <h1 className="text-3xl md:text-4xl font-bold mb-2">{tour.title}</h1>
+              {tour.subtitle && (
+                <p className="text-lg md:text-xl opacity-90">{tour.subtitle}</p>
+              )}
+            </div>
           </div>
+
+          {/* Highlights Tags - Below Hero */}
+          {tour.highlights && tour.highlights.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {tour.highlights.map((h) => (
+                <span
+                  key={h}
+                  className="text-sm bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium"
+                >
+                  #{h}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Description (Day Tour only) */}
