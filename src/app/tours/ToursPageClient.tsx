@@ -79,24 +79,9 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
       .finally(() => setLoading(false))
   }, [])
 
-  // 監聽滾動，顯示/隱藏浮動按鈕
+  // 展開歷史案例時立即顯示浮動按鈕
   useEffect(() => {
-    if (!showHistory) {
-      setShowFloatingButton(false)
-      return
-    }
-
-    const handleScroll = () => {
-      const historySection = document.getElementById('history-cases')
-      if (historySection) {
-        const rect = historySection.getBoundingClientRect()
-        // 當歷史區塊的頂部滾出視窗時顯示浮動按鈕
-        setShowFloatingButton(rect.top < 0 && rect.bottom > 100)
-      }
-    }
-
-    window.addEventListener('scroll', handleScroll)
-    return () => window.removeEventListener('scroll', handleScroll)
+    setShowFloatingButton(showHistory)
   }, [showHistory])
 
   // Load history cases (按年份分組)

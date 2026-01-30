@@ -179,9 +179,9 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
           <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
         </Link>
 
-        {/* Badge 2: 5.0 滿分好評 - Link to Facebook Reviews */}
+        {/* Badge 2: 5.0 滿分好評 - Link to Google Reviews */}
         <a
-          href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
+          href="https://maps.app.goo.gl/8MbRV4PPBggwj2pF6"
           target="_blank"
           rel="noopener noreferrer"
           className={`group ${badgeBase} border-yellow-300 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-[0_8px_30px_-4px_rgba(250,204,21,0.5)] hover:-translate-y-1 active:scale-95 ${animationClass}`}
