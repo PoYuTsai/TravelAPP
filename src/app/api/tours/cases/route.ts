@@ -3,8 +3,14 @@
 import { NextResponse } from 'next/server'
 import { fetchTourCases, fetchRecentTourCases, fetchAllTourCasesGroupedByYear } from '@/lib/notion'
 import { apiLogger } from '@/lib/logger'
+import { checkRateLimit, getClientIP } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
+  // Rate limiting: 30 requests per minute per IP
+  const clientIP = getClientIP(request)
+  const rateLimitError = checkRateLimit(clientIP, 30, 60000)
+  if (rateLimitError) return rateLimitError
+
   try {
     const { searchParams } = new URL(request.url)
     const mode = searchParams.get('mode') // 'recent' | 'history' | null (default)

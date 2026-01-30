@@ -1,7 +1,9 @@
 /**
  * Signed URL utilities for secure API access
- * Uses HMAC-SHA256-like approach to generate time-limited access tokens
+ * Uses HMAC-SHA256 for cryptographically secure tokens
  */
+
+import { createHmac, timingSafeEqual as cryptoTimingSafeEqual } from 'crypto'
 
 // Token validity duration (5 minutes)
 const TOKEN_VALIDITY_MS = 5 * 60 * 1000
@@ -13,7 +15,7 @@ const TOKEN_VALIDITY_MS = 5 * 60 * 1000
 export function generateSignedToken(id: string, type: string, secret: string): { token: string; expires: number } {
   const expires = Date.now() + TOKEN_VALIDITY_MS
   const data = `${id}:${type}:${expires}`
-  const token = createHash(data, secret)
+  const token = createHmacHash(data, secret)
 
   return { token, expires }
 }
@@ -47,11 +49,10 @@ export function verifySignedToken(
     return { valid: false, error: 'Token expired' }
   }
 
-  // Verify token
+  // Verify token using timing-safe comparison
   const data = `${id}:${type}:${expiresNum}`
-  const expectedToken = createHash(data, secret)
+  const expectedToken = createHmacHash(data, secret)
 
-  // Timing-safe comparison
   if (!timingSafeEqual(token, expectedToken)) {
     return { valid: false, error: 'Invalid token' }
   }
@@ -60,40 +61,30 @@ export function verifySignedToken(
 }
 
 /**
- * Create a hash from data and secret
- * Uses a simple but effective algorithm for short-lived tokens
+ * Create HMAC-SHA256 hash from data and secret
+ * Returns first 32 characters for shorter URLs while maintaining security
  */
-function createHash(data: string, secret: string): string {
-  const combined = data + ':' + secret
-  let hash1 = 0
-  let hash2 = 0
-
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i)
-    hash1 = ((hash1 << 5) - hash1) + char
-    hash1 = hash1 & hash1
-    hash2 = ((hash2 << 7) + hash2) ^ char
-    hash2 = hash2 & hash2
-  }
-
-  // Combine both hashes for better distribution
-  return Math.abs(hash1).toString(36) + Math.abs(hash2).toString(36)
+function createHmacHash(data: string, secret: string): string {
+  return createHmac('sha256', secret)
+    .update(data)
+    .digest('hex')
+    .slice(0, 32) // Truncate for shorter URLs, still cryptographically strong
 }
 
 /**
- * Timing-safe string comparison to prevent timing attacks
+ * Timing-safe string comparison using Node.js crypto
+ * Prevents timing attacks
  */
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) {
     return false
   }
 
-  let result = 0
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  try {
+    return cryptoTimingSafeEqual(Buffer.from(a), Buffer.from(b))
+  } catch {
+    return false
   }
-
-  return result === 0
 }
 
 /**

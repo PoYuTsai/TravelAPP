@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { trackLineClick } from '@/lib/analytics'
 
 interface ButtonProps {
   children: React.ReactNode
@@ -39,18 +38,9 @@ export default function Button({
   }
   const styles = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`
 
-  // 檢查是否為 LINE 連結
-  const isLineLink = href?.includes('line.me')
-
-  // 處理點擊事件（追蹤 LINE 點擊）
-  const handleClick = () => {
-    if (isLineLink) {
-      // 從按鈕文字取得位置標籤
-      const buttonText = typeof children === 'string' ? children : 'LINE Button'
-      trackLineClick(buttonText)
-    }
-    onClick?.()
-  }
+  // Note: LINE tracking removed from Button to prevent duplicate tracking
+  // Individual components (FloatingLineButton, Header, Footer, StickyMobileCTA)
+  // handle their own tracking for better control and accuracy
 
   if (href) {
     if (external) {
@@ -60,14 +50,14 @@ export default function Button({
           target="_blank"
           rel="noopener noreferrer"
           className={styles}
-          onClick={handleClick}
+          onClick={onClick}
         >
           {children}
         </a>
       )
     }
     return (
-      <Link href={href} className={styles} onClick={handleClick}>
+      <Link href={href} className={styles} onClick={onClick}>
         {children}
       </Link>
     )
@@ -78,7 +68,7 @@ export default function Button({
     <button
       type={type}
       disabled={disabled}
-      onClick={handleClick}
+      onClick={onClick}
       className={`${styles} ${disabledStyles}`}
     >
       {children}

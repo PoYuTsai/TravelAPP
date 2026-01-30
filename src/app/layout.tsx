@@ -114,6 +114,41 @@ const localBusinessSchema = {
   },
 }
 
+// Organization Schema for Google Knowledge Panel
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': 'https://chiangway-travel.com/#organization',
+  name: '清微旅行 Chiangway Travel',
+  url: 'https://chiangway-travel.com',
+  logo: 'https://chiangway-travel.com/icons/apple-touch-icon.png',
+  description: '清邁親子包車首選，台灣爸爸＋泰國媽媽在地經營',
+  sameAs: [
+    'https://line.me/R/ti/p/@037nyuwk',
+    'https://www.facebook.com/profile.php?id=61569067776768',
+    'https://www.instagram.com/chiangway_travel',
+    'https://www.tiktok.com/@chiangway_travel',
+  ],
+  contactPoint: {
+    '@type': 'ContactPoint',
+    telephone: '+66-63-790-0666',
+    contactType: 'customer service',
+    availableLanguage: ['Chinese', 'Thai', 'English'],
+  },
+}
+
+// WebSite Schema for site search optimization
+const websiteSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': 'https://chiangway-travel.com/#website',
+  name: '清微旅行 Chiangway Travel',
+  url: 'https://chiangway-travel.com',
+  publisher: {
+    '@id': 'https://chiangway-travel.com/#organization',
+  },
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -127,7 +162,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(localBusinessSchema) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify([localBusinessSchema, organizationSchema, websiteSchema]) }}
         />
       </head>
       <body className="flex flex-col min-h-screen">

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
-import { trackFormSubmit, trackLineClick } from '@/lib/analytics'
+import { trackFormSubmit } from '@/lib/analytics'
 
 interface FormData {
   name: string
@@ -152,9 +152,9 @@ ${formData.message}`
       const lineUrl = `${baseUrl}${encodeURIComponent(message)}`
       window.open(lineUrl, '_blank')
 
-      // 追蹤表單提交和 LINE 點擊 (GA4 + Google Ads 轉換)
+      // 追蹤表單提交 (GA4)
+      // Note: trackLineClick removed to prevent duplicate conversion counting
       trackFormSubmit('contact_inquiry')
-      trackLineClick('Contact Form Submit')
 
       setSubmitStatus('success')
       setFormData(initialFormData)
