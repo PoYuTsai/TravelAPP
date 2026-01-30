@@ -120,8 +120,9 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
 
   // 收回歷史案例並滾動回「最近出發的家庭」區塊
   const collapseHistory = () => {
-    // 先隱藏歷史區塊
+    // 先隱藏歷史區塊並重置每年顯示數量
     setShowHistory(false)
+    setYearLimits({})
 
     // 等待 DOM 更新後，再滾動到目標位置
     setTimeout(() => {
