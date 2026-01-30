@@ -120,12 +120,16 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
 
   // 收回歷史案例並滾動回「最近出發的家庭」區塊
   const collapseHistory = () => {
+    // 先隱藏歷史區塊
     setShowHistory(false)
-    // 滾動到最近案例區塊
-    const recentSection = document.getElementById('recent-cases')
-    if (recentSection) {
-      recentSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+
+    // 等待 DOM 更新後，再滾動到目標位置
+    setTimeout(() => {
+      const recentSection = document.getElementById('recent-cases')
+      if (recentSection) {
+        recentSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 50)
   }
 
   return (
