@@ -302,7 +302,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
           {showFloatingButton && (
             <button
               onClick={collapseHistory}
-              className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 transition-all"
+              className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.15)] hover:bg-primary-dark hover:shadow-[0_6px_25px_rgba(0,0,0,0.2)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 animate-fade-in"
               aria-label="收回歷史案例"
             >
               <svg
@@ -313,7 +313,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
-              <span className="text-sm font-medium">收回</span>
+              <span className="text-sm font-medium">回到頂部</span>
             </button>
           )}
         </section>
