@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 
 export const metadata: Metadata = {
   title: '取消與退款政策',
@@ -19,8 +20,33 @@ export const metadata: Metadata = {
 }
 
 export default function CancellationPage() {
+  // Static schema - no user input, safe to use
+  const webPageSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: '取消與退款政策',
+    description: '清微旅行的取消與退款政策，包含取消時程、退款比例等說明。',
+    url: 'https://chiangway-travel.com/cancellation',
+    inLanguage: 'zh-TW',
+    isPartOf: {
+      '@type': 'WebSite',
+      '@id': 'https://chiangway-travel.com/#website',
+    },
+    publisher: {
+      '@type': 'Organization',
+      '@id': 'https://chiangway-travel.com/#organization',
+    },
+    dateModified: '2026-01-01',
+  }
+
   return (
-    <div className="py-12 md:py-20">
+    <>
+      <Script
+        id="cancellation-schema"
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageSchema) }}
+      />
+      <div className="py-12 md:py-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
           取消與退款政策
@@ -326,5 +352,6 @@ export default function CancellationPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }

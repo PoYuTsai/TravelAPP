@@ -6,8 +6,11 @@ import { client, urlFor } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import CategoryFilter from '@/components/blog/CategoryFilter'
 import SearchBox from '@/components/blog/SearchBox'
+import Pagination from '@/components/blog/Pagination'
 import BlogPageSchema from '@/components/schema/BlogPageSchema'
 import { CATEGORY_NAMES, getCategoryName } from '@/lib/constants'
+
+const POSTS_PER_PAGE = 9
 
 export const metadata: Metadata = {
   title: '部落格 | 清邁旅遊攻略',
@@ -102,20 +105,30 @@ async function getPosts(category?: string, searchQuery?: string): Promise<Post[]
 export const revalidate = 60 // 每 60 秒重新驗證
 
 interface BlogPageProps {
-  searchParams: Promise<{ category?: string; q?: string }>
+  searchParams: Promise<{ category?: string; q?: string; page?: string }>
 }
 
 export default async function BlogPage({ searchParams }: BlogPageProps) {
   const params = await searchParams
   const category = params.category
   const searchQuery = params.q
-  const posts = await getPosts(category, searchQuery)
+  const currentPage = Math.max(1, parseInt(params.page || '1', 10) || 1)
+  const allPosts = await getPosts(category, searchQuery)
 
-  const featuredPost = posts.find((p) => p.featured)
-  const otherPosts = posts.filter((p) => p._id !== featuredPost?._id)
+  const featuredPost = allPosts.find((p) => p.featured)
+  const regularPosts = allPosts.filter((p) => p._id !== featuredPost?._id)
+
+  // 分頁計算
+  const totalPosts = regularPosts.length
+  const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE)
+  const startIndex = (currentPage - 1) * POSTS_PER_PAGE
+  const paginatedPosts = regularPosts.slice(startIndex, startIndex + POSTS_PER_PAGE)
+
+  // 只在第一頁且無分類篩選時顯示精選文章
+  const showFeatured = currentPage === 1 && !category && !searchQuery && featuredPost
 
   // 如果沒有文章，顯示提示
-  if (posts.length === 0) {
+  if (allPosts.length === 0) {
     return (
       <div className="py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -154,7 +167,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
   return (
     <>
-      <BlogPageSchema postCount={posts.length} />
+      <BlogPageSchema postCount={allPosts.length} />
       <div className="py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <SectionTitle
@@ -174,18 +187,18 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
 
           {/* 搜尋結果提示 */}
           {searchQuery && (
-          <div className="text-center mb-8">
-            <p className="text-gray-600">
-              搜尋「<span className="font-medium text-primary">{searchQuery}</span>」找到 {posts.length} 篇文章
-            </p>
-            <Link href="/blog" className="text-sm text-gray-500 hover:text-primary">
-              清除搜尋
-            </Link>
-          </div>
-        )}
+            <div className="text-center mb-8">
+              <p className="text-gray-600">
+                搜尋「<span className="font-medium text-primary">{searchQuery}</span>」找到 {allPosts.length} 篇文章
+              </p>
+              <Link href="/blog" className="text-sm text-gray-500 hover:text-primary">
+                清除搜尋
+              </Link>
+            </div>
+          )}
 
-        {/* 精選文章 */}
-        {featuredPost && !category && (
+        {/* 精選文章 - 只在第一頁且無篩選時顯示 */}
+        {showFeatured && (
           <Link href={`/blog/${featuredPost.slug.current}`} className="block mb-12 group">
             <article className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow">
               <div className="md:flex">
@@ -233,9 +246,9 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
         )}
 
         {/* 文章列表 */}
-        {(category ? posts : otherPosts).length > 0 && (
+        {paginatedPosts.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {(category ? posts : otherPosts).map((post) => (
+            {paginatedPosts.map((post) => (
               <Link key={post._id} href={`/blog/${post.slug.current}`} className="group">
                 <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
                   <div className="relative h-48">
@@ -276,6 +289,11 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
             ))}
           </div>
         )}
+
+          {/* 分頁導航 */}
+          <Suspense fallback={null}>
+            <Pagination currentPage={currentPage} totalPages={totalPages} />
+          </Suspense>
 
           {/* SEO 說明文字 */}
           <div className="mt-16 text-center">
