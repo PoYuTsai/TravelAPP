@@ -31,8 +31,31 @@ interface Testimonial {
   source?: 'facebook' | 'google'
 }
 
-// Real Facebook reviews - actual customer feedback from FB page
+// Real customer reviews from Facebook and Google (一字不漏)
 const defaultTestimonials: Testimonial[] = [
+  // Google Reviews
+  {
+    name: '魏文陽',
+    location: '台灣',
+    content: '第一次安排清邁自由行～行程排好後發現有幾天行程較遠需要包車上網找到微清旅行～包車含油12小時價格算偏高一點點，但有問題詢問老闆阿裕都能即時回覆親切，很快就敲定時間預約，安排去清萊的導遊郭姐也很熱情介紹當地文化景點，想要朝聖的餐廳訂位也可幫忙預訂，因為是自己安排的行程第一次造訪有些景點時間沒抓好較可惜停留時間不夠，基本上都蠻彈性的可以討論，老闆也會有建議的方向想法，有機會再次深度造訪清邁！！',
+    highlight: '即時回覆，彈性討論',
+    source: 'google',
+  },
+  {
+    name: 'Lu Lu',
+    location: '台灣',
+    content: '可以提供中文溝通、服務貼心，更棒的是有提供汽車座椅，這個服務在清邁少有。',
+    highlight: '有提供汽車座椅',
+    source: 'google',
+  },
+  {
+    name: 'Tsai Wei Wei',
+    location: '台灣',
+    content: '這次清邁郊區有包車三天，都開車大概一小時可到，第一天司機大哥人很好，雖然語言不通但很努力用翻譯跟我們溝通，開車也很小心謹慎。二、三天是開朗活潑會講中文的J導遊小姐帶我們遊玩，除了事前規劃的行程，中間有想去哪，J導遊都會給我們建議和安排，也很自由的帶我們去。這趟清邁旅遊真的是很美好😊',
+    highlight: '導遊開朗活潑，行程自由',
+    source: 'google',
+  },
+  // Facebook Reviews (最新 3 則，一字不漏)
   {
     name: '王薪驊',
     location: '台灣',
@@ -41,17 +64,17 @@ const defaultTestimonials: Testimonial[] = [
     source: 'facebook',
   },
   {
-    name: 'Vicky Lin',
+    name: 'Feather Chin',
     location: '台灣',
-    content: '從行前的討論安排，都很細心，都能中文溝通完全不用擔心，還有中文解說的導遊，很盡責喔！全程陪伴走完解說不會到點了就把大家放生，超 nice，推推～',
-    highlight: '中文溝通完全不用擔心',
+    content: '值得推薦的包車旅遊～地陪親力親為～很貼心和很棒～如果下次朋友要來玩一定會推薦你們家的包車行程。',
+    highlight: '值得推薦，很貼心',
     source: 'facebook',
   },
   {
-    name: 'Lily Chen',
+    name: 'Vicky Lin',
     location: '台灣',
-    content: '行前很有耐心的討論行程，老闆和老闆娘還邀約我們吃飯，很貼心的服務，值得推薦哦！',
-    highlight: '貼心服務，值得推薦',
+    content: '從行前的討論安排，都很細心，都能中文溝通完全不用擔心，還有中文解說的導遊，很盡責喔！全程陪伴走完解說不會到點了就把大家放生，超nice，推推～',
+    highlight: '中文溝通完全不用擔心',
     source: 'facebook',
   },
 ]
@@ -131,6 +154,14 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
           )}
+          {testimonial.source === 'google' && (
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+          )}
         </div>
       </div>
     </div>
@@ -144,9 +175,9 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
           subtitle="聽聽其他爸媽怎麼說"
         />
 
-        {/* Desktop: Grid view */}
+        {/* Desktop: Grid view - 3 columns, 2 rows */}
         <div className="hidden md:grid md:grid-cols-3 gap-6">
-          {testimonials.map((testimonial, index) => (
+          {testimonials.slice(0, 6).map((testimonial, index) => (
             <TestimonialCard key={index} testimonial={testimonial} />
           ))}
         </div>
@@ -207,18 +238,33 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
           <p className="text-center text-xs text-gray-400 mt-2">← 左右滑動查看更多 →</p>
         </div>
 
-        {/* Link to more reviews */}
-        <div className="text-center mt-8">
+        {/* Links to more reviews */}
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
+          <a
+            href="https://maps.app.goo.gl/8MbRV4PPBggwj2pF6"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium text-sm transition-colors"
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            <span>Google 評價</span>
+          </a>
+          <span className="hidden sm:block text-gray-300">|</span>
           <a
             href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium text-sm transition-colors"
+            className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium text-sm transition-colors"
           >
-            <span>查看更多 Facebook 評價</span>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
             </svg>
+            <span>Facebook 評價</span>
           </a>
         </div>
       </div>
