@@ -1,16 +1,35 @@
 // src/app/api/tours/cases/route.ts
 
 import { NextResponse } from 'next/server'
-import { fetchTourCases } from '@/lib/notion'
+import { fetchTourCases, fetchRecentTourCases, fetchAllTourCasesGroupedByYear } from '@/lib/notion'
 import { apiLogger } from '@/lib/logger'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const mode = searchParams.get('mode') // 'recent' | 'history' | null (default)
     const yearParam = searchParams.get('year')
     const limitParam = searchParams.get('limit')
     const offsetParam = searchParams.get('offset')
 
+    // Mode: recent - 取得最近案例（跨年份，狀態優先排序）
+    if (mode === 'recent') {
+      const rawLimit = limitParam ? parseInt(limitParam, 10) : 8
+      if (isNaN(rawLimit)) {
+        return NextResponse.json({ error: '無效的參數格式' }, { status: 400 })
+      }
+      const limit = Math.min(Math.max(rawLimit, 1), 20)
+      const data = await fetchRecentTourCases(limit)
+      return NextResponse.json(data)
+    }
+
+    // Mode: history - 取得所有歷史案例（按年份分組）
+    if (mode === 'history') {
+      const data = await fetchAllTourCasesGroupedByYear()
+      return NextResponse.json(data)
+    }
+
+    // Default mode: 取得指定年份的案例
     const currentYear = new Date().getFullYear()
     const year = yearParam ? parseInt(yearParam, 10) : currentYear
     const rawLimit = limitParam ? parseInt(limitParam, 10) : 20

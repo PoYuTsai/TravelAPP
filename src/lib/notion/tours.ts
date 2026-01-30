@@ -115,3 +115,127 @@ export async function fetchTourCases(
     availableYears,
   }
 }
+
+/**
+ * 狀態優先權：旅遊中 > 即將出發 > 已完成
+ */
+function getStatusPriority(status: TourCase['status']): number {
+  switch (status) {
+    case 'traveling': return 0
+    case 'upcoming': return 1
+    case 'completed': return 2
+    default: return 3
+  }
+}
+
+/**
+ * 取得最近案例（跨年份，狀態優先排序）
+ * 排序邏輯：
+ * 1. 旅遊中 → 全部顯示
+ * 2. 即將出發 → 未來 60 天內，按日期排序
+ * 3. 已完成 → 按完成日期倒序，填滿剩餘位置
+ */
+export async function fetchRecentTourCases(limit: number = 8): Promise<TourCasesResponse> {
+  const currentYear = new Date().getFullYear()
+  const availableYears = [currentYear, currentYear - 1]
+
+  // 取得當年和去年的資料
+  const [currentYearOrders, lastYearOrders] = await Promise.all([
+    fetchNotionOrdersByYear(currentYear),
+    fetchNotionOrdersByYear(currentYear - 1),
+  ])
+
+  // 合併並轉換為案例
+  const allOrders = [...currentYearOrders, ...lastYearOrders]
+  const allCases = allOrders
+    .map(orderToCase)
+    .filter((c): c is TourCase => c !== null)
+
+  const today = getThailandToday()
+  const sixtyDaysLater = new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000)
+
+  // 分類案例
+  const traveling: TourCase[] = []
+  const upcoming: TourCase[] = []
+  const completed: TourCase[] = []
+
+  for (const c of allCases) {
+    if (c.status === 'traveling') {
+      traveling.push(c)
+    } else if (c.status === 'upcoming') {
+      // 只取未來 60 天內的
+      const startDate = parseDate(c.startDate)
+      if (startDate <= sixtyDaysLater) {
+        upcoming.push(c)
+      }
+    } else {
+      completed.push(c)
+    }
+  }
+
+  // 排序
+  // 旅遊中：按開始日期排序
+  traveling.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+  // 即將出發：按開始日期排序（最近的先）
+  upcoming.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+  // 已完成：按結束日期倒序（最近完成的先）
+  completed.sort((a, b) => {
+    const aEnd = a.endDate || a.startDate
+    const bEnd = b.endDate || b.startDate
+    return new Date(bEnd).getTime() - new Date(aEnd).getTime()
+  })
+
+  // 組合結果：旅遊中 + 即將出發 + 已完成，取前 limit 個
+  const combined = [...traveling, ...upcoming, ...completed]
+  const cases = combined.slice(0, limit)
+
+  return {
+    cases,
+    total: combined.length,
+    year: currentYear,
+    availableYears,
+  }
+}
+
+/**
+ * 取得所有歷史案例（按年份分組）
+ */
+export interface TourCasesGroupedByYear {
+  [year: number]: TourCase[]
+}
+
+export async function fetchAllTourCasesGroupedByYear(): Promise<{
+  grouped: TourCasesGroupedByYear
+  years: number[]
+}> {
+  const currentYear = new Date().getFullYear()
+  const years = [currentYear, currentYear - 1]
+
+  const results = await Promise.all(
+    years.map(async (year) => ({
+      year,
+      orders: await fetchNotionOrdersByYear(year),
+    }))
+  )
+
+  const grouped: TourCasesGroupedByYear = {}
+
+  for (const { year, orders } of results) {
+    const cases = orders
+      .map(orderToCase)
+      .filter((c): c is TourCase => c !== null)
+      // 按旅遊日期排序（最新的在前面）
+      .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+
+    if (cases.length > 0) {
+      grouped[year] = cases
+    }
+  }
+
+  // 只回傳有資料的年份
+  const availableYears = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => b - a) // 新的年份在前
+
+  return { grouped, years: availableYears }
+}
