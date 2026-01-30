@@ -118,13 +118,13 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
     }))
   }
 
-  // 收回歷史案例並滾動到頂部
+  // 收回歷史案例並滾動回「最近出發的家庭」區塊
   const collapseHistory = () => {
     setShowHistory(false)
-    // 滾動到歷史區塊的按鈕位置
-    const button = document.querySelector('[aria-controls="history-cases"]')
-    if (button) {
-      button.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // 滾動到最近案例區塊
+    const recentSection = document.getElementById('recent-cases')
+    if (recentSection) {
+      recentSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
 
@@ -189,7 +189,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
         )}
 
         {/* Recent Cases Section */}
-        <section className="mb-16">
+        <section id="recent-cases" className="mb-16">
           <SectionTitle
             title="最近出發的家庭"
             subtitle="每一組家庭的專屬清邁回憶"
@@ -298,11 +298,11 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
             </div>
           )}
 
-          {/* 浮動收回按鈕 */}
+          {/* 浮動收回按鈕 - 位置在 LINE 按鈕上方 */}
           {showFloatingButton && (
             <button
               onClick={collapseHistory}
-              className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 bg-primary text-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.15)] hover:bg-primary-dark hover:shadow-[0_6px_25px_rgba(0,0,0,0.2)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 animate-fade-in"
+              className="fixed bottom-36 right-4 md:bottom-20 md:right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-primary text-white text-sm rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.15)] hover:bg-primary-dark hover:shadow-[0_6px_25px_rgba(0,0,0,0.2)] hover:-translate-y-0.5 active:scale-95 transition-all duration-200 animate-fade-in"
               aria-label="收回歷史案例"
             >
               <svg
@@ -313,7 +313,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
-              <span className="text-sm font-medium">回到頂部</span>
+              收回
             </button>
           )}
         </section>
