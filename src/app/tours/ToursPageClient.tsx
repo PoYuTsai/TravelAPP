@@ -45,6 +45,8 @@ interface ToursPageClientProps {
 }
 
 const INITIAL_CASES = 8
+const CASES_PER_YEAR = 10  // 每年預設顯示筆數
+const LOAD_MORE_COUNT = 10 // 每次載入更多筆數
 
 interface HistoryData {
   grouped: { [year: number]: Case[] }
@@ -60,6 +62,12 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
   const [showHistory, setShowHistory] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
 
+  // 每年顯示數量的狀態
+  const [yearLimits, setYearLimits] = useState<{ [year: number]: number }>({})
+
+  // 浮動按鈕顯示狀態
+  const [showFloatingButton, setShowFloatingButton] = useState(false)
+
   // Fetch recent cases (跨年份，狀態優先排序)
   useEffect(() => {
     fetch(`/api/tours/cases?mode=recent&limit=${INITIAL_CASES}`)
@@ -70,6 +78,26 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
       .catch(() => { /* Silent fail for public data */ })
       .finally(() => setLoading(false))
   }, [])
+
+  // 監聽滾動，顯示/隱藏浮動按鈕
+  useEffect(() => {
+    if (!showHistory) {
+      setShowFloatingButton(false)
+      return
+    }
+
+    const handleScroll = () => {
+      const historySection = document.getElementById('history-cases')
+      if (historySection) {
+        const rect = historySection.getBoundingClientRect()
+        // 當歷史區塊的頂部滾出視窗時顯示浮動按鈕
+        setShowFloatingButton(rect.top < 0 && rect.bottom > 100)
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [showHistory])
 
   // Load history cases (按年份分組)
   const loadHistory = async () => {
@@ -83,11 +111,35 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
       const res = await fetch('/api/tours/cases?mode=history')
       const data = await res.json()
       setHistoryData(data)
+      // 初始化每年顯示數量
+      const initialLimits: { [year: number]: number } = {}
+      data.years.forEach((year: number) => {
+        initialLimits[year] = CASES_PER_YEAR
+      })
+      setYearLimits(initialLimits)
       setShowHistory(true)
     } catch {
       // Silent fail for public data
     } finally {
       setLoadingHistory(false)
+    }
+  }
+
+  // 載入更多某年的案例
+  const loadMoreForYear = (year: number) => {
+    setYearLimits((prev) => ({
+      ...prev,
+      [year]: (prev[year] || CASES_PER_YEAR) + LOAD_MORE_COUNT,
+    }))
+  }
+
+  // 收回歷史案例並滾動到頂部
+  const collapseHistory = () => {
+    setShowHistory(false)
+    // 滾動到歷史區塊的按鈕位置
+    const button = document.querySelector('[aria-controls="history-cases"]')
+    if (button) {
+      button.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }
 
@@ -202,29 +254,49 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
 
           {showHistory && historyData && historyData.years.length > 0 && (
             <div id="history-cases" className="mt-6 space-y-8">
-              {historyData.years.map((year) => (
-                <div key={year}>
-                  <h3 className="text-lg font-semibold text-gray-600 mb-4 text-center border-b border-gray-200 pb-2">
-                    {year} 年案例
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
-                    {historyData.grouped[year]?.map((c) => (
-                      <CaseCard
-                        key={c.id}
-                        name={c.name}
-                        days={c.days}
-                        startDate={c.startDate}
-                        endDate={c.endDate}
-                        status={c.status}
-                      />
-                    ))}
+              {historyData.years.map((year) => {
+                const allCases = historyData.grouped[year] || []
+                const limit = yearLimits[year] || CASES_PER_YEAR
+                const visibleCases = allCases.slice(0, limit)
+                const hasMore = allCases.length > limit
+
+                return (
+                  <div key={year}>
+                    <h3 className="text-lg font-semibold text-gray-600 mb-4 text-center border-b border-gray-200 pb-2">
+                      {year} 年案例
+                      <span className="text-sm font-normal text-gray-400 ml-2">
+                        ({visibleCases.length}/{allCases.length})
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                      {visibleCases.map((c) => (
+                        <CaseCard
+                          key={c.id}
+                          name={c.name}
+                          days={c.days}
+                          startDate={c.startDate}
+                          endDate={c.endDate}
+                          status={c.status}
+                        />
+                      ))}
+                    </div>
+                    {hasMore && (
+                      <div className="text-center mt-4">
+                        <button
+                          onClick={() => loadMoreForYear(year)}
+                          className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                        >
+                          載入更多 {year} 年案例
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
-              {/* 收回按鈕 */}
+                )
+              })}
+              {/* 底部收回按鈕 */}
               <div className="text-center mt-6">
                 <button
-                  onClick={() => setShowHistory(false)}
+                  onClick={collapseHistory}
                   className="inline-flex items-center gap-2 px-6 py-3 text-gray-500 hover:text-gray-700 font-medium transition-colors"
                 >
                   <svg
@@ -239,6 +311,25 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
                 </button>
               </div>
             </div>
+          )}
+
+          {/* 浮動收回按鈕 */}
+          {showFloatingButton && (
+            <button
+              onClick={collapseHistory}
+              className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 hover:bg-gray-50 transition-all"
+              aria-label="收回歷史案例"
+            >
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+              <span className="text-sm font-medium">收回</span>
+            </button>
           )}
         </section>
 
