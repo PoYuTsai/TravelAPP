@@ -208,6 +208,44 @@
 
 ## 歷史審查記錄
 
+### 審查 #7 - 2026-01-31 (A11y、資安、行銷追蹤優化)
+
+**執行範圍**: 架構安全、前端 UX/A11y、SEO、行銷追蹤 全面掃描
+
+**發現問題與處理**:
+
+| 角色 | 問題 | 嚴重度 | 處理結果 |
+|------|------|--------|----------|
+| 資安 | signed-url 使用自訂 hash 而非 HMAC-SHA256 | 🟠 高 | ✅ 改用 Node.js crypto HMAC-SHA256 |
+| 資安 | /api/tours/cases 無 rate limiting | 🟠 高 | ✅ 加入 30 req/min 限制 |
+| 行銷 | LINE 點擊追蹤重複（Button 自動追蹤） | 🟠 高 | ✅ 移除 Button 自動追蹤 |
+| 行銷 | 表單提交雙重計數 | 🟠 高 | ✅ 移除 ContactForm 的 trackLineClick |
+| A11y | OverviewVideo 缺少 role="dialog" | 🟠 高 | ✅ 加入 dialog + aria-modal |
+| A11y | OverviewVideo 無 Escape 鍵關閉 | 🟠 高 | ✅ 加入 keydown listener |
+| A11y | OverviewVideo 關閉按鈕觸控目標過小 | 🟠 高 | ✅ 增大至 48px |
+| A11y | OverviewVideo 無 focus trap | 🟡 中 | ✅ 實作 focus trap |
+| SEO | 缺少 Organization Schema | 🟡 中 | ✅ 加入 layout.tsx |
+| SEO | 缺少 WebSite Schema | 🟡 中 | ✅ 加入 layout.tsx |
+| SEO | robots.txt 未禁止 /api-docs/ | 🟢 低 | ✅ 已加入 disallow |
+
+**確認正常項目**:
+- `.env.local` 未被 commit（僅 `.env.example` 在版控）
+- Notion 快取有 MAX_CACHE_SIZE = 50 限制
+- CSP 設定正確（已移除 unsafe-eval）
+
+**修改檔案**:
+- `src/components/tours/OverviewVideo.tsx`
+- `src/components/ui/Button.tsx`
+- `src/components/ContactForm.tsx`
+- `src/lib/signed-url.ts`
+- `src/app/api/tours/cases/route.ts`
+- `src/app/layout.tsx`
+- `src/app/robots.ts`
+
+**Commit**: `dae9521`
+
+---
+
 ### 審查 #6 - 2026-01-30 (SEO、A11y、文件一致性優化)
 
 **執行範圍**: 架構、前端 UX、SEO、資安、行銷追蹤 全面掃描
@@ -424,5 +462,5 @@
 
 ---
 
-*最後更新: 2026-01-30*
-*版本: 1.3*
+*最後更新: 2026-01-31*
+*版本: 1.4*
