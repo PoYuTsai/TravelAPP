@@ -28,6 +28,7 @@
 | Phase 6.1 | 審查 #5 系統優化 | ✅ 完成 |
 | Phase 6.2 | 審查 #6 SEO/A11y 優化 | ✅ 完成 |
 | Phase 6.3 | API 安全性強化 | ✅ 完成 |
+| Phase 6.4 | 審查 #7 + UX 優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -164,6 +165,24 @@ Itinerary API 存取控制強化：
 - **Signed URL**：時效性 Token 驗證（5 分鐘過期）
 - **API 保護**：PDF/Excel/Text 匯出 API 需驗證 token
 - **流程整合**：Sanity Actions 先取得 signed URL 再開啟匯出連結
+
+### Phase 6.4：審查 #7 + UX 優化
+綜合審查與使用者體驗改善：
+
+- **評論整合**：Google 評論加入 Testimonials、5 星 badge 連結改為 Google
+- **案例展示優化**：
+  - 狀態優先排序（旅遊中 > 即將出發 > 已完成）
+  - 歷史案例按年份分組、每年 10 筆分頁載入
+  - 浮動收回按鈕（位於 LINE 按鈕上方）
+- **無障礙改善**：
+  - OverviewVideo：dialog role、Escape 鍵、focus trap、48px 按鈕
+- **資安強化**：
+  - signed-url 改用 HMAC-SHA256（Node.js crypto）
+  - /api/tours/cases 加入 rate limiting
+- **行銷追蹤修正**：
+  - 移除 Button 自動 LINE 追蹤（防重複）
+  - 移除 ContactForm 雙重轉換計數
+- **SEO**：Organization + WebSite Schema、robots.txt 更新
 
 ## 技術架構
 
