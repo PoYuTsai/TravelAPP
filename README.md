@@ -29,6 +29,7 @@
 | Phase 6.2 | 審查 #6 SEO/A11y 優化 | ✅ 完成 |
 | Phase 6.3 | API 安全性強化 | ✅ 完成 |
 | Phase 6.4 | 審查 #7 + UX 優化 | ✅ 完成 |
+| Phase 6.5 | Blog 分頁 + Schema 補強 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -184,6 +185,14 @@ Itinerary API 存取控制強化：
   - 移除 ContactForm 雙重轉換計數
 - **SEO**：Organization + WebSite Schema、robots.txt 更新
 
+### Phase 6.5：Blog 分頁 + Schema 補強
+部落格分頁功能與政策頁面 Schema 強化：
+
+- **Blog 分頁**：每頁 9 篇文章、WCAG 44px 觸控目標
+- **精選文章**：只在第一頁且無篩選時顯示
+- **URL 支援**：分頁與 category/search 參數共存
+- **WebPage Schema**：新增至 privacy、terms、cancellation 頁面
+
 ## 技術架構
 
 ```
@@ -236,4 +245,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-31 Comprehensive review #7: A11y, security, analytics fixes -->
+<!-- Last build trigger: 2026-01-31 Phase 6.5: Blog pagination + policy page schemas -->
