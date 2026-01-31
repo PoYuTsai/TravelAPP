@@ -172,10 +172,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               {posts.map((post) => (
                 <Link key={post._id} href={`/blog/${post.slug.current}`} className="group">
                   <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
-                    <div className="relative h-48">
+                    <div className="relative aspect-[4/3]">
                       {post.mainImage ? (
                         <Image
-                          src={urlFor(post.mainImage).width(600).height(400).url()}
+                          src={urlFor(post.mainImage).width(600).height(450).url()}
                           alt={post.mainImage.alt || post.title}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
