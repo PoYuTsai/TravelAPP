@@ -245,4 +245,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-01-31 Phase 6.5: Blog pagination + policy page schemas -->
+<!-- Last build trigger: 2026-02-01 Content fixes: Eric story FAQ + transportation article updates -->
