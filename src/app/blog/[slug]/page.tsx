@@ -172,14 +172,14 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
               <Image
                 src={urlFor(post.mainImage)
                   .width(1200)
-                  .height(630)
-                  .fit('crop')
-                  .crop('focalpoint')
+                  .fit('max')
+                  .auto('format')
                   .url()}
                 alt={post.mainImage.alt || post.title}
                 width={1200}
-                height={630}
-                className="w-full h-auto object-cover"
+                height={800}
+                className="w-full h-auto"
+                sizes="(max-width: 768px) 100vw, 896px"
                 priority
               />
             </div>
