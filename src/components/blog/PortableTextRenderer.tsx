@@ -5,8 +5,55 @@ import type { PortableTextBlock } from '@portabletext/types'
 import type { SanityImageSource } from '@sanity/image-url'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useState } from 'react'
 import { urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
+
+// 圖片燈箱元件
+const ImageLightbox = ({
+  src,
+  alt,
+  onClose
+}: {
+  src: string
+  alt: string
+  onClose: () => void
+}) => {
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* 關閉按鈕 */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors z-10"
+        aria-label="關閉"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {/* 圖片 */}
+      <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+        <Image
+          src={src}
+          alt={alt}
+          width={1920}
+          height={1920}
+          className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
+          quality={90}
+        />
+      </div>
+
+      {/* 提示文字 */}
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+        點擊任意處關閉
+      </p>
+    </div>
+  )
+}
 
 // 自訂區塊元件
 const CTABlock = ({ value }: { value: { title?: string; description?: string } }) => (
@@ -97,32 +144,60 @@ const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells
   </div>
 )
 
-// 圖片區塊（優化尺寸，支援 hotspot）
+// 圖片區塊（保持原圖比例，支援點擊放大）
 const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string; caption?: string } }) => {
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+
   if (!value?.asset) return null
 
+  const thumbnailUrl = urlFor(value)
+    .width(800)
+    .fit('max')
+    .auto('format')
+    .url()
+
+  const fullSizeUrl = urlFor(value)
+    .width(1920)
+    .fit('max')
+    .auto('format')
+    .quality(90)
+    .url()
+
+  const altText = value.alt || '文章圖片'
+
   return (
-    <figure className="my-10 not-prose">
-      <div className="rounded-xl overflow-hidden shadow-md">
-        <Image
-          src={urlFor(value)
-            .width(800)
-            .fit('max')
-            .auto('format')
-            .url()}
-          alt={value.alt || '文章圖片'}
-          width={800}
-          height={600}
-          className="w-full h-auto"
-          sizes="(max-width: 768px) 100vw, 800px"
+    <>
+      <figure className="my-10 not-prose">
+        <div
+          className="rounded-xl overflow-hidden shadow-md cursor-zoom-in hover:shadow-lg transition-shadow"
+          onClick={() => setIsLightboxOpen(true)}
+        >
+          <Image
+            src={thumbnailUrl}
+            alt={altText}
+            width={800}
+            height={1200}
+            className="w-full h-auto"
+            sizes="(max-width: 768px) 100vw, 800px"
+          />
+        </div>
+        {value.caption && (
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg -mt-1">
+            📷 {value.caption}
+          </figcaption>
+        )}
+        <p className="text-center text-xs text-gray-400 mt-1">點擊圖片放大</p>
+      </figure>
+
+      {/* 燈箱 */}
+      {isLightboxOpen && (
+        <ImageLightbox
+          src={fullSizeUrl}
+          alt={altText}
+          onClose={() => setIsLightboxOpen(false)}
         />
-      </div>
-      {value.caption && (
-        <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg -mt-1">
-          📷 {value.caption}
-        </figcaption>
       )}
-    </figure>
+    </>
   )
 }
 
