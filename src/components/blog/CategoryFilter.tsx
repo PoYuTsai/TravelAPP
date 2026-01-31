@@ -8,9 +8,8 @@ const categories = [
   { key: 'guide', label: '攻略' },
   { key: 'attraction', label: '景點' },
   { key: 'food', label: '美食' },
-  { key: 'accommodation', label: '住宿' },
   { key: 'transportation', label: '交通' },
-  { key: 'itinerary', label: '行程' },
+  { key: 'practical', label: '實用' },
   { key: 'story', label: '故事' },
 ]
 

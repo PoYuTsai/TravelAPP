@@ -7,9 +7,8 @@ export const CATEGORY_NAMES: Record<string, string> = {
   guide: '攻略',
   attraction: '景點',
   food: '美食',
-  accommodation: '住宿',
   transportation: '交通',
-  itinerary: '行程',
+  practical: '實用',
   story: '故事',
 } as const
 
