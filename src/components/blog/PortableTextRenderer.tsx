@@ -77,8 +77,8 @@ const ImageLightbox = ({
         </svg>
       </button>
 
-      {/* 圖片 */}
-      <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+      {/* 圖片 - 點擊圖片也會關閉燈箱 */}
+      <div className="relative max-w-full max-h-full">
         <Image
           src={src}
           alt={alt}
