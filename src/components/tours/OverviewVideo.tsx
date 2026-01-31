@@ -137,15 +137,14 @@ export default function OverviewVideo({ src, title = '行程總覽' }: OverviewV
             </svg>
           </button>
 
-          {/* Fullscreen video */}
+          {/* Fullscreen video - clicking also closes */}
           <video
             src={src}
             autoPlay
             loop
             muted
             playsInline
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
+            className="max-w-full max-h-full object-contain cursor-pointer"
           />
 
           {/* Hint text */}

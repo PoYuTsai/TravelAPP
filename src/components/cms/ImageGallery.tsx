@@ -144,7 +144,8 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
             </>
           )}
 
-          <div className="relative max-w-5xl max-h-[90vh] w-full h-full" onClick={(e) => e.stopPropagation()}>
+          {/* Image container - clicking also closes */}
+          <div className="relative max-w-5xl max-h-[90vh] w-full h-full cursor-pointer">
             <Image
               src={urlFor(selectedImage.asset).width(1200).url()}
               alt={selectedImage.alt || '照片'}
@@ -163,6 +164,10 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
               {(selectedIndex ?? 0) + 1} / {images.length}
             </p>
           )}
+          {/* Hint text */}
+          <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+            點擊任意處或按 Esc 關閉
+          </p>
         </div>
       )}
     </>

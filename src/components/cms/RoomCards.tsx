@@ -128,7 +128,8 @@ export default function RoomCards({ cards }: RoomCardsProps) {
             </>
           )}
 
-          <div className="relative max-w-2xl max-h-[90vh] w-full" onClick={(e) => e.stopPropagation()}>
+          {/* Image container - clicking also closes */}
+          <div className="relative max-w-2xl max-h-[90vh] w-full cursor-pointer">
             <Image
               src={urlFor(selectedCard.asset).width(800).url()}
               alt={selectedCard.alt || '房型圖片'}
@@ -139,10 +140,14 @@ export default function RoomCards({ cards }: RoomCardsProps) {
           </div>
           {/* 圖片計數 */}
           {cards.length > 1 && (
-            <p className="absolute bottom-4 left-0 right-0 text-center text-white/70 text-sm">
+            <p className="absolute bottom-8 left-0 right-0 text-center text-white/70 text-sm">
               {(selectedIndex ?? 0) + 1} / {cards.length}
             </p>
           )}
+          {/* Hint text */}
+          <p className="absolute bottom-2 left-1/2 -translate-x-1/2 text-white/60 text-sm">
+            點擊任意處或按 Esc 關閉
+          </p>
         </div>
       )}
     </>
