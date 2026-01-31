@@ -299,6 +299,14 @@ export default defineType({
 
     // === SEO 群組 ===
     defineField({
+      name: 'seoTitle',
+      title: 'SEO 標題',
+      type: 'string',
+      group: 'seo',
+      description: 'Google 搜尋結果顯示的標題，建議 30-60 字，關鍵字放前面。留空則使用文章標題。',
+      validation: (Rule) => Rule.max(60).warning('SEO 標題建議不超過 60 字'),
+    }),
+    defineField({
       name: 'seoDescription',
       title: 'SEO 描述',
       type: 'text',
