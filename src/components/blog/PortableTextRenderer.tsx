@@ -144,9 +144,10 @@ const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells
   </div>
 )
 
-// 圖片區塊（保持原圖比例，支援點擊放大）
-const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string; caption?: string } }) => {
+// 圖片區塊（直式圖限制寬度，支援點擊放大）
+const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: string }; alt?: string; caption?: string } }) => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [isPortrait, setIsPortrait] = useState(false)
 
   if (!value?.asset) return null
 
@@ -165,28 +166,50 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string
 
   const altText = value.alt || '文章圖片'
 
+  // 從 Sanity asset ref 判斷圖片比例（格式：image-{id}-{width}x{height}-{format}）
+  const assetRef = (value.asset as { _ref?: string })?._ref || ''
+  const dimensionMatch = assetRef.match(/-(\d+)x(\d+)-/)
+  const detectedPortrait = dimensionMatch
+    ? parseInt(dimensionMatch[2]) > parseInt(dimensionMatch[1])
+    : false
+
   return (
     <>
       <figure className="my-10 not-prose">
-        <div
-          className="rounded-xl overflow-hidden shadow-md cursor-zoom-in hover:shadow-lg transition-shadow"
-          onClick={() => setIsLightboxOpen(true)}
-        >
-          <Image
-            src={thumbnailUrl}
-            alt={altText}
-            width={800}
-            height={1200}
-            className="w-full h-auto"
-            sizes="(max-width: 768px) 100vw, 800px"
-          />
+        {/* 直式圖片限制寬度 50%，置中顯示 */}
+        <div className={detectedPortrait ? 'flex justify-center' : ''}>
+          <div
+            className={`
+              rounded-xl overflow-hidden shadow-md cursor-zoom-in hover:shadow-lg transition-shadow
+              ${detectedPortrait ? 'w-full max-w-[50%] md:max-w-[40%]' : 'w-full'}
+            `}
+            onClick={() => setIsLightboxOpen(true)}
+          >
+            <Image
+              src={thumbnailUrl}
+              alt={altText}
+              width={800}
+              height={1200}
+              className="w-full h-auto"
+              sizes={detectedPortrait ? '(max-width: 768px) 50vw, 320px' : '(max-width: 768px) 100vw, 800px'}
+              onLoad={(e) => {
+                // 備用：圖片載入後檢測比例
+                const img = e.target as HTMLImageElement
+                if (img.naturalHeight > img.naturalWidth) {
+                  setIsPortrait(true)
+                }
+              }}
+            />
+          </div>
         </div>
         {value.caption && (
-          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg -mt-1">
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-lg">
             📷 {value.caption}
           </figcaption>
         )}
-        <p className="text-center text-xs text-gray-400 mt-1">點擊圖片放大</p>
+        <p className="text-center text-xs text-gray-400 mt-1">
+          {detectedPortrait || isPortrait ? '點擊查看完整圖片' : '點擊圖片放大'}
+        </p>
       </figure>
 
       {/* 燈箱 */}

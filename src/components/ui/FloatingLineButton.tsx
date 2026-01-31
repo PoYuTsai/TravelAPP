@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { trackLineClick } from '@/lib/analytics'
 import { LINE_URL } from '@/lib/navigation'
 
@@ -21,8 +22,18 @@ export default function FloatingLineButton({
   lineUrl = LINE_URL
 }: FloatingLineButtonProps) {
   const [isVisible, setIsVisible] = useState(false)
+  const pathname = usePathname()
+
+  // 在文章頁面隱藏浮動按鈕（已有底部 CTA 和 Footer）
+  const isBlogArticlePage = pathname?.startsWith('/blog/') && pathname !== '/blog/'
 
   useEffect(() => {
+    // 文章頁直接隱藏
+    if (isBlogArticlePage) {
+      setIsVisible(false)
+      return
+    }
+
     const handleScroll = () => {
       const scrollY = window.scrollY
       const windowHeight = window.innerHeight
@@ -41,7 +52,7 @@ export default function FloatingLineButton({
     handleScroll()
 
     return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [isBlogArticlePage])
 
   const handleClick = () => {
     trackLineClick('Floating LINE Button')
