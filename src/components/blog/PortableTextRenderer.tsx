@@ -335,7 +335,7 @@ const components: PortableTextComponents = {
       )
     },
     highlight: ({ children }) => (
-      <mark className="bg-yellow-200 px-1">{children}</mark>
+      <mark className="bg-yellow-200 px-1.5 py-0.5 rounded text-lg font-semibold">{children}</mark>
     ),
   },
   list: {
