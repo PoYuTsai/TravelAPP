@@ -36,7 +36,7 @@ const ImageLightbox = ({
       </button>
 
       {/* 圖片 */}
-      <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
+      <div className="relative max-w-full max-h-full">
         <Image
           src={src}
           alt={alt}
