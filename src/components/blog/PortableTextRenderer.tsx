@@ -97,7 +97,7 @@ const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells
   </div>
 )
 
-// 圖片區塊
+// 圖片區塊（優化尺寸，支援 hotspot）
 const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string; caption?: string } }) => {
   if (!value?.asset) return null
 
@@ -105,11 +105,16 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string
     <figure className="my-10 not-prose">
       <div className="rounded-xl overflow-hidden shadow-md">
         <Image
-          src={urlFor(value).width(1200).url()}
+          src={urlFor(value)
+            .width(800)
+            .fit('max')
+            .auto('format')
+            .url()}
           alt={value.alt || '文章圖片'}
-          width={1200}
-          height={800}
+          width={800}
+          height={600}
           className="w-full h-auto"
+          sizes="(max-width: 768px) 100vw, 800px"
         />
       </div>
       {value.caption && (
@@ -121,10 +126,60 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource; alt?: string
   )
 }
 
+// 影片/GIF 區塊
+const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provider?: string } }) => {
+  if (!value?.url) return null
+
+  // 判斷是 Cloudflare Stream 還是一般影片連結
+  const isCloudflare = value.url.includes('cloudflarestream.com') || value.url.includes('videodelivery.net')
+
+  if (isCloudflare) {
+    // Cloudflare Stream iframe
+    const videoId = value.url.split('/').pop()?.replace('.m3u8', '') || ''
+    return (
+      <figure className="my-10 not-prose">
+        <div className="rounded-xl overflow-hidden shadow-md aspect-video">
+          <iframe
+            src={`https://iframe.videodelivery.net/${videoId}`}
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+            allowFullScreen
+            className="w-full h-full"
+          />
+        </div>
+        {value.caption && (
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg">
+            🎬 {value.caption}
+          </figcaption>
+        )}
+      </figure>
+    )
+  }
+
+  // 一般影片連結（YouTube 等）
+  return (
+    <figure className="my-10 not-prose">
+      <div className="rounded-xl overflow-hidden shadow-md aspect-video">
+        <iframe
+          src={value.url}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="w-full h-full"
+        />
+      </div>
+      {value.caption && (
+        <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg">
+          🎬 {value.caption}
+        </figcaption>
+      )}
+    </figure>
+  )
+}
+
 // PortableText 元件設定
 const components: PortableTextComponents = {
   types: {
     image: ImageBlock,
+    videoBlock: VideoBlock,
     ctaBlock: CTABlock,
     toursBlock: ToursBlock,
     tipBox: TipBox,

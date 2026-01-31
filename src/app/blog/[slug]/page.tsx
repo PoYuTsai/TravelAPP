@@ -72,7 +72,9 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 
   const description = post.seoDescription || post.excerpt || `${post.title} - 清微旅行`
-  const imageUrl = post.mainImage ? urlFor(post.mainImage).width(1200).height(630).url() : undefined
+  const imageUrl = post.mainImage
+    ? urlFor(post.mainImage).width(1200).height(630).fit('crop').crop('focalpoint').url()
+    : undefined
 
   return {
     title: post.title,
@@ -168,11 +170,16 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {post.mainImage && (
             <div className="mb-8 rounded-2xl overflow-hidden">
               <Image
-                src={urlFor(post.mainImage).width(1200).height(630).url()}
+                src={urlFor(post.mainImage)
+                  .width(1200)
+                  .height(630)
+                  .fit('crop')
+                  .crop('focalpoint')
+                  .url()}
                 alt={post.mainImage.alt || post.title}
                 width={1200}
                 height={630}
-                className="w-full h-auto"
+                className="w-full h-auto object-cover"
                 priority
               />
             </div>

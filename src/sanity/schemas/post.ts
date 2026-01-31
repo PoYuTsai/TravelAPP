@@ -253,6 +253,47 @@ export default defineType({
             }),
           },
         }),
+        // 影片區塊（支援 Cloudflare Stream 或 YouTube）
+        defineArrayMember({
+          name: 'videoBlock',
+          title: '影片',
+          type: 'object',
+          fields: [
+            defineField({
+              name: 'url',
+              title: '影片網址',
+              type: 'url',
+              description: '支援 Cloudflare Stream、YouTube embed 網址',
+              validation: (Rule) => Rule.required(),
+            }),
+            defineField({
+              name: 'caption',
+              title: '影片說明',
+              type: 'string',
+            }),
+            defineField({
+              name: 'provider',
+              title: '平台',
+              type: 'string',
+              options: {
+                list: [
+                  { title: 'Cloudflare Stream', value: 'cloudflare' },
+                  { title: 'YouTube', value: 'youtube' },
+                  { title: '其他', value: 'other' },
+                ],
+              },
+              initialValue: 'cloudflare',
+            }),
+          ],
+          preview: {
+            select: { caption: 'caption', url: 'url' },
+            prepare: ({ caption, url }) => ({
+              title: caption || '影片',
+              subtitle: url?.substring(0, 50) || '未設定網址',
+              media: () => '🎬',
+            }),
+          },
+        }),
       ],
     }),
 
