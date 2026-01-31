@@ -2,9 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-
-// Google Ads Conversion ID
-const AW_CONVERSION_ID = 'AW-17124009918'
+import { AW_CONVERSION_ID } from '@/lib/constants'
 
 // 頁面轉換事件設定
 const PAGE_CONVERSIONS: Record<string, string> = {

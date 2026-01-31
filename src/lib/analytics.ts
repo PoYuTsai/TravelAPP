@@ -1,5 +1,7 @@
 // Google Analytics 追蹤工具
 
+import { AW_CONVERSION_ID, LINE_CLICK_CONVERSION } from './constants'
+
 declare global {
   interface Window {
     gtag: (
@@ -19,10 +21,6 @@ export function trackEvent(
     window.gtag('event', eventName, params)
   }
 }
-
-// Google Ads Conversion ID
-const AW_CONVERSION_ID = 'AW-17124009918'
-const LINE_CLICK_CONVERSION = '0CrLCKj1l-obEL7PruU_'
 
 // 追蹤 LINE 點擊 (GA4 + Google Ads 轉換)
 export function trackLineClick(location: string) {

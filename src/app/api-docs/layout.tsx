@@ -6,6 +6,9 @@ export const metadata: Metadata = {
     index: false,
     follow: false,
   },
+  alternates: {
+    canonical: 'https://chiangway-travel.com/api-docs',
+  },
 }
 
 export default function ApiDocsLayout({

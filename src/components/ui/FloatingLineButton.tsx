@@ -70,7 +70,7 @@ export default function FloatingLineButton({
         flex items-center gap-2
         bg-[#06C755] hover:bg-[#05b34d]
         text-white font-medium
-        px-4 py-3 rounded-full
+        px-4 min-h-[44px] rounded-full
         shadow-lg hover:shadow-xl
         transition-all duration-300 ease-out
         ${isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-16 opacity-0 scale-90 pointer-events-none'}

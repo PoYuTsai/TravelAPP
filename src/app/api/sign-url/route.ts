@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSignedUrl, getSigningSecret } from '@/lib/signed-url'
 import { checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { apiLogger } from '@/lib/logger'
 
 // Valid export types
 const VALID_TYPES = ['pdf', 'excel', 'text'] as const
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ url: signedUrl })
   } catch (error) {
-    console.error('Sign URL error:', error)
+    apiLogger.error('Sign URL error', error instanceof Error ? error : new Error(String(error)))
     return NextResponse.json(
       { error: 'Failed to generate signed URL' },
       { status: 500 }

@@ -116,10 +116,10 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
           </div>
         </div>
 
-        {/* Navigation Arrows - positioned on image area only (top-[28%] to center on 16:10 image) */}
+        {/* Navigation Arrows - 44px touch target for WCAG */}
         <button
           onClick={scrollPrev}
-          className="absolute left-3 top-[28%] -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
+          className="absolute left-3 top-[28%] -translate-y-1/2 w-11 h-11 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
           aria-label="上一張"
         >
           <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -128,7 +128,7 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
         </button>
         <button
           onClick={scrollNext}
-          className="absolute right-3 top-[28%] -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
+          className="absolute right-3 top-[28%] -translate-y-1/2 w-11 h-11 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors z-10"
           aria-label="下一張"
         >
           <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -50,6 +50,7 @@ export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSection
             className="border border-gray-200 rounded-lg overflow-hidden"
           >
             <button
+              id={`faq-question-${index}`}
               onClick={() => toggle(index)}
               className="w-full flex items-center justify-between p-4 md:p-5 text-left bg-white hover:bg-gray-50 transition-colors"
               aria-expanded={openIndex === index}
@@ -78,6 +79,8 @@ export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSection
             {openIndex === index && (
               <div
                 id={`faq-answer-${index}`}
+                role="region"
+                aria-labelledby={`faq-question-${index}`}
                 className="p-4 md:p-5 pt-0 md:pt-0 bg-white"
               >
                 <p className="text-gray-600 leading-relaxed whitespace-pre-line">

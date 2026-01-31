@@ -5,11 +5,11 @@ import type { PortableTextBlock } from '@portabletext/types'
 import type { SanityImageSource } from '@sanity/image-url'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
 
-// 圖片燈箱元件
+// 圖片燈箱元件（完整無障礙支援）
 const ImageLightbox = ({
   src,
   alt,
@@ -19,24 +19,66 @@ const ImageLightbox = ({
   alt: string
   onClose: () => void
 }) => {
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const previousActiveElement = useRef<HTMLElement | null>(null)
+
+  // Handle keyboard events (Esc to close)
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+    // Focus trap - keep focus on close button
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      closeButtonRef.current?.focus()
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    // Store previous active element for focus restoration
+    previousActiveElement.current = document.activeElement as HTMLElement
+
+    // Prevent background scrolling
+    document.body.style.overflow = 'hidden'
+
+    // Add keyboard listener
+    document.addEventListener('keydown', handleKeyDown)
+
+    // Focus the close button on mount
+    closeButtonRef.current?.focus()
+
+    return () => {
+      // Restore scrolling
+      document.body.style.overflow = ''
+      // Remove keyboard listener
+      document.removeEventListener('keydown', handleKeyDown)
+      // Restore focus
+      previousActiveElement.current?.focus()
+    }
+  }, [handleKeyDown])
+
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`圖片放大檢視：${alt}`}
       className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      {/* 關閉按鈕 */}
+      {/* 關閉按鈕 - 48px 觸控目標 (WCAG) */}
       <button
+        ref={closeButtonRef}
         onClick={onClose}
-        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-full p-2 transition-colors z-10"
-        aria-label="關閉"
+        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-full w-12 h-12 flex items-center justify-center transition-colors z-10"
+        aria-label="關閉圖片"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
 
       {/* 圖片 */}
-      <div className="relative max-w-full max-h-full">
+      <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
         <Image
           src={src}
           alt={alt}
@@ -49,7 +91,7 @@ const ImageLightbox = ({
 
       {/* 提示文字 */}
       <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
-        點擊任意處關閉
+        點擊任意處或按 Esc 關閉
       </p>
     </div>
   )

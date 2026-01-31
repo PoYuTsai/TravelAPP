@@ -62,13 +62,14 @@ export function verifySignedToken(
 
 /**
  * Create HMAC-SHA256 hash from data and secret
- * Returns first 32 characters for shorter URLs while maintaining security
+ * Returns first 40 characters (160 bits) for shorter URLs while maintaining security
+ * Note: 160 bits provides sufficient collision resistance for short-lived tokens (5 min)
  */
 function createHmacHash(data: string, secret: string): string {
   return createHmac('sha256', secret)
     .update(data)
     .digest('hex')
-    .slice(0, 32) // Truncate for shorter URLs, still cryptographically strong
+    .slice(0, 40) // 160 bits - balance between URL length and security
 }
 
 /**

@@ -18,6 +18,9 @@ const DASHBOARD_ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS || '')
 /**
  * Validate API key from request headers
  * Returns error response if invalid, null if valid
+ *
+ * Note: Currently reserved for future use with external API integrations.
+ * Internal APIs use validateDashboardAccess or signed URLs instead.
  */
 export function validateApiKey(request: NextRequest): NextResponse | null {
   // In production, API key is mandatory
@@ -109,6 +112,37 @@ export function validateDashboardAccess(request: Request): NextResponse | null {
  * For production, use Redis or similar
  */
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+const MAX_RATE_LIMIT_ENTRIES = 1000 // Prevent memory leak
+let lastCleanup = Date.now()
+const CLEANUP_INTERVAL = 60000 // Clean every minute
+
+/**
+ * Clean up expired rate limit entries to prevent memory leak
+ */
+function cleanupRateLimitMap(): void {
+  const now = Date.now()
+
+  // Only cleanup periodically
+  if (now - lastCleanup < CLEANUP_INTERVAL) return
+  lastCleanup = now
+
+  // Remove expired entries
+  const entries = Array.from(rateLimitMap.entries())
+  for (const [key, value] of entries) {
+    if (now > value.resetTime) {
+      rateLimitMap.delete(key)
+    }
+  }
+
+  // If still too many entries, remove oldest ones (LRU-like)
+  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    const entriesToRemove = rateLimitMap.size - MAX_RATE_LIMIT_ENTRIES
+    const keys = Array.from(rateLimitMap.keys())
+    for (let i = 0; i < entriesToRemove; i++) {
+      rateLimitMap.delete(keys[i])
+    }
+  }
+}
 
 /**
  * Simple rate limiting
@@ -122,10 +156,14 @@ export function checkRateLimit(
   windowMs: number = 60000
 ): NextResponse | null {
   const now = Date.now()
+
+  // Periodically cleanup expired entries
+  cleanupRateLimitMap()
+
   const record = rateLimitMap.get(identifier)
 
   if (!record || now > record.resetTime) {
-    // New window
+    // New window - also delete old record if expired
     rateLimitMap.set(identifier, { count: 1, resetTime: now + windowMs })
     return null
   }

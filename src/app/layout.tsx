@@ -5,9 +5,7 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import GoogleAdsConversion from '@/components/GoogleAdsConversion'
 import FloatingLineButton from '@/components/ui/FloatingLineButton'
-
-// Google Analytics Measurement ID
-const GA_MEASUREMENT_ID = 'G-5180ZF5WFF'
+import { GA_MEASUREMENT_ID } from '@/lib/constants'
 
 // Viewport 設定（Next.js 14 推薦方式）
 export const viewport: Viewport = {
@@ -17,8 +15,6 @@ export const viewport: Viewport = {
   userScalable: true,
   themeColor: '#FFD700',
 }
-// Google Ads Conversion ID
-const AW_CONVERSION_ID = 'AW-17124009918'
 
 export const metadata: Metadata = {
   title: {
