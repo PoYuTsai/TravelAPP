@@ -75,10 +75,11 @@ export default async function RelatedPosts({ currentPostId, category }: RelatedP
         {posts.map((post) => (
           <Link key={post._id} href={`/blog/${post.slug.current}`} className="group">
             <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
-              <div className="relative h-40">
+              {/* 使用 aspect-[4/3] 保持圖片比例，避免裁切 */}
+              <div className="relative aspect-[4/3]">
                 {post.mainImage ? (
                   <Image
-                    src={urlFor(post.mainImage).width(400).height(250).url()}
+                    src={urlFor(post.mainImage).width(400).height(300).url()}
                     alt={post.mainImage.alt || post.title}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
