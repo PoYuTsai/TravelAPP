@@ -30,6 +30,7 @@
 | Phase 6.3 | API 安全性強化 | ✅ 完成 |
 | Phase 6.4 | 審查 #7 + UX 優化 | ✅ 完成 |
 | Phase 6.5 | Blog 分頁 + Schema 補強 | ✅ 完成 |
+| Phase 6.6 | 審查 #8 A11y/資安優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -193,6 +194,14 @@ Itinerary API 存取控制強化：
 - **URL 支援**：分頁與 category/search 參數共存
 - **WebPage Schema**：新增至 privacy、terms、cancellation 頁面
 
+### Phase 6.6：審查 #8 A11y/資安優化
+第 8 次全面審查，重點改善無障礙與程式碼品質：
+
+- **A11y 強化**：PortableTextRenderer Lightbox 完整鍵盤支援（Esc、focus trap）
+- **觸控目標**：StopsCarousel、FloatingLineButton 增大至 44px+ (WCAG)
+- **資安改善**：Rate limit 清理機制、HMAC 增強、logger 統一
+- **程式碼品質**：Google Ads ID 集中管理、FAQSection role="region"
+
 ## 技術架構
 
 ```
@@ -245,4 +254,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-02-01 Content fixes: Eric story FAQ + transportation article updates -->
+<!-- Last build trigger: 2026-02-01 Phase 6.6: Comprehensive review #8 A11y/security improvements -->

@@ -208,6 +208,51 @@
 
 ## 歷史審查記錄
 
+### 審查 #8 - 2026-02-01 (A11y、資安、程式碼品質優化)
+
+**執行範圍**: 架構安全、前端 UX/A11y、SEO、行銷追蹤 全面掃描
+
+**發現問題與處理**:
+
+| 角色 | 問題 | 嚴重度 | 處理結果 |
+|------|------|--------|----------|
+| A11y | PortableTextRenderer Lightbox 缺 Esc + 焦點管理 | 🔴 緊急 | ✅ 加入 role="dialog"、Esc 鍵、focus trap、48px 按鈕 |
+| 資安 | Rate limit Map 無自動清理（記憶體洩漏風險） | 🟠 高 | ✅ 加入清理機制 + MAX 1000 entries |
+| 行銷 | Google Ads Conversion ID 重複定義在 3 個檔案 | 🟠 高 | ✅ 集中到 constants.ts |
+| A11y | PortableTextRenderer 關閉按鈕 32px | 🟠 高 | ✅ 增大至 48px (WCAG) |
+| A11y | StopsCarousel 導航按鈕 40px | 🟠 高 | ✅ 增大至 44px (WCAG) |
+| 資安 | signed-url HMAC 截斷為 32 字元 | 🟠 高 | ✅ 增加至 40 字元（160 bits）|
+| SEO | api-docs 頁面缺少 canonical URL | 🟡 中 | ✅ 已加入 |
+| A11y | FAQSection 缺少 role="region" | 🟡 中 | ✅ 加入 role + aria-labelledby |
+| 資安 | console.error 直接使用而非 logger | 🟡 中 | ✅ 改用 apiLogger |
+| A11y | FloatingLineButton 觸控目標邊界情況 | 🟡 中 | ✅ 加入 min-h-[44px] |
+| 資安 | validateApiKey() 定義但未使用 | 🟡 中 | ✅ 加入註解說明保留給未來使用 |
+
+**確認正常項目**:
+- `.env.local` 未被 commit ✅
+- Notion 快取有 MAX_CACHE_SIZE = 50 限制 ✅
+- SEO 整體評分 95/100 ✅
+- GA4 初始化正確，無重複 ✅
+- Homestay Twitter Card 已有圖片（誤報）✅
+
+**修改檔案**:
+- `src/components/blog/PortableTextRenderer.tsx`
+- `src/components/cms/FAQSection.tsx`
+- `src/components/tours/StopsCarousel.tsx`
+- `src/components/ui/FloatingLineButton.tsx`
+- `src/components/GoogleAdsConversion.tsx`
+- `src/lib/api-auth.ts`
+- `src/lib/analytics.ts`
+- `src/lib/constants.ts`
+- `src/lib/signed-url.ts`
+- `src/app/api/sign-url/route.ts`
+- `src/app/api-docs/layout.tsx`
+- `src/app/layout.tsx`
+
+**Commit**: `becf8cb`
+
+---
+
 ### 審查 #7 - 2026-01-31 (A11y、資安、行銷追蹤優化)
 
 **執行範圍**: 架構安全、前端 UX/A11y、SEO、行銷追蹤 全面掃描
@@ -462,5 +507,5 @@
 
 ---
 
-*最後更新: 2026-01-31*
-*版本: 1.4*
+*最後更新: 2026-02-01*
+*版本: 1.5*
