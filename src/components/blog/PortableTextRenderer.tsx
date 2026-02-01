@@ -299,11 +299,19 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
   if (isDirectVideo) {
     // 直接影片連結（Cloudinary、MP4 等）
     // 需要 <source> 標籤才能在 iOS Safari 正常播放
+
+    // Cloudinary 影片自動產生封面圖（把 .mp4 換成 .jpg）
+    const isCloudinary = value.url.includes('cloudinary.com')
+    const posterUrl = isCloudinary
+      ? value.url.replace(/\.(mp4|webm|mov)$/i, '.jpg')
+      : undefined
+
     return (
       <figure className="my-10 not-prose">
         <div className="rounded-xl overflow-hidden shadow-md bg-gray-900">
           <video
             src={value.url}
+            poster={posterUrl}
             controls
             playsInline
             preload="metadata"
