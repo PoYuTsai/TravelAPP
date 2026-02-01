@@ -194,3 +194,31 @@
 | 清邁包車兒童座椅指南 | 交通 | 2026-01-31 | |
 | 泰國 7-11 救急神藥 | 實用 | 2026-02-01 | |
 | 清邁夜間動物園攻略 | 景點 | 2026-02-01 | |
+
+---
+
+## 技術筆記 / Troubleshooting
+
+### Cloudinary 影片 iOS 無法播放（2026-02-01）
+
+**問題：** Cloudinary 上傳的影片在 iOS Safari 無法播放，顯示黑畫面 + 錯誤圖示
+
+**原因：**
+1. 中文檔名被 URL encode 後 iOS 無法處理
+2. 影片編碼非 H.264（iOS Safari 只支援 H.264）
+
+**解法：**
+1. 上傳時使用英文檔名（避免中文）
+2. URL 加上 `f_auto,q_auto` 參數讓 Cloudinary 自動轉碼
+
+**正確 URL 格式：**
+```
+https://res.cloudinary.com/{cloud_name}/video/upload/f_auto,q_auto/v{version}/{filename}.mp4
+```
+
+**範例：**
+```
+❌ .../video/upload/v123/夜間動物園.mp4
+❌ .../video/upload/v123/night-safari.mp4（可能編碼不對）
+✅ .../video/upload/f_auto,q_auto/v123/night-safari.mp4
+```
