@@ -115,7 +115,7 @@ const nextConfig = {
               `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com`,
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://cdn.sanity.io https://img.youtube.com https://www.google-analytics.com",
+              "img-src 'self' data: blob: https://cdn.sanity.io https://img.youtube.com https://www.google-analytics.com https://res.cloudinary.com",
               "connect-src 'self' https://www.google-analytics.com https://*.sanity.io https://res.cloudinary.com",
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com",
               "media-src 'self' https://cdn.sanity.io https://res.cloudinary.com",
