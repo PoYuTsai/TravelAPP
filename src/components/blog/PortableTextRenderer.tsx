@@ -270,8 +270,9 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: st
 const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provider?: string } }) => {
   if (!value?.url) return null
 
-  // 判斷是 Cloudflare Stream 還是一般影片連結
+  // 判斷影片類型
   const isCloudflare = value.url.includes('cloudflarestream.com') || value.url.includes('videodelivery.net')
+  const isDirectVideo = value.url.includes('.mp4') || value.url.includes('.webm') || value.url.includes('.mov') || value.url.includes('cloudinary.com')
 
   if (isCloudflare) {
     // Cloudflare Stream iframe
@@ -288,6 +289,30 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
         </div>
         {value.caption && (
           <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg">
+            🎬 {value.caption}
+          </figcaption>
+        )}
+      </figure>
+    )
+  }
+
+  if (isDirectVideo) {
+    // 直接影片連結（Cloudinary、MP4 等）
+    return (
+      <figure className="my-10 not-prose">
+        <div className="rounded-xl overflow-hidden shadow-md">
+          <video
+            src={value.url}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full h-auto max-h-[70vh]"
+          >
+            您的瀏覽器不支援影片播放
+          </video>
+        </div>
+        {value.caption && (
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-lg">
             🎬 {value.caption}
           </figcaption>
         )}
