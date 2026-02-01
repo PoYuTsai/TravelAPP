@@ -160,9 +160,9 @@ const TipBox = ({ value }: { value: { type?: string; content?: string } }) => {
 }
 
 const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells?: string[]; isHeader?: boolean }> } }) => (
-  <div className="my-8 overflow-x-auto not-prose">
+  <div className="my-8 overflow-x-auto not-prose -mx-4 px-4 md:mx-0 md:px-0">
     {value.caption && <p className="text-sm text-gray-600 mb-2">{value.caption}</p>}
-    <table className="w-full border-collapse">
+    <table className="w-full border-collapse text-sm md:text-base min-w-[400px]">
       <tbody>
         {value.rows?.map((row, rowIndex) => (
           <tr key={rowIndex} className={row.isHeader ? 'bg-gray-100' : ''}>
@@ -171,8 +171,8 @@ const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells
               return (
                 <Tag
                   key={cellIndex}
-                  className={`border border-gray-200 px-4 py-2 text-left ${
-                    row.isHeader ? 'font-semibold' : ''
+                  className={`border border-gray-200 px-3 py-2 text-left md:px-4 ${
+                    row.isHeader ? 'font-semibold whitespace-nowrap' : ''
                   }`}
                 >
                   {cell}
@@ -267,7 +267,7 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: st
 }
 
 // 影片/GIF 區塊
-const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provider?: string } }) => {
+const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provider?: string; posterTime?: number } }) => {
   if (!value?.url) return null
 
   // 判斷影片類型
@@ -301,11 +301,12 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
     // 需要 <source> 標籤才能在 iOS Safari 正常播放
 
     // Cloudinary 影片自動產生封面圖
-    // so_auto = 自動選擇好看的幀（避免太暗、模糊的畫面）
+    // posterTime 有值 = 指定秒數，否則用 so_auto 自動選擇好看的幀
     const isCloudinary = value.url.includes('cloudinary.com')
+    const timeParam = value.posterTime !== undefined ? `so_${value.posterTime}` : 'so_auto'
     const posterUrl = isCloudinary
       ? value.url
-          .replace('/upload/', '/upload/so_auto/')
+          .replace('/upload/', `/upload/${timeParam}/`)
           .replace(/\.(mp4|webm|mov)$/i, '.jpg')
       : undefined
 

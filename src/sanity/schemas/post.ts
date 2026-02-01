@@ -263,13 +263,19 @@ export default defineType({
               name: 'url',
               title: '影片網址',
               type: 'url',
-              description: '支援 Cloudflare Stream、YouTube embed 網址',
+              description: '支援 Cloudinary、Cloudflare Stream、YouTube embed 網址',
               validation: (Rule) => Rule.required(),
             }),
             defineField({
               name: 'caption',
               title: '影片說明',
               type: 'string',
+            }),
+            defineField({
+              name: 'posterTime',
+              title: '封面時間（秒）',
+              type: 'number',
+              description: '指定封面圖要抓影片的第幾秒，留空則自動選擇',
             }),
             defineField({
               name: 'provider',
