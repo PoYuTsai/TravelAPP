@@ -79,9 +79,10 @@ export default async function RelatedPosts({ currentPostId, category }: RelatedP
               <div className="relative aspect-[4/3]">
                 {post.mainImage ? (
                   <Image
-                    src={urlFor(post.mainImage).width(400).height(300).url()}
+                    src={urlFor(post.mainImage).width(800).height(600).url()}
                     alt={post.mainImage.alt || post.title}
                     fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
