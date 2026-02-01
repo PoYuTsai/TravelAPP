@@ -182,7 +182,7 @@ const body = [
   textBlock('去程', 'h3'),
   textBlock('包車最方便。如果當天還有其他行程（素帖寺、雙龍寺），司機可以一起安排，看完動物園直接去吃晚餐或回飯店。'),
   textBlock('也可以用 Grab 叫車，單程約 200-300 THB。'),
-  linkBlock('想了解更多交通方式？可以參考這篇 ', '清邁交通攻略｜包車 vs Grab vs 雙條車怎麼選？', '/blog/chiang-mai-transportation-guide', ''),
+  linkBlock('想了解更多交通方式？可以參考這篇 ', '清邁交通攻略｜包車 vs Grab vs 雙條車怎麼選？', '/blog/chiang-mai-transportation', ''),
   textBlock('回程', 'h3'),
   textBlock('園區外有雙條車可以搭回市區，價格大約 300-400 THB，可以試著殺價。'),
   textBlock('Grab 應該也可以叫，但我們都是自己開車，沒實測過等車時間。'),
