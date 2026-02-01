@@ -298,9 +298,10 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
 
   if (isDirectVideo) {
     // 直接影片連結（Cloudinary、MP4 等）
+    // 需要 <source> 標籤才能在 iOS Safari 正常播放
     return (
       <figure className="my-10 not-prose">
-        <div className="rounded-xl overflow-hidden shadow-md">
+        <div className="rounded-xl overflow-hidden shadow-md bg-gray-900">
           <video
             src={value.url}
             controls
@@ -308,6 +309,7 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
             preload="metadata"
             className="w-full h-auto max-h-[70vh]"
           >
+            <source src={value.url} type="video/mp4" />
             您的瀏覽器不支援影片播放
           </video>
         </div>
