@@ -222,3 +222,106 @@ https://res.cloudinary.com/{cloud_name}/video/upload/f_auto,q_auto/v{version}/{f
 ❌ .../video/upload/v123/night-safari.mp4（可能編碼不對）
 ✅ .../video/upload/f_auto,q_auto/v123/night-safari.mp4
 ```
+
+---
+
+### 部落格影片功能完整 Debug 記錄（2026-02-01）
+
+這次花了不少時間 debug 部落格影片功能，以下是完整的問題與解決過程：
+
+#### 問題 1：Cloudinary 影片在 iOS 無法播放
+
+**症狀：** 影片顯示黑畫面 + 錯誤圖示（broken icon）
+
+**Debug 過程：**
+1. 先檢查程式碼：發現部落格的 `<video>` 沒有 `<source>` 標籤
+2. 加上 `<source>` 標籤後還是不行
+3. 測試直接開 Cloudinary URL → 也不能播
+4. 發現是影片編碼問題（非 H.264）
+
+**根本原因：**
+- 中文檔名被 URL encode，iOS 無法處理
+- 影片編碼不是 H.264（iOS Safari 只支援 H.264）
+
+**解法：**
+1. 上傳時用英文檔名
+2. URL 加 `f_auto,q_auto` 讓 Cloudinary 自動轉成 H.264
+
+**程式碼修改：**
+- `src/components/blog/PortableTextRenderer.tsx`：新增 `<source>` 標籤
+
+---
+
+#### 問題 2：影片沒有封面圖（poster）
+
+**症狀：** 影片載入前顯示黑畫面，不像包車頁/民宿頁有縮圖
+
+**對比發現：**
+- 包車頁用 `VideoPlayer.tsx`，poster 是 Sanity 上傳的圖片
+- 部落格用 `VideoBlock`，沒有 poster 功能
+
+**解法：**
+- 自動從 Cloudinary URL 產生封面（把 `.mp4` 換成 `.jpg`）
+- Cloudinary 會自動回傳影片第一幀
+
+**程式碼修改：**
+```tsx
+// src/components/blog/PortableTextRenderer.tsx
+const isCloudinary = value.url.includes('cloudinary.com')
+const posterUrl = isCloudinary
+  ? value.url.replace(/\.(mp4|webm|mov)$/i, '.jpg')
+  : undefined
+
+<video poster={posterUrl} ...>
+```
+
+---
+
+#### 問題 3：電腦有封面，手機沒有
+
+**症狀：** 電腦版 Chrome 有顯示 poster，iOS Safari 沒有
+
+**Debug 過程：**
+1. 檢查 HTML：`poster` 屬性有正確設定
+2. 檢查 Cloudinary URL：直接開 `.jpg` 可以顯示
+3. 懷疑是瀏覽器快取 → 清快取、無痕模式都沒用
+4. 檢查 DevTools Console → 發現 CSP 錯誤
+
+**根本原因：**
+- `next.config.js` 的 CSP `img-src` 沒有包含 Cloudinary
+- `media-src` 有 Cloudinary（所以影片可以播）
+- `img-src` 沒有 Cloudinary（所以 poster 圖片被擋）
+- iOS Safari 嚴格執行 CSP，桌面 Chrome 比較寬鬆
+
+**解法：**
+```javascript
+// next.config.js
+// 修改前
+"img-src 'self' ... https://cdn.sanity.io ..."
+
+// 修改後
+"img-src 'self' ... https://cdn.sanity.io https://res.cloudinary.com ..."
+```
+
+---
+
+#### 最終 Cloudinary 影片上傳 SOP
+
+1. **檔名用英文**（避免中文）
+2. **URL 加 `f_auto,q_auto`**（自動轉碼 + 優化畫質）
+3. **完整 URL 格式：**
+   ```
+   https://res.cloudinary.com/{cloud_name}/video/upload/f_auto,q_auto/v{version}/{english-filename}.mp4
+   ```
+4. **封面圖會自動產生**（程式會把 `.mp4` 換成 `.jpg`）
+
+---
+
+#### 相關 Commits
+
+| Commit | 說明 |
+|--------|------|
+| `da4bae7` | feat: support Cloudinary and direct MP4 video URLs |
+| `ff70271` | fix: add source tag for iOS Safari video compatibility |
+| `92b6c96` | feat: auto-generate video poster from Cloudinary URL |
+| `b02795c` | fix: add Cloudinary to CSP img-src for video posters |
