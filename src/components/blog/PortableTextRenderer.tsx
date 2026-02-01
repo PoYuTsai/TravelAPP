@@ -308,14 +308,14 @@ const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provid
 
     return (
       <figure className="my-10 not-prose">
-        <div className="rounded-xl overflow-hidden shadow-md bg-gray-900">
+        <div className="relative aspect-video rounded-xl overflow-hidden shadow-md bg-gray-900">
           <video
             src={value.url}
             poster={posterUrl}
             controls
             playsInline
             preload="metadata"
-            className="w-full h-auto max-h-[70vh]"
+            className="w-full h-full object-cover"
           >
             <source src={value.url} type="video/mp4" />
             您的瀏覽器不支援影片播放
