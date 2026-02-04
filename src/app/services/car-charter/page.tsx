@@ -8,21 +8,21 @@ import { FeatureGrid, PricingTable, FAQSection, VideoPlayer, ImageGallery, Proce
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: '清邁親子包車服務',
-  description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。清邁一日 NT$ 3,200 起。',
+  title: '清邁親子包車2026｜兒童座椅、中文導遊、司機導遊分工｜清微旅行',
+  description: '清邁親子包車首選！清微旅行提供司機+導遊專業分工（不是一人包辦）、兒童安全座椅（0-6歲皆有）、全程中文溝通。清邁一日 NT$3,200 起，清萊一日 NT$4,500 起。台灣爸爸+泰國媽媽在地經營，專為親子家庭設計的彈性行程。',
   alternates: {
     canonical: 'https://chiangway-travel.com/services/car-charter',
   },
   openGraph: {
-    title: '清邁親子包車服務',
-    description: '專為親子家庭設計的清邁包車服務。司機導遊專業分工，兒童安全座椅，行程彈性不趕路。',
+    title: '清邁親子包車2026｜兒童座椅、中文導遊、司機導遊分工｜清微旅行',
+    description: '清邁親子包車首選！清微旅行提供司機+導遊專業分工、兒童安全座椅（0-6歲）、全程中文溝通。清邁一日 NT$3,200 起。',
     url: 'https://chiangway-travel.com/services/car-charter',
     images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '清邁親子包車服務 - 清微旅行' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '清邁親子包車服務',
-    description: '專為親子家庭設計的清邁包車服務。清邁一日 NT$ 3,200 起。',
+    title: '清邁親子包車2026｜兒童座椅、中文導遊｜清微旅行',
+    description: '清邁親子包車首選！司機+導遊專業分工、兒童安全座椅、全程中文。清邁一日 NT$3,200 起。',
     images: ['/images/og-image.png'],
   },
 }
