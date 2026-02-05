@@ -7,7 +7,7 @@ export const revalidate = 60
 
 export const metadata: Metadata = {
   alternates: {
-    canonical: 'https://chiangway-travel.com',
+    canonical: 'https://chiangway-travel.com/',
   },
 }
 
