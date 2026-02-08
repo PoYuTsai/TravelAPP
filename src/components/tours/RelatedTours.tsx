@@ -78,9 +78,10 @@ export default async function RelatedTours({ currentSlug, currentType }: Related
               <div className="relative h-40">
                 {tour.coverImage ? (
                   <Image
-                    src={urlFor(tour.coverImage).width(400).height(250).url()}
+                    src={urlFor(tour.coverImage).width(800).height(500).quality(85).url()}
                     alt={tour.coverImage.alt || tour.title}
                     fill
+                    sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (

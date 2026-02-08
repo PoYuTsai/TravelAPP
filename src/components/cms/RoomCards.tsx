@@ -81,9 +81,10 @@ export default function RoomCards({ cards }: RoomCardsProps) {
             className="relative aspect-[3/4] rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow cursor-pointer group"
           >
             <Image
-              src={urlFor(card.asset).width(400).height(533).url()}
+              src={urlFor(card.asset).width(600).height(800).quality(85).url()}
               alt={card.alt || `房型 ${index + 1}`}
               fill
+              sizes="(max-width: 768px) 50vw, 25vw"
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           </button>

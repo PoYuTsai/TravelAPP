@@ -152,9 +152,10 @@ export default function StopsCarousel({ stops }: StopsCarouselProps) {
             <div className="w-20 h-14 md:w-24 md:h-16 relative">
               {stop.image ? (
                 <Image
-                  src={urlFor(stop.image).width(200).height(140).url()}
+                  src={urlFor(stop.image).width(400).height(280).quality(80).url()}
                   alt={stop.name}
                   fill
+                  sizes="96px"
                   className="object-cover"
                 />
               ) : (
