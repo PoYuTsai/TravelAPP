@@ -247,7 +247,7 @@
 - `src/components/tours/PackageCard.tsx`
 - `src/components/Footer.tsx`
 
-**Commit**: `待補充`
+**Commit**: `8744b3a`
 
 ---
 
