@@ -92,9 +92,10 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
             className="relative aspect-[4/3] rounded-lg overflow-hidden group cursor-pointer"
           >
             <Image
-              src={urlFor(image.asset).width(600).height(450).url()}
+              src={urlFor(image.asset).width(600).height(450).quality(85).url()}
               alt={image.alt || `照片 ${index + 1}`}
               fill
+              sizes="(max-width: 768px) 50vw, 33vw"
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
             {image.caption && (
@@ -150,6 +151,7 @@ export default function ImageGallery({ images, columns = 3 }: ImageGalleryProps)
               src={urlFor(selectedImage.asset).width(1200).url()}
               alt={selectedImage.alt || '照片'}
               fill
+              sizes="(max-width: 1280px) 100vw, 1200px"
               className="object-contain"
             />
           </div>

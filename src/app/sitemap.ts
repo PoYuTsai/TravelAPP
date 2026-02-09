@@ -38,23 +38,24 @@ async function getAllTourSlugs() {
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://chiangway-travel.com'
 
-  // 靜態頁面
+  // 靜態頁面 - 使用固定版本日期（避免每次生成都變更）
+  const lastUpdated = new Date('2026-02-09')
   const staticPages: MetadataRoute.Sitemap = [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: 'weekly', priority: 1 },
-    { url: `${baseUrl}/tours`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${baseUrl}/services/car-charter`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.9 },
-    { url: `${baseUrl}/homestay`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.8 },
-    { url: `${baseUrl}/blog`, lastModified: new Date(), changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${baseUrl}/contact`, lastModified: new Date(), changeFrequency: 'monthly', priority: 0.7 },
-    { url: `${baseUrl}/privacy`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${baseUrl}/terms`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
-    { url: `${baseUrl}/cancellation`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
+    { url: baseUrl, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 1 },
+    { url: `${baseUrl}/tours`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${baseUrl}/services/car-charter`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${baseUrl}/homestay`, lastModified: lastUpdated, changeFrequency: 'monthly', priority: 0.8 },
+    { url: `${baseUrl}/blog`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.8 },
+    { url: `${baseUrl}/contact`, lastModified: lastUpdated, changeFrequency: 'monthly', priority: 0.7 },
+    { url: `${baseUrl}/privacy`, lastModified: lastUpdated, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${baseUrl}/terms`, lastModified: lastUpdated, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${baseUrl}/cancellation`, lastModified: lastUpdated, changeFrequency: 'yearly', priority: 0.3 },
   ]
 
   // 部落格分類頁面
   const categoryPages: MetadataRoute.Sitemap = Object.keys(CATEGORY_NAMES).map((category) => ({
     url: `${baseUrl}/blog/category/${category}`,
-    lastModified: new Date(),
+    lastModified: lastUpdated,
     changeFrequency: 'weekly' as const,
     priority: 0.6,
   }))

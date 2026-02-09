@@ -73,14 +73,14 @@ export default function Footer() {
           {/* Social & Contact */}
           <div>
             <h3 className="font-bold text-lg mb-4">聯繫我們</h3>
-            <div className="flex space-x-4 mb-4">
+            <div className="flex space-x-2 mb-4">
               {socialLinks.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-primary transition-colors"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-primary transition-colors"
                   aria-label={social.label}
                   onClick={social.label === 'LINE' ? () => trackLineClick('Footer - Social Icon') : undefined}
                 >

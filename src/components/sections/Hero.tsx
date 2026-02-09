@@ -9,7 +9,7 @@ const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYE
 // Default values - Brand: Eric & Min 強調家庭定位
 const defaults = {
   title: '清邁親子包車，交給 Eric & Min',
-  subtitle: '台灣爸爸 × 在地 30 年泰國媽媽，住在清邁的真實家庭',
+  subtitle: '台灣爸爸 × 在清邁住 30 年的泰國媽媽，住在清邁的真實家庭',
   description: '司機導遊分開服務，不趕路、不跟團，專為爸媽設計的包車旅程',
   primaryCta: { text: 'LINE 聊聊你的清邁計畫', link: 'https://line.me/R/ti/p/@037nyuwk' },
   secondaryCta: { text: '看行程案例', link: '/tours' },
@@ -44,6 +44,7 @@ export default function Hero({
           src={heroImageSrc}
           alt={backgroundImage?.alt || '清微旅行 - 清邁親子包車'}
           fill
+          sizes="100vw"
           className="object-cover object-center"
           priority
           placeholder="blur"

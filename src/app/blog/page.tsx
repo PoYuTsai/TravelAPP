@@ -18,6 +18,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: '部落格 | 清邁旅遊攻略',
     description: '清邁親子旅遊攻略、景點推薦、美食分享，在地人的第一手資訊。',
+    url: 'https://chiangway-travel.com/blog',
+    images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '清微旅行部落格' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '部落格 | 清邁旅遊攻略',
+    description: '清邁親子旅遊攻略、景點推薦、美食分享，在地人的第一手資訊。',
+    images: ['/images/og-image.png'],
   },
   alternates: {
     canonical: 'https://chiangway-travel.com/blog',
@@ -205,9 +213,10 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
                 <div className="md:w-1/2 relative h-64 md:h-80">
                   {featuredPost.mainImage ? (
                     <Image
-                      src={urlFor(featuredPost.mainImage).width(800).height(600).url()}
+                      src={urlFor(featuredPost.mainImage).width(800).height(600).quality(85).url()}
                       alt={featuredPost.mainImage.alt || featuredPost.title}
                       fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -254,9 +263,10 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
                   <div className="relative aspect-[4/3]">
                     {post.mainImage ? (
                       <Image
-                        src={urlFor(post.mainImage).width(600).height(450).url()}
+                        src={urlFor(post.mainImage).width(600).height(450).quality(85).url()}
                         alt={post.mainImage.alt || post.title}
                         fill
+                        sizes="(max-width: 768px) 100vw, 33vw"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (

@@ -6,6 +6,30 @@ import { fetchTotalFamilyCount } from '@/lib/notion'
 export const revalidate = 60
 
 export const metadata: Metadata = {
+  title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
+  description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，在地家庭提供司機導遊分工服務。兒童座椅、中文溝通、客製行程，100+ 組家庭好評推薦。清邁一日 NT$3,200 起。',
+  openGraph: {
+    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
+    description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
+    url: 'https://chiangway-travel.com/',
+    siteName: '清微旅行 Chiangway Travel',
+    locale: 'zh_TW',
+    type: 'website',
+    images: [
+      {
+        url: '/images/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: '清微旅行 - 清邁親子包車',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽｜清微旅行',
+    description: '清邁親子包車首選！司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
+    images: ['/images/og-image.png'],
+  },
   alternates: {
     canonical: 'https://chiangway-travel.com/',
   },

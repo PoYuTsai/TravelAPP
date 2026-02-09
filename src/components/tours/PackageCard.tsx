@@ -31,9 +31,10 @@ export default function PackageCard({
       <div className="relative aspect-[3/2] bg-gradient-to-br from-primary-light to-primary/20">
         {coverImage ? (
           <Image
-            src={urlFor(coverImage).width(600).height(400).url()}
+            src={urlFor(coverImage).width(600).height(400).quality(85).url()}
             alt={coverImage.alt || title}
             fill
+            sizes="(max-width: 768px) 100vw, 50vw"
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
         ) : (
