@@ -2,12 +2,8 @@
  * Shared constants used across the application
  */
 
-// Google Analytics
-export const GA_MEASUREMENT_ID = 'G-5180ZF5WFF'
-
-// Google Ads - centralized to avoid duplication
-export const AW_CONVERSION_ID = 'AW-17124009918'
-export const LINE_CLICK_CONVERSION = '0CrLCKj1l-obEL7PruU_'
+// Google Tag Manager (GTM 統一管理 GA4 和 Google Ads)
+export const GTM_ID = 'GTM-5WH32MLX'
 
 // Blog category names (Chinese translations)
 export const CATEGORY_NAMES: Record<string, string> = {

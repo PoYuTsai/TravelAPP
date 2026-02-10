@@ -3,9 +3,10 @@ import Script from 'next/script'
 import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
-import GoogleAdsConversion from '@/components/GoogleAdsConversion'
 import FloatingLineButton from '@/components/ui/FloatingLineButton'
-import { GA_MEASUREMENT_ID } from '@/lib/constants'
+
+// Google Tag Manager ID
+const GTM_ID = 'GTM-5WH32MLX'
 
 // Viewport 設定（Next.js 14 推薦方式）
 export const viewport: Viewport = {
@@ -153,6 +154,14 @@ export default function RootLayout({
   return (
     <html lang="zh-TW">
       <head>
+        {/* Google Tag Manager */}
+        <Script id="gtm" strategy="afterInteractive">
+          {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','${GTM_ID}');`}
+        </Script>
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
         <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16x16.png" />
@@ -162,6 +171,15 @@ export default function RootLayout({
         />
       </head>
       <body className="flex flex-col min-h-screen">
+        {/* Google Tag Manager (noscript) */}
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+            height="0"
+            width="0"
+            style={{ display: 'none', visibility: 'hidden' }}
+          />
+        </noscript>
         {/* Skip Link for accessibility */}
         <a
           href="#main-content"
@@ -169,21 +187,6 @@ export default function RootLayout({
         >
           跳到主要內容
         </a>
-        {/* Google Analytics + Google Ads */}
-        <Script
-          src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', '${GA_MEASUREMENT_ID}');
-          `}
-        </Script>
-        {/* Google Ads Conversion Tracking */}
-        <GoogleAdsConversion />
         <Header />
         <main id="main-content" className="flex-grow pt-20">
           {children}

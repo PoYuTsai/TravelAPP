@@ -1,6 +1,5 @@
 // Google Analytics 追蹤工具
-
-import { AW_CONVERSION_ID, LINE_CLICK_CONVERSION } from './constants'
+// 注意：GA4 和 Google Ads 轉換現在由 GTM 統一管理
 
 declare global {
   interface Window {
@@ -9,34 +8,33 @@ declare global {
       targetId: string | Date,
       params?: Record<string, unknown>
     ) => void
+    dataLayer: unknown[]
   }
 }
 
-// 追蹤自訂事件
+// 追蹤自訂事件（透過 dataLayer 傳送給 GTM）
 export function trackEvent(
   eventName: string,
   params?: Record<string, unknown>
 ) {
-  if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', eventName, params)
+  if (typeof window !== 'undefined') {
+    // 優先使用 dataLayer（GTM 標準方式）
+    window.dataLayer = window.dataLayer || []
+    window.dataLayer.push({
+      event: eventName,
+      ...params,
+    })
   }
 }
 
-// 追蹤 LINE 點擊 (GA4 + Google Ads 轉換)
+// 追蹤 LINE 點擊
+// Google Ads 轉換由 GTM 觸發器處理（監聽 line.me 連結點擊）
 export function trackLineClick(location: string) {
-  // GA4 事件
   trackEvent('line_click', {
     event_category: 'engagement',
     event_label: location,
     link_url: 'https://line.me/R/ti/p/@037nyuwk',
   })
-
-  // Google Ads 轉換
-  if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', 'conversion', {
-      send_to: `${AW_CONVERSION_ID}/${LINE_CLICK_CONVERSION}`,
-    })
-  }
 }
 
 // 追蹤文章閱讀
