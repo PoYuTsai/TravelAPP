@@ -1,4 +1,5 @@
 import Button from '@/components/ui/Button'
+import LineCTAButton from '@/components/ui/LineCTAButton'
 
 // Default values
 const defaults = {
@@ -31,14 +32,9 @@ export default function CTA({
           {description}
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            href={primaryCta?.link || defaults.primaryCta.link}
-            external={primaryCta?.link?.startsWith('http')}
-            variant="secondary"
-            size="lg"
-          >
+          <LineCTAButton location="CTA Section" variant="secondary">
             {primaryCta?.text || defaults.primaryCta.text}
-          </Button>
+          </LineCTAButton>
           <Button
             href={secondaryCta?.link || defaults.secondaryCta.link}
             variant="outline"

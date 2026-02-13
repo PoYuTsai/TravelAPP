@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Button from '@/components/ui/Button'
+import LineCTAButton from '@/components/ui/LineCTAButton'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
 
@@ -65,13 +66,9 @@ export default function Hero({
             {description}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              href={primaryCta?.link || defaults.primaryCta.link}
-              external={primaryCta?.link?.startsWith('http')}
-              size="lg"
-            >
+            <LineCTAButton location="Hero - Primary CTA">
               {primaryCta?.text || defaults.primaryCta.text}
-            </Button>
+            </LineCTAButton>
             <Button
               href={secondaryCta?.link || defaults.secondaryCta.link}
               variant="outline"

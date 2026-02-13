@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
+import LineCTAButton from '@/components/ui/LineCTAButton'
 import StopsCarousel from '@/components/tours/StopsCarousel'
 import TourViewTracker from '@/components/tours/TourViewTracker'
 import RelatedTours from '@/components/tours/RelatedTours'
@@ -162,6 +163,8 @@ export async function generateMetadata({
       title: tour.title,
       description,
       type: 'website',
+      siteName: '清微旅行 Chiangway Travel',
+      locale: 'zh_TW',
       images: imageUrl ? [imageUrl] : undefined,
     },
     twitter: {
@@ -218,6 +221,13 @@ export default async function TourDetailPage({
         availability: 'https://schema.org/InStock',
       },
     }),
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '5',
+      reviewCount: '110',
+      bestRating: '5',
+      worstRating: '1',
+    },
   }
 
   // BreadcrumbList Schema for SEO
@@ -481,9 +491,9 @@ export default async function TourDetailPage({
           <p className="text-xl font-semibold text-gray-900 mb-6">
             聊聊你們的想法，我們幫你規劃
           </p>
-          <Button href="https://line.me/R/ti/p/@037nyuwk" external size="lg">
+          <LineCTAButton location="Tour Detail CTA">
             LINE 聊聊
-          </Button>
+          </LineCTAButton>
         </section>
 
         {/* Related Tours */}

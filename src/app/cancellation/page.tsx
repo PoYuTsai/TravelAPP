@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     url: 'https://chiangway-travel.com/cancellation',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: '取消與退款政策',
     description: '清微旅行的取消與退款政策。',
   },

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     url: 'https://chiangway-travel.com/terms',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: '服務條款',
     description: '清微旅行的服務條款。',
   },

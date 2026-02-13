@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     url: 'https://chiangway-travel.com/privacy',
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: '隱私權政策',
     description: '清微旅行的隱私權政策。',
   },

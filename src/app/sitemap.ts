@@ -39,7 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://chiangway-travel.com'
 
   // 靜態頁面 - 使用固定版本日期（避免每次生成都變更）
-  const lastUpdated = new Date('2026-02-09')
+  const lastUpdated = new Date('2026-02-13')
   const staticPages: MetadataRoute.Sitemap = [
     { url: baseUrl, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/tours`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.9 },

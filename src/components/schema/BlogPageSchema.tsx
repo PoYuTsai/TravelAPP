@@ -1,18 +1,36 @@
 const SITE_URL = 'https://chiangway-travel.com'
 
-interface BlogPageSchemaProps {
-  postCount: number
+interface BlogPost {
+  title: string
+  slug: { current: string }
+  excerpt?: string
+  publishedAt?: string
 }
 
-export default function BlogPageSchema({ postCount }: BlogPageSchemaProps) {
-  // Blog schema
+interface BlogPageSchemaProps {
+  postCount: number
+  posts?: BlogPost[]
+}
+
+export default function BlogPageSchema({ postCount, posts = [] }: BlogPageSchemaProps) {
+  // Blog schema with dynamic blogPost list
   const blogSchema = {
     '@context': 'https://schema.org',
     '@type': 'Blog',
     name: '清微旅行部落格',
     description: '清邁親子旅遊攻略、景點推薦、美食分享，由住在清邁的台灣人親自撰寫的第一手資訊。',
     url: `${SITE_URL}/blog`,
-    blogPost: [],
+    blogPost: posts.slice(0, 10).map((post) => ({
+      '@type': 'BlogPosting',
+      headline: post.title,
+      url: `${SITE_URL}/blog/${post.slug.current}`,
+      ...(post.excerpt && { description: post.excerpt }),
+      ...(post.publishedAt && { datePublished: post.publishedAt }),
+      author: {
+        '@type': 'Person',
+        name: 'Eric',
+      },
+    })),
     publisher: {
       '@type': 'Organization',
       name: '清微旅行 Chiangway Travel',

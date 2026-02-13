@@ -13,6 +13,7 @@ import ScrollDepthTracker from '@/components/analytics/ScrollDepthTracker'
 import PortableTextRenderer from '@/components/blog/PortableTextRenderer'
 import RelatedPosts from '@/components/blog/RelatedPosts'
 import Button from '@/components/ui/Button'
+import LineCTAButton from '@/components/ui/LineCTAButton'
 import { getCategoryName } from '@/lib/constants'
 
 // Sanity 查詢 - 取得單篇文章
@@ -86,6 +87,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
       title: post.title,
       description,
       type: 'article',
+      locale: 'zh_TW',
+      siteName: '清微旅行 Chiangway Travel',
       publishedTime: post.publishedAt,
       modifiedTime: post.updatedAt || post.publishedAt,
       authors: ['清微旅行'],
@@ -210,9 +213,9 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
             <p className="text-gray-600 mb-6 max-w-lg mx-auto">
               我們是住在清邁的台泰夫妻，提供專業的親子包車服務。免費諮詢，讓在地人帶你玩最道地的清邁！
             </p>
-            <Button href="https://line.me/R/ti/p/@037nyuwk" external size="lg">
+            <LineCTAButton location="Article Bottom CTA">
               LINE 免費諮詢
-            </Button>
+            </LineCTAButton>
           </div>
 
           {/* 作者資訊（底部再次顯示）*/}
