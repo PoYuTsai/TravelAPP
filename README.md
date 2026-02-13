@@ -31,6 +31,7 @@
 | Phase 6.4 | 審查 #7 + UX 優化 | ✅ 完成 |
 | Phase 6.5 | Blog 分頁 + Schema 補強 | ✅ 完成 |
 | Phase 6.6 | 審查 #8 A11y/資安優化 | ✅ 完成 |
+| Phase 6.7 | 審查 #10 SEO/行銷追蹤優化 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -254,4 +255,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-02-01 Phase 6.6: Comprehensive review #8 A11y/security improvements -->
+<!-- Last build trigger: 2026-02-13 Phase 6.7: Comprehensive review #10 SEO/marketing tracking improvements -->
