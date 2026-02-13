@@ -208,6 +208,59 @@
 
 ## 歷史審查記錄
 
+### 審查 #10 - 2026-02-13 (SEO Schema 動態化、行銷追蹤補全、Metadata 優化)
+
+**執行範圍**: 架構安全、前端 UX/A11y、SEO、行銷追蹤 全面掃描
+
+**發現問題與處理**:
+
+| 角色 | 問題 | 嚴重度 | 處理結果 |
+|------|------|--------|----------|
+| SEO | BlogPageSchema 的 `blogPost: []` 為空 | 🟠 高 | ✅ 動態填入文章列表（最多 10 篇）|
+| 行銷 | Hero/CTA/文章底部 LINE 按鈕缺少點擊追蹤 | 🟠 高 | ✅ 新增 LineCTAButton 元件，統一追蹤 |
+| 行銷 | Tour 詳情頁 CTA 按鈕缺少追蹤 | 🟠 高 | ✅ 改用 LineCTAButton |
+| SEO | Sitemap 靜態頁面日期過舊 (2026-02-09) | 🟡 中 | ✅ 更新至 2026-02-13 |
+| SEO | `/privacy`、`/terms`、`/cancellation` Twitter Card 用 `summary` | 🟡 中 | ✅ 統一改為 `summary_large_image` |
+| SEO | `/tours/[slug]` openGraph 缺少 `siteName` 和 `locale` | 🟡 中 | ✅ 補充 siteName + locale |
+| SEO | `/blog/[slug]` openGraph 缺少 `locale` 和 `siteName` | 🟡 中 | ✅ 補充 locale + siteName |
+| SEO | Tour Schema 缺少 `aggregateRating` | 🟡 中 | ✅ 補充 5 星 110 評論 |
+
+**確認正常項目**:
+- `.env.local` 未被 commit ✅（探索代理誤報，.gitignore 有效）
+- Rate Limiting 有上限 + 清理機制 ✅
+- HSTS/CSP/CORS 配置完善 ✅
+- API 認證 timing-safe 比較 ✅
+- A11y WCAG 2.1 AA 合規 ✅
+- 所有觸控目標 ≥ 44px ✅
+- Dialog/Modal focus trap + Esc ✅
+- 表單驗證 + aria 屬性 ✅
+- Canonical URLs 完整 ✅
+- robots.txt 配置正確 ✅
+- LocalBusiness/Organization Schema ✅
+- GTM 正確部署 ✅
+- 視頻/滾動深度追蹤 ✅
+- ArticleSchema 已正確調用（探索代理誤報）✅
+- CollectionPageSchema 已正確調用（探索代理誤報）✅
+
+**新增檔案**:
+- `src/components/ui/LineCTAButton.tsx`
+
+**修改檔案**:
+- `src/app/sitemap.ts`
+- `src/app/privacy/page.tsx`
+- `src/app/terms/page.tsx`
+- `src/app/cancellation/page.tsx`
+- `src/app/tours/[slug]/page.tsx`
+- `src/app/blog/[slug]/page.tsx`
+- `src/app/blog/page.tsx`
+- `src/components/schema/BlogPageSchema.tsx`
+- `src/components/sections/Hero.tsx`
+- `src/components/sections/CTA.tsx`
+
+**Commit**: `983ac8b`
+
+---
+
 ### 審查 #9 - 2026-02-09 (SEO Metadata、A11y 圖片優化、品牌語意修正)
 
 **執行範圍**: 架構安全、前端 UX/A11y、SEO、行銷追蹤、品牌用戶體驗 全面掃描
@@ -550,5 +603,5 @@
 
 ---
 
-*最後更新: 2026-02-09*
-*版本: 1.6*
+*最後更新: 2026-02-13*
+*版本: 1.7*
