@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>清邁 6天5夜 報價計算器 v3</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #2d5a3d; margin-bottom: 5px; }
+    .subtitle { color: #666; margin-bottom: 20px; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 10px 20px;
+      background: #ddd;
+      border: none;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .tab.active { background: #2d5a3d; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      color: #333;
+      border-bottom: 2px solid #2d5a3d;
+      padding-bottom: 8px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .row label { min-width: 100px; }
+    input[type="number"], select {
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 16px;
+    }
+    input[type="number"] { width: 80px; }
+    select { min-width: 150px; }
+    .room-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .room-card {
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .room-card .name { font-weight: bold; margin-bottom: 4px; }
+    .room-card .price { color: #666; font-size: 14px; margin-bottom: 8px; }
+    .room-card input { width: 60px; text-align: center; }
+    .ticket-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+    }
+    .ticket-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      background: #f9f9f9;
+      border-radius: 6px;
+    }
+    .ticket-item input { margin: 0; }
+    .ticket-item .price { margin-left: auto; color: #666; font-size: 14px; }
+    .optional-section { background: #fff9e6; border: 1px solid #f0d000; }
+    .result {
+      background: #2d5a3d;
+      color: white;
+      text-align: center;
+      padding: 24px;
+      position: sticky;
+      bottom: 0;
+      border-radius: 12px;
+    }
+    .result .total { font-size: 36px; font-weight: bold; }
+    .result .per-person { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+    .warning {
+      background: #fff3cd;
+      color: #856404;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .note { font-size: 12px; color: #999; }
+    .info-box {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    /* 表格 */
+    .cost-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .cost-table th, .cost-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: right;
+    }
+    .cost-table th { background: #f5f5f5; text-align: center; }
+    .cost-table td:first-child { text-align: left; }
+    .cost-table .section-header {
+      background: #2d5a3d;
+      color: white;
+      text-align: left;
+      font-weight: bold;
+    }
+    .cost-table .subtotal { background: #e8f5e9; font-weight: bold; }
+    .cost-table .profit { color: #2d5a3d; font-weight: bold; }
+    .cost-table .your-profit { background: #c8e6c9; }
+    .cost-table .partner-profit { background: #fff3cd; }
+    .cost-table .day-row { background: #fafafa; }
+
+    /* 對外報價單 */
+    .quote-card {
+      background: white;
+      border: 2px solid #2d5a3d;
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .quote-header {
+      text-align: center;
+      border-bottom: 2px solid #2d5a3d;
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+    }
+    .quote-header h2 { color: #2d5a3d; margin: 0; }
+    .quote-header .subtitle { margin: 8px 0 0 0; }
+    .quote-items { margin-bottom: 16px; }
+    .quote-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px dashed #ddd;
+    }
+    .quote-total {
+      background: #2d5a3d;
+      color: white;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 16px;
+    }
+    .quote-total .price { font-size: 28px; font-weight: bold; }
+    .quote-note {
+      font-size: 12px;
+      color: #666;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #ddd;
+    }
+
+    /* 列印樣式 */
+    @media print {
+      body { background: white; padding: 0; }
+      .tabs, .section:not(.quote-card), #tab-input, #tab-internal { display: none !important; }
+      #tab-external { display: block !important; }
+      .quote-card {
+        max-width: 100%;
+        border: none;
+        box-shadow: none;
+        margin: 0;
+        padding: 20px;
+      }
+      @page { margin: 1cm; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🚐 清邁 6天5夜 報價計算器</h1>
+  <p class="subtitle">內部工具 v3 — 含車導明細</p>
+
+  <!-- 分頁 -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('input')">📝 輸入</button>
+    <button class="tab" onclick="showTab('internal')">📊 內部明細</button>
+    <button class="tab" onclick="showTab('external')">📄 對外報價單</button>
+    <button class="tab" onclick="printQuote()" style="background:#4a7c59; color:white;">🖨️ 列印/PDF</button>
+    <button class="tab" onclick="copyTextQuote()" style="background:#1976d2; color:white;">📋 複製文字</button>
+  </div>
+
+  <!-- 輸入頁 -->
+  <div id="tab-input" class="tab-content active">
+    <!-- 人數 -->
+    <div class="section">
+      <h2>👥 人數</h2>
+      <div class="row">
+        <label>總人數</label>
+        <input type="number" id="totalPeople" min="4" max="20" value="10">
+        <span class="note">4人起</span>
+      </div>
+      <div id="peopleWarning" class="warning" style="display:none;"></div>
+      <div class="row" style="margin-top:12px;">
+        <label>匯率</label>
+        <input type="number" id="exchangeRate" min="0.90" max="1.00" step="0.01" value="0.93" style="width:100px;">
+        <span class="note">泰銖 ÷ 匯率 = 台幣（0.90~1.00）</span>
+      </div>
+    </div>
+
+    <!-- 住宿 -->
+    <div class="section">
+      <h2>🏨 住宿（5晚）</h2>
+      <div class="room-grid">
+        <div class="room-card">
+          <div class="name">雙人房</div>
+          <div class="price">2,500/晚</div>
+          <input type="number" id="roomDouble" min="0" max="10" value="5">
+          <div class="note">容納 2 人</div>
+        </div>
+        <div class="room-card">
+          <div class="name">三人房</div>
+          <div class="price">3,500/晚</div>
+          <input type="number" id="roomTriple" min="0" max="5" value="0">
+          <div class="note">容納 3 人</div>
+        </div>
+        <div class="room-card">
+          <div class="name">家庭房</div>
+          <div class="price">4,500/晚</div>
+          <input type="number" id="roomFamily" min="0" max="4" value="0">
+          <div class="note">容納 4 人</div>
+        </div>
+      </div>
+      <div id="roomWarning" class="warning" style="display:none;"></div>
+      <p class="note" style="margin-top:12px;">房間容納：<span id="roomCapacity">4</span> 人</p>
+    </div>
+
+    <!-- 餐費 -->
+    <div class="section">
+      <h2>🍜 餐費（5天午晚餐）</h2>
+      <div class="row">
+        <label>餐費等級</label>
+        <select id="mealLevel">
+          <option value="900">平價 - 900/人/天</option>
+          <option value="1200">精選 - 1,200/人/天</option>
+          <option value="1500">高級 - 1,500/人/天</option>
+        </select>
+      </div>
+      <p class="note">餐費小計：<span id="mealSubtotal">0</span> 泰銖</p>
+    </div>
+
+    <!-- 車導 -->
+    <div class="section">
+      <h2>🚗 車導費</h2>
+      <div id="luggageRow" class="checkbox-row" style="display:none;">
+        <input type="checkbox" id="luggageCar" checked>
+        <label for="luggageCar">行李車（7人以上建議）接+送 = 1,200 泰銖</label>
+      </div>
+      <p class="note">車輛數：<span id="carCount">1</span> 台</p>
+      <div class="info-box">
+        <strong>⏱️ 超時費規則</strong><br>
+        • 清邁行程：10 小時/天<br>
+        • 清萊行程：12 小時/天<br>
+        • 超時費：200 泰銖/小時
+      </div>
+    </div>
+
+    <!-- 門票 -->
+    <div class="section">
+      <h2>🎫 門票活動（預設全選）</h2>
+      <div class="ticket-grid" id="ticketGrid"></div>
+      <p class="note" style="margin-top:12px;">門票小計/人：<span id="ticketSubtotal">0</span> 泰銖</p>
+    </div>
+
+    <!-- D1 泰服體驗 -->
+    <div class="section optional-section">
+      <h2>👘 D1 泰服體驗</h2>
+      <div class="checkbox-row">
+        <input type="checkbox" id="thaiDressCloth" checked>
+        <label for="thaiDressCloth">泰服衣服</label>
+        <span class="note">售價 500 / 成本 200 /人（全員）</span>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="thaiDressPhoto">
+        <label for="thaiDressPhoto">攝影師</label>
+        <span class="note">售價 2,500 / 成本 500 /位（1位可拍10人）</span>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <label>化妝人數</label>
+        <input type="number" id="makeupCount" min="0" max="20" value="0">
+        <span class="note">售價 1,000 / 成本 500 /人</span>
+      </div>
+      <p class="note" style="margin-top:8px;">泰服小計：<span id="thaiDressSubtotal">0</span> 泰銖</p>
+    </div>
+
+    <!-- 結果 -->
+    <div class="section result">
+      <div class="per-person">每人報價（台幣）</div>
+      <div class="total" id="finalPrice">--</div>
+      <p class="note" style="color:rgba(255,255,255,0.7);margin-top:8px;">
+        總計 <span id="totalTHB">0</span> 泰銖 ÷ <span id="divPeople">4</span>人 ÷ <span id="divRate">0.93</span>
+      </p>
+    </div>
+  </div>
+
+  <!-- 內部明細頁 -->
+  <div id="tab-internal" class="tab-content">
+    <div class="section">
+      <h2>📊 成本/售價/利潤明細（內部用）</h2>
+      <table class="cost-table" id="costTable"></table>
+    </div>
+  </div>
+
+  <!-- 對外報價單頁 -->
+  <div id="tab-external" class="tab-content">
+    <div class="quote-card" id="quoteCard"></div>
+  </div>
+
+  <script>
+    // ===== 資料定義 =====
+
+    // 每日車費明細（成本/售價）
+    const dailyCarFees = [
+      { day: 'D1', name: '市區(接機+行程)', cost: 2700, price: 3200, type: 'city' },
+      { day: 'D2', name: '郊區(大象/射擊)', cost: 3300, price: 3800, type: 'suburban' },
+      { day: 'D3', name: '清萊一日遊', cost: 4000, price: 4500, type: 'chiangrai' },
+      { day: 'D4', name: '郊區(水上/動物園)', cost: 3300, price: 3800, type: 'suburban' },
+      { day: 'D5', name: '郊區(叢林/蛇園)', cost: 3300, price: 3800, type: 'suburban' },
+      { day: 'D6', name: '市區(送機)', cost: 2700, price: 3200, type: 'city' },
+    ];
+
+    // 車導其他費用（接送機已含在 D1/D6 車費）
+    const otherTransport = {
+      guidePerDay: { name: '導遊/天', cost: 1500, price: 2500, days: 5 },
+      luggagePerTrip: { name: '行李車/趟', cost: 0, price: 600 },
+    };
+
+    // 超時費
+    const overtime = {
+      city: { hours: 10, rate: 200 },      // 清邁市區/郊區
+      suburban: { hours: 10, rate: 200 },
+      chiangrai: { hours: 12, rate: 200 }, // 清萊
+    };
+
+    // 門票資料（郭姐報價：售價/退款，成本=售價-退款，利潤=退款對分）
+    // rebate = 退款（佣金），cost = price - rebate
+    const tickets = [
+      // D2
+      { id: 'elephant', name: 'D2 大象保護營（不含餐）', price: 1600, rebate: 1100, split: true },
+      { id: 'shooting', name: 'D2 射擊', price: 1700, rebate: 500, split: true },
+      { id: 'cabaret', name: 'D2 人妖秀', price: 1000, rebate: 500, split: true },
+      // D3
+      { id: 'whiteTemple', name: 'D3 白廟', price: 0, rebate: 0, split: false },
+      { id: 'blueTemple', name: 'D3 藍廟', price: 0, rebate: 0, split: false },
+      { id: 'blackTemple', name: 'D3 黑廟', price: 0, rebate: 0, split: false },
+      { id: 'longNeck', name: 'D3 長頸村', price: 300, rebate: 200, split: true },
+      // D4
+      { id: 'waterPark', name: 'D4 水上樂園 ⚠️待補', price: 950, rebate: 0, split: true },
+      { id: 'nightSafari', name: 'D4 夜間動物園', price: 1200, rebate: 550, split: true },
+      // D5
+      { id: 'zipline', name: 'D5 叢林飛索', price: 2400, rebate: 500, split: true },
+      { id: 'snakeFarm', name: 'D5 蛇園', price: 200, rebate: 100, split: true },
+      { id: 'pigSlide', name: 'D5 豬豬溜滑梯', price: 200, rebate: 30, split: true },
+    ];
+
+    // 計算 cost（售價 - 退款）
+    tickets.forEach(t => { t.cost = t.price - t.rebate; });
+
+    // D1 泰服（獨立計算，同樣是 售價/退款）
+    const thaiDressOptions = {
+      cloth: { name: '泰服衣服', price: 500, rebate: 200, split: true },      // 成本 300
+      makeup: { name: '泰服化妝', price: 1000, rebate: 500, split: true },    // 成本 500
+      photo: { name: '攝影師', price: 2500, rebate: 500, split: true },       // 成本 2000
+    };
+    // 計算泰服 cost
+    Object.values(thaiDressOptions).forEach(t => { t.cost = t.price - t.rebate; });
+
+    
+    // 常數（匯率從 input 讀取）
+    function getExchangeRate() {
+      return parseFloat(document.getElementById('exchangeRate').value) || 0.93;
+    }
+    const NIGHTS = 5;
+    const MEAL_DAYS = 5;
+    const INSURANCE_PER_PERSON = 100;
+    const ROOM_PRICES = { double: 2500, triple: 3500, family: 4500 };
+
+    // ===== 函數 =====
+
+    function showTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.querySelector('.tab[onclick*="' + tabName + '"]').classList.add('active');
+      document.getElementById('tab-' + tabName).classList.add('active');
+      if (tabName === 'internal') renderCostTable();
+      if (tabName === 'external') renderQuoteCard();
+    }
+
+    function initTickets() {
+      const grid = document.getElementById('ticketGrid');
+      grid.replaceChildren();
+      tickets.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'ticket-item';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = 'ticket_' + t.id;
+        checkbox.checked = true;
+        checkbox.addEventListener('change', calculate);
+        const label = document.createElement('label');
+        label.htmlFor = 'ticket_' + t.id;
+        label.textContent = t.name;
+        const price = document.createElement('span');
+        price.className = 'price';
+        // 顯示 售價/退款 格式
+        if (t.rebate > 0) {
+          price.textContent = t.price.toLocaleString() + '/' + t.rebate.toLocaleString();
+        } else {
+          price.textContent = t.price > 0 ? t.price.toLocaleString() : '免費';
+        }
+        item.appendChild(checkbox);
+        item.appendChild(label);
+        item.appendChild(price);
+        grid.appendChild(item);
+      });
+    }
+
+    function updateDefaultRooms() {
+      const people = parseInt(document.getElementById('totalPeople').value) || 4;
+      document.getElementById('roomDouble').value = Math.ceil(people / 2);
+      document.getElementById('roomTriple').value = 0;
+      document.getElementById('roomFamily').value = 0;
+    }
+
+    function getInputs() {
+      const people = parseInt(document.getElementById('totalPeople').value) || 4;
+      const roomDouble = parseInt(document.getElementById('roomDouble').value) || 0;
+      const roomTriple = parseInt(document.getElementById('roomTriple').value) || 0;
+      const roomFamily = parseInt(document.getElementById('roomFamily').value) || 0;
+      const mealLevel = parseInt(document.getElementById('mealLevel').value) || 900;
+      const makeupCount = parseInt(document.getElementById('makeupCount').value) || 0;
+      const luggageCheckbox = document.getElementById('luggageCar');
+      const needLuggageCar = people >= 7 && luggageCheckbox ? luggageCheckbox.checked : false;
+      const carCount = people >= 10 ? 2 : 1;
+      const roomCapacity = roomDouble * 2 + roomTriple * 3 + roomFamily * 4;
+
+      // 門票
+      const selectedTickets = tickets.filter(t => {
+        const cb = document.getElementById('ticket_' + t.id);
+        return cb && cb.checked;
+      });
+
+      // D1 泰服
+      const hasThaiDressCloth = document.getElementById('thaiDressCloth').checked;
+      const hasThaiDressPhoto = document.getElementById('thaiDressPhoto').checked;
+
+      return {
+        people, roomDouble, roomTriple, roomFamily, mealLevel, makeupCount,
+        needLuggageCar, carCount, roomCapacity, selectedTickets,
+        hasThaiDressCloth, hasThaiDressPhoto
+      };
+    }
+
+    function calculateCosts() {
+      const i = getInputs();
+
+      // 住宿
+      const accommodation = {
+        cost: (i.roomDouble * ROOM_PRICES.double + i.roomTriple * ROOM_PRICES.triple + i.roomFamily * ROOM_PRICES.family) * NIGHTS,
+        price: (i.roomDouble * ROOM_PRICES.double + i.roomTriple * ROOM_PRICES.triple + i.roomFamily * ROOM_PRICES.family) * NIGHTS
+      };
+
+      // 餐費
+      const meal = {
+        cost: i.people * i.mealLevel * MEAL_DAYS,
+        price: i.people * i.mealLevel * MEAL_DAYS
+      };
+
+      // 車導明細
+      let carCostTotal = 0, carPriceTotal = 0;
+      dailyCarFees.forEach(d => {
+        carCostTotal += d.cost * i.carCount;
+        carPriceTotal += d.price * i.carCount;
+      });
+
+      // 導遊
+      const guide = {
+        cost: otherTransport.guidePerDay.cost * otherTransport.guidePerDay.days,
+        price: otherTransport.guidePerDay.price * otherTransport.guidePerDay.days
+      };
+
+      // 行李車
+      const luggage = {
+        cost: 0,
+        price: i.needLuggageCar ? otherTransport.luggagePerTrip.price * 2 : 0
+      };
+
+      const transportTotal = {
+        cost: carCostTotal + guide.cost + luggage.cost,
+        price: carPriceTotal + guide.price + luggage.price
+      };
+      const transportProfit = transportTotal.price - transportTotal.cost;
+
+      // 車導小計（分開）
+      const carSubtotal = { cost: carCostTotal, price: carPriceTotal };
+      const guideSubtotal = { cost: guide.cost, price: guide.price };
+
+      // 門票
+      let ticketCost = 0, ticketPrice = 0, ticketYourProfit = 0, ticketPartnerProfit = 0;
+      i.selectedTickets.forEach(t => {
+        ticketCost += t.cost * i.people;
+        ticketPrice += t.price * i.people;
+        const profit = (t.price - t.cost) * i.people;
+        if (t.split) {
+          ticketYourProfit += profit / 2;
+          ticketPartnerProfit += profit / 2;
+        }
+      });
+      const ticketTotal = { cost: ticketCost, price: ticketPrice, yourProfit: ticketYourProfit, partnerProfit: ticketPartnerProfit };
+
+      // D1 泰服體驗
+      let thaiDressCost = 0, thaiDressPrice = 0, thaiDressYourProfit = 0, thaiDressPartnerProfit = 0;
+
+      // 泰服衣服（全員）
+      if (i.hasThaiDressCloth) {
+        const clothCost = thaiDressOptions.cloth.cost * i.people;
+        const clothPrice = thaiDressOptions.cloth.price * i.people;
+        thaiDressCost += clothCost;
+        thaiDressPrice += clothPrice;
+        const clothProfit = clothPrice - clothCost;
+        thaiDressYourProfit += clothProfit / 2;
+        thaiDressPartnerProfit += clothProfit / 2;
+      }
+
+      // 化妝（可選人數）
+      if (i.makeupCount > 0) {
+        const makeupCost = thaiDressOptions.makeup.cost * i.makeupCount;
+        const makeupPrice = thaiDressOptions.makeup.price * i.makeupCount;
+        thaiDressCost += makeupCost;
+        thaiDressPrice += makeupPrice;
+        const makeupProfit = makeupPrice - makeupCost;
+        thaiDressYourProfit += makeupProfit / 2;
+        thaiDressPartnerProfit += makeupProfit / 2;
+      }
+
+      // 攝影師（1位可拍10人）
+      if (i.hasThaiDressPhoto) {
+        const photographerCount = i.people <= 10 ? 1 : 2;
+        const photoCost = thaiDressOptions.photo.cost * photographerCount;
+        const photoPrice = thaiDressOptions.photo.price * photographerCount;
+        thaiDressCost += photoCost;
+        thaiDressPrice += photoPrice;
+        const photoProfit = photoPrice - photoCost;
+        thaiDressYourProfit += photoProfit / 2;
+        thaiDressPartnerProfit += photoProfit / 2;
+      }
+
+      const thaiDress = {
+        cost: thaiDressCost,
+        price: thaiDressPrice,
+        yourProfit: thaiDressYourProfit,
+        partnerProfit: thaiDressPartnerProfit
+      };
+
+      // 保險
+      const insurance = {
+        cost: i.people * INSURANCE_PER_PERSON,
+        price: i.people * INSURANCE_PER_PERSON
+      };
+
+      // 總計
+      const totalCost = accommodation.cost + meal.cost + transportTotal.cost + ticketTotal.cost + thaiDress.cost + insurance.cost;
+      const totalPrice = accommodation.price + meal.price + transportTotal.price + ticketTotal.price + thaiDress.price + insurance.price;
+
+      // 利潤
+      const yourTotalProfit = transportProfit + ticketTotal.yourProfit + thaiDress.yourProfit;
+      const partnerTotalProfit = ticketTotal.partnerProfit + thaiDress.partnerProfit;
+
+      // 每人報價
+      const perPersonTHB = totalPrice / i.people;
+      const perPersonTWD = Math.round(perPersonTHB / getExchangeRate());
+
+      return {
+        inputs: i,
+        accommodation, meal, transportTotal, carSubtotal, guideSubtotal, luggage,
+        ticketTotal, thaiDress, insurance,
+        totalCost, totalPrice, transportProfit, yourTotalProfit, partnerTotalProfit,
+        perPersonTHB, perPersonTWD
+      };
+    }
+
+    function calculate() {
+      const i = getInputs();
+      const c = calculateCosts();
+
+      // 驗證
+      const peopleWarning = document.getElementById('peopleWarning');
+      peopleWarning.style.display = i.people < 4 ? 'block' : 'none';
+      if (i.people < 4) peopleWarning.textContent = '⚠️ 最低 4 人成團';
+
+      document.getElementById('roomCapacity').textContent = i.roomCapacity;
+      const roomWarning = document.getElementById('roomWarning');
+      if (i.roomCapacity < i.people) {
+        roomWarning.textContent = '⚠️ 房間不足！需容納 ' + i.people + ' 人，目前只有 ' + i.roomCapacity + ' 人';
+        roomWarning.style.display = 'block';
+      } else {
+        roomWarning.style.display = 'none';
+      }
+
+      document.getElementById('carCount').textContent = i.carCount;
+      document.getElementById('luggageRow').style.display = i.people >= 7 ? 'flex' : 'none';
+
+      // 泰服小計
+      document.getElementById('thaiDressSubtotal').textContent = c.thaiDress.price.toLocaleString();
+
+      let ticketPerPerson = 0;
+      i.selectedTickets.forEach(t => ticketPerPerson += t.price);
+      document.getElementById('ticketSubtotal').textContent = ticketPerPerson.toLocaleString();
+      document.getElementById('mealSubtotal').textContent = c.meal.price.toLocaleString();
+
+      document.getElementById('finalPrice').textContent = 'NT$ ' + c.perPersonTWD.toLocaleString();
+      document.getElementById('totalTHB').textContent = c.totalPrice.toLocaleString();
+      document.getElementById('divPeople').textContent = i.people;
+      document.getElementById('divRate').textContent = getExchangeRate();
+    }
+
+    function renderCostTable() {
+      const c = calculateCosts();
+      const i = c.inputs;
+      const table = document.getElementById('costTable');
+      table.replaceChildren();
+
+      const fmt = n => n.toLocaleString();
+
+      // 表頭
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      ['項目', '成本', '售價', '利潤'].forEach(text => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+
+      // 住宿
+      addSection(tbody, '🏨 住宿 (' + NIGHTS + '晚)');
+      addRow(tbody, '住宿費', c.accommodation.cost, c.accommodation.price, 0);
+
+      // 餐費
+      addSection(tbody, '🍜 餐費 (' + MEAL_DAYS + '天)');
+      addRow(tbody, '餐費 (' + i.mealLevel + '/人/天)', c.meal.cost, c.meal.price, 0);
+
+      // 車費明細
+      addSection(tbody, '🚗 車費明細 (' + i.carCount + '台)');
+      dailyCarFees.forEach(d => {
+        const cost = d.cost * i.carCount;
+        const price = d.price * i.carCount;
+        addRow(tbody, d.day + ' ' + d.name, cost, price, price - cost, 'day-row');
+      });
+      addSubtotal(tbody, '車費小計', c.carSubtotal.cost, c.carSubtotal.price, c.carSubtotal.price - c.carSubtotal.cost);
+
+      // 導遊
+      addSection(tbody, '👤 導遊');
+      addRow(tbody, '導遊 (5天)', c.guideSubtotal.cost, c.guideSubtotal.price, c.guideSubtotal.price - c.guideSubtotal.cost);
+      if (i.needLuggageCar) {
+        addRow(tbody, '行李車 (2趟)', 0, c.luggage.price, c.luggage.price);
+      }
+      addSubtotal(tbody, '車導總計', c.transportTotal.cost, c.transportTotal.price, c.transportProfit);
+      addInfoRow(tbody, '※ 接送機已含在 D1/D6 車費');
+
+      // 超時費說明
+      addSection(tbody, '⏱️ 超時費規則（未計入報價）');
+      addInfoRow(tbody, '清邁行程：10小時/天，超時 200 泰銖/小時');
+      addInfoRow(tbody, '清萊行程：12小時/天，超時 200 泰銖/小時');
+
+      // 門票明細表（售價/退款格式）
+      addSection(tbody, '🎫 門票活動明細（' + i.people + '人）');
+      addInfoRow(tbody, '格式：售價/退款（佣金）→ 成本=售價-退款，利潤=退款對分');
+
+      // 表頭：單價
+      const ticketHeaderRow = document.createElement('tr');
+      ticketHeaderRow.style.cssText = 'background:#e3f2fd; font-size:12px; font-weight:bold;';
+      addCell(ticketHeaderRow, '項目');
+      addCell(ticketHeaderRow, '售價');
+      addCell(ticketHeaderRow, '退款');
+      addCell(ticketHeaderRow, '成本');
+      tbody.appendChild(ticketHeaderRow);
+
+      i.selectedTickets.forEach(t => {
+        const row = document.createElement('tr');
+        row.className = 'day-row';
+        addCell(row, t.name + (t.split && t.rebate > 0 ? ' ★' : ''));
+        addCell(row, fmt(t.price));
+        addCell(row, t.rebate > 0 ? fmt(t.rebate) : '-');
+        addCell(row, fmt(t.cost));
+        tbody.appendChild(row);
+      });
+
+      // 總計表頭
+      const ticketTotalHeader = document.createElement('tr');
+      ticketTotalHeader.style.cssText = 'background:#e3f2fd; font-size:12px; font-weight:bold;';
+      addCell(ticketTotalHeader, '總計 ×' + i.people + '人');
+      addCell(ticketTotalHeader, '售價');
+      addCell(ticketTotalHeader, '退款(利潤)');
+      addCell(ticketTotalHeader, '成本');
+      tbody.appendChild(ticketTotalHeader);
+
+      // 總計行
+      const totalRebate = c.ticketTotal.yourProfit + c.ticketTotal.partnerProfit;
+      const ticketTotalRow = document.createElement('tr');
+      ticketTotalRow.className = 'subtotal';
+      addCell(ticketTotalRow, '門票總計');
+      addCell(ticketTotalRow, fmt(c.ticketTotal.price));
+      addCell(ticketTotalRow, fmt(totalRebate));
+      addCell(ticketTotalRow, fmt(c.ticketTotal.cost));
+      tbody.appendChild(ticketTotalRow);
+
+      // 對分明細
+      const yourTicketRow = document.createElement('tr');
+      yourTicketRow.className = 'your-profit';
+      addCell(yourTicketRow, '　→ 你的利潤（退款½）');
+      addCell(yourTicketRow, '');
+      addCell(yourTicketRow, fmt(c.ticketTotal.yourProfit), 'profit');
+      addCell(yourTicketRow, '');
+      tbody.appendChild(yourTicketRow);
+
+      const partnerTicketRow = document.createElement('tr');
+      partnerTicketRow.className = 'partner-profit';
+      addCell(partnerTicketRow, '　→ 郭姐利潤（退款½）');
+      addCell(partnerTicketRow, '');
+      addCell(partnerTicketRow, fmt(c.ticketTotal.partnerProfit), 'profit');
+      addCell(partnerTicketRow, '');
+      tbody.appendChild(partnerTicketRow);
+
+      addInfoRow(tbody, '★ 標記項目有退款（佣金）需對分｜無標記為原價或免費');
+
+      // D1 泰服體驗
+      if (c.thaiDress.price > 0) {
+        addSection(tbody, '👘 D1 泰服體驗（利潤對分）');
+        if (i.hasThaiDressCloth) {
+          const clothCost = thaiDressOptions.cloth.cost * i.people;
+          const clothPrice = thaiDressOptions.cloth.price * i.people;
+          addRow(tbody, '泰服衣服 (' + i.people + '人)', clothCost, clothPrice, clothPrice - clothCost);
+        }
+        if (i.makeupCount > 0) {
+          const makeupCost = thaiDressOptions.makeup.cost * i.makeupCount;
+          const makeupPrice = thaiDressOptions.makeup.price * i.makeupCount;
+          addRow(tbody, '化妝 (' + i.makeupCount + '人)', makeupCost, makeupPrice, makeupPrice - makeupCost);
+        }
+        if (i.hasThaiDressPhoto) {
+          const photographerCount = i.people <= 10 ? 1 : 2;
+          const photoCost = thaiDressOptions.photo.cost * photographerCount;
+          const photoPrice = thaiDressOptions.photo.price * photographerCount;
+          addRow(tbody, '攝影師 (' + photographerCount + '位)', photoCost, photoPrice, photoPrice - photoCost);
+        }
+        addSubtotal(tbody, '泰服小計', c.thaiDress.cost, c.thaiDress.price, c.thaiDress.yourProfit + c.thaiDress.partnerProfit);
+      }
+
+      // 保險
+      addSection(tbody, '🛡️ 保險');
+      addRow(tbody, '旅遊保險 (' + i.people + '人)', c.insurance.cost, c.insurance.price, 0);
+
+      // 總計
+      addSection(tbody, '💰 總計');
+      const totalRow = document.createElement('tr');
+      totalRow.className = 'subtotal';
+      addCell(totalRow, '總計');
+      addCell(totalRow, fmt(c.totalCost));
+      addCell(totalRow, fmt(c.totalPrice));
+      addCell(totalRow, fmt(c.yourTotalProfit + c.partnerTotalProfit));
+      tbody.appendChild(totalRow);
+
+      // 利潤分配
+      addSection(tbody, '📈 利潤分配');
+      const yourRow = document.createElement('tr');
+      yourRow.className = 'your-profit';
+      addCell(yourRow, '✅ 你的利潤（車導差價 + 門票½）');
+      addCell(yourRow, '');
+      addCell(yourRow, '');
+      addCell(yourRow, fmt(c.yourTotalProfit), 'profit');
+      tbody.appendChild(yourRow);
+
+      const partnerRow = document.createElement('tr');
+      partnerRow.className = 'partner-profit';
+      addCell(partnerRow, '🤝 郭姐利潤（門票½）');
+      addCell(partnerRow, '');
+      addCell(partnerRow, '');
+      addCell(partnerRow, fmt(c.partnerTotalProfit), 'profit');
+      tbody.appendChild(partnerRow);
+
+      // 付給郭姐
+      const payPartner = c.transportTotal.cost + c.ticketTotal.cost + c.meal.cost + c.thaiDress.cost;
+      const payRow = document.createElement('tr');
+      payRow.className = 'partner-profit';
+      addCell(payRow, '💵 付給郭姐（成本）');
+      addCell(payRow, fmt(payPartner));
+      addCell(payRow, '');
+      addCell(payRow, '');
+      tbody.appendChild(payRow);
+
+      // 每人報價
+      addSection(tbody, '🏷️ 每人報價');
+      const priceRow = document.createElement('tr');
+      priceRow.className = 'subtotal';
+      addCell(priceRow, '每人報價');
+      addCell(priceRow, '');
+      addCell(priceRow, fmt(Math.round(c.perPersonTHB)) + ' 泰銖');
+      addCell(priceRow, 'NT$ ' + fmt(c.perPersonTWD), 'profit');
+      tbody.appendChild(priceRow);
+
+      table.appendChild(tbody);
+
+      function addSection(tbody, title) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 4;
+        cell.className = 'section-header';
+        cell.textContent = title;
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      }
+
+      function addRow(tbody, name, cost, price, profit, className) {
+        const row = document.createElement('tr');
+        if (className) row.className = className;
+        addCell(row, name);
+        addCell(row, fmt(cost));
+        addCell(row, fmt(price));
+        addCell(row, profit > 0 ? fmt(profit) : '-');
+        tbody.appendChild(row);
+      }
+
+      function addSubtotal(tbody, name, cost, price, profit) {
+        const row = document.createElement('tr');
+        row.className = 'subtotal';
+        addCell(row, name);
+        addCell(row, fmt(cost));
+        addCell(row, fmt(price));
+        addCell(row, fmt(profit));
+        tbody.appendChild(row);
+      }
+
+      function addInfoRow(tbody, text) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 4;
+        cell.style.cssText = 'text-align:left; color:#666; font-size:12px; background:#f9f9f9;';
+        cell.textContent = text;
+        row.appendChild(cell);
+        tbody.appendChild(row);
+      }
+
+      function addCell(row, text, className) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        if (className) cell.className = className;
+        row.appendChild(cell);
+      }
+    }
+
+    // 行程資料
+    const itinerary = [
+      {
+        day: 'DAY 1',
+        title: '抵達清邁・放鬆展開旅程',
+        items: [
+          '🛬 機場接機',
+          '💱 巫宗雄換匯',
+          '🍽️ 午餐：脆皮豬 NENG\'S CLAY OVEN',
+          '👘 泰服體驗＋專業攝影',
+          '🥭 阿嬤芒果糯米飯',
+          '🍽️ 晚餐：EKACHAN 泰北料理'
+        ],
+        hotel: '香格里拉酒店'
+      },
+      {
+        day: 'DAY 2',
+        title: '大象互動 + 射擊體驗',
+        items: [
+          '🐘 大象保護營（洗澡、餵食、拍照）',
+          '☕ AIR DIAMOND CAFE',
+          '🍽️ 午餐：MAI HEUN 60',
+          '🔫 射擊體驗',
+          '🍽️ 晚餐：SAMSEN VILLA 米其林',
+          '💃 人妖秀 20:00'
+        ],
+        hotel: '香格里拉酒店'
+      },
+      {
+        day: 'DAY 3',
+        title: '清萊一日遊（經典三廟）',
+        items: [
+          '⛪ 白廟',
+          '🍽️ 午餐：LALITTA CAFÉ 仙境咖啡廳',
+          '💙 藍廟',
+          '🖤 黑廟',
+          '👩 長頸村',
+          '🍽️ 晚餐：泰式烤肉自助餐'
+        ],
+        hotel: '香格里拉酒店'
+      },
+      {
+        day: 'DAY 4',
+        title: '水上樂園 + 夜間動物園',
+        items: [
+          '🏊 清邁大峽谷水上樂園',
+          '🍽️ 午餐：園區內用餐',
+          '🎨 藝術村 BAAN KANGWAT',
+          '🦁 夜間動物園',
+          '🍽️ 晚餐：黑森林餐廳'
+        ],
+        hotel: '清邁美平洲際酒店'
+      },
+      {
+        day: 'DAY 5',
+        title: '湄林探險一日',
+        items: [
+          '🌲 叢林飛索 ZIPLINE',
+          '🍽️ 午餐：FLEUR CAFE',
+          '🐍 蛇園表演',
+          '🐷 豬豬溜滑梯',
+          '🛒 BIG C 採買紀念品',
+          '🍽️ 晚餐：康托克帝王餐晚宴'
+        ],
+        hotel: '清邁美平洲際酒店'
+      },
+      {
+        day: 'DAY 6',
+        title: '收心慢遊・送機回國',
+        items: [
+          '🍳 早餐後退房',
+          '🛫 專車送機'
+        ],
+        hotel: null
+      }
+    ];
+
+    function renderQuoteCard() {
+      const c = calculateCosts();
+      const i = c.inputs;
+      const card = document.getElementById('quoteCard');
+      card.replaceChildren();
+
+      // === Header ===
+      const header = document.createElement('div');
+      header.className = 'quote-header';
+      header.style.cssText = 'background: linear-gradient(135deg, #2d5a3d, #4a7c59); color: white; border-radius: 12px 12px 0 0; margin: -24px -24px 20px -24px; padding: 24px;';
+
+      const logo = document.createElement('div');
+      logo.style.cssText = 'font-size: 32px; margin-bottom: 8px;';
+      logo.textContent = '🚐';
+
+      const brandName = document.createElement('h2');
+      brandName.style.cssText = 'margin: 0; font-size: 24px;';
+      brandName.textContent = '清微旅行 Chiangway Travel';
+
+      const tagline = document.createElement('p');
+      tagline.style.cssText = 'margin: 8px 0 0 0; opacity: 0.9; font-size: 14px;';
+      tagline.textContent = '台灣爸爸 × 泰國媽媽｜清邁在地親子包車';
+
+      const tripTitle = document.createElement('div');
+      tripTitle.style.cssText = 'margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.3); font-size: 18px; font-weight: bold;';
+      tripTitle.textContent = '清邁 6天5夜 親子包車行程';
+
+      header.appendChild(logo);
+      header.appendChild(brandName);
+      header.appendChild(tagline);
+      header.appendChild(tripTitle);
+      card.appendChild(header);
+
+      // === 行程概覽 ===
+      const itinerarySection = document.createElement('div');
+      itinerarySection.style.cssText = 'margin-bottom: 20px;';
+
+      const itineraryTitle = document.createElement('h3');
+      itineraryTitle.style.cssText = 'margin: 0 0 12px 0; color: #2d5a3d; font-size: 16px; border-bottom: 2px solid #2d5a3d; padding-bottom: 8px;';
+      itineraryTitle.textContent = '📅 行程概覽';
+      itinerarySection.appendChild(itineraryTitle);
+
+      itinerary.forEach(day => {
+        const dayCard = document.createElement('div');
+        dayCard.style.cssText = 'background: #f9f9f9; border-radius: 8px; padding: 12px; margin-bottom: 8px; border-left: 4px solid #2d5a3d;';
+
+        const dayHeader = document.createElement('div');
+        dayHeader.style.cssText = 'font-weight: bold; color: #2d5a3d; margin-bottom: 6px;';
+        dayHeader.textContent = day.day + '｜' + day.title;
+        dayCard.appendChild(dayHeader);
+
+        const dayItems = document.createElement('div');
+        dayItems.style.cssText = 'font-size: 13px; color: #555; line-height: 1.6;';
+        dayItems.textContent = day.items.join('　');
+        dayCard.appendChild(dayItems);
+
+        if (day.hotel) {
+          const hotelInfo = document.createElement('div');
+          hotelInfo.style.cssText = 'font-size: 12px; color: #888; margin-top: 6px;';
+          hotelInfo.textContent = '🏨 ' + day.hotel;
+          dayCard.appendChild(hotelInfo);
+        }
+
+        itinerarySection.appendChild(dayCard);
+      });
+
+      card.appendChild(itinerarySection);
+
+      // === 報價明細 ===
+      const priceSection = document.createElement('div');
+      priceSection.style.cssText = 'margin-bottom: 20px;';
+
+      const priceTitle = document.createElement('h3');
+      priceTitle.style.cssText = 'margin: 0 0 12px 0; color: #2d5a3d; font-size: 16px; border-bottom: 2px solid #2d5a3d; padding-bottom: 8px;';
+      priceTitle.textContent = '💰 報價明細';
+      priceSection.appendChild(priceTitle);
+
+      const info = document.createElement('div');
+      info.className = 'quote-items';
+
+      addQuoteItem(info, '👥 人數', i.people + ' 人');
+
+      const rooms = [];
+      if (i.roomDouble > 0) rooms.push('雙人房 x' + i.roomDouble);
+      if (i.roomTriple > 0) rooms.push('三人房 x' + i.roomTriple);
+      if (i.roomFamily > 0) rooms.push('家庭房 x' + i.roomFamily);
+      addQuoteItem(info, '🏨 住宿', rooms.join('、') + '（5晚）');
+
+      const mealLabels = { 900: '平價', 1200: '精選', 1500: '高級' };
+      addQuoteItem(info, '🍜 餐費', mealLabels[i.mealLevel] + '（5天午晚餐）');
+
+      addQuoteItem(info, '🚗 包車', i.carCount + ' 台 + 中文導遊（5天）');
+
+      // 門票（簡化顯示）
+      const ticketCount = i.selectedTickets.filter(t => t.price > 0).length;
+      addQuoteItem(info, '🎫 門票', ticketCount + ' 項活動（大象、射擊、人妖秀、三廟、水上樂園...）');
+
+      // 泰服
+      const thaiDressItems = [];
+      if (i.hasThaiDressCloth) thaiDressItems.push('泰服');
+      if (i.makeupCount > 0) thaiDressItems.push('化妝 x' + i.makeupCount);
+      if (i.hasThaiDressPhoto) thaiDressItems.push('攝影師');
+      if (thaiDressItems.length > 0) {
+        addQuoteItem(info, '👘 泰服體驗', thaiDressItems.join(' + '));
+      }
+
+      addQuoteItem(info, '🛡️ 旅遊保險', '含');
+
+      priceSection.appendChild(info);
+      card.appendChild(priceSection);
+
+      // === 總價 ===
+      const total = document.createElement('div');
+      total.className = 'quote-total';
+      total.style.cssText = 'background: linear-gradient(135deg, #2d5a3d, #4a7c59); color: white; padding: 20px; border-radius: 12px; text-align: center;';
+
+      const priceLabel = document.createElement('div');
+      priceLabel.style.cssText = 'font-size: 14px; opacity: 0.9;';
+      priceLabel.textContent = '每人費用';
+
+      const priceValue = document.createElement('div');
+      priceValue.style.cssText = 'font-size: 36px; font-weight: bold; margin: 8px 0;';
+      priceValue.textContent = 'NT$ ' + c.perPersonTWD.toLocaleString();
+
+      const priceSub = document.createElement('div');
+      priceSub.style.cssText = 'font-size: 12px; opacity: 0.8;';
+      priceSub.textContent = '約 ' + Math.round(c.perPersonTHB).toLocaleString() + ' 泰銖';
+
+      total.appendChild(priceLabel);
+      total.appendChild(priceValue);
+      total.appendChild(priceSub);
+      card.appendChild(total);
+
+      // === 費用說明 ===
+      const includeSection = document.createElement('div');
+      includeSection.style.cssText = 'margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;';
+
+      const includeBox = document.createElement('div');
+      includeBox.style.cssText = 'background: #e8f5e9; padding: 12px; border-radius: 8px;';
+      includeBox.innerHTML = '<div style="font-weight:bold; color:#2d5a3d; margin-bottom:8px;">✅ 費用包含</div>' +
+        '<div style="font-size:13px; color:#333; line-height:1.6;">• 5晚住宿<br>• 5天午晚餐<br>• 6天包車<br>• 5天中文導遊<br>• 全部門票活動<br>• 旅遊保險</div>';
+
+      const excludeBox = document.createElement('div');
+      excludeBox.style.cssText = 'background: #fff3e0; padding: 12px; border-radius: 8px;';
+      excludeBox.innerHTML = '<div style="font-weight:bold; color:#e65100; margin-bottom:8px;">❌ 費用不含</div>' +
+        '<div style="font-size:13px; color:#333; line-height:1.6;">• 來回機票<br>• 個人消費<br>• 按摩 SPA<br>• 超時費用</div>';
+
+      includeSection.appendChild(includeBox);
+      includeSection.appendChild(excludeBox);
+      card.appendChild(includeSection);
+
+      // === 注意事項 ===
+      const note = document.createElement('div');
+      note.style.cssText = 'margin-top: 16px; padding: 12px; background: #f5f5f5; border-radius: 8px; font-size: 12px; color: #666;';
+      note.innerHTML = '<div style="font-weight:bold; margin-bottom:8px;">📋 注意事項</div>' +
+        '• 超時費：清邁 10 小時/天、清萊 12 小時/天，超時 200 泰銖/小時<br>' +
+        '• 匯率以實際結算日為準<br>' +
+        '• 行程順序可能依當地狀況微調';
+      card.appendChild(note);
+
+      // === Footer ===
+      const footer = document.createElement('div');
+      footer.style.cssText = 'margin-top: 20px; padding-top: 16px; border-top: 2px solid #eee; text-align: center; font-size: 13px; color: #666;';
+      footer.innerHTML = '<div style="margin-bottom:8px;">💬 LINE 諮詢：<strong>@037nyuwk</strong></div>' +
+        '<div>🌐 chiangway-travel.com</div>';
+      card.appendChild(footer);
+
+      function addQuoteItem(container, label, value) {
+        const item = document.createElement('div');
+        item.className = 'quote-item';
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = label;
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = value;
+        item.appendChild(labelSpan);
+        item.appendChild(valueSpan);
+        container.appendChild(item);
+      }
+    }
+
+    // 事件
+    document.querySelectorAll('input, select').forEach(el => {
+      el.addEventListener('change', calculate);
+      el.addEventListener('input', calculate);
+    });
+
+    document.getElementById('totalPeople').addEventListener('change', function() {
+      updateDefaultRooms();
+      calculate();
+    });
+
+    // 列印/PDF
+    function printQuote() {
+      showTab('external');
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    }
+
+    // 複製文字版報價
+    function copyTextQuote() {
+      const c = calculateCosts();
+      const i = c.inputs;
+
+      const rooms = [];
+      if (i.roomDouble > 0) rooms.push('雙人房x' + i.roomDouble);
+      if (i.roomTriple > 0) rooms.push('三人房x' + i.roomTriple);
+      if (i.roomFamily > 0) rooms.push('家庭房x' + i.roomFamily);
+
+      const mealLabels = { 900: '平價', 1200: '精選', 1500: '高級' };
+
+      const thaiDressItems = [];
+      if (i.hasThaiDressCloth) thaiDressItems.push('泰服');
+      if (i.makeupCount > 0) thaiDressItems.push('化妝x' + i.makeupCount);
+      if (i.hasThaiDressPhoto) thaiDressItems.push('攝影師');
+
+      const text = [
+        '🚐 清微旅行｜清邁 6天5夜 親子包車行程',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        '📅 行程概覽',
+        'D1｜抵達清邁・泰服體驗',
+        'D2｜大象保護營・射擊・人妖秀',
+        'D3｜清萊一日遊（白廟/藍廟/黑廟/長頸村）',
+        'D4｜水上樂園・夜間動物園',
+        'D5｜叢林飛索・蛇園・帝王餐',
+        'D6｜送機回國',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        '💰 報價明細',
+        '👥 人數：' + i.people + ' 人',
+        '🏨 住宿：' + rooms.join('、') + '（5晚）',
+        '🍜 餐費：' + mealLabels[i.mealLevel] + '（5天午晚餐）',
+        '🚗 包車：' + i.carCount + ' 台 + 中文導遊',
+        '🎫 門票：全部活動含',
+        thaiDressItems.length > 0 ? '👘 泰服：' + thaiDressItems.join('+') : '',
+        '🛡️ 保險：含',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        '💵 每人費用',
+        '★ NT$ ' + c.perPersonTWD.toLocaleString(),
+        '（約 ' + Math.round(c.perPersonTHB).toLocaleString() + ' 泰銖）',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '',
+        '✅ 包含：住宿、餐費、包車、導遊、門票、保險',
+        '❌ 不含：機票、個人消費、按摩、超時費',
+        '',
+        '📋 超時費：清邁10hr/天、清萊12hr/天，超時200泰銖/hr',
+        '',
+        '━━━━━━━━━━━━━━━━━━━━',
+        '💬 LINE 諮詢：@037nyuwk',
+        '🌐 chiangway-travel.com',
+      ].filter(line => line !== '').join('\n');
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('✅ 已複製報價文字！可直接貼到 LINE');
+      });
+    }
+
+    // 初始化
+    initTickets();
+    calculate();
+  </script>
+</body>
+</html>

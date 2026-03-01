@@ -122,6 +122,25 @@ export default defineType({
               rows: 2,
               description: '例：接機 → 飯店 Check-in → 尼曼區晚餐',
             }),
+            defineField({
+              name: 'images',
+              title: '當日照片',
+              type: 'array',
+              of: [
+                defineArrayMember({
+                  type: 'image',
+                  options: { hotspot: true },
+                  fields: [
+                    defineField({
+                      name: 'alt',
+                      title: '圖片描述',
+                      type: 'string',
+                    }),
+                  ],
+                }),
+              ],
+              description: '此日行程的精選照片（建議 2-4 張）',
+            }),
           ],
           preview: {
             select: { day: 'day', title: 'title', emoji: 'emoji' },

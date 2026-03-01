@@ -6,4 +6,12 @@ import itinerary from './itinerary'
 import tourPackage from './tourPackage'
 import dayTour from './dayTour'
 
-export const schemaTypes = [post, landingPage, carCharter, homestay, itinerary, tourPackage, dayTour]
+export const schemaTypes = [
+  post,
+  landingPage,
+  carCharter,
+  homestay,
+  itinerary,
+  tourPackage,
+  dayTour,
+]
