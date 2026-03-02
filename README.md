@@ -219,13 +219,14 @@ Sanity Studio 內部報價計算工具：
 - **兒童設施**：汽座（0-2歲/2-5歲）、增高墊定價
 - **三階段付款**：住宿全額 → 餐費門票 → 車導尾款（送機前一天）
 - **超時計算**：清邁 10hr / 清萊 12hr、200 泰銖/小時
-- **報價單匯出**：內部報價（含成本利潤）、外部報價（客戶用）
+- **報價單匯出**：內部報價（含成本利潤）、外部報價 PDF（客戶用）
 - **政策說明**：退款政策（車導/住宿/門票餐費）、隱私政策（TM30 申報）
 - **UX 優化**：
   - 房型分類可收合展開（預設：有房間才展開）
   - 品牌配色（紅標題 + 綠強調 + 米色背景）
   - 押金勾選（代收/提醒客人自付）
   - Footer 官網 + LINE 連結
+  - 直接下載 PDF（html2pdf.js 客戶端產生）
 
 ## 技術架構
 
@@ -279,4 +280,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-02 Phase 6.8: Pricing calculator with policies -->
+<!-- Last build trigger: 2026-03-02 Phase 6.8: Pricing calculator PDF download -->
