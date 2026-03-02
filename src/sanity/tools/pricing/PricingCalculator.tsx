@@ -291,17 +291,19 @@ function downloadExternalQuote(
       </div>
       ` : ''}
       <div class="payment-phase">
-        <div class="label">📍 第三階段｜車導費</div>
-        <div class="timing">⏰ 出發前一天</div>
-        <div class="items">• 包車費用、導遊費用${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}</div>
+        <div class="label">📍 第三階段｜車導費（含超時結算）</div>
+        <div class="timing">⏰ 送機前一天</div>
+        <div class="items">
+          • 包車費用、導遊費用${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
+          • 統一結算超時費（若有）
+        </div>
         <div class="amount">💰 ${fmt(phase3Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase3Amount / exchangeRate))}</span></div>
       </div>
       <div style="margin-top: 12px; padding: 10px; background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px; font-size: 12px;">
         <div style="font-weight:bold;color:#e65100;margin-bottom:4px;">⏱️ 超時費說明</div>
         <div style="color:#555;">
           • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-          • 超時費：<strong>200 泰銖/小時 × ${c.carCount}台車</strong>（導遊不另收）<br />
-          • 送機前一天統一結算，若有超時再加收
+          • 超時費：<strong>200 泰銖/小時 × ${c.carCount}台車</strong>（導遊不另收）
         </div>
       </div>
       <!-- 台幣匯款資訊 -->
@@ -331,6 +333,27 @@ function downloadExternalQuote(
       </div>
     </div>
     ` : ''}
+
+    <!-- Policies -->
+    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px;">
+        <div style="font-weight: bold; color: #333; margin-bottom: 8px;">📋 退款政策</div>
+        <div style="color: #555; line-height: 1.6;">
+          • 出發前 30 天以上：全額退款（扣除已代訂項目）<br />
+          • 出發前 15～30 天：退款 50%<br />
+          • 出發前 15 天內：恕不退款<br />
+          • 不可抗力（天災、疫情、班機取消）：另案協商
+        </div>
+      </div>
+      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px;">
+        <div style="font-weight: bold; color: #333; margin-bottom: 8px;">🔒 隱私政策</div>
+        <div style="color: #555; line-height: 1.6;">
+          • 您的護照資料僅提供給飯店辦理入住登記與泰國當地 TM30 移民局申報（法規必備）<br />
+          • 我們遵守各飯店之隱私權政策<br />
+          • 行程結束後不保留您的個人資料
+        </div>
+      </div>
+    </div>
 
     <!-- Footer -->
     <div class="footer">
@@ -1646,9 +1669,12 @@ export function PricingCalculator() {
 
             {/* Phase 3 - 車導 */}
             <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-              <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第三階段｜車導費</div>
-              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前一天</div>
-              <div style={{ fontSize: 12, color: '#555' }}>• 包車費用、導遊費用{calculation.needLuggageCar ? '、行李車' : ''}{calculation.childSeatCost > 0 ? '、兒童座椅' : ''}</div>
+              <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第三階段｜車導費（含超時結算）</div>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 送機前一天</div>
+              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                • 包車費用、導遊費用{calculation.needLuggageCar ? '、行李車' : ''}{calculation.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
+                • 統一結算超時費（若有）
+              </div>
               <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
                 💰 {fmt(calculation.transportPrice)} 泰銖
                 <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.transportPrice / exchangeRate))}</span>
@@ -1660,8 +1686,7 @@ export function PricingCalculator() {
               <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 4 }}>⏱️ 超時費說明</div>
               <div style={{ color: '#555' }}>
                 • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-                • 超時費：<strong>200 泰銖/小時 × {calculation.carCount}台車</strong>（導遊不另收）<br />
-                • 送機前一天統一結算，若有超時再加收
+                • 超時費：<strong>200 泰銖/小時 × {calculation.carCount}台車</strong>（導遊不另收）
               </div>
             </div>
 
@@ -1727,6 +1752,27 @@ export function PricingCalculator() {
                   <span>NT$ {fmt(Math.round(calculation.totalDeposit / exchangeRate))}</span>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Policies */}
+          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 8, fontSize: 11 }}>
+              <div style={{ fontWeight: 'bold', color: '#333', marginBottom: 8 }}>📋 退款政策</div>
+              <div style={{ color: '#555', lineHeight: 1.6 }}>
+                • 出發前 30 天以上：全額退款（扣除已代訂項目）<br />
+                • 出發前 15～30 天：退款 50%<br />
+                • 出發前 15 天內：恕不退款<br />
+                • 不可抗力（天災、疫情、班機取消）：另案協商
+              </div>
+            </div>
+            <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 8, fontSize: 11 }}>
+              <div style={{ fontWeight: 'bold', color: '#333', marginBottom: 8 }}>🔒 隱私政策</div>
+              <div style={{ color: '#555', lineHeight: 1.6 }}>
+                • 您的護照資料僅提供給飯店辦理入住登記與泰國當地 TM30 移民局申報（法規必備）<br />
+                • 我們遵守各飯店之隱私權政策<br />
+                • 行程結束後不保留您的個人資料
+              </div>
             </div>
           </div>
 
