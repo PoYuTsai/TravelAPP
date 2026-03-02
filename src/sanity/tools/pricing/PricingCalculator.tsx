@@ -218,6 +218,8 @@ export function PricingCalculator() {
   const [thaiDressPhoto, setThaiDressPhoto] = useState(false)
   const [makeupCount, setMakeupCount] = useState(0)
   const [luggageCar, setLuggageCar] = useState(true)
+  const [includeAccommodation, setIncludeAccommodation] = useState(true)
+  const [includeMeals, setIncludeMeals] = useState(true)
   const [activeTab, setActiveTab] = useState<'input' | 'internal' | 'external'>('input')
   const config = DEFAULT_CONFIG
 
@@ -231,12 +233,14 @@ export function PricingCalculator() {
     setRoomFamily(0)
   }, [people])
 
-  // Auto-adjust luggage car based on average passengers per car
-  // ≥8 自動勾選（8人以上就很緊，需要行李車）
+  // Auto-adjust luggage car based on max passengers per car
+  // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
   useEffect(() => {
     const cars = people <= 9 ? 1 : 1 + Math.ceil((people - 9) / 10)
-    const avg = Math.ceil(people / cars)
-    setLuggageCar(avg >= 8)
+    const basePerCar = Math.floor(people / cars)
+    const remainder = people % cars
+    const maxPerCar = basePerCar + (remainder > 0 ? 1 : 0)
+    setLuggageCar(maxPerCar >= 8)
   }, [people])
 
   // Calculations
@@ -246,21 +250,35 @@ export function PricingCalculator() {
     // 1-9人=1台, 10-19人=2台, 20-29人=3台...
     const carCount = people <= 9 ? 1 : 1 + Math.ceil((people - 9) / 10)
 
-    // 實際會平均分配乘客（舒適考量）
-    // avgPerCar = 平均分配後，人最多的那台車的乘客數
-    const avgPerCar = Math.ceil(people / carCount)
-    // ≤7: 寬鬆（有空間）, ≥8: 很緊（建議/必須加行李車）
-    const luggageStatus: 'relaxed' | 'tight' =
-      avgPerCar <= 7 ? 'relaxed' : 'tight'
-    const suggestLuggageCar = avgPerCar >= 8
+    // 舒適配車人數計算（平均分配）
+    // 例：22人/3台 = 8+7+7
+    const basePerCar = Math.floor(people / carCount)
+    const remainder = people % carCount
+    // 產生配車字串，例："8+7+7"
+    const carDistributionArr: number[] = []
+    for (let i = 0; i < carCount; i++) {
+      // 多的人分配到前面幾台車
+      carDistributionArr.push(basePerCar + (i < remainder ? 1 : 0))
+    }
+    const carDistribution = carDistributionArr.join('+')
+    // 最大單車人數（用於判斷行李空間）
+    const maxPerCar = Math.max(...carDistributionArr)
+
+    // 行李車邏輯：
+    // ≤7: OK（行李剛好）
+    // 8-10: 很緊，建議加行李車，提醒確認行李件數/尺寸
+    const luggageStatus: 'ok' | 'tight' = maxPerCar <= 7 ? 'ok' : 'tight'
+    const suggestLuggageCar = maxPerCar >= 8
     const needLuggageCar = luggageCar
 
-    // Room - 使用動態房價
+    // Room - 使用動態房價（可選擇不含住宿）
     const roomCapacity = roomDouble * 2 + roomTriple * 3 + roomFamily * 4
-    const accommodationCost = (roomDouble * priceDouble + roomTriple * priceTriple + roomFamily * priceFamily) * nights
+    const accommodationCost = includeAccommodation
+      ? (roomDouble * priceDouble + roomTriple * priceTriple + roomFamily * priceFamily) * nights
+      : 0
 
-    // Meal
-    const mealCost = people * mealLevel * mealDays
+    // Meal（可選擇不含餐費）
+    const mealCost = includeMeals ? people * mealLevel * mealDays : 0
 
     // Car
     let carCostTotal = 0, carPriceTotal = 0
@@ -340,7 +358,8 @@ export function PricingCalculator() {
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, carCount, avgPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, roomCapacity, nights, mealDays, guideDays, mealLevel,
+      people, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, roomCapacity, nights, mealDays, guideDays, mealLevel,
+      includeAccommodation, includeMeals,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost,
       selectedTickets, ticketCost, ticketPrice, ticketYourProfit, ticketPartnerProfit,
@@ -349,13 +368,24 @@ export function PricingCalculator() {
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, people, exchangeRate, roomDouble, roomTriple, roomFamily, priceDouble, priceTriple, priceFamily, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar])
+  }, [config, people, exchangeRate, roomDouble, roomTriple, roomFamily, priceDouble, priceTriple, priceFamily, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, includeAccommodation, includeMeals])
 
   const fmt = (n: number) => n.toLocaleString()
 
   const toggleTicket = (id: string) => {
     setTickets(prev => prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t))
   }
+
+  const selectAllTickets = () => {
+    setTickets(prev => prev.map(t => ({ ...t, checked: true })))
+  }
+
+  const deselectAllTickets = () => {
+    setTickets(prev => prev.map(t => ({ ...t, checked: false })))
+  }
+
+  const allTicketsSelected = tickets.every(t => t.checked)
+  const noTicketsSelected = tickets.every(t => !t.checked)
 
   const copyTextQuote = () => {
     const c = calculation
@@ -419,6 +449,25 @@ export function PricingCalculator() {
       {/* Input Tab */}
       {activeTab === 'input' && (
         <>
+          {/* 報價類型 */}
+          <Section title="📋 報價類型">
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeAccommodation} onChange={e => setIncludeAccommodation(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 15 }}>🏨 含住宿</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeMeals} onChange={e => setIncludeMeals(e.target.checked)} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 15 }}>🍜 含餐費</span>
+              </label>
+            </div>
+            {(!includeAccommodation || !includeMeals) && (
+              <div style={{ marginTop: 8, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
+                💡 {!includeAccommodation && '住宿'}{!includeAccommodation && !includeMeals && '、'}{!includeMeals && '餐費'}由客人自理
+              </div>
+            )}
+          </Section>
+
           {/* 人數 */}
           <Section title="👥 人數">
             <Row>
@@ -435,27 +484,43 @@ export function PricingCalculator() {
           </Section>
 
           {/* 住宿 */}
-          <Section title={`🏨 住宿（${calculation.nights}晚）`}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-              <RoomCardEditable name="雙人房" priceValue={priceDouble} onPriceChange={setPriceDouble} countValue={roomDouble} onCountChange={setRoomDouble} capacity={2} />
-              <RoomCardEditable name="三人房" priceValue={priceTriple} onPriceChange={setPriceTriple} countValue={roomTriple} onCountChange={setRoomTriple} capacity={3} />
-              <RoomCardEditable name="家庭房" priceValue={priceFamily} onPriceChange={setPriceFamily} countValue={roomFamily} onCountChange={setRoomFamily} capacity={4} />
-            </div>
-            {calculation.roomCapacity < people && <div style={warningStyle}>⚠️ 房間不足！需容納 {people} 人，目前只有 {calculation.roomCapacity} 人</div>}
-            <p style={{ ...noteStyle, marginTop: 12 }}>房間容納：{calculation.roomCapacity} 人 ｜ 住宿費：{fmt(calculation.accommodationCost)} 泰銖</p>
+          <Section title={`🏨 住宿（${calculation.nights}晚）`} style={!includeAccommodation ? { opacity: 0.5 } : {}}>
+            {!includeAccommodation ? (
+              <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8, textAlign: 'center', color: '#666' }}>
+                客人自理住宿
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  <RoomCardEditable name="雙人房" priceValue={priceDouble} onPriceChange={setPriceDouble} countValue={roomDouble} onCountChange={setRoomDouble} capacity={2} />
+                  <RoomCardEditable name="三人房" priceValue={priceTriple} onPriceChange={setPriceTriple} countValue={roomTriple} onCountChange={setRoomTriple} capacity={3} />
+                  <RoomCardEditable name="家庭房" priceValue={priceFamily} onPriceChange={setPriceFamily} countValue={roomFamily} onCountChange={setRoomFamily} capacity={4} />
+                </div>
+                {calculation.roomCapacity < people && <div style={warningStyle}>⚠️ 房間不足！需容納 {people} 人，目前只有 {calculation.roomCapacity} 人</div>}
+                <p style={{ ...noteStyle, marginTop: 12 }}>房間容納：{calculation.roomCapacity} 人 ｜ 住宿費：{fmt(calculation.accommodationCost)} 泰銖</p>
+              </>
+            )}
           </Section>
 
           {/* 餐費 */}
-          <Section title={`🍜 餐費（${calculation.mealDays}天午晚餐）`}>
-            <Row>
-              <label style={{ minWidth: 100 }}>餐費等級</label>
-              <select value={mealLevel} onChange={e => setMealLevel(Number(e.target.value))} style={{ ...inputStyle, minWidth: 150 }}>
-                <option value={900}>平價 - 900/人/天</option>
-                <option value={1200}>精選 - 1,200/人/天</option>
-                <option value={1500}>高級 - 1,500/人/天</option>
-              </select>
-            </Row>
-            <p style={noteStyle}>餐費小計：{fmt(calculation.mealCost)} 泰銖</p>
+          <Section title={`🍜 餐費（${calculation.mealDays}天午晚餐）`} style={!includeMeals ? { opacity: 0.5 } : {}}>
+            {!includeMeals ? (
+              <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8, textAlign: 'center', color: '#666' }}>
+                客人自理餐費
+              </div>
+            ) : (
+              <>
+                <Row>
+                  <label style={{ minWidth: 100 }}>餐費等級</label>
+                  <select value={mealLevel} onChange={e => setMealLevel(Number(e.target.value))} style={{ ...inputStyle, minWidth: 150 }}>
+                    <option value={900}>平價 - 900/人/天</option>
+                    <option value={1200}>精選 - 1,200/人/天</option>
+                    <option value={1500}>高級 - 1,500/人/天</option>
+                  </select>
+                </Row>
+                <p style={noteStyle}>餐費小計：{fmt(calculation.mealCost)} 泰銖</p>
+              </>
+            )}
           </Section>
 
           {/* 車導 */}
@@ -466,21 +531,28 @@ export function PricingCalculator() {
               • 後續車輛：無導遊，每台可坐 10 人<br />
               • 1~9人→1台｜10~19人→2台｜20~29人→3台...
             </div>
-            <p style={{ ...noteStyle, marginBottom: 8, fontWeight: 'bold', color: '#333' }}>
-              🚗 車輛數：{calculation.carCount} 台{calculation.needLuggageCar ? ' + 行李車' : ''}
-              <span style={{ fontWeight: 'normal', marginLeft: 8 }}>
-                （平均每車 {calculation.avgPerCar} 人）
-              </span>
-            </p>
-            {calculation.luggageStatus === 'relaxed' ? (
+            <div style={{ background: '#e3f2fd', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <p style={{ margin: 0, fontWeight: 'bold', color: '#1565c0', fontSize: 15 }}>
+                🚗 {calculation.carCount} 台車：<span style={{ fontFamily: 'monospace' }}>{calculation.carDistribution}</span>
+                {calculation.needLuggageCar ? ' + 🧳行李車' : ''}
+              </p>
+              <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#555' }}>
+                舒適配車（單車最多 {calculation.maxPerCar} 人）
+              </p>
+            </div>
+            {calculation.luggageStatus === 'ok' ? (
               <div style={{ background: '#e8f5e9', padding: 10, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
-                ✅ 每車約 {calculation.avgPerCar} 人，有空間放行李，不需額外行李車
+                ✅ 每車 ≤7 人，行李空間 OK，不需額外行李車
               </div>
             ) : (
               <div style={{ background: '#ffebee', padding: 10, borderRadius: 6, marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <input type="checkbox" checked={luggageCar} onChange={e => setLuggageCar(e.target.checked)} />
-                  <label>🧳 行李車（每車 {calculation.avgPerCar} 人，<strong style={{ color: '#c62828' }}>空間很緊</strong>，建議加）接+送 = 1,200 泰銖</label>
+                  <label>🧳 行李車（接+送 = 1,200 泰銖）</label>
+                </div>
+                <div style={{ fontSize: 13, color: '#c62828', background: '#fff', padding: 8, borderRadius: 4 }}>
+                  ⚠️ 單車 {calculation.maxPerCar} 人，<strong>行李空間很緊</strong><br />
+                  📋 請跟客人確認：行李件數 & 尺寸
                 </div>
               </div>
             )}
@@ -494,10 +566,33 @@ export function PricingCalculator() {
 
           {/* 門票 */}
           <Section title="🎫 門票活動">
-            <p style={{ ...noteStyle, marginBottom: 8 }}>格式：成本（售價-退款）｜★ 表示有退款對分</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <p style={{ ...noteStyle, margin: 0 }}>格式：成本｜★ 表示有退款對分</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={selectAllTickets}
+                  disabled={allTicketsSelected}
+                  style={{ padding: '6px 12px', background: allTicketsSelected ? '#ccc' : '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: allTicketsSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
+                >
+                  ✅ 全選
+                </button>
+                <button
+                  onClick={deselectAllTickets}
+                  disabled={noTicketsSelected}
+                  style={{ padding: '6px 12px', background: noTicketsSelected ? '#ccc' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: noTicketsSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
+                >
+                  ❌ 全不選
+                </button>
+              </div>
+            </div>
+            {noTicketsSelected && (
+              <div style={{ background: '#fff3e0', padding: 10, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
+                💡 門票由客人現場付給導遊
+              </div>
+            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
               {tickets.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: '#f9f9f9', borderRadius: 6 }}>
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: t.checked ? '#e8f5e9' : '#f5f5f5', borderRadius: 6, opacity: t.checked ? 1 : 0.7 }}>
                   <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
                   <label style={{ flex: 1 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
                   <span style={{ color: '#666', fontSize: 13 }}>
@@ -506,7 +601,9 @@ export function PricingCalculator() {
                 </div>
               ))}
             </div>
-            <p style={{ ...noteStyle, marginTop: 12 }}>門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖</p>
+            <p style={{ ...noteStyle, marginTop: 12 }}>
+              已選 {calculation.selectedTickets.length}/{tickets.length} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖
+            </p>
           </Section>
 
           {/* 泰服 */}
@@ -698,10 +795,14 @@ export function PricingCalculator() {
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ margin: '0 0 12px 0', color: '#2d5a3d', fontSize: 16, borderBottom: '2px solid #2d5a3d', paddingBottom: 8 }}>💰 報價明細</h3>
             <QuoteItem label="👥 人數" value={`${people} 人`} />
-            <QuoteItem label="🏨 住宿" value={`${roomDouble > 0 ? `雙人房x${roomDouble}` : ''}${roomTriple > 0 ? ` 三人房x${roomTriple}` : ''}${roomFamily > 0 ? ` 家庭房x${roomFamily}` : ''}（${calculation.nights}晚）`} />
-            <QuoteItem label="🍜 餐費" value={`${mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}（${calculation.mealDays}天午晚餐）`} />
-            <QuoteItem label="🚗 包車" value={`${calculation.carCount} 台 + 中文導遊`} />
-            <QuoteItem label="🎫 門票" value={`${calculation.selectedTickets.length} 項活動`} />
+            {includeAccommodation && (
+              <QuoteItem label="🏨 住宿" value={`${roomDouble > 0 ? `雙人房x${roomDouble}` : ''}${roomTriple > 0 ? ` 三人房x${roomTriple}` : ''}${roomFamily > 0 ? ` 家庭房x${roomFamily}` : ''}（${calculation.nights}晚）`} />
+            )}
+            {includeMeals && (
+              <QuoteItem label="🍜 餐費" value={`${mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}（${calculation.mealDays}天午晚餐）`} />
+            )}
+            <QuoteItem label="🚗 包車" value={`D1接機旅遊 + ${calculation.guideDays - 1}天包車 + D6送機｜中文導遊1位`} />
+            <QuoteItem label="🎫 門票" value={calculation.selectedTickets.length > 0 ? `${calculation.selectedTickets.length} 項活動（含）` : '現場付費'} />
             <QuoteItem label="🛡️ 保險" value="含" />
           </div>
 
@@ -716,11 +817,26 @@ export function PricingCalculator() {
           <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#e8f5e9', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 8 }}>✅ 費用包含</div>
-              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>• 5晚住宿<br />• 5天午晚餐<br />• 6天包車<br />• 5天中文導遊<br />• 門票活動<br />• 旅遊保險</div>
+              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>
+                {includeAccommodation && `• ${calculation.nights}晚住宿`}{includeAccommodation && <br />}
+                {includeMeals && `• ${calculation.mealDays}天午晚餐`}{includeMeals && <br />}
+                • D1接機旅遊 + {calculation.guideDays - 1}天包車 + D6送機<br />
+                • 中文導遊1位（{calculation.guideDays}天）<br />
+                {calculation.selectedTickets.length > 0 && `• 門票活動（${calculation.selectedTickets.length}項）`}{calculation.selectedTickets.length > 0 && <br />}
+                • 旅遊保險
+              </div>
             </div>
             <div style={{ background: '#fff3e0', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 8 }}>❌ 費用不含</div>
-              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>• 來回機票<br />• 個人消費<br />• 按摩 SPA<br />• 超時費用</div>
+              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>
+                • 來回機票<br />
+                {!includeAccommodation && '• 住宿'}{!includeAccommodation && <br />}
+                {!includeMeals && '• 餐費'}{!includeMeals && <br />}
+                {calculation.selectedTickets.length === 0 && '• 門票（現場付費）'}{calculation.selectedTickets.length === 0 && <br />}
+                • 個人消費<br />
+                • 按摩 SPA<br />
+                • 超時費用
+              </div>
             </div>
           </div>
 
