@@ -162,12 +162,73 @@ function downloadExternalQuote(
       👥 <strong>${people} 人</strong>｜🗓️ ${totalNights + 1}天${totalNights}夜
     </div>
     <div style="background: #f9f9f9; border-radius: 8px; padding: 16px;">
-      ${includeAccommodation ? `<div class="price-row"><span>🏨 住宿（${totalNights}晚）</span><span style="font-weight:bold;">${fmt(c.accommodationCost)} 泰銖</span></div>` : ''}
-      ${includeMeals ? `<div class="price-row"><span>🍜 餐費（${c.mealDays}天）</span><span style="font-weight:bold;">${fmt(c.mealCost)} 泰銖</span></div>` : ''}
-      <div class="price-row"><span>🚗 包車 + 導遊${c.childSeatCost > 0 ? `（含兒童座椅）` : ''}</span><span style="font-weight:bold;">${fmt(c.transportPrice)} 泰銖</span></div>
-      ${c.selectedTickets.length > 0 ? `<div class="price-row"><span>🎫 門票活動（${c.selectedTickets.length}項）</span><span style="font-weight:bold;">${fmt(c.ticketPrice)} 泰銖</span></div>` : ''}
-      ${c.thaiDressPrice > 0 ? `<div class="price-row"><span>👘 泰服體驗</span><span style="font-weight:bold;">${fmt(c.thaiDressPrice)} 泰銖</span></div>` : ''}
-      <div class="price-row"><span>🛡️ 旅遊保險</span><span style="font-weight:bold;">${fmt(c.insuranceCost)} 泰銖</span></div>
+
+      ${includeAccommodation ? `
+      <!-- 住宿明細 -->
+      <div class="price-row" style="border-bottom: 2px solid #2d5a3d; padding-bottom: 8px; margin-bottom: 8px;">
+        <span style="font-weight:bold; color:#2d5a3d;">🏨 住宿（${totalNights}晚）</span>
+        <span style="font-weight:bold;">${fmt(c.accommodationCost)} 泰銖</span>
+      </div>
+      ${hotels.map(h => `
+        <div style="padding-left: 16px; font-size: 12px; color: #555; margin-bottom: 4px;">
+          • ${h.name}（${h.nights}晚）
+        </div>
+      `).join('')}
+      ` : ''}
+
+      ${includeMeals ? `
+      <!-- 餐費明細 -->
+      <div class="price-row" style="border-bottom: 2px solid #2d5a3d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
+        <span style="font-weight:bold; color:#2d5a3d;">🍜 餐費（${c.mealDays}天）</span>
+        <span style="font-weight:bold;">${fmt(c.mealCost)} 泰銖</span>
+      </div>
+      <div style="padding-left: 16px; font-size: 12px; color: #555;">
+        • ${mealLabels[mealLevel]}餐廳 ${fmt(mealLevel)}/人/天 × ${people}人 × ${c.mealDays}天
+      </div>
+      ` : ''}
+
+      <!-- 車導明細 -->
+      <div class="price-row" style="border-bottom: 2px solid #2d5a3d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
+        <span style="font-weight:bold; color:#2d5a3d;">🚗 包車 + 導遊（${c.carCount}台車）</span>
+        <span style="font-weight:bold;">${fmt(c.transportPrice)} 泰銖</span>
+      </div>
+      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
+        • 包車 6 天 × ${c.carCount}台<br />
+        • 中文導遊 ${c.guideDays} 天
+        ${c.needLuggageCar ? `<br />• 行李車（接機＋送機）` : ''}
+        ${c.childSeatCost > 0 ? `<br />• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天` : ''}
+      </div>
+
+      ${c.selectedTickets.length > 0 ? `
+      <!-- 門票明細 -->
+      <div class="price-row" style="border-bottom: 2px solid #2d5a3d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
+        <span style="font-weight:bold; color:#2d5a3d;">🎫 門票活動（${c.selectedTickets.length}項）</span>
+        <span style="font-weight:bold;">${fmt(c.ticketPrice)} 泰銖</span>
+      </div>
+      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
+        ${c.selectedTickets.map((t: any) => `• ${t.name.replace(/^D\\d /, '')}${t.price > 0 ? ` ${fmt(t.price)}/人` : '（免費）'}`).join('<br />')}
+      </div>
+      ` : ''}
+
+      ${c.thaiDressPrice > 0 ? `
+      <!-- 泰服明細 -->
+      <div class="price-row" style="border-bottom: 2px solid #2d5a3d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
+        <span style="font-weight:bold; color:#2d5a3d;">👘 泰服體驗</span>
+        <span style="font-weight:bold;">${fmt(c.thaiDressPrice)} 泰銖</span>
+      </div>
+      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
+        ${thaiDressCloth ? `• 泰服衣服 500/人 × ${people}人<br />` : ''}
+        ${makeupCount > 0 ? `• 專業化妝 1,000/人 × ${makeupCount}人<br />` : ''}
+        ${thaiDressPhoto ? `• 攝影師 2,500/位 × ${people <= 10 ? 1 : 2}位` : ''}
+      </div>
+      ` : ''}
+
+      <!-- 保險 -->
+      <div class="price-row" style="margin-top: 12px;">
+        <span>🛡️ 旅遊保險（${fmt(config.insurancePerPerson)}/人 × ${people}人）</span>
+        <span style="font-weight:bold;">${fmt(c.insuranceCost)} 泰銖</span>
+      </div>
+
       <div class="price-total"><span>總計</span><span>${fmt(c.totalPrice)} 泰銖</span></div>
     </div>
 
@@ -211,9 +272,13 @@ function downloadExternalQuote(
       <h4>💳 付款方式與時程</h4>
       ${includeAccommodation && phase1Amount > 0 ? `
       <div class="payment-phase">
-        <div class="label">📍 第一階段｜住宿訂金</div>
+        <div class="label">📍 第一階段｜住宿全額</div>
         <div class="timing">⏰ 出發前 1.5～2 個月</div>
-        <div class="items">• 飯店房費（確認後即刻支付）</div>
+        <div class="items">
+          • 討論好飯店細節（星級、房型、預算）後統一報價<br />
+          • 收到款項後下訂，會請飯店提供每晚/每房的正式 PDF 單據<br />
+          <span style="color:#888;font-size:11px;">（入境或 TDAC 如被詢問，可出示飯店訂房資料）</span>
+        </div>
         <div class="amount">💰 ${fmt(phase1Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase1Amount / exchangeRate))}</span></div>
       </div>
       ` : ''}
@@ -226,7 +291,7 @@ function downloadExternalQuote(
       </div>
       ` : ''}
       <div class="payment-phase">
-        <div class="label">📍 第三階段｜車導尾款</div>
+        <div class="label">📍 第三階段｜車導費</div>
         <div class="timing">⏰ 出發前一天</div>
         <div class="items">• 包車費用、導遊費用${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}</div>
         <div class="amount">💰 ${fmt(phase3Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase3Amount / exchangeRate))}</span></div>
@@ -237,6 +302,15 @@ function downloadExternalQuote(
           • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
           • 超時費：<strong>200 泰銖/小時 × ${c.carCount}台車</strong>（導遊不另收）<br />
           • 送機前一天統一結算，若有超時再加收
+        </div>
+      </div>
+      <!-- 台幣匯款資訊 -->
+      <div style="margin-top: 12px; padding: 12px; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 6px; font-size: 12px;">
+        <div style="font-weight:bold;color:#2d5a3d;margin-bottom:8px;">🏦 台幣匯款資訊</div>
+        <div style="color:#333; line-height: 1.8;">
+          戶名：<strong>蔡柏裕</strong><br />
+          銀行：彰化銀行（代碼 009）<br />
+          帳號：<strong>51619501772100</strong>
         </div>
       </div>
     </div>
@@ -1411,38 +1485,82 @@ export function PricingCalculator() {
               👥 <strong>{people} 人</strong>｜🗓️ {totalNights + 1}天{totalNights}夜
             </div>
 
-            {/* Category Breakdown */}
+            {/* Detailed Breakdown */}
             <div style={{ background: '#f9f9f9', borderRadius: 8, padding: 16 }}>
+
+              {/* 住宿明細 */}
               {includeAccommodation && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                  <span>🏨 住宿（{totalNights}晚）</span>
-                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.accommodationCost)} 泰銖</span>
-                </div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #2d5a3d', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>🏨 住宿（{totalNights}晚）</span>
+                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.accommodationCost)} 泰銖</span>
+                  </div>
+                  {hotels.map(h => (
+                    <div key={h.id} style={{ paddingLeft: 16, fontSize: 12, color: '#555', marginBottom: 4 }}>
+                      • {h.name}（{h.nights}晚）
+                    </div>
+                  ))}
+                </>
               )}
+
+              {/* 餐費明細 */}
               {includeMeals && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                  <span>🍜 餐費（{calculation.mealDays}天）</span>
-                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.mealCost)} 泰銖</span>
-                </div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #2d5a3d', marginBottom: 8, marginTop: includeAccommodation ? 12 : 0 }}>
+                    <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>🍜 餐費（{calculation.mealDays}天）</span>
+                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.mealCost)} 泰銖</span>
+                  </div>
+                  <div style={{ paddingLeft: 16, fontSize: 12, color: '#555' }}>
+                    • {mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}餐廳 {fmt(mealLevel)}/人/天 × {people}人 × {calculation.mealDays}天
+                  </div>
+                </>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                <span>🚗 包車 + 導遊{calculation.childSeatCost > 0 ? '（含兒童座椅）' : ''}</span>
+
+              {/* 車導明細 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #2d5a3d', marginBottom: 8, marginTop: 12 }}>
+                <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>🚗 包車 + 導遊（{calculation.carCount}台車）</span>
                 <span style={{ fontWeight: 'bold' }}>{fmt(calculation.transportPrice)} 泰銖</span>
               </div>
+              <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                • 包車 6 天 × {calculation.carCount}台<br />
+                • 中文導遊 {calculation.guideDays} 天
+                {calculation.needLuggageCar && <><br />• 行李車（接機＋送機）</>}
+                {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {babySeatCount + childSeatCount}張 × {calculation.guideDays}天</>}
+              </div>
+
+              {/* 門票明細 */}
               {calculation.selectedTickets.length > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                  <span>🎫 門票活動（{calculation.selectedTickets.length}項）</span>
-                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice)} 泰銖</span>
-                </div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #2d5a3d', marginBottom: 8, marginTop: 12 }}>
+                    <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>🎫 門票活動（{calculation.selectedTickets.length}項）</span>
+                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice)} 泰銖</span>
+                  </div>
+                  <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                    {calculation.selectedTickets.map((t: any, idx: number) => (
+                      <div key={idx}>• {t.name.replace(/^D\d /, '')}{t.price > 0 ? ` ${fmt(t.price)}/人` : '（免費）'}</div>
+                    ))}
+                  </div>
+                </>
               )}
+
+              {/* 泰服明細 */}
               {calculation.thaiDressPrice > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                  <span>👘 泰服體驗</span>
-                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.thaiDressPrice)} 泰銖</span>
-                </div>
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #2d5a3d', marginBottom: 8, marginTop: 12 }}>
+                    <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>👘 泰服體驗</span>
+                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.thaiDressPrice)} 泰銖</span>
+                  </div>
+                  <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                    {thaiDressCloth && <>• 泰服衣服 500/人 × {people}人<br /></>}
+                    {makeupCount > 0 && <>• 專業化妝 1,000/人 × {makeupCount}人<br /></>}
+                    {thaiDressPhoto && <>• 攝影師 2,500/位 × {people <= 10 ? 1 : 2}位</>}
+                  </div>
+                </>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
-                <span>🛡️ 旅遊保險</span>
+
+              {/* 保險 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', marginTop: 12, borderBottom: '1px dashed #ddd' }}>
+                <span>🛡️ 旅遊保險（{fmt(config.insurancePerPerson)}/人 × {people}人）</span>
                 <span style={{ fontWeight: 'bold' }}>{fmt(calculation.insuranceCost)} 泰銖</span>
               </div>
 
@@ -1496,9 +1614,13 @@ export function PricingCalculator() {
             {/* Phase 1 - 住宿 */}
             {includeAccommodation && calculation.accommodationCost > 0 && (
               <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-                <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第一階段｜住宿訂金</div>
+                <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第一階段｜住宿全額</div>
                 <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1.5～2 個月</div>
-                <div style={{ fontSize: 12, color: '#555' }}>• 飯店房費（確認後即刻支付）</div>
+                <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                  • 討論好飯店細節（星級、房型、預算）後統一報價<br />
+                  • 收到款項後下訂，會請飯店提供每晚/每房的正式 PDF 單據<br />
+                  <span style={{ color: '#888', fontSize: 11 }}>（入境或 TDAC 如被詢問，可出示飯店訂房資料）</span>
+                </div>
                 <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
                   💰 {fmt(calculation.accommodationCost)} 泰銖
                   <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
@@ -1524,7 +1646,7 @@ export function PricingCalculator() {
 
             {/* Phase 3 - 車導 */}
             <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-              <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第三階段｜車導尾款</div>
+              <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第三階段｜車導費</div>
               <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前一天</div>
               <div style={{ fontSize: 12, color: '#555' }}>• 包車費用、導遊費用{calculation.needLuggageCar ? '、行李車' : ''}{calculation.childSeatCost > 0 ? '、兒童座椅' : ''}</div>
               <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
@@ -1540,6 +1662,16 @@ export function PricingCalculator() {
                 • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
                 • 超時費：<strong>200 泰銖/小時 × {calculation.carCount}台車</strong>（導遊不另收）<br />
                 • 送機前一天統一結算，若有超時再加收
+              </div>
+            </div>
+
+            {/* 台幣匯款資訊 */}
+            <div style={{ marginTop: 12, padding: 12, background: '#e8f5e9', border: '1px solid #4caf50', borderRadius: 6, fontSize: 12 }}>
+              <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 8 }}>🏦 台幣匯款資訊</div>
+              <div style={{ color: '#333', lineHeight: 1.8 }}>
+                戶名：<strong>蔡柏裕</strong><br />
+                銀行：彰化銀行（代碼 009）<br />
+                帳號：<strong>51619501772100</strong>
               </div>
             </div>
           </div>
