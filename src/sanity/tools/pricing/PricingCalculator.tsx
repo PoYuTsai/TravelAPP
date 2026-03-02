@@ -335,14 +335,18 @@ function downloadExternalQuote(
     ` : ''}
 
     <!-- Policies -->
-    <div style="margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px;">
+    <div style="margin-top: 20px;">
+      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px; margin-bottom: 12px;">
         <div style="font-weight: bold; color: #333; margin-bottom: 8px;">📋 退款政策</div>
-        <div style="color: #555; line-height: 1.6;">
-          • 出發前 30 天以上：全額退款（扣除已代訂項目）<br />
-          • 出發前 15～30 天：退款 50%<br />
-          • 出發前 15 天內：恕不退款<br />
-          • 不可抗力（天災、疫情、班機取消）：另案協商
+        <div style="color: #555; line-height: 1.8;">
+          <strong>【車導服務】</strong><br />
+          • 14 天前取消：全額退款<br />
+          • 7-13 天前取消：退款 50%<br />
+          • 4-6 天前取消：退款 30%<br />
+          • 3 天內取消：不予退款<br /><br />
+          <strong>【住宿】</strong>依各飯店取消政策為準<br />
+          <strong>【門票/餐費】</strong>訂購後恕不退款<br />
+          <strong>【不可抗力】</strong>天災、疫情、班機取消另案協商
         </div>
       </div>
       <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px;">
@@ -1756,14 +1760,18 @@ export function PricingCalculator() {
           </div>
 
           {/* Policies */}
-          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 8, fontSize: 11 }}>
+          <div style={{ marginTop: 20 }}>
+            <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 8, fontSize: 11, marginBottom: 12 }}>
               <div style={{ fontWeight: 'bold', color: '#333', marginBottom: 8 }}>📋 退款政策</div>
-              <div style={{ color: '#555', lineHeight: 1.6 }}>
-                • 出發前 30 天以上：全額退款（扣除已代訂項目）<br />
-                • 出發前 15～30 天：退款 50%<br />
-                • 出發前 15 天內：恕不退款<br />
-                • 不可抗力（天災、疫情、班機取消）：另案協商
+              <div style={{ color: '#555', lineHeight: 1.8 }}>
+                <strong>【車導服務】</strong><br />
+                • 14 天前取消：全額退款<br />
+                • 7-13 天前取消：退款 50%<br />
+                • 4-6 天前取消：退款 30%<br />
+                • 3 天內取消：不予退款<br /><br />
+                <strong>【住宿】</strong>依各飯店取消政策為準<br />
+                <strong>【門票/餐費】</strong>訂購後恕不退款<br />
+                <strong>【不可抗力】</strong>天災、疫情、班機取消另案協商
               </div>
             </div>
             <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 8, fontSize: 11 }}>
