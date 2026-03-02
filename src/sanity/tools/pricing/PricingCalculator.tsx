@@ -17,7 +17,7 @@ const DEFAULT_CONFIG = {
     { day: 'D3', name: '清萊一日遊', cost: 4000, price: 4500, type: 'chiangrai' },
     { day: 'D4', name: '郊區(水上/動物園)', cost: 3300, price: 3800, type: 'suburban' },
     { day: 'D5', name: '郊區(叢林/蛇園)', cost: 3300, price: 3800, type: 'suburban' },
-    { day: 'D6', name: '市區(送機)', cost: 2700, price: 3200, type: 'city' },
+    { day: 'D6', name: '送機', cost: 500, price: 600, type: 'airport' },
   ],
   guidePerDay: { cost: 1500, price: 2500 },
   luggagePerTrip: 600,
@@ -1063,78 +1063,88 @@ export function PricingCalculator() {
             ))}
           </div>
 
-          {/* Price */}
+          {/* Price Summary */}
           <div style={{ marginBottom: 20 }}>
-            <h3 style={{ margin: '0 0 12px 0', color: '#2d5a3d', fontSize: 16, borderBottom: '2px solid #2d5a3d', paddingBottom: 8 }}>💰 報價明細</h3>
-            <QuoteItem label="👥 人數" value={`${people} 人`} />
-            {includeAccommodation && (
-              <>
-                <QuoteItem label="🏨 住宿" value={`共 ${totalNights} 晚`} />
-                {hotels.map(h => {
-                  const roomInfo = [
-                    h.roomDouble > 0 && `雙人x${h.roomDouble}`,
-                    h.roomTriple > 0 && `三人x${h.roomTriple}`,
-                    h.roomFamily > 0 && `家庭x${h.roomFamily}`,
-                  ].filter(Boolean).join(' ')
-                  return (
-                    <div key={h.id} style={{ paddingLeft: 24, fontSize: 13, color: '#555', borderBottom: '1px dashed #eee', paddingBottom: 6, paddingTop: 6 }}>
-                      • {h.name}（{h.nights}晚）{roomInfo}{h.hasDeposit && ' 💳'}
-                    </div>
-                  )
-                })}
-              </>
-            )}
-            {includeMeals && (
-              <QuoteItem label="🍜 餐費" value={`${mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}（${calculation.mealDays}天午晚餐）`} />
-            )}
-            <QuoteItem label="🚗 包車" value={`D1接機旅遊 + ${calculation.guideDays - 1}天包車 + D6送機｜中文導遊1位`} />
-            <QuoteItem label="🎫 門票" value={calculation.selectedTickets.length > 0 ? `${calculation.selectedTickets.length} 項活動（含）` : '現場付費'} />
-            <QuoteItem label="🛡️ 保險" value="含" />
+            <h3 style={{ margin: '0 0 12px 0', color: '#2d5a3d', fontSize: 16, borderBottom: '2px solid #2d5a3d', paddingBottom: 8 }}>💰 費用明細</h3>
+
+            <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
+              👥 <strong>{people} 人</strong>｜🗓️ {totalNights + 1}天{totalNights}夜
+            </div>
+
+            {/* Category Breakdown */}
+            <div style={{ background: '#f9f9f9', borderRadius: 8, padding: 16 }}>
+              {includeAccommodation && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                  <span>🏨 住宿（{totalNights}晚）</span>
+                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.accommodationCost)} 泰銖</span>
+                </div>
+              )}
+              {includeMeals && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                  <span>🍜 餐費（{calculation.mealDays}天）</span>
+                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.mealCost)} 泰銖</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                <span>🚗 包車 + 導遊</span>
+                <span style={{ fontWeight: 'bold' }}>{fmt(calculation.transportPrice)} 泰銖</span>
+              </div>
+              {calculation.selectedTickets.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                  <span>🎫 門票活動（{calculation.selectedTickets.length}項）</span>
+                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice)} 泰銖</span>
+                </div>
+              )}
+              {calculation.thaiDressPrice > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                  <span>👘 泰服體驗</span>
+                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.thaiDressPrice)} 泰銖</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #ddd' }}>
+                <span>🛡️ 旅遊保險</span>
+                <span style={{ fontWeight: 'bold' }}>{fmt(calculation.insuranceCost)} 泰銖</span>
+              </div>
+
+              {/* Total */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 4px 0', marginTop: 8, borderTop: '2px solid #2d5a3d' }}>
+                <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>總計</span>
+                <span style={{ fontWeight: 'bold', color: '#2d5a3d' }}>{fmt(calculation.totalPrice)} 泰銖</span>
+              </div>
+            </div>
           </div>
 
-          {/* Total */}
+          {/* Per Person Price */}
           <div style={{ background: 'linear-gradient(135deg, #2d5a3d, #4a7c59)', color: 'white', padding: 20, borderRadius: 12, textAlign: 'center' }}>
             <div style={{ fontSize: 14, opacity: 0.9 }}>每人費用</div>
             <div style={{ fontSize: 36, fontWeight: 'bold', margin: '8px 0' }}>NT$ {fmt(calculation.perPersonTWD)}</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>約 {fmt(Math.round(calculation.perPersonTHB))} 泰銖</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>約 {fmt(Math.round(calculation.perPersonTHB))} 泰銖 ÷ {people}人</div>
           </div>
 
-          {/* Includes */}
+          {/* Includes/Excludes */}
           <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#e8f5e9', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 8 }}>✅ 費用包含</div>
-              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>
-                {includeAccommodation && (
-                  <>
-                    • {totalNights}晚住宿<br />
-                    {hotels.map((h) => {
-                      const roomInfo = [
-                        h.roomDouble > 0 && `雙人x${h.roomDouble}`,
-                        h.roomTriple > 0 && `三人x${h.roomTriple}`,
-                        h.roomFamily > 0 && `家庭x${h.roomFamily}`,
-                      ].filter(Boolean).join(' ')
-                      return <span key={h.id}>　{h.name}({h.nights}晚) {roomInfo}<br /></span>
-                    })}
-                  </>
-                )}
-                {includeMeals && `• ${calculation.mealDays}天午晚餐`}{includeMeals && <br />}
-                • D1接機旅遊 + {calculation.guideDays - 1}天包車 + D6送機<br />
-                • 中文導遊1位（{calculation.guideDays}天）<br />
-                {calculation.selectedTickets.length > 0 && `• 門票活動（${calculation.selectedTickets.length}項）`}{calculation.selectedTickets.length > 0 && <br />}
+              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+                {includeAccommodation && <>• {totalNights}晚五星住宿<br /></>}
+                {includeMeals && <>• {calculation.mealDays}天午晚餐<br /></>}
+                • 全程包車（{calculation.carCount}台）<br />
+                • 專業中文導遊<br />
+                {calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
+                {calculation.thaiDressPrice > 0 && <>• 泰服體驗<br /></>}
                 • 旅遊保險
               </div>
             </div>
             <div style={{ background: '#fff3e0', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 8 }}>❌ 費用不含</div>
-              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
                 • 來回機票<br />
-                {!includeAccommodation && '• 住宿'}{!includeAccommodation && <br />}
-                {!includeMeals && '• 餐費'}{!includeMeals && <br />}
-                {calculation.selectedTickets.length === 0 && '• 門票（現場付費）'}{calculation.selectedTickets.length === 0 && <br />}
+                {!includeAccommodation && <>• 住宿<br /></>}
+                {!includeMeals && <>• 餐費<br /></>}
+                {calculation.selectedTickets.length === 0 && <>• 門票（現場付費）<br /></>}
                 • 個人消費<br />
                 • 按摩 SPA<br />
-                • 小費<br />
-                • 超時費用
+                • 小費
               </div>
             </div>
           </div>
