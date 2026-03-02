@@ -222,6 +222,7 @@ interface Hotel {
   priceFamily: number
   // 押金政策
   hasDeposit: boolean
+  depositPerRoom: number  // 每間房押金（check-in 時收取）
 }
 
 export function PricingCalculator() {
@@ -231,8 +232,8 @@ export function PricingCalculator() {
 
   // 多飯店住宿
   const [hotels, setHotels] = useState<Hotel[]>([
-    { id: 1, name: '香格里拉酒店', nights: 3, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 2500, priceTriple: 3500, priceFamily: 4500, hasDeposit: true },
-    { id: 2, name: '美平洲際酒店', nights: 2, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 3000, priceTriple: 4000, priceFamily: 5000, hasDeposit: true },
+    { id: 1, name: '香格里拉酒店', nights: 3, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 2500, priceTriple: 3500, priceFamily: 4500, hasDeposit: true, depositPerRoom: 3000 },
+    { id: 2, name: '美平洲際酒店', nights: 2, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 3000, priceTriple: 4000, priceFamily: 5000, hasDeposit: true, depositPerRoom: 3000 },
   ])
   const [nextHotelId, setNextHotelId] = useState(3)
 
@@ -260,7 +261,8 @@ export function PricingCalculator() {
       priceDouble: 2500,
       priceTriple: 3500,
       priceFamily: 4500,
-      hasDeposit: false
+      hasDeposit: false,
+      depositPerRoom: 3000
     }])
     setNextHotelId(prev => prev + 1)
   }
@@ -332,6 +334,14 @@ export function PricingCalculator() {
 
     // 有押金的飯店
     const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
+
+    // 計算押金：每間房押金 × 房間數（check-in 時收取，退房退還）
+    const getHotelDeposit = (h: Hotel) => {
+      if (!h.hasDeposit) return 0
+      const totalRooms = h.roomDouble + h.roomTriple + h.roomFamily
+      return h.depositPerRoom * totalRooms
+    }
+    const totalDeposit = hotelsWithDeposit.reduce((sum, h) => sum + getHotelDeposit(h), 0)
 
     // Meal（可選擇不含餐費）
     const mealCost = includeMeals ? people * mealLevel * mealDays : 0
@@ -415,7 +425,7 @@ export function PricingCalculator() {
 
     return {
       people, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, mealLevel,
-      includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity, getHotelCost,
+      includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity, getHotelCost, getHotelDeposit, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost,
       selectedTickets, ticketCost, ticketPrice, ticketYourProfit, ticketPartnerProfit,
@@ -432,15 +442,7 @@ export function PricingCalculator() {
     setTickets(prev => prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t))
   }
 
-  const selectAllTickets = () => {
-    setTickets(prev => prev.map(t => ({ ...t, checked: true })))
-  }
-
-  const deselectAllTickets = () => {
-    setTickets(prev => prev.map(t => ({ ...t, checked: false })))
-  }
-
-  // 含門票/活動 - 包含門票 + 泰服
+  // 門票 + 泰服 統一控制
   const selectAllActivities = () => {
     setTickets(prev => prev.map(t => ({ ...t, checked: true })))
     setThaiDressCloth(true)
@@ -640,26 +642,46 @@ export function PricingCalculator() {
 
                         {/* 第三行：押金勾選 + 小計 */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                            <input
-                              type="checkbox"
-                              checked={hotel.hasDeposit}
-                              onChange={e => updateHotel(hotel.id, 'hasDeposit', e.target.checked)}
-                              style={{ width: 16, height: 16 }}
-                            />
-                            <span style={{ fontSize: 13, color: hotel.hasDeposit ? '#e65100' : '#666' }}>
-                              💳 需付押金
-                            </span>
-                          </label>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={hotel.hasDeposit}
+                                onChange={e => updateHotel(hotel.id, 'hasDeposit', e.target.checked)}
+                                style={{ width: 16, height: 16 }}
+                              />
+                              <span style={{ fontSize: 13, color: hotel.hasDeposit ? '#e65100' : '#666' }}>
+                                💳 押金
+                              </span>
+                            </label>
+                            {hotel.hasDeposit && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <input
+                                  type="number"
+                                  value={hotel.depositPerRoom}
+                                  onChange={e => updateHotel(hotel.id, 'depositPerRoom', Math.max(0, Number(e.target.value)))}
+                                  min={0}
+                                  step={500}
+                                  style={{ width: 70, padding: 4, border: '1px solid #ff9800', borderRadius: 4, textAlign: 'center', fontSize: 12 }}
+                                />
+                                <span style={{ fontSize: 11, color: '#e65100' }}>/間房</span>
+                              </div>
+                            )}
+                          </div>
                           <div style={{ fontSize: 13, color: '#555' }}>
                             容納 {hotelCapacity} 人 ｜ <strong>{fmt(hotelTotal)} 泰銖</strong>（{hotel.nights}晚）
                           </div>
                         </div>
 
-                        {/* 押金提示 */}
+                        {/* 押金明細 */}
                         {hotel.hasDeposit && (
-                          <div style={{ marginTop: 8, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 12, color: '#e65100' }}>
-                            ⚠️ {hotel.name} 需付押金，可與房費一起收取，退房後退還客人
+                          <div style={{ marginTop: 8, padding: 10, background: '#fff3e0', borderRadius: 6, fontSize: 12 }}>
+                            <div style={{ color: '#e65100', fontWeight: 'bold', marginBottom: 4 }}>
+                              💳 {hotel.name} 押金：{fmt(hotel.depositPerRoom)} × {hotel.roomDouble + hotel.roomTriple + hotel.roomFamily} 間 = <strong>{fmt(calculation.getHotelDeposit(hotel))} 泰銖</strong>
+                            </div>
+                            <div style={{ color: '#666', fontSize: 11 }}>
+                              Check-in 時統一收取，退房由導遊退還客人
+                            </div>
                           </div>
                         )}
                       </div>
@@ -669,11 +691,23 @@ export function PricingCalculator() {
 
                 {/* 押金總提示 */}
                 {calculation.hotelsWithDeposit.length > 0 && (
-                  <div style={{ marginTop: 12, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
-                    <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 4 }}>💳 押金提醒</div>
-                    <div style={{ fontSize: 13, color: '#555' }}>
-                      以下飯店需付押金：{calculation.hotelsWithDeposit.map(h => h.name).join('、')}<br />
-                      📋 可告知客人：「押金可以跟房費一起付，退房時會退還」
+                  <div style={{ marginTop: 12, padding: 12, background: '#fff8e1', border: '2px solid #ff9800', borderRadius: 8 }}>
+                    <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 8, fontSize: 15 }}>
+                      💳 押金總計：{fmt(calculation.totalDeposit)} 泰銖
+                    </div>
+                    <div style={{ fontSize: 13, color: '#555', marginBottom: 8 }}>
+                      {calculation.hotelsWithDeposit.map(h => (
+                        <div key={h.id} style={{ marginBottom: 2 }}>
+                          • {h.name}：{fmt(h.depositPerRoom)} × {h.roomDouble + h.roomTriple + h.roomFamily} 間 = {fmt(calculation.getHotelDeposit(h))} 泰銖
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ background: '#fff', padding: 8, borderRadius: 6, fontSize: 12 }}>
+                      <div style={{ color: '#2d5a3d', fontWeight: 'bold', marginBottom: 4 }}>📋 跟客人說明：</div>
+                      <div style={{ color: '#555' }}>
+                        1. 押金統一收取 <strong>{fmt(calculation.totalDeposit)} 泰銖</strong>，退房後由導遊退還<br />
+                        2. <span style={{ color: '#d32f2f' }}>建議付現金</span>（信用卡退款需 7~14 天處理時間）
+                      </div>
                     </div>
                   </div>
                 )}
@@ -764,27 +798,27 @@ export function PricingCalculator() {
           {/* 門票 */}
           <Section title="🎫 門票活動">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <p style={{ ...noteStyle, margin: 0 }}>格式：成本｜★ 表示有退款對分</p>
+              <p style={{ ...noteStyle, margin: 0 }}>格式：成本｜★ 表示有退款對分（含泰服）</p>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
-                  onClick={selectAllTickets}
-                  disabled={allTicketsSelected}
-                  style={{ padding: '6px 12px', background: allTicketsSelected ? '#ccc' : '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: allTicketsSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
+                  onClick={selectAllActivities}
+                  disabled={allActivitiesSelected}
+                  style={{ padding: '6px 12px', background: allActivitiesSelected ? '#ccc' : '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: allActivitiesSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
                 >
                   ✅ 全選
                 </button>
                 <button
-                  onClick={deselectAllTickets}
-                  disabled={noTicketsSelected}
-                  style={{ padding: '6px 12px', background: noTicketsSelected ? '#ccc' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: noTicketsSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
+                  onClick={deselectAllActivities}
+                  disabled={noActivitiesSelected}
+                  style={{ padding: '6px 12px', background: noActivitiesSelected ? '#ccc' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: noActivitiesSelected ? 'not-allowed' : 'pointer', fontSize: 13 }}
                 >
                   ❌ 全不選
                 </button>
               </div>
             </div>
-            {noTicketsSelected && (
+            {noActivitiesSelected && (
               <div style={{ background: '#fff3e0', padding: 10, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
-                💡 門票由客人現場付給導遊
+                💡 門票/活動由客人現場付給導遊
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
@@ -830,6 +864,13 @@ export function PricingCalculator() {
             <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8, fontSize: 12 }}>
               總計 {fmt(calculation.totalPrice)} 泰銖 ÷ {people}人 ÷ {exchangeRate}
             </p>
+            {calculation.totalDeposit > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+                <div style={{ fontSize: 13, color: '#ffcc00' }}>
+                  💳 另收押金：{fmt(calculation.totalDeposit)} 泰銖（退房退還，建議現金）
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -974,6 +1015,26 @@ export function PricingCalculator() {
                 <td style={tdStyle}>{fmt(Math.round(calculation.perPersonTHB))} 泰銖</td>
                 <td style={{ ...tdStyle, color: '#2d5a3d', fontWeight: 'bold' }}>NT$ {fmt(calculation.perPersonTWD)}</td>
               </tr>
+
+              {calculation.totalDeposit > 0 && (
+                <>
+                  <SectionRow title="💳 飯店押金（另收，退房退還）" />
+                  {calculation.hotelsWithDeposit.map(h => (
+                    <tr key={h.id} style={{ background: '#fff8e1' }}>
+                      <td style={{ ...tdStyle, textAlign: 'left' }}>{h.name}</td>
+                      <td style={tdStyle}>{h.roomDouble + h.roomTriple + h.roomFamily} 間 × {fmt(h.depositPerRoom)}</td>
+                      <td style={tdStyle}></td>
+                      <td style={{ ...tdStyle, color: '#e65100', fontWeight: 'bold' }}>{fmt(calculation.getHotelDeposit(h))}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ background: '#ff9800', color: 'white', fontWeight: 'bold' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>押金總計（建議現金）</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}>{fmt(calculation.totalDeposit)} 泰銖</td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </Section>
@@ -1081,11 +1142,17 @@ export function PricingCalculator() {
           {/* Deposit Notice */}
           {calculation.hotelsWithDeposit.length > 0 && (
             <div style={{ marginTop: 16, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
-              <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 4, fontSize: 13 }}>💳 飯店押金說明</div>
-              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
-                以下飯店 check-in 時需支付押金：<br />
-                {calculation.hotelsWithDeposit.map(h => <span key={h.id}>• {h.name}<br /></span>)}
-                <span style={{ color: '#2d5a3d' }}>→ 押金可與房費一起支付，退房時會全額退還</span>
+              <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 8, fontSize: 14 }}>
+                💳 飯店押金說明（{fmt(calculation.totalDeposit)} 泰銖）
+              </div>
+              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+                {calculation.hotelsWithDeposit.map(h => (
+                  <div key={h.id}>• {h.name}：{fmt(calculation.getHotelDeposit(h))} 泰銖（{h.roomDouble + h.roomTriple + h.roomFamily} 間 × {fmt(h.depositPerRoom)}）</div>
+                ))}
+                <div style={{ marginTop: 8, padding: 8, background: '#e8f5e9', borderRadius: 4 }}>
+                  ✅ 押金統一由導遊收取，退房後全額退還<br />
+                  💡 建議以現金支付（信用卡退款需 7~14 天）
+                </div>
               </div>
             </div>
           )}
