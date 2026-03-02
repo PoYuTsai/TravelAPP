@@ -53,12 +53,7 @@ function downloadPDF(
   c: any,
   people: number,
   exchangeRate: number,
-  roomDouble: number,
-  roomTriple: number,
-  roomFamily: number,
-  priceDouble: number,
-  priceTriple: number,
-  priceFamily: number,
+  hotels: Hotel[],
   mealLevel: number,
   thaiDressCloth: boolean,
   thaiDressPhoto: boolean,
@@ -68,11 +63,12 @@ function downloadPDF(
   const fmt = (n: number) => n.toLocaleString()
   const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
 
-  // 房間資訊
-  const rooms = []
-  if (roomDouble > 0) rooms.push(`雙人房x${roomDouble} (${priceDouble}/晚)`)
-  if (roomTriple > 0) rooms.push(`三人房x${roomTriple} (${priceTriple}/晚)`)
-  if (roomFamily > 0) rooms.push(`家庭房x${roomFamily} (${priceFamily}/晚)`)
+  // 飯店資訊
+  const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
+  const totalNights = hotels.reduce((sum, h) => sum + h.nights, 0)
+  const getHotelCost = (h: Hotel) =>
+    (h.roomDouble * h.priceDouble + h.roomTriple * h.priceTriple + h.roomFamily * h.priceFamily) * h.nights
+  const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
 
   const html = `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -110,7 +106,7 @@ function downloadPDF(
   <div class="section">
     <h3>📋 基本資訊</h3>
     <p>👥 人數：${people} 人</p>
-    <p>🏨 住宿：${rooms.join('、')}（${c.nights}晚）</p>
+    <p>🏨 住宿：${hotelInfo}（共${totalNights}晚）</p>
     <p>🍜 餐費：${mealLabels[mealLevel] || '標準'} ${mealLevel}/人/天（${c.mealDays}天）</p>
     <p>🚗 車輛：${c.carCount} 台${c.needLuggageCar ? ' + 行李車' : ''}</p>
     <p>💱 匯率：${exchangeRate}</p>
@@ -123,8 +119,18 @@ function downloadPDF(
         <tr><th>項目</th><th>成本</th><th>售價</th><th>利潤</th></tr>
       </thead>
       <tbody>
-        <tr class="section-header"><td colspan="4">🏨 住宿 (${c.nights}晚)</td></tr>
-        <tr><td>住宿費</td><td>${fmt(c.accommodationCost)}</td><td>${fmt(c.accommodationCost)}</td><td>-</td></tr>
+        <tr class="section-header"><td colspan="4">🏨 住宿 (${totalNights}晚)</td></tr>
+        ${hotels.map((h: Hotel) => {
+          const hotelCost = getHotelCost(h)
+          const roomInfo = [
+            h.roomDouble > 0 && `雙人x${h.roomDouble}`,
+            h.roomTriple > 0 && `三人x${h.roomTriple}`,
+            h.roomFamily > 0 && `家庭x${h.roomFamily}`,
+          ].filter(Boolean).join('+')
+          return `<tr><td>${h.name} (${h.nights}晚) ${roomInfo}${h.hasDeposit ? ' 💳' : ''}</td><td>${fmt(hotelCost)}</td><td>${fmt(hotelCost)}</td><td>-</td></tr>`
+        }).join('')}
+        <tr class="subtotal"><td>住宿小計</td><td>${fmt(c.accommodationCost)}</td><td>${fmt(c.accommodationCost)}</td><td>-</td></tr>
+        ${hotelsWithDeposit.length > 0 ? `<tr><td colspan="4" style="background:#fff3cd;font-size:12px;">💳 需押金飯店：${hotelsWithDeposit.map((h: Hotel) => h.name).join('、')}</td></tr>` : ''}
 
         <tr class="section-header"><td colspan="4">🍜 餐費 (${c.mealDays}天)</td></tr>
         <tr><td>餐費 (${mealLevel}/人/天)</td><td>${fmt(c.mealCost)}</td><td>${fmt(c.mealCost)}</td><td>-</td></tr>
@@ -201,17 +207,35 @@ const ITINERARY = [
   { day: 'DAY 6', title: '收心慢遊・送機回國', items: ['🍳 早餐後退房', '🛫 專車送機'], hotel: null },
 ]
 
+// 飯店類型
+interface Hotel {
+  id: number
+  name: string
+  nights: number
+  // 房型數量
+  roomDouble: number
+  roomTriple: number
+  roomFamily: number
+  // 房型單價（每晚）
+  priceDouble: number
+  priceTriple: number
+  priceFamily: number
+  // 押金政策
+  hasDeposit: boolean
+}
+
 export function PricingCalculator() {
   // Form states
   const [people, setPeople] = useState(10)
   const [exchangeRate, setExchangeRate] = useState(0.93)
-  const [roomDouble, setRoomDouble] = useState(5)
-  const [roomTriple, setRoomTriple] = useState(0)
-  const [roomFamily, setRoomFamily] = useState(0)
-  // 房價可編輯
-  const [priceDouble, setPriceDouble] = useState(2500)
-  const [priceTriple, setPriceTriple] = useState(3500)
-  const [priceFamily, setPriceFamily] = useState(4500)
+
+  // 多飯店住宿
+  const [hotels, setHotels] = useState<Hotel[]>([
+    { id: 1, name: '香格里拉酒店', nights: 3, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 2500, priceTriple: 3500, priceFamily: 4500, hasDeposit: true },
+    { id: 2, name: '美平洲際酒店', nights: 2, roomDouble: 5, roomTriple: 0, roomFamily: 0, priceDouble: 3000, priceTriple: 4000, priceFamily: 5000, hasDeposit: true },
+  ])
+  const [nextHotelId, setNextHotelId] = useState(3)
+
   const [mealLevel, setMealLevel] = useState(900)
   const [tickets, setTickets] = useState(DEFAULT_TICKETS)
   const [thaiDressCloth, setThaiDressCloth] = useState(true)
@@ -220,18 +244,38 @@ export function PricingCalculator() {
   const [luggageCar, setLuggageCar] = useState(true)
   const [includeAccommodation, setIncludeAccommodation] = useState(true)
   const [includeMeals, setIncludeMeals] = useState(true)
+  const [includeTickets, setIncludeTickets] = useState(true)
   const [activeTab, setActiveTab] = useState<'input' | 'internal' | 'external'>('input')
   const config = DEFAULT_CONFIG
 
-  // 動態房價
-  const roomPrices = { double: priceDouble, triple: priceTriple, family: priceFamily }
+  // 飯店管理函數
+  const addHotel = () => {
+    setHotels(prev => [...prev, {
+      id: nextHotelId,
+      name: '新飯店',
+      nights: 1,
+      roomDouble: 5,
+      roomTriple: 0,
+      roomFamily: 0,
+      priceDouble: 2500,
+      priceTriple: 3500,
+      priceFamily: 4500,
+      hasDeposit: false
+    }])
+    setNextHotelId(prev => prev + 1)
+  }
 
-  // Auto-adjust rooms when people changes
-  useEffect(() => {
-    setRoomDouble(Math.ceil(people / 2))
-    setRoomTriple(0)
-    setRoomFamily(0)
-  }, [people])
+  const removeHotel = (id: number) => {
+    if (hotels.length <= 1) return // 至少保留一間
+    setHotels(prev => prev.filter(h => h.id !== id))
+  }
+
+  const updateHotel = (id: number, field: keyof Hotel, value: string | number) => {
+    setHotels(prev => prev.map(h => h.id === id ? { ...h, [field]: value } : h))
+  }
+
+  // 計算總住宿晚數
+  const totalNights = hotels.reduce((sum, h) => sum + h.nights, 0)
 
   // Auto-adjust luggage car based on max passengers per car
   // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
@@ -245,7 +289,10 @@ export function PricingCalculator() {
 
   // Calculations
   const calculation = useMemo(() => {
-    const { nights, mealDays, guideDays, dailyCarFees, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    const { mealDays, guideDays, dailyCarFees, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    // 使用多飯店的總晚數
+    const nights = totalNights
+
     // 車輛計算：第一台 9 人（導遊坐副駕）、之後每台 10 人
     // 1-9人=1台, 10-19人=2台, 20-29人=3台...
     const carCount = people <= 9 ? 1 : 1 + Math.ceil((people - 9) / 10)
@@ -271,11 +318,20 @@ export function PricingCalculator() {
     const suggestLuggageCar = maxPerCar >= 8
     const needLuggageCar = luggageCar
 
-    // Room - 使用動態房價（可選擇不含住宿）
-    const roomCapacity = roomDouble * 2 + roomTriple * 3 + roomFamily * 4
+    // 住宿 - 使用多飯店系統（可選擇不含住宿）
+    // 每間飯店的住宿費 = (雙人房數×單價 + 三人房數×單價 + 家庭房數×單價) × 晚數
+    const getHotelCost = (h: Hotel) =>
+      (h.roomDouble * h.priceDouble + h.roomTriple * h.priceTriple + h.roomFamily * h.priceFamily) * h.nights
     const accommodationCost = includeAccommodation
-      ? (roomDouble * priceDouble + roomTriple * priceTriple + roomFamily * priceFamily) * nights
+      ? hotels.reduce((sum, h) => sum + getHotelCost(h), 0)
       : 0
+
+    // 總房間容量
+    const totalRoomCapacity = hotels.reduce((sum, h) =>
+      sum + h.roomDouble * 2 + h.roomTriple * 3 + h.roomFamily * 4, 0) / hotels.length
+
+    // 有押金的飯店
+    const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
 
     // Meal（可選擇不含餐費）
     const mealCost = includeMeals ? people * mealLevel * mealDays : 0
@@ -358,8 +414,8 @@ export function PricingCalculator() {
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, roomCapacity, nights, mealDays, guideDays, mealLevel,
-      includeAccommodation, includeMeals,
+      people, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, mealLevel,
+      includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity, getHotelCost,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost,
       selectedTickets, ticketCost, ticketPrice, ticketYourProfit, ticketPartnerProfit,
@@ -368,7 +424,7 @@ export function PricingCalculator() {
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, people, exchangeRate, roomDouble, roomTriple, roomFamily, priceDouble, priceTriple, priceFamily, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, includeAccommodation, includeMeals])
+  }, [config, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, includeAccommodation, includeMeals, includeTickets])
 
   const fmt = (n: number) => n.toLocaleString()
 
@@ -384,19 +440,31 @@ export function PricingCalculator() {
     setTickets(prev => prev.map(t => ({ ...t, checked: false })))
   }
 
+  // 含門票/活動 - 包含門票 + 泰服
+  const selectAllActivities = () => {
+    setTickets(prev => prev.map(t => ({ ...t, checked: true })))
+    setThaiDressCloth(true)
+  }
+
+  const deselectAllActivities = () => {
+    setTickets(prev => prev.map(t => ({ ...t, checked: false })))
+    setThaiDressCloth(false)
+    setThaiDressPhoto(false)
+    setMakeupCount(0)
+  }
+
   const allTicketsSelected = tickets.every(t => t.checked)
   const noTicketsSelected = tickets.every(t => !t.checked)
+  const allActivitiesSelected = allTicketsSelected && thaiDressCloth
+  const noActivitiesSelected = noTicketsSelected && !thaiDressCloth && !thaiDressPhoto && makeupCount === 0
 
   const copyTextQuote = () => {
     const c = calculation
-    const rooms = []
-    if (roomDouble > 0) rooms.push(`雙人房x${roomDouble}`)
-    if (roomTriple > 0) rooms.push(`三人房x${roomTriple}`)
-    if (roomFamily > 0) rooms.push(`家庭房x${roomFamily}`)
+    const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
     const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
 
     const text = [
-      '🚐 清微旅行｜清邁 6天5夜 親子包車行程',
+      `🚐 清微旅行｜清邁 ${totalNights + 1}天${totalNights}夜 親子包車行程`,
       '━━━━━━━━━━━━━━━━━━━━',
       '',
       '📅 行程概覽',
@@ -411,7 +479,7 @@ export function PricingCalculator() {
       '',
       '💰 報價明細',
       `👥 人數：${people} 人`,
-      `🏨 住宿：${rooms.join('、')}（${c.nights}晚）`,
+      `🏨 住宿：${hotelInfo}`,
       `🍜 餐費：${mealLabels[mealLevel] || '標準'}（${c.mealDays}天）`,
       `🚗 包車：${c.carCount} 台 + 中文導遊`,
       '🎫 門票：含',
@@ -442,7 +510,7 @@ export function PricingCalculator() {
         <button onClick={() => setActiveTab('input')} style={{ padding: '10px 20px', background: activeTab === 'input' ? '#2d5a3d' : '#ddd', color: activeTab === 'input' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📝 輸入</button>
         <button onClick={() => setActiveTab('internal')} style={{ padding: '10px 20px', background: activeTab === 'internal' ? '#2d5a3d' : '#ddd', color: activeTab === 'internal' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📊 內部明細</button>
         <button onClick={() => setActiveTab('external')} style={{ padding: '10px 20px', background: activeTab === 'external' ? '#2d5a3d' : '#ddd', color: activeTab === 'external' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📄 對外報價單</button>
-        <button onClick={() => downloadPDF(calculation, people, exchangeRate, roomDouble, roomTriple, roomFamily, priceDouble, priceTriple, priceFamily, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config)} style={{ padding: '10px 20px', background: '#4a7c59', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
+        <button onClick={() => downloadPDF(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config)} style={{ padding: '10px 20px', background: '#4a7c59', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
         <button onClick={copyTextQuote} style={{ padding: '10px 20px', background: '#1976d2', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📋 複製文字</button>
       </div>
 
@@ -460,10 +528,18 @@ export function PricingCalculator() {
                 <input type="checkbox" checked={includeMeals} onChange={e => setIncludeMeals(e.target.checked)} style={{ width: 18, height: 18 }} />
                 <span style={{ fontSize: 15 }}>🍜 含餐費</span>
               </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={allActivitiesSelected} onChange={e => e.target.checked ? selectAllActivities() : deselectAllActivities()} style={{ width: 18, height: 18 }} />
+                <span style={{ fontSize: 15 }}>🎫 含門票/活動</span>
+              </label>
             </div>
-            {(!includeAccommodation || !includeMeals) && (
+            {(!includeAccommodation || !includeMeals || noActivitiesSelected) && (
               <div style={{ marginTop: 8, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
-                💡 {!includeAccommodation && '住宿'}{!includeAccommodation && !includeMeals && '、'}{!includeMeals && '餐費'}由客人自理
+                💡 {[
+                  !includeAccommodation && '住宿',
+                  !includeMeals && '餐費',
+                  noActivitiesSelected && '門票/活動'
+                ].filter(Boolean).join('、')}由客人自理
               </div>
             )}
           </Section>
@@ -484,20 +560,141 @@ export function PricingCalculator() {
           </Section>
 
           {/* 住宿 */}
-          <Section title={`🏨 住宿（${calculation.nights}晚）`} style={!includeAccommodation ? { opacity: 0.5 } : {}}>
+          <Section title={`🏨 住宿（共 ${totalNights} 晚）`} style={!includeAccommodation ? { opacity: 0.5 } : {}}>
             {!includeAccommodation ? (
               <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8, textAlign: 'center', color: '#666' }}>
                 客人自理住宿
               </div>
             ) : (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                  <RoomCardEditable name="雙人房" priceValue={priceDouble} onPriceChange={setPriceDouble} countValue={roomDouble} onCountChange={setRoomDouble} capacity={2} />
-                  <RoomCardEditable name="三人房" priceValue={priceTriple} onPriceChange={setPriceTriple} countValue={roomTriple} onCountChange={setRoomTriple} capacity={3} />
-                  <RoomCardEditable name="家庭房" priceValue={priceFamily} onPriceChange={setPriceFamily} countValue={roomFamily} onCountChange={setRoomFamily} capacity={4} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {hotels.map((hotel, index) => {
+                    const hotelTotal = (hotel.roomDouble * hotel.priceDouble + hotel.roomTriple * hotel.priceTriple + hotel.roomFamily * hotel.priceFamily) * hotel.nights
+                    const hotelCapacity = hotel.roomDouble * 2 + hotel.roomTriple * 3 + hotel.roomFamily * 4
+                    return (
+                      <div key={hotel.id} style={{ background: '#f9f9f9', borderRadius: 8, padding: 16, border: hotel.hasDeposit ? '2px solid #ff9800' : '1px solid #e0e0e0' }}>
+                        {/* 第一行：飯店名稱、晚數、刪除 */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 'bold', color: '#2d5a3d', minWidth: 70 }}>飯店 {index + 1}</span>
+                          <input
+                            type="text"
+                            value={hotel.name}
+                            onChange={e => updateHotel(hotel.id, 'name', e.target.value)}
+                            placeholder="飯店名稱"
+                            style={{ flex: 1, minWidth: 150, padding: 8, border: '1px solid #ddd', borderRadius: 6, fontWeight: 'bold' }}
+                          />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <label style={{ fontSize: 13, color: '#666' }}>晚數</label>
+                            <input
+                              type="number"
+                              value={hotel.nights}
+                              onChange={e => updateHotel(hotel.id, 'nights', Math.max(1, Number(e.target.value)))}
+                              min={1}
+                              max={30}
+                              style={{ width: 50, padding: 6, border: '1px solid #ddd', borderRadius: 6, textAlign: 'center' }}
+                            />
+                          </div>
+                          {hotels.length > 1 && (
+                            <button
+                              onClick={() => removeHotel(hotel.id)}
+                              style={{ padding: '6px 10px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                            >
+                              ✕ 刪除
+                            </button>
+                          )}
+                        </div>
+
+                        {/* 第二行：房型設定 */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 8, marginBottom: 12 }}>
+                          {/* 雙人房 */}
+                          <div style={{ background: 'white', padding: 8, borderRadius: 6, border: '1px solid #e0e0e0' }}>
+                            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>🛏️ 雙人房 (2人)</div>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input type="number" value={hotel.roomDouble} onChange={e => updateHotel(hotel.id, 'roomDouble', Math.max(0, Number(e.target.value)))} min={0} max={20} style={{ width: 40, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                              <span style={{ fontSize: 11, color: '#999' }}>間</span>
+                              <span style={{ fontSize: 11, color: '#999' }}>@</span>
+                              <input type="number" value={hotel.priceDouble} onChange={e => updateHotel(hotel.id, 'priceDouble', Math.max(0, Number(e.target.value)))} min={0} step={100} style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                            </div>
+                          </div>
+                          {/* 三人房 */}
+                          <div style={{ background: 'white', padding: 8, borderRadius: 6, border: '1px solid #e0e0e0' }}>
+                            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>🛏️ 三人房 (3人)</div>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input type="number" value={hotel.roomTriple} onChange={e => updateHotel(hotel.id, 'roomTriple', Math.max(0, Number(e.target.value)))} min={0} max={20} style={{ width: 40, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                              <span style={{ fontSize: 11, color: '#999' }}>間</span>
+                              <span style={{ fontSize: 11, color: '#999' }}>@</span>
+                              <input type="number" value={hotel.priceTriple} onChange={e => updateHotel(hotel.id, 'priceTriple', Math.max(0, Number(e.target.value)))} min={0} step={100} style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                            </div>
+                          </div>
+                          {/* 家庭房 */}
+                          <div style={{ background: 'white', padding: 8, borderRadius: 6, border: '1px solid #e0e0e0' }}>
+                            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>🛏️ 家庭房 (4人)</div>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <input type="number" value={hotel.roomFamily} onChange={e => updateHotel(hotel.id, 'roomFamily', Math.max(0, Number(e.target.value)))} min={0} max={20} style={{ width: 40, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                              <span style={{ fontSize: 11, color: '#999' }}>間</span>
+                              <span style={{ fontSize: 11, color: '#999' }}>@</span>
+                              <input type="number" value={hotel.priceFamily} onChange={e => updateHotel(hotel.id, 'priceFamily', Math.max(0, Number(e.target.value)))} min={0} step={100} style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 第三行：押金勾選 + 小計 */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={hotel.hasDeposit}
+                              onChange={e => updateHotel(hotel.id, 'hasDeposit', e.target.checked)}
+                              style={{ width: 16, height: 16 }}
+                            />
+                            <span style={{ fontSize: 13, color: hotel.hasDeposit ? '#e65100' : '#666' }}>
+                              💳 需付押金
+                            </span>
+                          </label>
+                          <div style={{ fontSize: 13, color: '#555' }}>
+                            容納 {hotelCapacity} 人 ｜ <strong>{fmt(hotelTotal)} 泰銖</strong>（{hotel.nights}晚）
+                          </div>
+                        </div>
+
+                        {/* 押金提示 */}
+                        {hotel.hasDeposit && (
+                          <div style={{ marginTop: 8, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 12, color: '#e65100' }}>
+                            ⚠️ {hotel.name} 需付押金，可與房費一起收取，退房後退還客人
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
-                {calculation.roomCapacity < people && <div style={warningStyle}>⚠️ 房間不足！需容納 {people} 人，目前只有 {calculation.roomCapacity} 人</div>}
-                <p style={{ ...noteStyle, marginTop: 12 }}>房間容納：{calculation.roomCapacity} 人 ｜ 住宿費：{fmt(calculation.accommodationCost)} 泰銖</p>
+
+                {/* 押金總提示 */}
+                {calculation.hotelsWithDeposit.length > 0 && (
+                  <div style={{ marginTop: 12, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
+                    <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 4 }}>💳 押金提醒</div>
+                    <div style={{ fontSize: 13, color: '#555' }}>
+                      以下飯店需付押金：{calculation.hotelsWithDeposit.map(h => h.name).join('、')}<br />
+                      📋 可告知客人：「押金可以跟房費一起付，退房時會退還」
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <button
+                    onClick={addHotel}
+                    style={{ padding: '8px 16px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}
+                  >
+                    + 新增飯店
+                  </button>
+                  <p style={{ ...noteStyle, margin: 0 }}>
+                    住宿總計：<strong>{fmt(calculation.accommodationCost)} 泰銖</strong>（{totalNights} 晚）
+                  </p>
+                </div>
+
+                {totalNights !== config.nights && (
+                  <div style={{ ...warningStyle, marginTop: 12 }}>
+                    ⚠️ 總晚數 {totalNights} 晚，與預設 {config.nights} 晚不同（行程天數會自動調整）
+                  </div>
+                )}
               </>
             )}
           </Section>
@@ -650,8 +847,22 @@ export function PricingCalculator() {
               </tr>
             </thead>
             <tbody>
-              <SectionRow title={`🏨 住宿 (${calculation.nights}晚)`} />
-              <DataRow name="住宿費" cost={calculation.accommodationCost} price={calculation.accommodationCost} profit={0} />
+              <SectionRow title={`🏨 住宿 (${totalNights}晚)`} />
+              {hotels.map(h => {
+                const hotelCost = calculation.getHotelCost(h)
+                const roomInfo = [
+                  h.roomDouble > 0 && `雙人x${h.roomDouble}`,
+                  h.roomTriple > 0 && `三人x${h.roomTriple}`,
+                  h.roomFamily > 0 && `家庭x${h.roomFamily}`,
+                ].filter(Boolean).join('+')
+                return (
+                  <DataRow key={h.id} name={`${h.name} (${h.nights}晚) ${roomInfo}${h.hasDeposit ? ' 💳' : ''}`} cost={hotelCost} price={hotelCost} profit={0} className="day-row" />
+                )
+              })}
+              <SubtotalRow name="住宿小計" cost={calculation.accommodationCost} price={calculation.accommodationCost} profit={0} />
+              {calculation.hotelsWithDeposit.length > 0 && (
+                <InfoRow text={`💳 需押金飯店：${calculation.hotelsWithDeposit.map(h => h.name).join('、')}`} />
+              )}
 
               <SectionRow title={`🍜 餐費 (${calculation.mealDays}天)`} />
               <DataRow name={`餐費 (${mealLevel}/人/天)`} cost={calculation.mealCost} price={calculation.mealCost} profit={0} />
@@ -796,7 +1007,21 @@ export function PricingCalculator() {
             <h3 style={{ margin: '0 0 12px 0', color: '#2d5a3d', fontSize: 16, borderBottom: '2px solid #2d5a3d', paddingBottom: 8 }}>💰 報價明細</h3>
             <QuoteItem label="👥 人數" value={`${people} 人`} />
             {includeAccommodation && (
-              <QuoteItem label="🏨 住宿" value={`${roomDouble > 0 ? `雙人房x${roomDouble}` : ''}${roomTriple > 0 ? ` 三人房x${roomTriple}` : ''}${roomFamily > 0 ? ` 家庭房x${roomFamily}` : ''}（${calculation.nights}晚）`} />
+              <>
+                <QuoteItem label="🏨 住宿" value={`共 ${totalNights} 晚`} />
+                {hotels.map(h => {
+                  const roomInfo = [
+                    h.roomDouble > 0 && `雙人x${h.roomDouble}`,
+                    h.roomTriple > 0 && `三人x${h.roomTriple}`,
+                    h.roomFamily > 0 && `家庭x${h.roomFamily}`,
+                  ].filter(Boolean).join(' ')
+                  return (
+                    <div key={h.id} style={{ paddingLeft: 24, fontSize: 13, color: '#555', borderBottom: '1px dashed #eee', paddingBottom: 6, paddingTop: 6 }}>
+                      • {h.name}（{h.nights}晚）{roomInfo}{h.hasDeposit && ' 💳'}
+                    </div>
+                  )
+                })}
+              </>
             )}
             {includeMeals && (
               <QuoteItem label="🍜 餐費" value={`${mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}（${calculation.mealDays}天午晚餐）`} />
@@ -818,7 +1043,19 @@ export function PricingCalculator() {
             <div style={{ background: '#e8f5e9', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 8 }}>✅ 費用包含</div>
               <div style={{ fontSize: 13, color: '#333', lineHeight: 1.6 }}>
-                {includeAccommodation && `• ${calculation.nights}晚住宿`}{includeAccommodation && <br />}
+                {includeAccommodation && (
+                  <>
+                    • {totalNights}晚住宿<br />
+                    {hotels.map((h) => {
+                      const roomInfo = [
+                        h.roomDouble > 0 && `雙人x${h.roomDouble}`,
+                        h.roomTriple > 0 && `三人x${h.roomTriple}`,
+                        h.roomFamily > 0 && `家庭x${h.roomFamily}`,
+                      ].filter(Boolean).join(' ')
+                      return <span key={h.id}>　{h.name}({h.nights}晚) {roomInfo}<br /></span>
+                    })}
+                  </>
+                )}
                 {includeMeals && `• ${calculation.mealDays}天午晚餐`}{includeMeals && <br />}
                 • D1接機旅遊 + {calculation.guideDays - 1}天包車 + D6送機<br />
                 • 中文導遊1位（{calculation.guideDays}天）<br />
@@ -835,10 +1072,23 @@ export function PricingCalculator() {
                 {calculation.selectedTickets.length === 0 && '• 門票（現場付費）'}{calculation.selectedTickets.length === 0 && <br />}
                 • 個人消費<br />
                 • 按摩 SPA<br />
+                • 小費<br />
                 • 超時費用
               </div>
             </div>
           </div>
+
+          {/* Deposit Notice */}
+          {calculation.hotelsWithDeposit.length > 0 && (
+            <div style={{ marginTop: 16, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
+              <div style={{ fontWeight: 'bold', color: '#e65100', marginBottom: 4, fontSize: 13 }}>💳 飯店押金說明</div>
+              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                以下飯店 check-in 時需支付押金：<br />
+                {calculation.hotelsWithDeposit.map(h => <span key={h.id}>• {h.name}<br /></span>)}
+                <span style={{ color: '#2d5a3d' }}>→ 押金可與房費一起支付，退房時會全額退還</span>
+              </div>
+            </div>
+          )}
 
           {/* Footer */}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '2px solid #eee', textAlign: 'center', fontSize: 13, color: '#666' }}>
@@ -870,55 +1120,6 @@ function Section({ title, children, style }: { title: string; children: React.Re
 
 function Row({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap', ...style }}>{children}</div>
-}
-
-function RoomCard({ name, price, value, onChange, note }: { name: string; price: string; value: number; onChange: (v: number) => void; note: string }) {
-  return (
-    <div style={{ border: '2px solid #ddd', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-      <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name}</div>
-      <div style={{ color: '#666', fontSize: 14, marginBottom: 8 }}>{price}</div>
-      <input type="number" value={value} onChange={e => onChange(Number(e.target.value))} min={0} max={10} style={{ width: 60, textAlign: 'center', padding: 8, border: '1px solid #ddd', borderRadius: 6 }} />
-      <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{note}</div>
-    </div>
-  )
-}
-
-function RoomCardEditable({ name, priceValue, onPriceChange, countValue, onCountChange, capacity }: {
-  name: string;
-  priceValue: number;
-  onPriceChange: (v: number) => void;
-  countValue: number;
-  onCountChange: (v: number) => void;
-  capacity: number;
-}) {
-  return (
-    <div style={{ border: '2px solid #ddd', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-      <div style={{ fontWeight: 'bold', marginBottom: 4 }}>{name}</div>
-      <div style={{ marginBottom: 8 }}>
-        <label style={{ fontSize: 12, color: '#666' }}>單價/晚</label>
-        <input
-          type="number"
-          value={priceValue}
-          onChange={e => onPriceChange(Number(e.target.value))}
-          min={0}
-          step={100}
-          style={{ width: 80, textAlign: 'center', padding: 6, border: '1px solid #ddd', borderRadius: 6, marginLeft: 4 }}
-        />
-      </div>
-      <div style={{ marginBottom: 4 }}>
-        <label style={{ fontSize: 12, color: '#666' }}>數量</label>
-        <input
-          type="number"
-          value={countValue}
-          onChange={e => onCountChange(Number(e.target.value))}
-          min={0}
-          max={10}
-          style={{ width: 60, textAlign: 'center', padding: 6, border: '1px solid #ddd', borderRadius: 6, marginLeft: 4 }}
-        />
-      </div>
-      <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>容納 {capacity} 人</div>
-    </div>
-  )
 }
 
 function SectionRow({ title }: { title: string }) {
