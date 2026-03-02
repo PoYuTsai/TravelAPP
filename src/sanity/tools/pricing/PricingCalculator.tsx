@@ -29,22 +29,30 @@ const DEFAULT_CONFIG = {
   },
 }
 
-// 門票資料（跟 HTML v3 一樣）
+// 門票資料
 const DEFAULT_TICKETS = [
-  // D2
+  // D2 大象保護營（二擇一）
+  { id: 'elephant-meal', name: 'D2 大象保護營（含餐）', price: 1600, rebate: 1000, split: true, checked: false },
   { id: 'elephant', name: 'D2 大象保護營（不含餐）', price: 1600, rebate: 1100, split: true, checked: true },
-  { id: 'shooting', name: 'D2 射擊', price: 1700, rebate: 500, split: true, checked: true },
-  { id: 'cabaret', name: 'D2 人妖秀', price: 1000, rebate: 500, split: true, checked: true },
+  // D2 射擊（二擇一）
+  { id: 'shooting', name: 'D2 射擊（基本）', price: 1700, rebate: 500, split: true, checked: true },
+  { id: 'shooting-pro', name: 'D2 射擊（進階）', price: 5000, rebate: 1000, split: true, checked: false },
+  // D2 人妖秀（二擇一）
+  { id: 'cabaret-vip', name: 'D2 人妖秀（VIP）', price: 1000, rebate: 500, split: true, checked: true },
+  { id: 'cabaret', name: 'D2 人妖秀（普通）', price: 800, rebate: 350, split: true, checked: false },
   // D3
   { id: 'whiteTemple', name: 'D3 白廟', price: 0, rebate: 0, split: false, checked: true },
   { id: 'blueTemple', name: 'D3 藍廟', price: 0, rebate: 0, split: false, checked: true },
   { id: 'blackTemple', name: 'D3 黑廟', price: 0, rebate: 0, split: false, checked: true },
   { id: 'longNeck', name: 'D3 長頸村', price: 300, rebate: 200, split: true, checked: true },
   // D4
-  { id: 'waterPark', name: 'D4 水上樂園 ⚠️待補', price: 950, rebate: 0, split: true, checked: true },
+  { id: 'waterPark', name: 'D4 水上樂園', price: 950, rebate: 250, split: true, checked: true },
   { id: 'nightSafari', name: 'D4 夜間動物園', price: 1200, rebate: 550, split: true, checked: true },
+  // D5 叢林飛索（三擇一）
+  { id: 'zipline-a', name: 'D5 叢林飛索 A', price: 2400, rebate: 500, split: true, checked: true },
+  { id: 'zipline-b', name: 'D5 叢林飛索 B', price: 2200, rebate: 450, split: true, checked: false },
+  { id: 'zipline-c', name: 'D5 叢林飛索 C', price: 2000, rebate: 400, split: true, checked: false },
   // D5
-  { id: 'zipline', name: 'D5 叢林飛索', price: 2400, rebate: 500, split: true, checked: true },
   { id: 'snakeFarm', name: 'D5 蛇園', price: 200, rebate: 100, split: true, checked: true },
   { id: 'pigSlide', name: 'D5 豬豬溜滑梯', price: 200, rebate: 30, split: true, checked: true },
 ]
