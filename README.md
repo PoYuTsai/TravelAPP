@@ -32,6 +32,7 @@
 | Phase 6.5 | Blog 分頁 + Schema 補強 | ✅ 完成 |
 | Phase 6.6 | 審查 #8 A11y/資安優化 | ✅ 完成 |
 | Phase 6.7 | 審查 #10 SEO/行銷追蹤優化 | ✅ 完成 |
+| Phase 6.8 | 報價計算系統 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -203,6 +204,24 @@ Itinerary API 存取控制強化：
 - **資安改善**：Rate limit 清理機制、HMAC 增強、logger 統一
 - **程式碼品質**：Google Ads ID 集中管理、FAQSection role="region"
 
+### Phase 6.7：審查 #10 SEO/行銷追蹤優化
+第 10 次全面審查，SEO 與行銷追蹤改善：
+
+- **SEO 優化**：頁面 meta 改善、結構化資料補強
+- **行銷追蹤**：Google Tag Manager 遷移、轉換追蹤優化
+- **程式碼品質**：集中式追蹤管理
+
+### Phase 6.8：報價計算系統
+Sanity Studio 內部報價計算工具：
+
+- **住宿系統**：多飯店支援、4 類房型 × 3 子類型（12 種房型配置）
+- **門票系統**：多階方案（基本/進階）、回扣計算
+- **兒童設施**：汽座（0-2歲/2-5歲）、增高墊定價
+- **三階段付款**：住宿全額 → 餐費門票 → 車導尾款（送機前一天）
+- **超時計算**：清邁 10hr / 清萊 12hr、200 泰銖/小時
+- **報價單匯出**：內部報價（含成本利潤）、外部報價（客戶用）
+- **政策說明**：退款政策（車導/住宿/門票餐費）、隱私政策（TM30 申報）
+
 ## 技術架構
 
 ```
@@ -255,4 +274,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-02-13 Phase 6.7: Comprehensive review #10 SEO/marketing tracking improvements -->
+<!-- Last build trigger: 2026-03-02 Phase 6.8: Pricing calculator with policies -->
