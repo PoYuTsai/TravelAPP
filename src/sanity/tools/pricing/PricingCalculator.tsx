@@ -2,6 +2,7 @@
 // 報價計算器 - 複製 HTML prototype 的 UI
 
 import React, { useState, useEffect, useMemo } from 'react'
+import html2pdf from 'html2pdf.js'
 
 // 預設資料（跟 HTML prototype v3 一樣）
 const DEFAULT_CONFIG = {
@@ -521,17 +522,56 @@ function downloadExternalQuote(
 </body>
 </html>`
 
-  // 下載 HTML 檔案（更穩定的方案）
-  const filename = `清微旅行報價_${people}人_${new Date().toISOString().slice(0, 10)}.html`
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  // 使用 html2pdf.js 直接產生 PDF
+  const filename = `清微旅行報價_${people}人_${new Date().toISOString().slice(0, 10)}.pdf`
+
+  // 使用 DOMParser 解析 HTML（比 innerHTML 更安全）
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+
+  // 建立臨時容器
+  const container = document.createElement('div')
+  container.style.position = 'absolute'
+  container.style.left = '-9999px'
+  container.style.top = '0'
+
+  // 將解析後的 body 內容移入容器
+  while (doc.body.firstChild) {
+    container.appendChild(doc.body.firstChild)
+  }
+  document.body.appendChild(container)
+
+  // 設定 html2pdf 選項
+  const opt = {
+    margin: [10, 10, 10, 10],
+    filename: filename,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      letterRendering: true,
+    },
+    jsPDF: {
+      unit: 'mm' as const,
+      format: 'a4' as const,
+      orientation: 'portrait' as const
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  }
+
+  // 產生並下載 PDF
+  html2pdf()
+    .set(opt)
+    .from(container)
+    .save()
+    .then(() => {
+      document.body.removeChild(container)
+    })
+    .catch((err: Error) => {
+      console.error('PDF 產生失敗:', err)
+      document.body.removeChild(container)
+      alert('PDF 產生失敗，請稍後再試')
+    })
 }
 
 // 行程資料（跟 HTML v3 一樣）
