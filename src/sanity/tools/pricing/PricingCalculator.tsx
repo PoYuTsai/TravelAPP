@@ -228,11 +228,13 @@ function downloadExternalQuote(
       </div>
       ` : ''}
 
+      ${c.insuranceCost > 0 ? `
       <!-- 保險 -->
       <div class="price-row" style="margin-top: 12px;">
         <span>🛡️ 旅遊保險（${fmt(config.insurancePerPerson)}/人 × ${people}人）</span>
         <span style="font-weight:bold;">${fmt(c.insuranceCost)} 泰銖</span>
       </div>
+      ` : ''}
 
       <div class="price-total"><span>總計</span><span>${fmt(c.totalPrice)} 泰銖</span></div>
     </div>
@@ -252,10 +254,10 @@ function downloadExternalQuote(
           ${includeAccommodation ? `<li>• ${totalNights}晚五星住宿</li>` : ''}
           ${includeMeals ? `<li>• ${c.mealDays}天午晚餐</li>` : ''}
           <li>• 全程包車（${c.carCount}台）</li>
-          <li>• 專業中文導遊</li>
+          ${includeGuide ? `<li>• 專業中文導遊</li>` : ''}
           ${c.selectedTickets.length > 0 ? `<li>• ${c.selectedTickets.length}項門票活動</li>` : ''}
           ${c.thaiDressPrice > 0 ? `<li>• 泰服體驗</li>` : ''}
-          <li>• 旅遊保險</li>
+          ${c.insuranceCost > 0 ? `<li>• 旅遊保險</li>` : ''}
         </ul>
       </div>
       <div class="box no">
@@ -755,8 +757,9 @@ export function PricingCalculator() {
       thaiDressPartnerProfit += profit / 2
     }
 
-    // Insurance
-    const insuranceCost = insurancePerPerson * people
+    // Insurance（只有包套行程才含保險，純包車不含）
+    const hasPackageServices = includeAccommodation || includeMeals || selectedTickets.length > 0
+    const insuranceCost = hasPackageServices ? insurancePerPerson * people : 0
 
     // Totals
     const totalCost = accommodationCost + mealCost + transportCost + ticketCost + thaiDressCost + insuranceCost + luggageCost
@@ -1617,11 +1620,13 @@ export function PricingCalculator() {
                 </>
               )}
 
-              {/* 保險 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', marginTop: 12, borderBottom: '1px dashed #ddd' }}>
-                <span>🛡️ 旅遊保險（{fmt(config.insurancePerPerson)}/人 × {people}人）</span>
-                <span style={{ fontWeight: 'bold' }}>{fmt(calculation.insuranceCost)} 泰銖</span>
-              </div>
+              {/* 保險（只有包套行程才顯示） */}
+              {calculation.insuranceCost > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', marginTop: 12, borderBottom: '1px dashed #ddd' }}>
+                  <span>🛡️ 旅遊保險（{fmt(config.insurancePerPerson)}/人 × {people}人）</span>
+                  <span style={{ fontWeight: 'bold' }}>{fmt(calculation.insuranceCost)} 泰銖</span>
+                </div>
+              )}
 
               {/* Total */}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0 4px 0', marginTop: 8, borderTop: '2px solid #2d5a3d' }}>
@@ -1646,10 +1651,10 @@ export function PricingCalculator() {
                 {includeAccommodation && <>• {totalNights}晚五星住宿<br /></>}
                 {includeMeals && <>• {calculation.mealDays}天午晚餐<br /></>}
                 • 全程包車（{calculation.carCount}台）<br />
-                • 專業中文導遊<br />
+                {includeGuide && <>• 專業中文導遊<br /></>}
                 {calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
                 {calculation.thaiDressPrice > 0 && <>• 泰服體驗<br /></>}
-                • 旅遊保險
+                {calculation.insuranceCost > 0 && <>• 旅遊保險</>}
               </div>
             </div>
             <div style={{ background: '#fff3e0', padding: 12, borderRadius: 8 }}>
