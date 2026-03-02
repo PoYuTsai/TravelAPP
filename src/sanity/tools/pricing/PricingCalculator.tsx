@@ -71,7 +71,9 @@ function downloadExternalQuote(
 
   const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
   const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
-  const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => sum + h.rooms[cat.key].quantity, 0)
+  const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
+    return sum + h.rooms[cat.key].reduce((catSum: number, subRoom: SubRoomConfig) => catSum + subRoom.quantity, 0)
+  }, 0)
   const getHotelDeposit = (h: Hotel) => {
     if (!h.hasDeposit) return 0
     return h.depositPerRoom * getHotelRoomCount(h)
@@ -226,7 +228,7 @@ function downloadExternalQuote(
         <div style="color:#555;">
           • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
           • 超時費：<strong>200 泰銖/小時 × ${c.carCount}台車</strong>（導遊不另收）<br />
-          • 行程結束後統一結算，多退少補
+          • 送機前一天統一結算，若有超時再加收
         </div>
       </div>
     </div>
@@ -284,32 +286,38 @@ const ITINERARY = [
 // 房型基本分類（固定 4 種）
 type RoomCategory = 'double' | 'twin' | 'triple' | 'family'
 
-const ROOM_CATEGORIES: { key: RoomCategory; label: string; icon: string; capacity: number }[] = [
-  { key: 'double', label: '雙床房（1大床）', icon: '🛏️', capacity: 2 },
-  { key: 'twin', label: '兩張單人床房', icon: '🛏️🛏️', capacity: 2 },
-  { key: 'triple', label: '三人房', icon: '🛏️🛏️🛏️', capacity: 3 },
-  { key: 'family', label: '家庭4人房', icon: '👨‍👩‍👧‍👦', capacity: 4 },
+const ROOM_CATEGORIES: { key: RoomCategory; label: string; icon: string; capacity: number; defaultPrice: number }[] = [
+  { key: 'double', label: '雙床房（1大床）', icon: '🛏️', capacity: 2, defaultPrice: 2500 },
+  { key: 'twin', label: '兩張單人床房', icon: '🛏️🛏️', capacity: 2, defaultPrice: 2500 },
+  { key: 'triple', label: '三人房', icon: '🛏️🛏️🛏️', capacity: 3, defaultPrice: 3500 },
+  { key: 'family', label: '家庭4人房', icon: '👨‍👩‍👧‍👦', capacity: 4, defaultPrice: 4500 },
 ]
 
-// 房型設定
-interface RoomConfig {
+// 子房型索引
+type SubRoomIndex = 0 | 1 | 2
+
+// 子房型設定
+interface SubRoomConfig {
   name: string        // 飯店具體房型名稱 (e.g., "Horizon俱樂部豪華雙人間")
   quantity: number    // 房間數量
   price: number       // 每晚價格
   hasExtraBed: boolean // 是否加床（免費）
 }
 
+// 每個分類有 3 個子房型
+type CategoryRooms = [SubRoomConfig, SubRoomConfig, SubRoomConfig]
+
 // 飯店類型
 interface Hotel {
   id: number
   name: string
   nights: number
-  // 4 種房型各自的設定
+  // 4 種房型分類，每種有 3 個子房型
   rooms: {
-    double: RoomConfig
-    twin: RoomConfig
-    triple: RoomConfig
-    family: RoomConfig
+    double: CategoryRooms
+    twin: CategoryRooms
+    triple: CategoryRooms
+    family: CategoryRooms
   }
   // 押金政策
   hasDeposit: boolean
@@ -321,12 +329,18 @@ export function PricingCalculator() {
   const [people, setPeople] = useState(10)
   const [exchangeRate, setExchangeRate] = useState(0.93)
 
-  // 多飯店住宿（每飯店 4 種固定房型分類）
+  // 多飯店住宿（每飯店 4 種固定房型分類，每種 3 個子房型）
+  const createEmptySubRooms = (defaultPrice: number): CategoryRooms => [
+    { name: '', quantity: 0, price: defaultPrice, hasExtraBed: false },
+    { name: '', quantity: 0, price: defaultPrice, hasExtraBed: false },
+    { name: '', quantity: 0, price: defaultPrice, hasExtraBed: false },
+  ]
+
   const createEmptyRooms = () => ({
-    double: { name: '', quantity: 0, price: 2500, hasExtraBed: false },
-    twin: { name: '', quantity: 0, price: 2500, hasExtraBed: false },
-    triple: { name: '', quantity: 0, price: 3500, hasExtraBed: false },
-    family: { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+    double: createEmptySubRooms(2500),
+    twin: createEmptySubRooms(2500),
+    triple: createEmptySubRooms(3500),
+    family: createEmptySubRooms(4500),
   })
 
   const [hotels, setHotels] = useState<Hotel[]>([
@@ -335,10 +349,26 @@ export function PricingCalculator() {
       name: '香格里拉酒店',
       nights: 3,
       rooms: {
-        double: { name: 'Horizon俱樂部豪華雙人間', quantity: 2, price: 3500, hasExtraBed: true },
-        twin: { name: '行政樓層俱樂部尊貴雙人間', quantity: 3, price: 3000, hasExtraBed: false },
-        triple: { name: '', quantity: 0, price: 3500, hasExtraBed: false },
-        family: { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+        double: [
+          { name: 'Horizon俱樂部豪華雙人間', quantity: 2, price: 3500, hasExtraBed: true },
+          { name: '行政樓層俱樂部尊貴雙人間', quantity: 3, price: 3000, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+        ],
+        twin: [
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+        ],
+        triple: [
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+        ],
+        family: [
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+        ],
       },
       hasDeposit: true,
       depositPerRoom: 3000
@@ -348,10 +378,26 @@ export function PricingCalculator() {
       name: '美平洲際酒店',
       nights: 2,
       rooms: {
-        double: { name: '豪華雙人房', quantity: 5, price: 3000, hasExtraBed: false },
-        twin: { name: '', quantity: 0, price: 3000, hasExtraBed: false },
-        triple: { name: '', quantity: 0, price: 3500, hasExtraBed: false },
-        family: { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+        double: [
+          { name: '豪華雙人房', quantity: 5, price: 3000, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+        ],
+        twin: [
+          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+        ],
+        triple: [
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+        ],
+        family: [
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+        ],
       },
       hasDeposit: true,
       depositPerRoom: 3000
@@ -396,14 +442,16 @@ export function PricingCalculator() {
     setHotels(prev => prev.map(h => h.id === id ? { ...h, [field]: value } : h))
   }
 
-  const updateRoom = (hotelId: number, category: RoomCategory, field: keyof RoomConfig, value: any) => {
+  const updateRoom = (hotelId: number, category: RoomCategory, subIndex: SubRoomIndex, field: keyof SubRoomConfig, value: any) => {
     setHotels(prev => prev.map(h => {
       if (h.id !== hotelId) return h
+      const newSubRooms = [...h.rooms[category]] as CategoryRooms
+      newSubRooms[subIndex] = { ...newSubRooms[subIndex], [field]: value }
       return {
         ...h,
         rooms: {
           ...h.rooms,
-          [category]: { ...h.rooms[category], [field]: value }
+          [category]: newSubRooms
         }
       }
     }))
@@ -454,11 +502,14 @@ export function PricingCalculator() {
     const needLuggageCar = luggageCar
 
     // 住宿 - 使用多飯店系統（可選擇不含住宿）
-    // 每間飯店的住宿費 = 各房型 (數量 × 單價) 加總 × 晚數
+    // 每間飯店的住宿費 = 各房型分類內所有子房型 (數量 × 單價) 加總 × 晚數
     const getHotelCost = (h: Hotel) => {
       const roomTotal = ROOM_CATEGORIES.reduce((sum, cat) => {
-        const room = h.rooms[cat.key]
-        return sum + (room.quantity * room.price)
+        // 遍歷該分類的 3 個子房型
+        const categoryTotal = h.rooms[cat.key].reduce((catSum, subRoom) => {
+          return catSum + (subRoom.quantity * subRoom.price)
+        }, 0)
+        return sum + categoryTotal
       }, 0)
       return roomTotal * h.nights
     }
@@ -466,15 +517,20 @@ export function PricingCalculator() {
       ? hotels.reduce((sum, h) => sum + getHotelCost(h), 0)
       : 0
 
-    // 計算飯店總房間數
-    const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => sum + h.rooms[cat.key].quantity, 0)
+    // 計算飯店總房間數（所有子房型數量加總）
+    const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
+      return sum + h.rooms[cat.key].reduce((catSum, subRoom) => catSum + subRoom.quantity, 0)
+    }, 0)
 
     // 計算飯店總容量（含加床）
     const getHotelCapacity = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
-      const room = h.rooms[cat.key]
-      const baseCapacity = room.quantity * cat.capacity
-      const extraBeds = room.hasExtraBed ? room.quantity : 0  // 每間加床房多 1 人
-      return sum + baseCapacity + extraBeds
+      // 遍歷該分類的 3 個子房型
+      const categoryCapacity = h.rooms[cat.key].reduce((catSum, subRoom) => {
+        const baseCapacity = subRoom.quantity * cat.capacity
+        const extraBeds = subRoom.hasExtraBed ? subRoom.quantity : 0  // 每間加床房多 1 人
+        return catSum + baseCapacity + extraBeds
+      }, 0)
+      return sum + categoryCapacity
     }, 0)
 
     // 總房間容量（平均）
@@ -685,7 +741,10 @@ export function PricingCalculator() {
                     const hotelTotal = calculation.getHotelCost(hotel)
                     const hotelCapacity = calculation.getHotelCapacity(hotel)
                     const hotelRoomCount = calculation.getHotelRoomCount(hotel)
-                    const activeRooms = ROOM_CATEGORIES.filter(cat => hotel.rooms[cat.key].quantity > 0)
+                    // 找出有任何子房型數量 > 0 的分類
+                    const activeRooms = ROOM_CATEGORIES.filter(cat =>
+                      hotel.rooms[cat.key].some(subRoom => subRoom.quantity > 0)
+                    )
                     return (
                       <div key={hotel.id} style={{ background: '#f9f9f9', borderRadius: 8, padding: 16, border: hotel.hasDeposit ? '2px solid #ff9800' : '1px solid #e0e0e0' }}>
                         {/* 第一行：飯店名稱、晚數、刪除 */}
@@ -719,82 +778,114 @@ export function PricingCalculator() {
                           )}
                         </div>
 
-                        {/* 第二行：4 種固定房型分類 */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                        {/* 第二行：4 種固定房型分類，每種有 3 個子房型 */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
                           {ROOM_CATEGORIES.map(cat => {
-                            const room = hotel.rooms[cat.key]
+                            const subRooms = hotel.rooms[cat.key]
+                            const categoryHasRooms = subRooms.some(sr => sr.quantity > 0)
+                            const categoryTotal = subRooms.reduce((sum, sr) => sum + (sr.quantity * sr.price), 0)
+
                             return (
                               <div
                                 key={cat.key}
                                 style={{
-                                  background: room.quantity > 0 ? '#e8f5e9' : 'white',
-                                  padding: 10,
-                                  borderRadius: 6,
-                                  border: room.quantity > 0 ? '1px solid #4caf50' : '1px solid #e0e0e0',
-                                  opacity: room.quantity > 0 ? 1 : 0.7
+                                  background: categoryHasRooms ? '#e8f5e9' : 'white',
+                                  padding: 12,
+                                  borderRadius: 8,
+                                  border: categoryHasRooms ? '2px solid #4caf50' : '1px solid #e0e0e0',
                                 }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  {/* 房型分類標籤 */}
-                                  <span style={{ fontSize: 12, color: '#2d5a3d', fontWeight: 'bold', minWidth: 110 }}>
+                                {/* 房型分類標題 */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                  <span style={{ fontSize: 13, color: '#2d5a3d', fontWeight: 'bold' }}>
                                     {cat.icon} {cat.label}
                                   </span>
-
-                                  {/* 飯店具體房型名稱 */}
-                                  <input
-                                    type="text"
-                                    value={room.name}
-                                    onChange={e => updateRoom(hotel.id, cat.key, 'name', e.target.value)}
-                                    placeholder="飯店房型名稱（選填）"
-                                    style={{ flex: 1, minWidth: 160, padding: 6, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
-                                  />
-
-                                  {/* 數量 */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <input
-                                      type="number"
-                                      value={room.quantity}
-                                      onChange={e => updateRoom(hotel.id, cat.key, 'quantity', Math.max(0, Number(e.target.value)))}
-                                      min={0}
-                                      max={20}
-                                      style={{ width: 45, padding: 6, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center', fontSize: 13 }}
-                                    />
-                                    <span style={{ fontSize: 11, color: '#666' }}>間</span>
-                                  </div>
-
-                                  {/* 價格 */}
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <span style={{ fontSize: 11, color: '#666' }}>@</span>
-                                    <input
-                                      type="number"
-                                      value={room.price}
-                                      onChange={e => updateRoom(hotel.id, cat.key, 'price', Math.max(0, Number(e.target.value)))}
-                                      min={0}
-                                      step={100}
-                                      style={{ width: 65, padding: 6, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center', fontSize: 13 }}
-                                    />
-                                    <span style={{ fontSize: 11, color: '#666' }}>/晚</span>
-                                  </div>
-
-                                  {/* 加床選項 */}
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 12 }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={room.hasExtraBed}
-                                      onChange={e => updateRoom(hotel.id, cat.key, 'hasExtraBed', e.target.checked)}
-                                      style={{ width: 14, height: 14 }}
-                                    />
-                                    <span style={{ color: room.hasExtraBed ? '#4caf50' : '#999' }}>+加床</span>
-                                  </label>
+                                  {categoryHasRooms && (
+                                    <span style={{ fontSize: 12, color: '#555' }}>
+                                      小計：{fmt(categoryTotal)}/晚
+                                    </span>
+                                  )}
                                 </div>
 
-                                {/* 房型小計（當有數量時顯示）*/}
-                                {room.quantity > 0 && (
-                                  <div style={{ marginTop: 6, fontSize: 11, color: '#555', paddingLeft: 118 }}>
-                                    💰 {room.quantity} × {fmt(room.price)} = {fmt(room.quantity * room.price)}/晚
-                                    {room.hasExtraBed && <span style={{ color: '#4caf50', marginLeft: 8 }}>🛏️ 含{room.quantity}張加床（免費）</span>}
-                                  </div>
-                                )}
+                                {/* 3 個子房型輸入欄位 */}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                  {subRooms.map((subRoom, subIdx) => (
+                                    <div
+                                      key={subIdx}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        padding: 8,
+                                        background: subRoom.quantity > 0 ? '#fff' : '#f9f9f9',
+                                        borderRadius: 4,
+                                        border: subRoom.quantity > 0 ? '1px solid #4caf50' : '1px solid #eee',
+                                        opacity: subRoom.quantity > 0 ? 1 : 0.7,
+                                        flexWrap: 'wrap'
+                                      }}
+                                    >
+                                      {/* 子房型序號 */}
+                                      <span style={{ fontSize: 11, color: '#999', minWidth: 20 }}>
+                                        {subIdx + 1}.
+                                      </span>
+
+                                      {/* 飯店具體房型名稱 */}
+                                      <input
+                                        type="text"
+                                        value={subRoom.name}
+                                        onChange={e => updateRoom(hotel.id, cat.key, subIdx as SubRoomIndex, 'name', e.target.value)}
+                                        placeholder="房型名稱"
+                                        style={{ flex: 1, minWidth: 140, padding: 5, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+                                      />
+
+                                      {/* 數量 */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <input
+                                          type="number"
+                                          value={subRoom.quantity}
+                                          onChange={e => updateRoom(hotel.id, cat.key, subIdx as SubRoomIndex, 'quantity', Math.max(0, Number(e.target.value)))}
+                                          min={0}
+                                          max={20}
+                                          style={{ width: 40, padding: 5, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center', fontSize: 12 }}
+                                        />
+                                        <span style={{ fontSize: 10, color: '#666' }}>間</span>
+                                      </div>
+
+                                      {/* 價格 */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                        <span style={{ fontSize: 10, color: '#666' }}>@</span>
+                                        <input
+                                          type="number"
+                                          value={subRoom.price}
+                                          onChange={e => updateRoom(hotel.id, cat.key, subIdx as SubRoomIndex, 'price', Math.max(0, Number(e.target.value)))}
+                                          min={0}
+                                          step={100}
+                                          style={{ width: 60, padding: 5, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center', fontSize: 12 }}
+                                        />
+                                        <span style={{ fontSize: 10, color: '#666' }}>/晚</span>
+                                      </div>
+
+                                      {/* 加床選項 */}
+                                      <label style={{ display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer', fontSize: 11 }}>
+                                        <input
+                                          type="checkbox"
+                                          checked={subRoom.hasExtraBed}
+                                          onChange={e => updateRoom(hotel.id, cat.key, subIdx as SubRoomIndex, 'hasExtraBed', e.target.checked)}
+                                          style={{ width: 12, height: 12 }}
+                                        />
+                                        <span style={{ color: subRoom.hasExtraBed ? '#4caf50' : '#999' }}>加床</span>
+                                      </label>
+
+                                      {/* 子房型小計（當有數量時顯示）*/}
+                                      {subRoom.quantity > 0 && (
+                                        <span style={{ fontSize: 11, color: '#2d5a3d', fontWeight: 'bold' }}>
+                                          = {fmt(subRoom.quantity * subRoom.price)}
+                                          {subRoom.hasExtraBed && <span style={{ color: '#4caf50', marginLeft: 4 }}>+{subRoom.quantity}床</span>}
+                                        </span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             )
                           })}
@@ -838,11 +929,18 @@ export function PricingCalculator() {
                           <div style={{ marginTop: 8, padding: 10, background: '#e8f5e9', borderRadius: 6, fontSize: 12 }}>
                             <div style={{ color: '#2d5a3d', fontWeight: 'bold', marginBottom: 4 }}>📋 房型摘要：</div>
                             {activeRooms.map(cat => {
-                              const room = hotel.rooms[cat.key]
+                              const subRooms = hotel.rooms[cat.key].filter(sr => sr.quantity > 0)
                               return (
-                                <div key={cat.key} style={{ color: '#555' }}>
-                                  • {cat.label}{room.name ? ` - ${room.name}` : ''} × {room.quantity}間
-                                  {room.hasExtraBed && <span style={{ color: '#4caf50' }}>（含加床）</span>}
+                                <div key={cat.key}>
+                                  <div style={{ color: '#2d5a3d', fontWeight: 'bold', fontSize: 11, marginTop: 4 }}>
+                                    {cat.icon} {cat.label}
+                                  </div>
+                                  {subRooms.map((sr, idx) => (
+                                    <div key={idx} style={{ color: '#555', paddingLeft: 12 }}>
+                                      • {sr.name || `子房型 ${idx + 1}`} × {sr.quantity}間 @{fmt(sr.price)}
+                                      {sr.hasExtraBed && <span style={{ color: '#4caf50' }}>（含加床）</span>}
+                                    </div>
+                                  ))}
                                 </div>
                               )
                             })}
@@ -1121,9 +1219,13 @@ export function PricingCalculator() {
               <SectionRow title={`🏨 住宿 (${totalNights}晚)`} />
               {hotels.map(h => {
                 const hotelCost = calculation.getHotelCost(h)
+                // 遍歷每個房型分類，計算該分類下所有子房型的總數量
                 const roomInfo = ROOM_CATEGORIES
-                  .filter(cat => h.rooms[cat.key].quantity > 0)
-                  .map(cat => `${cat.label.replace(/（.*）/, '')}x${h.rooms[cat.key].quantity}`)
+                  .filter(cat => h.rooms[cat.key].some(sr => sr.quantity > 0))
+                  .map(cat => {
+                    const totalQty = h.rooms[cat.key].reduce((sum, sr) => sum + sr.quantity, 0)
+                    return `${cat.label.replace(/（.*）/, '')}x${totalQty}`
+                  })
                   .join('+')
                 return (
                   <DataRow key={h.id} name={`${h.name} (${h.nights}晚) ${roomInfo}${h.hasDeposit ? ' 💳' : ''}`} cost={hotelCost} price={hotelCost} profit={0} className="day-row" />
@@ -1429,7 +1531,7 @@ export function PricingCalculator() {
               <div style={{ color: '#555' }}>
                 • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
                 • 超時費：<strong>200 泰銖/小時 × {calculation.carCount}台車</strong>（導遊不另收）<br />
-                • 行程結束後統一結算，多退少補
+                • 送機前一天統一結算，若有超時再加收
               </div>
             </div>
           </div>
