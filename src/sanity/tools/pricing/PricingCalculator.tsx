@@ -79,7 +79,8 @@ function downloadExternalQuote(
   const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
 
   const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
-  const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
+  // 只有勾選住宿時才考慮飯店押金
+  const hotelsWithDeposit = includeAccommodation ? hotels.filter(h => h.hasDeposit) : []
   const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
     return sum + h.rooms[cat.key].reduce((catSum: number, subRoom: SubRoomConfig) => catSum + subRoom.quantity, 0)
   }, 0)
@@ -673,8 +674,8 @@ export function PricingCalculator() {
       ? hotels.reduce((sum, h) => sum + getHotelCapacity(h), 0) / hotels.length
       : 0
 
-    // 有押金的飯店
-    const hotelsWithDeposit = hotels.filter(h => h.hasDeposit)
+    // 有押金的飯店（只有勾選住宿時才考慮）
+    const hotelsWithDeposit = includeAccommodation ? hotels.filter(h => h.hasDeposit) : []
 
     // 計算押金：每間房押金 × 房間數（check-in 時收取，退房退還）
     const getHotelDeposit = (h: Hotel) => {
