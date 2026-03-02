@@ -41,9 +41,9 @@ const DEFAULT_TICKETS = [
   { id: 'cabaret-vip', name: 'D2 人妖秀（VIP）', price: 1000, rebate: 500, split: true, checked: true },
   { id: 'cabaret', name: 'D2 人妖秀（普通）', price: 800, rebate: 350, split: true, checked: false },
   // D3
-  { id: 'whiteTemple', name: 'D3 白廟', price: 0, rebate: 0, split: false, checked: true },
+  { id: 'whiteTemple', name: 'D3 白廟', price: 200, rebate: 0, split: false, checked: true },
   { id: 'blueTemple', name: 'D3 藍廟', price: 0, rebate: 0, split: false, checked: true },
-  { id: 'blackTemple', name: 'D3 黑廟', price: 0, rebate: 0, split: false, checked: true },
+  { id: 'blackTemple', name: 'D3 黑廟', price: 80, rebate: 0, split: false, checked: true },
   { id: 'longNeck', name: 'D3 長頸村', price: 300, rebate: 200, split: true, checked: true },
   // D4
   { id: 'waterPark', name: 'D4 水上樂園', price: 950, rebate: 250, split: true, checked: true },
@@ -90,13 +90,25 @@ function downloadExternalQuote(
   }
   const totalDeposit = hotelsWithDeposit.reduce((sum, h) => sum + getHotelDeposit(h), 0)
 
-  // 計算各階段付款金額
-  const phase1Amount = c.accommodationCost  // 住宿（1.5-2個月前）
-  const phase2Amount = c.mealCost + c.ticketPrice + c.thaiDressPrice + c.insuranceCost  // 餐費+門票（1個月前）
-  const phase3Amount = c.transportPrice  // 車導（出發前一天，含超時費結算）
+  // 計算各項金額
+  const mealsAmount = c.mealCost  // 餐費
+  const ticketsAmount = c.ticketPrice + c.thaiDressPrice + c.insuranceCost  // 門票+泰服+保險
+  const mealsTicketsAmount = mealsAmount + ticketsAmount  // 餐費+門票總和
+  const carAmount = c.transportPrice  // 車導費用
 
-  // 判斷是否為純包車（無住宿、無餐費門票）
-  const isCarOnly = !includeAccommodation && phase2Amount === 0
+  // 判斷勾選狀態
+  const hasMeals = includeMeals && mealsAmount > 0
+  const hasTickets = ticketsAmount > 0
+  const hasMealsOrTickets = hasMeals || hasTickets
+  const isCarOnly = !includeAccommodation && !hasMealsOrTickets
+
+  // 動態標籤：餐費/門票/餐費+門票
+  const getMealsTicketsLabel = () => {
+    if (hasMeals && hasTickets) return '餐費＋門票'
+    if (hasMeals) return '餐費'
+    if (hasTickets) return '門票'
+    return ''
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -279,12 +291,12 @@ function downloadExternalQuote(
     <div class="payment-phases">
       <h4>💳 付款方式與時程</h4>
       ${isCarOnly ? `
-      <!-- 純包車：訂金制 -->
+      <!-- 純包車：訂金制 (2階段) -->
       <div class="payment-phase">
         <div class="label">📍 第一階段｜預約訂金 30%</div>
         <div class="timing">⏰ 確認行程後</div>
         <div class="items">• 確認行程細節後支付訂金，即完成預約</div>
-        <div class="amount">💰 ${fmt(Math.round(phase3Amount * 0.3))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase3Amount * 0.3 / exchangeRate))}</span></div>
+        <div class="amount">💰 ${fmt(Math.round(carAmount * 0.3))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span></div>
       </div>
       <div class="payment-phase">
         <div class="label">📍 第二階段｜尾款 70%（含超時結算）</div>
@@ -293,11 +305,10 @@ function downloadExternalQuote(
           • 包車費用${includeGuide ? '、導遊費用' : ''}${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
           • 統一結算超時費（若有）
         </div>
-        <div class="amount">💰 ${fmt(Math.round(phase3Amount * 0.7))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase3Amount * 0.7 / exchangeRate))}</span></div>
+        <div class="amount">💰 ${fmt(Math.round(carAmount * 0.7))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span></div>
       </div>
-      ` : `
-      <!-- 套裝行程：三階段制 -->
-      ${includeAccommodation && phase1Amount > 0 ? `
+      ` : includeAccommodation ? `
+      <!-- 有住宿：住宿 → 餐費/門票 → 車導全額 -->
       <div class="payment-phase">
         <div class="label">📍 第一階段｜住宿全額</div>
         <div class="timing">⏰ 出發前 1.5～2 個月</div>
@@ -306,25 +317,47 @@ function downloadExternalQuote(
           • 收到款項後下訂，會請飯店提供每晚/每房的正式 PDF 單據<br />
           <span style="color:#888;font-size:11px;">（入境或 TDAC 如被詢問，可出示飯店訂房資料）</span>
         </div>
-        <div class="amount">💰 ${fmt(phase1Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase1Amount / exchangeRate))}</span></div>
+        <div class="amount">💰 ${fmt(c.accommodationCost)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(c.accommodationCost / exchangeRate))}</span></div>
       </div>
-      ` : ''}
-      ${phase2Amount > 0 ? `
+      ${hasMealsOrTickets ? `
       <div class="payment-phase">
-        <div class="label">📍 ${includeAccommodation && phase1Amount > 0 ? '第二' : '第一'}階段｜餐費＋門票</div>
+        <div class="label">📍 第二階段｜${getMealsTicketsLabel()}</div>
         <div class="timing">⏰ 出發前 1 個月</div>
-        <div class="items">• 餐費、門票活動、泰服、保險</div>
-        <div class="amount">💰 ${fmt(phase2Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase2Amount / exchangeRate))}</span></div>
+        <div class="items">• ${hasMeals ? '餐費' : ''}${hasMeals && hasTickets ? '、' : ''}${hasTickets ? '門票活動、泰服、保險' : ''}</div>
+        <div class="amount">💰 ${fmt(mealsTicketsAmount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span></div>
       </div>
       ` : ''}
       <div class="payment-phase">
-        <div class="label">📍 ${includeAccommodation && phase1Amount > 0 ? (phase2Amount > 0 ? '第三' : '第二') : (phase2Amount > 0 ? '第二' : '第一')}階段｜車${includeGuide ? '導' : '輛'}費（含超時結算）</div>
+        <div class="label">📍 ${hasMealsOrTickets ? '第三' : '第二'}階段｜車${includeGuide ? '導' : '輛'}費（含超時結算）</div>
         <div class="timing">⏰ 送機前一天</div>
         <div class="items">
           • 包車費用${includeGuide ? '、導遊費用' : ''}${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
           • 統一結算超時費（若有）
         </div>
-        <div class="amount">💰 ${fmt(phase3Amount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(phase3Amount / exchangeRate))}</span></div>
+        <div class="amount">💰 ${fmt(carAmount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount / exchangeRate))}</span></div>
+      </div>
+      ` : `
+      <!-- 無住宿但有餐費/門票：餐費/門票全額 → 車30%訂金 → 車70%尾款 -->
+      <div class="payment-phase">
+        <div class="label">📍 第一階段｜${getMealsTicketsLabel()}全額</div>
+        <div class="timing">⏰ 出發前 1 個月</div>
+        <div class="items">• ${hasMeals ? '餐費' : ''}${hasMeals && hasTickets ? '、' : ''}${hasTickets ? '門票活動、泰服、保險' : ''}</div>
+        <div class="amount">💰 ${fmt(mealsTicketsAmount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span></div>
+      </div>
+      <div class="payment-phase">
+        <div class="label">📍 第二階段｜車${includeGuide ? '導' : '輛'}訂金 30%</div>
+        <div class="timing">⏰ 同時支付</div>
+        <div class="items">• 確認行程細節後支付訂金，即完成預約</div>
+        <div class="amount">💰 ${fmt(Math.round(carAmount * 0.3))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span></div>
+      </div>
+      <div class="payment-phase">
+        <div class="label">📍 第三階段｜車${includeGuide ? '導' : '輛'}尾款 70%（含超時結算）</div>
+        <div class="timing">⏰ 送機前一天</div>
+        <div class="items">
+          • 包車費用${includeGuide ? '、導遊費用' : ''}${c.needLuggageCar ? '、行李車' : ''}${c.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
+          • 統一結算超時費（若有）
+        </div>
+        <div class="amount">💰 ${fmt(Math.round(carAmount * 0.7))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span></div>
       </div>
       `}
       <div style="margin-top: 12px; padding: 10px; background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px; font-size: 12px;">
@@ -1674,21 +1707,31 @@ export function PricingCalculator() {
 
           {/* Payment Phases */}
           {(() => {
-            const phase2Total = calculation.mealCost + calculation.ticketPrice + calculation.thaiDressPrice + calculation.insuranceCost
-            const isCarOnly = !includeAccommodation && phase2Total === 0
-            const hasPhase1 = includeAccommodation && calculation.accommodationCost > 0
-            const hasPhase2 = phase2Total > 0
+            // 計算各項金額
+            const mealsAmount = calculation.mealCost
+            const ticketsAmount = calculation.ticketPrice + calculation.thaiDressPrice + calculation.insuranceCost
+            const mealsTicketsAmount = mealsAmount + ticketsAmount
+            const carAmount = calculation.transportPrice
 
-            // 計算階段編號
-            const getPhaseNumber = (phase: 'accommodation' | 'meals' | 'car') => {
-              if (phase === 'accommodation') return '第一'
-              if (phase === 'meals') return hasPhase1 ? '第二' : '第一'
-              if (phase === 'car') {
-                if (hasPhase1 && hasPhase2) return '第三'
-                if (hasPhase1 || hasPhase2) return '第二'
-                return '第一'
-              }
+            // 判斷勾選狀態
+            const hasMeals = includeMeals && mealsAmount > 0
+            const hasTickets = ticketsAmount > 0
+            const hasMealsOrTickets = hasMeals || hasTickets
+            const isCarOnly = !includeAccommodation && !hasMealsOrTickets
+
+            // 動態標籤
+            const getMealsTicketsLabel = () => {
+              if (hasMeals && hasTickets) return '餐費＋門票'
+              if (hasMeals) return '餐費'
+              if (hasTickets) return '門票'
               return ''
+            }
+
+            const getMealsTicketsItems = () => {
+              const items = []
+              if (hasMeals) items.push('餐費')
+              if (hasTickets) items.push('門票活動、泰服、保險')
+              return items.join('、')
             }
 
             return (
@@ -1697,14 +1740,14 @@ export function PricingCalculator() {
 
                 {isCarOnly ? (
                   <>
-                    {/* 純包車：訂金制 */}
+                    {/* 純包車：訂金制 (2階段) */}
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
                       <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第一階段｜預約訂金 30%</div>
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 確認行程後</div>
                       <div style={{ fontSize: 12, color: '#555' }}>• 確認行程細節後支付訂金，即完成預約</div>
                       <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
-                        💰 {fmt(Math.round(calculation.transportPrice * 0.3))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.transportPrice * 0.3 / exchangeRate))}</span>
+                        💰 {fmt(Math.round(carAmount * 0.3))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
                       </div>
                     </div>
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
@@ -1715,52 +1758,84 @@ export function PricingCalculator() {
                         • 統一結算超時費（若有）
                       </div>
                       <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
-                        💰 {fmt(Math.round(calculation.transportPrice * 0.7))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.transportPrice * 0.7 / exchangeRate))}</span>
+                        💰 {fmt(Math.round(carAmount * 0.7))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
                       </div>
                     </div>
                   </>
-                ) : (
+                ) : includeAccommodation ? (
                   <>
-                    {/* 套裝行程：動態階段制 */}
-                    {hasPhase1 && (
-                      <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-                        <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 {getPhaseNumber('accommodation')}階段｜住宿全額</div>
-                        <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1.5～2 個月</div>
-                        <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
-                          • 討論好飯店細節（星級、房型、預算）後統一報價<br />
-                          • 收到款項後下訂，會請飯店提供每晚/每房的正式 PDF 單據<br />
-                          <span style={{ color: '#888', fontSize: 11 }}>（入境或 TDAC 如被詢問，可出示飯店訂房資料）</span>
-                        </div>
-                        <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
-                          💰 {fmt(calculation.accommodationCost)} 泰銖
-                          <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
-                        </div>
+                    {/* 有住宿：住宿 → 餐費/門票 → 車導全額 */}
+                    <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第一階段｜住宿全額</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1.5～2 個月</div>
+                      <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                        • 討論好飯店細節（星級、房型、預算）後統一報價<br />
+                        • 收到款項後下訂，會請飯店提供每晚/每房的正式 PDF 單據<br />
+                        <span style={{ color: '#888', fontSize: 11 }}>（入境或 TDAC 如被詢問，可出示飯店訂房資料）</span>
                       </div>
-                    )}
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
+                        💰 {fmt(calculation.accommodationCost)} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
+                      </div>
+                    </div>
 
-                    {hasPhase2 && (
+                    {hasMealsOrTickets && (
                       <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-                        <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 {getPhaseNumber('meals')}階段｜餐費＋門票</div>
+                        <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第二階段｜{getMealsTicketsLabel()}</div>
                         <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1 個月</div>
-                        <div style={{ fontSize: 12, color: '#555' }}>• 餐費、門票活動、泰服、保險</div>
+                        <div style={{ fontSize: 12, color: '#555' }}>• {getMealsTicketsItems()}</div>
                         <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
-                          💰 {fmt(phase2Total)} 泰銖
-                          <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(phase2Total / exchangeRate))}</span>
+                          💰 {fmt(mealsTicketsAmount)} 泰銖
+                          <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span>
                         </div>
                       </div>
                     )}
 
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 {getPhaseNumber('car')}階段｜車{includeGuide ? '導' : '輛'}費（含超時結算）</div>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 {hasMealsOrTickets ? '第三' : '第二'}階段｜車{includeGuide ? '導' : '輛'}費（含超時結算）</div>
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 送機前一天</div>
                       <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
                         • 包車費用{includeGuide ? '、導遊費用' : ''}{calculation.needLuggageCar ? '、行李車' : ''}{calculation.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
                         • 統一結算超時費（若有）
                       </div>
                       <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
-                        💰 {fmt(calculation.transportPrice)} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(calculation.transportPrice / exchangeRate))}</span>
+                        💰 {fmt(carAmount)} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount / exchangeRate))}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* 無住宿但有餐費/門票：餐費/門票全額 → 車30%訂金 → 車70%尾款 */}
+                    <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第一階段｜{getMealsTicketsLabel()}全額</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1 個月</div>
+                      <div style={{ fontSize: 12, color: '#555' }}>• {getMealsTicketsItems()}</div>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
+                        💰 {fmt(mealsTicketsAmount)} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span>
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第二階段｜車{includeGuide ? '導' : '輛'}訂金 30%</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 同時支付</div>
+                      <div style={{ fontSize: 12, color: '#555' }}>• 確認行程細節後支付訂金，即完成預約</div>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
+                        💰 {fmt(Math.round(carAmount * 0.3))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                      </div>
+                    </div>
+                    <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 4 }}>📍 第三階段｜車{includeGuide ? '導' : '輛'}尾款 70%（含超時結算）</div>
+                      <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 送機前一天</div>
+                      <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                        • 包車費用{includeGuide ? '、導遊費用' : ''}{calculation.needLuggageCar ? '、行李車' : ''}{calculation.childSeatCost > 0 ? '、兒童座椅' : ''}<br />
+                        • 統一結算超時費（若有）
+                      </div>
+                      <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginTop: 6 }}>
+                        💰 {fmt(Math.round(carAmount * 0.7))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
                       </div>
                     </div>
                   </>
@@ -1811,8 +1886,21 @@ export function PricingCalculator() {
 
           {/* 實際收取金額摘要 */}
           {(() => {
-            const phase2Total = calculation.mealCost + calculation.ticketPrice + calculation.thaiDressPrice + calculation.insuranceCost
-            const isCarOnly = !includeAccommodation && phase2Total === 0
+            const mealsAmount = calculation.mealCost
+            const ticketsAmount = calculation.ticketPrice + calculation.thaiDressPrice + calculation.insuranceCost
+            const mealsTicketsAmount = mealsAmount + ticketsAmount
+            const carAmount = calculation.transportPrice
+            const hasMeals = includeMeals && mealsAmount > 0
+            const hasTickets = ticketsAmount > 0
+            const hasMealsOrTickets = hasMeals || hasTickets
+            const isCarOnly = !includeAccommodation && !hasMealsOrTickets
+
+            const getMealsTicketsLabel = () => {
+              if (hasMeals && hasTickets) return '餐費+門票'
+              if (hasMeals) return '餐費'
+              if (hasTickets) return '門票'
+              return ''
+            }
 
             return (
               <div style={{ marginTop: 20, background: '#2d5a3d', color: 'white', padding: 16, borderRadius: 8 }}>
@@ -1820,32 +1908,48 @@ export function PricingCalculator() {
                 <div style={{ fontSize: 13, lineHeight: 2 }}>
                   {isCarOnly ? (
                     <>
+                      {/* 純包車：30% + 70% */}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>第一階段（訂金 30%）</span>
-                        <span>NT$ {fmt(Math.round(calculation.transportPrice * 0.3 / exchangeRate))}</span>
+                        <span>NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>第二階段（尾款 70%）</span>
-                        <span>NT$ {fmt(Math.round(calculation.transportPrice * 0.7 / exchangeRate))}</span>
+                        <span>NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
                       </div>
                     </>
-                  ) : (
+                  ) : includeAccommodation ? (
                     <>
-                      {includeAccommodation && calculation.accommodationCost > 0 && (
+                      {/* 有住宿：住宿 → 餐費/門票 → 車導 */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>住宿</span>
+                        <span>NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
+                      </div>
+                      {hasMealsOrTickets && (
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>住宿</span>
-                          <span>NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
-                        </div>
-                      )}
-                      {phase2Total > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>餐費+門票</span>
-                          <span>NT$ {fmt(Math.round(phase2Total / exchangeRate))}</span>
+                          <span>{getMealsTicketsLabel()}</span>
+                          <span>NT$ {fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span>
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>車{includeGuide ? '導' : '輛'}費</span>
-                        <span>NT$ {fmt(Math.round(calculation.transportPrice / exchangeRate))}</span>
+                        <span>NT$ {fmt(Math.round(carAmount / exchangeRate))}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* 無住宿但有餐費/門票：餐費/門票 → 車30% → 車70% */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{getMealsTicketsLabel()}</span>
+                        <span>NT$ {fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>車{includeGuide ? '導' : '輛'}訂金 30%</span>
+                        <span>NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>車{includeGuide ? '導' : '輛'}尾款 70%</span>
+                        <span>NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
                       </div>
                     </>
                   )}
