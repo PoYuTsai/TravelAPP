@@ -198,13 +198,14 @@ function downloadPDF(
 }
 
 // 行程資料（跟 HTML v3 一樣）
+const PACKAGE_IMAGE_PATH = '/images/packages/6d5n-classic'
 const ITINERARY = [
-  { day: 'DAY 1', title: '抵達清邁・放鬆展開旅程', items: ['🛬 機場接機', '💱 巫宗雄換匯', '🍽️ 午餐：脆皮豬', '👘 泰服體驗＋攝影', '🥭 阿嬤芒果糯米飯', '🍽️ 晚餐：EKACHAN'], hotel: '香格里拉酒店' },
-  { day: 'DAY 2', title: '大象互動 + 射擊體驗', items: ['🐘 大象保護營', '☕ AIR DIAMOND CAFE', '🍽️ 午餐：MAI HEUN 60', '🔫 射擊體驗', '🍽️ 晚餐：SAMSEN VILLA 米其林', '💃 人妖秀'], hotel: '香格里拉酒店' },
-  { day: 'DAY 3', title: '清萊一日遊（經典三廟）', items: ['⛪ 白廟', '🍽️ 午餐：LALITTA CAFÉ', '💙 藍廟', '🖤 黑廟', '👩 長頸村', '🍽️ 晚餐：泰式烤肉'], hotel: '香格里拉酒店' },
-  { day: 'DAY 4', title: '水上樂園 + 夜間動物園', items: ['🏊 清邁大峽谷水上樂園', '🍽️ 午餐：園區內', '🎨 藝術村 BAAN KANGWAT', '🦁 夜間動物園', '🍽️ 晚餐：黑森林餐廳'], hotel: '清邁美平洲際酒店' },
-  { day: 'DAY 5', title: '湄林探險一日', items: ['🌲 叢林飛索 ZIPLINE', '🍽️ 午餐：FLEUR CAFE', '🐍 蛇園表演', '🐷 豬豬溜滑梯', '🛒 BIG C 採買', '🍽️ 晚餐：康托克帝王餐'], hotel: '清邁美平洲際酒店' },
-  { day: 'DAY 6', title: '收心慢遊・送機回國', items: ['🍳 早餐後退房', '🛫 專車送機'], hotel: null },
+  { day: 'DAY 1', title: '抵達清邁・放鬆展開旅程', items: ['🛬 機場接機', '💱 巫宗雄換匯', '🍽️ 午餐：脆皮豬', '👘 泰服體驗＋攝影', '🥭 阿嬤芒果糯米飯', '🍽️ 晚餐：EKACHAN'], hotel: '香格里拉酒店', image: 'd1.png' },
+  { day: 'DAY 2', title: '大象互動 + 射擊體驗', items: ['🐘 大象保護營', '☕ AIR DIAMOND CAFE', '🍽️ 午餐：MAI HEUN 60', '🔫 射擊體驗', '🍽️ 晚餐：SAMSEN VILLA 米其林', '💃 人妖秀'], hotel: '香格里拉酒店', image: 'd2.png' },
+  { day: 'DAY 3', title: '清萊一日遊（經典三廟）', items: ['⛪ 白廟', '🍽️ 午餐：LALITTA CAFÉ', '💙 藍廟', '🖤 黑廟', '👩 長頸村', '🍽️ 晚餐：泰式烤肉'], hotel: '香格里拉酒店', image: 'd3.png' },
+  { day: 'DAY 4', title: '水上樂園 + 夜間動物園', items: ['🏊 清邁大峽谷水上樂園', '🍽️ 午餐：園區內', '🎨 藝術村 BAAN KANGWAT', '🦁 夜間動物園', '🍽️ 晚餐：黑森林餐廳'], hotel: '清邁美平洲際酒店', image: 'd4.png' },
+  { day: 'DAY 5', title: '湄林探險一日', items: ['🌲 叢林飛索 ZIPLINE', '🍽️ 午餐：FLEUR CAFE', '🐍 蛇園表演', '🐷 豬豬溜滑梯', '🛒 BIG C 採買', '🍽️ 晚餐：康托克帝王餐'], hotel: '清邁美平洲際酒店', image: 'd5.png' },
+  { day: 'DAY 6', title: '收心慢遊・送機回國', items: ['🍳 早餐後退房', '🛫 專車送機'], hotel: null, image: 'd6.png' },
 ]
 
 // 飯店類型
@@ -1055,10 +1056,21 @@ export function PricingCalculator() {
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ margin: '0 0 12px 0', color: '#2d5a3d', fontSize: 16, borderBottom: '2px solid #2d5a3d', paddingBottom: 8 }}>📅 行程概覽</h3>
             {ITINERARY.map((day, i) => (
-              <div key={i} style={{ background: '#f9f9f9', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
-                <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 6 }}>{day.day}｜{day.title}</div>
-                <div style={{ fontSize: 13, color: '#555', lineHeight: 1.6 }}>{day.items.join('　')}</div>
-                {day.hotel && <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>🏨 {day.hotel}</div>}
+              <div key={i} style={{ display: 'flex', gap: 12, background: '#f9f9f9', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #2d5a3d' }}>
+                {/* 行程圖片 */}
+                <div style={{ flexShrink: 0 }}>
+                  <img
+                    src={`${PACKAGE_IMAGE_PATH}/${day.image}`}
+                    alt={day.title}
+                    style={{ width: 100, height: 100, objectFit: 'cover', borderRadius: 6 }}
+                  />
+                </div>
+                {/* 行程內容 */}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 'bold', color: '#2d5a3d', marginBottom: 6 }}>{day.day}｜{day.title}</div>
+                  <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('　')}</div>
+                  {day.hotel && <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>🏨 {day.hotel}</div>}
+                </div>
               </div>
             ))}
           </div>
