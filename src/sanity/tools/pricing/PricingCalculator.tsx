@@ -132,206 +132,261 @@ function downloadExternalQuote(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>清微旅行報價單</title>
   <style>
-    /* 清微旅行 - 溫暖品牌配色（紅標題 + 綠強調 + 米色背景） */
+    /* 清微旅行 - PDF 專業報價單樣式 */
     :root {
       --red-primary: #c94a4a;
       --red-dark: #a63d3d;
       --green-accent: #4a8c54;
-      --cream-bg: #fef8f0;
-      --cream-light: #fffbf5;
-      --text-primary: #333333;
-      --text-secondary: #555555;
-      --text-muted: #888888;
-      --border-light: #e8e0d5;
+      --cream-bg: #fefcf8;
+      --cream-light: #fffdf9;
+      --text-primary: #2c2c2c;
+      --text-secondary: #4a4a4a;
+      --text-muted: #777777;
+      --border-light: #e5e0d8;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      background: white;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
-      max-width: 600px; margin: 0 auto; padding: 20px;
-      background: #f5f0e8; color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      padding: 0;
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .pdf-container {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      background: white;
     }
     .header {
-      background: linear-gradient(135deg, #c94a4a 0%, #a63d3d 100%);
-      color: white; padding: 28px 24px; border-radius: 12px 12px 0 0; text-align: center;
-      box-shadow: 0 4px 12px rgba(166, 61, 61, 0.2);
+      background: linear-gradient(135deg, #c94a4a 0%, #9a3a3a 100%);
+      color: white;
+      padding: 24px 20px;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 20px;
     }
-    .header h1 { text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
-    .content {
-      background: var(--cream-bg);
-      border: 1px solid var(--border-light); border-top: none;
-      border-radius: 0 0 12px 12px; padding: 24px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    .header .brand-en { font-size: 11px; letter-spacing: 3px; opacity: 0.85; margin-bottom: 6px; text-transform: uppercase; }
+    .header .brand-zh { font-size: 24px; font-weight: 700; margin: 0; letter-spacing: 2px; }
+    .header .tagline { font-size: 12px; opacity: 0.9; margin-top: 6px; }
+    .header .trip-info {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.2);
     }
-    h3 {
+    .header .trip-label { font-size: 10px; opacity: 0.75; margin-bottom: 4px; }
+    .header .trip-title { font-size: 18px; font-weight: 600; }
+    .section { margin-bottom: 18px; }
+    .section-title {
       color: var(--red-primary);
+      font-size: 14px;
+      font-weight: 600;
       border-bottom: 2px solid var(--green-accent);
-      padding-bottom: 8px; margin: 0 0 16px 0; font-size: 16px;
+      padding-bottom: 6px;
+      margin-bottom: 12px;
     }
     .itinerary-day {
       background: var(--cream-light);
-      border-left: 4px solid var(--green-accent);
-      border-radius: 8px; padding: 12px; margin-bottom: 8px;
+      border-left: 3px solid var(--green-accent);
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin-bottom: 6px;
     }
-    .itinerary-day .title { font-weight: bold; color: var(--red-dark); margin-bottom: 4px; font-size: 14px; }
-    .itinerary-day .items { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
-    .itinerary-day .hotel { font-size: 11px; color: var(--green-accent); margin-top: 6px; font-weight: 500; }
-    .price-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border-light); }
+    .itinerary-day .title { font-weight: 600; color: var(--red-dark); font-size: 12px; margin-bottom: 3px; }
+    .itinerary-day .items { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+    .itinerary-day .hotel { font-size: 10px; color: var(--green-accent); margin-top: 4px; font-weight: 500; }
+    .price-summary {
+      background: var(--cream-bg);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .price-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+    .price-meta strong { color: var(--text-primary); }
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px dashed var(--border-light);
+      font-size: 12px;
+    }
     .price-row:last-child { border-bottom: none; }
+    .price-row.category {
+      border-bottom: 2px solid #d4c4a8;
+      padding: 8px 0 6px 0;
+      margin-top: 10px;
+    }
+    .price-row.category:first-child { margin-top: 0; }
+    .price-row.category span:first-child { font-weight: 600; color: #5c4a2a; }
+    .price-row.category span:last-child { font-weight: 600; }
+    .price-detail { padding-left: 14px; font-size: 11px; color: var(--text-secondary); margin: 2px 0; }
     .price-total {
-      display: flex; justify-content: space-between;
-      padding: 12px 0 4px 0; margin-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0 4px 0;
+      margin-top: 10px;
       border-top: 2px solid var(--green-accent);
-      font-weight: bold; color: var(--text-primary);
+      font-weight: 700;
+      font-size: 14px;
     }
     .price-box {
-      background: linear-gradient(135deg, #c94a4a 0%, #a63d3d 100%);
-      color: white; padding: 24px; border-radius: 12px; text-align: center; margin: 20px 0;
-      box-shadow: 0 4px 16px rgba(166, 61, 61, 0.25);
+      background: linear-gradient(135deg, #c94a4a 0%, #9a3a3a 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 8px;
+      text-align: center;
+      margin: 16px 0;
     }
-    .price-box .label { font-size: 14px; opacity: 0.95; margin-bottom: 4px; }
-    .price-box .amount { font-size: 38px; font-weight: bold; margin: 8px 0; }
-    .price-box .sub { font-size: 13px; opacity: 0.9; }
-    .includes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0; }
-    .includes .box { padding: 12px; border-radius: 8px; }
-    .includes .yes { background: #f0f7f1; border: 1px solid #c8e6c9; }
-    .includes .no { background: #fef5f5; border: 1px solid #ffcdd2; }
-    .includes .box h4 { font-size: 13px; margin-bottom: 8px; font-weight: 600; }
+    .price-box .label { font-size: 12px; opacity: 0.9; }
+    .price-box .amount { font-size: 32px; font-weight: 700; margin: 6px 0; letter-spacing: 1px; }
+    .price-box .sub { font-size: 11px; opacity: 0.85; }
+    .includes { display: flex; gap: 10px; margin: 16px 0; }
+    .includes .box { flex: 1; padding: 10px; border-radius: 6px; }
+    .includes .yes { background: #f4f9f5; border: 1px solid #c8e6c9; }
+    .includes .no { background: #fef7f7; border: 1px solid #ffcdd2; }
+    .includes .box h4 { font-size: 11px; margin-bottom: 6px; font-weight: 600; }
     .includes .yes h4 { color: var(--green-accent); }
     .includes .no h4 { color: #c94a4a; }
-    .includes .box ul { font-size: 12px; line-height: 1.8; color: var(--text-secondary); list-style: none; }
-    .deposit-box { background: #fff8e8; border: 1px solid #ffe082; border-radius: 8px; padding: 12px; margin: 16px 0; }
-    .deposit-box h4 { color: #e67e00; font-size: 14px; margin-bottom: 8px; font-weight: 600; }
-    .deposit-box .info { font-size: 12px; color: var(--text-secondary); line-height: 1.8; }
-    .payment-phases { background: var(--cream-light); border: 1px solid var(--border-light); border-radius: 8px; padding: 16px; margin: 20px 0; }
-    .payment-phases h4 { color: var(--text-primary); font-size: 14px; margin-bottom: 12px; font-weight: 600; }
-    .payment-phase { background: white; border-radius: 6px; padding: 12px; margin-bottom: 8px; border-left: 4px solid var(--green-accent); }
-    .payment-phase:last-child { margin-bottom: 0; }
-    .payment-phase .label { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; font-size: 13px; }
-    .payment-phase .timing { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
-    .payment-phase .items { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
-    .payment-phase .amount { font-weight: 600; color: var(--green-accent); margin-top: 6px; font-size: 13px; }
-    .footer {
-      margin-top: 24px; padding-top: 20px;
-      border-top: 1px solid var(--border-light);
-      text-align: center; font-size: 13px; color: var(--text-secondary);
+    .includes .box ul { font-size: 10px; line-height: 1.7; color: var(--text-secondary); list-style: none; }
+    .payment-phases {
+      background: var(--cream-light);
+      border: 1px solid var(--border-light);
+      border-radius: 6px;
+      padding: 12px;
     }
-    .footer a { color: var(--red-primary); text-decoration: none; }
-    .footer a:hover { text-decoration: underline; }
-    .footer .brand { font-weight: 600; color: var(--red-primary); margin-bottom: 8px; font-size: 15px; }
-    .note-box { background: var(--cream-light); border-radius: 8px; padding: 12px; font-size: 11px; margin-bottom: 12px; }
-    .note-box .title { font-weight: 600; color: var(--text-primary); margin-bottom: 6px; font-size: 12px; }
-    .note-box .content { color: var(--text-secondary); line-height: 1.7; }
-    @media print { body { background: white; padding: 0; } }
+    .payment-phases h4 { font-size: 12px; margin-bottom: 10px; font-weight: 600; color: var(--text-primary); }
+    .payment-phase {
+      background: white;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 6px;
+      border-left: 3px solid var(--green-accent);
+    }
+    .payment-phase:last-child { margin-bottom: 0; }
+    .payment-phase .label { font-weight: 600; color: var(--text-primary); font-size: 11px; margin-bottom: 2px; }
+    .payment-phase .timing { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
+    .payment-phase .items { font-size: 10px; color: var(--text-secondary); line-height: 1.5; }
+    .payment-phase .amount { font-weight: 600; color: var(--green-accent); margin-top: 4px; font-size: 11px; }
+    .policy-box {
+      background: #fafafa;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 10px;
+      margin-bottom: 10px;
+    }
+    .policy-box .title { font-weight: 600; color: var(--text-primary); margin-bottom: 6px; font-size: 11px; }
+    .policy-box .content { color: var(--text-secondary); line-height: 1.6; }
+    .footer {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-light);
+      text-align: center;
+    }
+    .footer .brand { font-weight: 600; color: var(--red-primary); font-size: 13px; margin-bottom: 6px; }
+    .footer .contact { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+    .footer .date { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div style="font-size: 14px; letter-spacing: 2px; opacity: 0.9; margin-bottom: 8px;">CHIANGWAY TRAVEL</div>
-    <h1 style="font-size: 26px; margin: 0; font-weight: 600;">清微旅行</h1>
-    <p style="margin: 10px 0 0 0; opacity: 0.95; font-size: 13px;">台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
-    <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.25);">
-      <div style="font-size: 11px; opacity: 0.8; margin-bottom: 4px;">行程報價單</div>
-      <div style="font-size: 20px; font-weight: 600;">清邁 ${totalNights + 1}天${totalNights}夜 親子包車</div>
-    </div>
-  </div>
-
-  <div class="content">
-    <!-- Itinerary -->
-    <h3>📅 行程概覽</h3>
-    ${ITINERARY.map(day => `
-      <div class="itinerary-day">
-        <div class="title">${day.day}｜${day.title}</div>
-        <div class="items">${day.items.join('　')}</div>
-        ${day.hotel ? `<div class="hotel">🏨 ${day.hotel}</div>` : ''}
+  <div class="pdf-container">
+    <div class="header">
+      <div class="brand-en">Chiangway Travel</div>
+      <h1 class="brand-zh">清微旅行</h1>
+      <p class="tagline">台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
+      <div class="trip-info">
+        <div class="trip-label">行程報價單</div>
+        <div class="trip-title">清邁 ${totalNights + 1}天${totalNights}夜 親子包車</div>
       </div>
-    `).join('')}
-
-    <!-- Price Summary -->
-    <h3 style="margin-top: 20px;">💰 費用明細</h3>
-    <div style="font-size: 14px; color: #555; margin-bottom: 12px;">
-      👥 <strong>${people} 人</strong>｜🗓️ ${totalNights + 1}天${totalNights}夜
     </div>
-    <div style="background: #fafafa; border-radius: 8px; padding: 16px;">
 
-      ${includeAccommodation ? `
-      <!-- 住宿明細 -->
-      <div class="price-row" style="border-bottom: 2px solid #b89b4d; padding-bottom: 8px; margin-bottom: 8px;">
-        <span style="font-weight:bold; color:#5c4a2a;">🏨 住宿（${totalNights}晚）</span>
-        <span style="font-weight:bold;">${fmt(c.accommodationCost)} 泰銖</span>
-      </div>
-      ${hotels.map(h => `
-        <div style="padding-left: 16px; font-size: 12px; color: #555; margin-bottom: 4px;">
-          • ${h.name}（${h.nights}晚）
+    <!-- 行程概覽 -->
+    <div class="section">
+      <h3 class="section-title">📅 行程概覽</h3>
+      ${ITINERARY.map(day => `
+        <div class="itinerary-day">
+          <div class="title">${day.day}｜${day.title}</div>
+          <div class="items">${day.items.join('　')}</div>
+          ${day.hotel ? `<div class="hotel">🏨 ${day.hotel}</div>` : ''}
         </div>
       `).join('')}
-      ` : ''}
-
-      ${includeMeals ? `
-      <!-- 餐費明細 -->
-      <div class="price-row" style="border-bottom: 2px solid #b89b4d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
-        <span style="font-weight:bold; color:#5c4a2a;">🍜 餐費（${c.mealDays}天午晚餐）</span>
-        <span style="font-weight:bold;">${fmt(c.mealCost)} 泰銖</span>
-      </div>
-      <div style="padding-left: 16px; font-size: 12px; color: #555;">
-        • ${mealLabels[mealLevel]}餐廳 ${fmt(mealLevel)}/人/天 × ${people}人 × ${c.mealDays}天
-      </div>
-      ` : ''}
-
-      <!-- 車導明細 -->
-      <div class="price-row" style="border-bottom: 2px solid #b89b4d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
-        <span style="font-weight:bold; color:#5c4a2a;">🚗 包車 + 導遊（${c.carCount}台車）</span>
-        <span style="font-weight:bold;">${fmt(c.transportPrice)} 泰銖</span>
-      </div>
-      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
-        • 包車 6 天 × ${c.carCount}台<br />
-        • 中文導遊 ${c.guideDays} 天
-        ${c.needLuggageCar ? `<br />• 行李車（接機＋送機）` : ''}
-        ${c.childSeatCost > 0 ? `<br />• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天` : ''}
-      </div>
-
-      ${c.selectedTickets.length > 0 ? `
-      <!-- 門票明細 -->
-      <div class="price-row" style="border-bottom: 2px solid #b89b4d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
-        <span style="font-weight:bold; color:#5c4a2a;">🎫 門票活動（${c.selectedTickets.length}項）</span>
-        <span style="font-weight:bold;">${fmt(c.ticketPrice)} 泰銖</span>
-      </div>
-      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
-        ${c.selectedTickets.map((t: any) => `• ${t.name.replace(/^D\\d /, '')}${t.price > 0 ? ` ${fmt(t.price)}/人` : '（免費）'}`).join('<br />')}
-      </div>
-      ` : ''}
-
-      ${c.thaiDressPrice > 0 ? `
-      <!-- 泰服明細 -->
-      <div class="price-row" style="border-bottom: 2px solid #b89b4d; padding-bottom: 8px; margin-bottom: 8px; margin-top: 12px;">
-        <span style="font-weight:bold; color:#5c4a2a;">👘 泰服體驗</span>
-        <span style="font-weight:bold;">${fmt(c.thaiDressPrice)} 泰銖</span>
-      </div>
-      <div style="padding-left: 16px; font-size: 12px; color: #555; line-height: 1.8;">
-        ${thaiDressCloth ? `• 泰服衣服 500/人 × ${people}人<br />` : ''}
-        ${makeupCount > 0 ? `• 專業化妝 1,000/人 × ${makeupCount}人<br />` : ''}
-        ${thaiDressPhoto ? `• 攝影師 2,500/位 × ${people <= 10 ? 1 : 2}位` : ''}
-      </div>
-      ` : ''}
-
-      ${c.insuranceCost > 0 ? `
-      <!-- 保險 -->
-      <div class="price-row" style="margin-top: 12px;">
-        <span>🛡️ 旅遊保險（${fmt(config.insurancePerPerson)}/人 × ${people}人）</span>
-        <span style="font-weight:bold;">${fmt(c.insuranceCost)} 泰銖</span>
-      </div>
-      ` : ''}
-
-      <div class="price-total"><span>總計</span><span>${fmt(c.totalPrice)} 泰銖</span></div>
     </div>
 
-    <!-- Per Person Price -->
+    <!-- 費用明細 -->
+    <div class="section">
+      <h3 class="section-title">💰 費用明細</h3>
+      <div class="price-meta">
+        👥 <strong>${people} 人</strong>　｜　🗓️ <strong>${totalNights + 1}天${totalNights}夜</strong>
+      </div>
+      <div class="price-summary">
+
+        ${includeAccommodation ? `
+        <div class="price-row category">
+          <span>🏨 住宿（${totalNights}晚）</span>
+          <span>${fmt(c.accommodationCost)} 泰銖</span>
+        </div>
+        ${hotels.map(h => `<div class="price-detail">• ${h.name}（${h.nights}晚）</div>`).join('')}
+        ` : ''}
+
+        ${includeMeals ? `
+        <div class="price-row category">
+          <span>🍜 餐費（${c.mealDays}天午晚餐）</span>
+          <span>${fmt(c.mealCost)} 泰銖</span>
+        </div>
+        <div class="price-detail">• ${mealLabels[mealLevel]}餐廳 ${fmt(mealLevel)}/人/天 × ${people}人</div>
+        ` : ''}
+
+        <div class="price-row category">
+          <span>🚗 包車 + 導遊</span>
+          <span>${fmt(c.transportPrice)} 泰銖</span>
+        </div>
+        <div class="price-detail">• 包車 6 天（${c.carCount}台）+ 中文導遊 ${c.guideDays} 天</div>
+        ${c.needLuggageCar ? `<div class="price-detail">• 行李車（接機＋送機）</div>` : ''}
+        ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天</div>` : ''}
+
+        ${c.selectedTickets.length > 0 ? `
+        <div class="price-row category">
+          <span>🎫 門票活動（${c.selectedTickets.length}項）</span>
+          <span>${fmt(c.ticketPrice)} 泰銖</span>
+        </div>
+        ${c.selectedTickets.slice(0, 6).map((t: any) => `<div class="price-detail">• ${t.name.replace(/^D\\d /, '')}${t.price > 0 ? ` ${fmt(t.price)}/人` : ''}</div>`).join('')}
+        ${c.selectedTickets.length > 6 ? `<div class="price-detail">• ...及其他 ${c.selectedTickets.length - 6} 項</div>` : ''}
+        ` : ''}
+
+        ${c.thaiDressPrice > 0 ? `
+        <div class="price-row category">
+          <span>👘 泰服體驗</span>
+          <span>${fmt(c.thaiDressPrice)} 泰銖</span>
+        </div>
+        ${thaiDressCloth ? `<div class="price-detail">• 泰服衣服 ${people}人</div>` : ''}
+        ${makeupCount > 0 ? `<div class="price-detail">• 專業化妝 ${makeupCount}人</div>` : ''}
+        ${thaiDressPhoto ? `<div class="price-detail">• 攝影師 ${people <= 10 ? 1 : 2}位</div>` : ''}
+        ` : ''}
+
+        ${c.insuranceCost > 0 ? `
+        <div class="price-row category">
+          <span>🛡️ 旅遊保險</span>
+          <span>${fmt(c.insuranceCost)} 泰銖</span>
+        </div>
+        <div class="price-detail">• ${fmt(config.insurancePerPerson)}/人 × ${people}人</div>
+        ` : ''}
+
+        <div class="price-total"><span>總計</span><span>${fmt(c.totalPrice)} 泰銖</span></div>
+      </div>
+    </div>
+
+    <!-- 每人費用 -->
     <div class="price-box">
-      <div style="font-size: 14px; opacity: 0.9;">每人費用</div>
+      <div class="label">每人費用</div>
       <div class="amount">NT$ ${fmt(c.perPersonTWD)}</div>
-      <div style="font-size: 12px; opacity: 0.8;">約 ${fmt(Math.round(c.perPersonTHB))} 泰銖 ÷ ${people}人</div>
+      <div class="sub">約 ${fmt(Math.round(c.perPersonTHB))} 泰銖</div>
     </div>
 
-    <!-- Includes/Excludes -->
+    <!-- 費用包含/不含 -->
     <div class="includes">
       <div class="box yes">
         <h4>✅ 費用包含</h4>
@@ -351,10 +406,9 @@ function downloadExternalQuote(
           <li>• 來回機票</li>
           ${!includeAccommodation ? `<li>• 住宿</li>` : ''}
           ${!includeMeals ? `<li>• 餐費</li>` : ''}
-          ${c.selectedTickets.length === 0 ? `<li>• 門票（現場付費）</li>` : ''}
+          ${c.selectedTickets.length === 0 ? `<li>• 門票（現場）</li>` : ''}
           ${!includeGuide ? `<li>• 導遊</li>` : ''}
-          <li>• 個人消費</li>
-                    <li>• 小費</li>
+          <li>• 個人消費、小費</li>
         </ul>
       </div>
     </div>
@@ -483,26 +537,13 @@ function downloadExternalQuote(
     ` : ''}
 
     <!-- Policies -->
-    <div style="margin-top: 20px;">
-      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px; margin-bottom: 12px;">
-        <div style="font-weight: bold; color: #333; margin-bottom: 8px;">📋 退款政策</div>
-        <div style="color: #555; line-height: 1.8;">
-          <strong>【車導服務】</strong><br />
-          • 14 天前取消：全額退款<br />
-          • 7-13 天前取消：退款 50%<br />
-          • 4-6 天前取消：退款 30%<br />
-          • 3 天內取消：不予退款<br /><br />
-          <strong>【住宿】</strong>依各飯店取消政策為準<br />
-          <strong>【門票/餐費】</strong>訂購後恕不退款<br />
-          <strong>【不可抗力】</strong>天災、疫情、班機取消另案協商
-        </div>
-      </div>
-      <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; font-size: 11px;">
-        <div style="font-weight: bold; color: #333; margin-bottom: 8px;">🔒 隱私政策</div>
-        <div style="color: #555; line-height: 1.6;">
-          • 您的護照資料僅提供給飯店辦理入住登記與泰國當地 TM30 移民局申報（法規必備）<br />
-          • 我們遵守各飯店之隱私權政策<br />
-          • 行程結束後不保留您的個人資料
+    <!-- 政策說明 -->
+    <div class="section">
+      <div class="policy-box">
+        <div class="title">📋 退款政策</div>
+        <div class="content">
+          <strong>車導服務</strong>：14天前全額｜7-13天50%｜4-6天30%｜3天內不退<br />
+          <strong>住宿</strong>：依各飯店政策　<strong>門票餐費</strong>：訂購後不退
         </div>
       </div>
     </div>
@@ -510,14 +551,10 @@ function downloadExternalQuote(
     <!-- Footer -->
     <div class="footer">
       <div class="brand">清微旅行 Chiangway Travel</div>
-      <div style="margin: 12px 0; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-        <a href="https://chiangway-travel.com" target="_blank">🌐 官網</a>
-        <a href="https://line.me/R/ti/p/@037nyuwk" target="_blank">💬 LINE 諮詢</a>
-      </div>
-      <div style="color: #999; font-size: 11px; margin-top: 12px;">
-        報價日期：${new Date().toLocaleDateString('zh-TW')}｜本報價有效期 14 天
-      </div>
+      <div class="contact">🌐 chiangway-travel.com　｜　💬 LINE: @037nyuwk</div>
+      <div class="date">報價日期：${new Date().toLocaleDateString('zh-TW')}　｜　有效期 14 天</div>
     </div>
+
   </div>
 </body>
 </html>`
@@ -526,15 +563,17 @@ function downloadExternalQuote(
   const filename = `清微旅行報價_${people}人_${new Date().toISOString().slice(0, 10)}.pdf`
 
   // 建立臨時 iframe 來渲染完整 HTML（包含 head 和 styles）
+  // A4 紙張寬度約 210mm，以 96dpi 計算約 794px，但留邊距後內容寬度約 600px
   const iframe = document.createElement('iframe')
   iframe.style.position = 'fixed'
   iframe.style.left = '0'
   iframe.style.top = '0'
-  iframe.style.width = '650px'
-  iframe.style.height = '2000px'
+  iframe.style.width = '600px'
+  iframe.style.height = '3000px'
   iframe.style.opacity = '0'
   iframe.style.pointerEvents = 'none'
   iframe.style.zIndex = '-1'
+  iframe.style.border = 'none'
   document.body.appendChild(iframe)
 
   // 寫入 HTML 到 iframe
@@ -552,19 +591,20 @@ function downloadExternalQuote(
 
   // 等待 iframe 載入完成
   setTimeout(() => {
-    const content = iframeDoc.body
+    const content = (iframeDoc.querySelector('.pdf-container') as HTMLElement) || iframeDoc.body
 
-    // 設定 html2pdf 選項
+    // 設定 html2pdf 選項（A4 紙張優化）
     const opt = {
-      margin: [5, 5, 5, 5],
+      margin: [8, 8, 8, 8],
       filename: filename,
-      image: { type: 'jpeg' as const, quality: 0.95 },
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: {
         scale: 2,
         useCORS: true,
         letterRendering: true,
         logging: false,
-        windowWidth: 650,
+        width: 600,
+        windowWidth: 600,
       },
       jsPDF: {
         unit: 'mm' as const,
