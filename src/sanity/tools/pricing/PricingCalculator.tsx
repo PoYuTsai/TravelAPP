@@ -525,53 +525,69 @@ function downloadExternalQuote(
   // 使用 html2pdf.js 直接產生 PDF
   const filename = `清微旅行報價_${people}人_${new Date().toISOString().slice(0, 10)}.pdf`
 
-  // 使用 DOMParser 解析 HTML（比 innerHTML 更安全）
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(html, 'text/html')
+  // 建立臨時 iframe 來渲染完整 HTML（包含 head 和 styles）
+  const iframe = document.createElement('iframe')
+  iframe.style.position = 'fixed'
+  iframe.style.left = '0'
+  iframe.style.top = '0'
+  iframe.style.width = '650px'
+  iframe.style.height = '2000px'
+  iframe.style.opacity = '0'
+  iframe.style.pointerEvents = 'none'
+  iframe.style.zIndex = '-1'
+  document.body.appendChild(iframe)
 
-  // 建立臨時容器
-  const container = document.createElement('div')
-  container.style.position = 'absolute'
-  container.style.left = '-9999px'
-  container.style.top = '0'
-
-  // 將解析後的 body 內容移入容器
-  while (doc.body.firstChild) {
-    container.appendChild(doc.body.firstChild)
-  }
-  document.body.appendChild(container)
-
-  // 設定 html2pdf 選項
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: filename,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: {
-      scale: 2,
-      useCORS: true,
-      letterRendering: true,
-    },
-    jsPDF: {
-      unit: 'mm' as const,
-      format: 'a4' as const,
-      orientation: 'portrait' as const
-    },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  // 寫入 HTML 到 iframe
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+  if (!iframeDoc) {
+    console.error('無法存取 iframe document')
+    document.body.removeChild(iframe)
+    alert('PDF 產生失敗')
+    return
   }
 
-  // 產生並下載 PDF
-  html2pdf()
-    .set(opt)
-    .from(container)
-    .save()
-    .then(() => {
-      document.body.removeChild(container)
-    })
-    .catch((err: Error) => {
-      console.error('PDF 產生失敗:', err)
-      document.body.removeChild(container)
-      alert('PDF 產生失敗，請稍後再試')
-    })
+  iframeDoc.open()
+  iframeDoc.write(html)
+  iframeDoc.close()
+
+  // 等待 iframe 載入完成
+  setTimeout(() => {
+    const content = iframeDoc.body
+
+    // 設定 html2pdf 選項
+    const opt = {
+      margin: [5, 5, 5, 5],
+      filename: filename,
+      image: { type: 'jpeg' as const, quality: 0.95 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        logging: false,
+        windowWidth: 650,
+      },
+      jsPDF: {
+        unit: 'mm' as const,
+        format: 'a4' as const,
+        orientation: 'portrait' as const
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    }
+
+    // 產生並下載 PDF
+    html2pdf()
+      .set(opt)
+      .from(content)
+      .save()
+      .then(() => {
+        document.body.removeChild(iframe)
+      })
+      .catch((err: Error) => {
+        console.error('PDF 產生失敗:', err)
+        document.body.removeChild(iframe)
+        alert('PDF 產生失敗，請稍後再試')
+      })
+  }, 500) // 給一點時間讓樣式載入
 }
 
 // 行程資料（跟 HTML v3 一樣）
