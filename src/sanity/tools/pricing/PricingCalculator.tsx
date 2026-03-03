@@ -2,7 +2,6 @@
 // 報價計算器 - 複製 HTML prototype 的 UI
 
 import React, { useState, useEffect, useMemo } from 'react'
-import html2pdf from 'html2pdf.js'
 
 // 預設資料（跟 HTML prototype v3 一樣）
 const DEFAULT_CONFIG = {
@@ -290,6 +289,41 @@ function downloadExternalQuote(
     .footer .brand { font-weight: 600; color: var(--red-primary); font-size: 13px; margin-bottom: 6px; }
     .footer .contact { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
     .footer .date { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+
+    /* 列印/PDF 專用樣式 */
+    @media print {
+      @page {
+        size: A4;
+        margin: 15mm 12mm;
+      }
+      html, body {
+        width: 100%;
+        height: auto;
+        background: white !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .pdf-container {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+        margin: 0;
+      }
+      .header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .section, .itinerary-day, .payment-phase {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      .price-box {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
   </style>
 </head>
 <body>
@@ -559,75 +593,21 @@ function downloadExternalQuote(
 </body>
 </html>`
 
-  // 使用 html2pdf.js 直接產生 PDF
-  const filename = `清微旅行報價_${people}人_${new Date().toISOString().slice(0, 10)}.pdf`
+  // 使用 Blob URL 開啟新視窗，讓用戶用瀏覽器列印成 PDF（效果最好）
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
 
-  // 建立臨時 iframe 來渲染完整 HTML（包含 head 和 styles）
-  // A4 紙張寬度約 210mm，以 96dpi 計算約 794px，但留邊距後內容寬度約 600px
-  const iframe = document.createElement('iframe')
-  iframe.style.position = 'fixed'
-  iframe.style.left = '0'
-  iframe.style.top = '0'
-  iframe.style.width = '600px'
-  iframe.style.height = '3000px'
-  iframe.style.opacity = '0'
-  iframe.style.pointerEvents = 'none'
-  iframe.style.zIndex = '-1'
-  iframe.style.border = 'none'
-  document.body.appendChild(iframe)
-
-  // 寫入 HTML 到 iframe
-  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
-  if (!iframeDoc) {
-    console.error('無法存取 iframe document')
-    document.body.removeChild(iframe)
-    alert('PDF 產生失敗')
+  const printWindow = window.open(url, '_blank', 'width=800,height=900')
+  if (!printWindow) {
+    URL.revokeObjectURL(url)
+    alert('無法開啟列印視窗，請允許彈出視窗')
     return
   }
 
-  iframeDoc.open()
-  iframeDoc.write(html)
-  iframeDoc.close()
-
-  // 等待 iframe 載入完成
-  setTimeout(() => {
-    const content = (iframeDoc.querySelector('.pdf-container') as HTMLElement) || iframeDoc.body
-
-    // 設定 html2pdf 選項（A4 紙張優化）
-    const opt = {
-      margin: [8, 8, 8, 8],
-      filename: filename,
-      image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        logging: false,
-        width: 600,
-        windowWidth: 600,
-      },
-      jsPDF: {
-        unit: 'mm' as const,
-        format: 'a4' as const,
-        orientation: 'portrait' as const
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    }
-
-    // 產生並下載 PDF
-    html2pdf()
-      .set(opt)
-      .from(content)
-      .save()
-      .then(() => {
-        document.body.removeChild(iframe)
-      })
-      .catch((err: Error) => {
-        console.error('PDF 產生失敗:', err)
-        document.body.removeChild(iframe)
-        alert('PDF 產生失敗，請稍後再試')
-      })
-  }, 500) // 給一點時間讓樣式載入
+  // 清理 URL（視窗關閉後）
+  printWindow.onbeforeunload = () => {
+    URL.revokeObjectURL(url)
+  }
 }
 
 // 行程資料（跟 HTML v3 一樣）
