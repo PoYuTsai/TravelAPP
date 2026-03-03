@@ -2,6 +2,7 @@
 // 報價計算器 - 複製 HTML prototype 的 UI
 
 import React, { useState, useEffect, useMemo } from 'react'
+import html2pdf from 'html2pdf.js'
 
 // 預設資料（跟 HTML prototype v3 一樣）
 const DEFAULT_CONFIG = {
@@ -133,9 +134,9 @@ function downloadExternalQuote(
   <style>
     /* 清微旅行 - PDF 專業報價單樣式 */
     :root {
-      --red-primary: #c94a4a;
-      --red-dark: #a63d3d;
-      --green-accent: #4a8c54;
+      --brand-primary: #2d5a3d;
+      --brand-dark: #1e3d2a;
+      --gold-accent: #b89b4d;
       --cream-bg: #fefcf8;
       --cream-light: #fffdf9;
       --text-primary: #2c2c2c;
@@ -163,7 +164,7 @@ function downloadExternalQuote(
       background: white;
     }
     .header {
-      background: linear-gradient(135deg, #c94a4a 0%, #9a3a3a 100%);
+      background: linear-gradient(135deg, #2d5a3d 0%, #1e3d2a 100%);
       color: white;
       padding: 24px 20px;
       border-radius: 8px;
@@ -182,23 +183,23 @@ function downloadExternalQuote(
     .header .trip-title { font-size: 18px; font-weight: 600; }
     .section { margin-bottom: 18px; }
     .section-title {
-      color: var(--red-primary);
+      color: var(--brand-primary);
       font-size: 14px;
       font-weight: 600;
-      border-bottom: 2px solid var(--green-accent);
+      border-bottom: 2px solid var(--gold-accent);
       padding-bottom: 6px;
       margin-bottom: 12px;
     }
     .itinerary-day {
       background: var(--cream-light);
-      border-left: 3px solid var(--green-accent);
+      border-left: 3px solid var(--gold-accent);
       border-radius: 4px;
       padding: 10px 12px;
       margin-bottom: 6px;
     }
-    .itinerary-day .title { font-weight: 600; color: var(--red-dark); font-size: 12px; margin-bottom: 3px; }
+    .itinerary-day .title { font-weight: 600; color: var(--brand-dark); font-size: 12px; margin-bottom: 3px; }
     .itinerary-day .items { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
-    .itinerary-day .hotel { font-size: 10px; color: var(--green-accent); margin-top: 4px; font-weight: 500; }
+    .itinerary-day .hotel { font-size: 10px; color: var(--brand-primary); margin-top: 4px; font-weight: 500; }
     .price-summary {
       background: var(--cream-bg);
       border: 1px solid var(--border-light);
@@ -229,12 +230,12 @@ function downloadExternalQuote(
       justify-content: space-between;
       padding: 10px 0 4px 0;
       margin-top: 10px;
-      border-top: 2px solid var(--green-accent);
+      border-top: 2px solid var(--gold-accent);
       font-weight: 700;
       font-size: 14px;
     }
     .price-box {
-      background: linear-gradient(135deg, #c94a4a 0%, #9a3a3a 100%);
+      background: linear-gradient(135deg, #2d5a3d 0%, #1e3d2a 100%);
       color: white;
       padding: 20px;
       border-radius: 8px;
@@ -247,10 +248,10 @@ function downloadExternalQuote(
     .includes { display: flex; gap: 10px; margin: 16px 0; }
     .includes .box { flex: 1; padding: 10px; border-radius: 6px; }
     .includes .yes { background: #f4f9f5; border: 1px solid #c8e6c9; }
-    .includes .no { background: #fef7f7; border: 1px solid #ffcdd2; }
+    .includes .no { background: #faf8f5; border: 1px solid #d4c4a8; }
     .includes .box h4 { font-size: 11px; margin-bottom: 6px; font-weight: 600; }
-    .includes .yes h4 { color: var(--green-accent); }
-    .includes .no h4 { color: #c94a4a; }
+    .includes .yes h4 { color: var(--brand-primary); }
+    .includes .no h4 { color: #8b7355; }
     .includes .box ul { font-size: 10px; line-height: 1.7; color: var(--text-secondary); list-style: none; }
     .payment-phases {
       background: var(--cream-light);
@@ -264,13 +265,13 @@ function downloadExternalQuote(
       border-radius: 4px;
       padding: 10px;
       margin-bottom: 6px;
-      border-left: 3px solid var(--green-accent);
+      border-left: 3px solid var(--gold-accent);
     }
     .payment-phase:last-child { margin-bottom: 0; }
     .payment-phase .label { font-weight: 600; color: var(--text-primary); font-size: 11px; margin-bottom: 2px; }
     .payment-phase .timing { font-size: 10px; color: var(--text-muted); margin-bottom: 3px; }
     .payment-phase .items { font-size: 10px; color: var(--text-secondary); line-height: 1.5; }
-    .payment-phase .amount { font-weight: 600; color: var(--green-accent); margin-top: 4px; font-size: 11px; }
+    .payment-phase .amount { font-weight: 600; color: var(--brand-primary); margin-top: 4px; font-size: 11px; }
     .policy-box {
       background: #fafafa;
       border-radius: 6px;
@@ -286,7 +287,7 @@ function downloadExternalQuote(
       border-top: 1px solid var(--border-light);
       text-align: center;
     }
-    .footer .brand { font-weight: 600; color: var(--red-primary); font-size: 13px; margin-bottom: 6px; }
+    .footer .brand { font-weight: 600; color: var(--brand-primary); font-size: 13px; margin-bottom: 6px; }
     .footer .contact { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
     .footer .date { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
 
@@ -593,21 +594,43 @@ function downloadExternalQuote(
 </body>
 </html>`
 
-  // 使用 Blob URL 開啟新視窗，讓用戶用瀏覽器列印成 PDF（效果最好）
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
+  // 使用 html2pdf.js 直接產生 PDF（不需要列印對話框，沒有瀏覽器頁首頁尾）
+  const container = document.createElement('div')
+  container.innerHTML = html
+  document.body.appendChild(container)
 
-  const printWindow = window.open(url, '_blank', 'width=800,height=900')
-  if (!printWindow) {
-    URL.revokeObjectURL(url)
-    alert('無法開啟列印視窗，請允許彈出視窗')
+  const element = container.querySelector('.pdf-container') as HTMLElement
+  if (!element) {
+    document.body.removeChild(container)
+    alert('產生 PDF 失敗')
     return
   }
 
-  // 清理 URL（視窗關閉後）
-  printWindow.onbeforeunload = () => {
-    URL.revokeObjectURL(url)
+  const opt = {
+    margin: [10, 10, 10, 10] as [number, number, number, number],
+    filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff'
+    },
+    jsPDF: {
+      unit: 'mm' as const,
+      format: 'a4' as const,
+      orientation: 'portrait' as const
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   }
+
+  html2pdf().set(opt).from(element).save().then(() => {
+    document.body.removeChild(container)
+  }).catch((err: Error) => {
+    document.body.removeChild(container)
+    console.error('PDF 產生錯誤:', err)
+    alert('PDF 下載失敗，請再試一次')
+  })
 }
 
 // 行程資料（跟 HTML v3 一樣）
