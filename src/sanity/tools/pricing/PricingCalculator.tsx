@@ -609,12 +609,13 @@ function downloadExternalQuote(
   const opt = {
     margin: [10, 10, 10, 10] as [number, number, number, number],
     filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
-    image: { type: 'jpeg' as const, quality: 0.98 },
+    image: { type: 'png' as const, quality: 1 },
     html2canvas: {
-      scale: 2,
+      scale: 3,
       useCORS: true,
       logging: false,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      letterRendering: true
     },
     jsPDF: {
       unit: 'mm' as const,
