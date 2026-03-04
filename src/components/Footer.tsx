@@ -88,6 +88,17 @@ export default function Footer() {
                 </a>
               ))}
             </div>
+            <address className="not-italic text-gray-400 text-sm space-y-1">
+              <p>📍 444, Wiang, Fang District, Chiang Mai 50110</p>
+              <p>
+                📞 <a href="tel:+886987591322" className="hover:text-primary transition-colors">+886 987-591-322</a>
+                <span className="text-gray-600">（台灣）</span>
+              </p>
+              <p>
+                📞 <a href="tel:+66637900666" className="hover:text-primary transition-colors">+66 63-790-0666</a>
+                <span className="text-gray-600">（泰國）</span>
+              </p>
+            </address>
           </div>
         </div>
 
