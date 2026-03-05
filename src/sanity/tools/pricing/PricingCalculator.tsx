@@ -83,7 +83,8 @@ const TICKET_KEYWORDS: Record<string, string[]> = {
   'zipline-c': ['叢林飛索', '叢林飛越', 'zipline', 'flight of gibbon'],
   'snakeFarm': ['蛇園', 'snake', '蛇園表演'],
   'pigSlide': ['豬豬', '溜滑梯', '豬豬溜滑梯'],
-  'muaythai': ['泰拳', 'muay thai', '泰拳體驗'],
+  'muaythai-vip': ['泰拳', 'muay thai', '泰拳體驗', '泰拳vip'],
+  'muaythai': ['泰拳', 'muay thai', '泰拳體驗', '泰拳一般'],
   'massage': ['按摩', 'massage', 'spa', '泰式按摩'],
   // 泰服
   'thaiDress': ['泰服', 'thai dress', '泰服體驗', '攝影師'],
@@ -115,8 +116,9 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   // 其他
   { id: 'snakeFarm', name: '蛇園', price: 200, rebate: 100, split: true, checked: false, source: 'default' },
   { id: 'pigSlide', name: '豬豬溜滑梯', price: 200, rebate: 30, split: true, checked: false, source: 'default' },
-  // 泰拳
-  { id: 'muaythai', name: '泰拳體驗', price: 1500, rebate: 300, split: true, checked: false, source: 'default' },
+  // 泰拳（二擇一）
+  { id: 'muaythai-vip', name: '泰拳VIP（靠舞台）', price: 1000, rebate: 600, split: true, checked: false, source: 'default', exclusiveGroup: 'muaythai' },
+  { id: 'muaythai', name: '泰拳一般（第6排）', price: 600, rebate: 400, split: true, checked: false, source: 'default', exclusiveGroup: 'muaythai' },
   // 按摩
   { id: 'massage', name: '泰式按摩', price: 500, rebate: 100, split: true, checked: false, source: 'default' },
 ]
