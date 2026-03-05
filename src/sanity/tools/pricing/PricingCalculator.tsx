@@ -468,30 +468,24 @@ function downloadExternalQuote(
         ` : ''}
 
         <div class="price-row category">
-          <span>🚗 包車 + 導遊</span>
+          <span>🚗 包車 + 導遊（${c.carCount}台車）</span>
           <span>${fmt(c.transportPrice)} 泰銖</span>
         </div>
-        <div class="price-detail">• 包車 6 天（${c.carCount}台）+ 中文導遊 ${c.guideDays} 天</div>
+        <div class="price-detail">• 包車 ${tripDays} 天 × ${c.carCount}台</div>
+        <div class="price-detail">• 中文導遊 ${c.guideDays} 天</div>
         ${c.needLuggageCar ? `<div class="price-detail">• 行李車（接機＋送機）</div>` : ''}
         ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天</div>` : ''}
 
-        ${c.includeTickets && c.selectedTickets.length > 0 ? `
+        ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `
         <div class="price-row category">
-          <span>🎫 門票活動（${c.selectedTickets.length}項）</span>
-          <span>${fmt(c.ticketPrice)} 泰銖</span>
+          <span>🎫 門票活動（${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
+          <span>${fmt(c.ticketPrice + c.thaiDressPrice)} 泰銖</span>
         </div>
         ${c.selectedTickets.slice(0, 6).map((t: any) => `<div class="price-detail">• ${t.name.replace(/^D\\d /, '')}${t.price > 0 ? ` ${fmt(t.price)}/人` : ''}</div>`).join('')}
         ${c.selectedTickets.length > 6 ? `<div class="price-detail">• ...及其他 ${c.selectedTickets.length - 6} 項</div>` : ''}
-        ` : ''}
-
-        ${c.thaiDressPrice > 0 ? `
-        <div class="price-row category">
-          <span>👘 泰服體驗</span>
-          <span>${fmt(c.thaiDressPrice)} 泰銖</span>
-        </div>
-        ${thaiDressCloth ? `<div class="price-detail">• 泰服衣服 ${people}人</div>` : ''}
-        ${makeupCount > 0 ? `<div class="price-detail">• 專業化妝 ${makeupCount}人</div>` : ''}
-        ${thaiDressPhoto ? `<div class="price-detail">• 攝影師 ${people <= 10 ? 1 : 2}位</div>` : ''}
+        ${thaiDressCloth ? `<div class="price-detail">• 泰服衣服 500/人 × ${people}人</div>` : ''}
+        ${makeupCount > 0 ? `<div class="price-detail">• 專業化妝 1,000/人 × ${makeupCount}人</div>` : ''}
+        ${thaiDressPhoto ? `<div class="price-detail">• 攝影師 2,500/位 × ${people <= 10 ? 1 : 2}位</div>` : ''}
         ` : ''}
 
         ${c.insuranceCost > 0 ? `
@@ -522,8 +516,7 @@ function downloadExternalQuote(
           ${includeMeals ? `<li>• ${c.mealDays}天午晚餐</li>` : ''}
           <li>• 全程包車（${c.carCount}台）</li>
           ${includeGuide ? `<li>• 專業中文導遊</li>` : ''}
-          ${c.includeTickets && c.selectedTickets.length > 0 ? `<li>• ${c.selectedTickets.length}項門票活動</li>` : ''}
-          ${c.includeTickets && c.thaiDressPrice > 0 ? `<li>• 泰服體驗</li>` : ''}
+          ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `<li>• ${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項門票活動</li>` : ''}
           ${c.insuranceCost > 0 ? `<li>• 旅遊保險</li>` : ''}
         </ul>
       </div>
