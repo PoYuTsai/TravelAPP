@@ -947,6 +947,7 @@ export function PricingCalculator() {
   const [thaiDressCloth, setThaiDressCloth] = useState(true)
   const [thaiDressPhoto, setThaiDressPhoto] = useState(true)  // 攝影師預設勾選
   const [makeupCount, setMakeupCount] = useState(0)
+  const [thaiDressDay, setThaiDressDay] = useState<number | null>(null)  // 泰服在哪一天（從解析結果取得）
   const [luggageCar, setLuggageCar] = useState(true)
   // 兒童座椅
   const [babySeatCount, setBabySeatCount] = useState(0)  // 0-2歲嬰兒座椅
@@ -1021,10 +1022,14 @@ export function PricingCalculator() {
     // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
     const thaiDressKeywords = ['泰服', 'thai dress', '泰服體驗', '攝影師拍攝']
 
-    // 檢查是否有泰服相關活動
-    const hasThaiDress = result.unmatched.some(u =>
+    // 找出泰服在哪一天（從 unmatched 活動中取得 dayNumber）
+    const thaiDressActivity = result.unmatched.find(u =>
       thaiDressKeywords.some(kw => u.text.toLowerCase().includes(kw.toLowerCase()))
-    ) || itineraryText.toLowerCase().includes('泰服')
+    )
+    const detectedThaiDressDay = thaiDressActivity?.dayNumber || null
+
+    // 檢查是否有泰服相關活動
+    const hasThaiDress = detectedThaiDressDay !== null || itineraryText.toLowerCase().includes('泰服')
 
     // 過濾掉泰服相關的未匹配項目（因為有獨立 UI 處理）
     const filteredUnmatched = result.unmatched.filter(u =>
@@ -1038,17 +1043,20 @@ export function PricingCalculator() {
     }
     setParseResult(filteredResult)
 
-    // 自動勾選泰服（如果偵測到）
+    // 自動勾選泰服並設定天數（如果偵測到）
     if (hasThaiDress) {
       setThaiDressCloth(true)
-      console.log('[Thai Dress] 偵測到泰服，自動勾選')
+      setThaiDressDay(detectedThaiDressDay)
+      console.log(`[Thai Dress] 偵測到泰服 (Day ${detectedThaiDressDay})，自動勾選`)
+    } else {
+      setThaiDressDay(null)
     }
 
     // DEBUG: 顯示匹配結果
     console.log('=== 解析結果 ===')
     console.log('匹配到的活動:', result.matched.map(m => `${m.activityName} (D${m.dayNumber})`))
     console.log('未匹配的活動:', filteredUnmatched.map(u => u.text))
-    if (hasThaiDress) console.log('泰服: ✓ 偵測到')
+    if (hasThaiDress) console.log(`泰服: ✓ 偵測到 (Day ${detectedThaiDressDay})`)
 
     // 儲存解析警告
     setParseWarnings(parsed.warnings || [])
@@ -1491,6 +1499,7 @@ export function PricingCalculator() {
     setThaiDressCloth(false)
     setThaiDressPhoto(false)
     setMakeupCount(0)
+    setThaiDressDay(null)
     // 清空報價名稱
     setCurrentQuoteName('')
     alert('✅ 已清空所有欄位，可以開始新報價')
@@ -2704,9 +2713,12 @@ Day 5｜送機
             {!useDefaultTickets && tickets.some(t => t.dayNumber) ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {/* 按 dayNumber 分組 */}
-                {Array.from(new Set(tickets.map(t => t.dayNumber))).sort((a, b) => (a || 0) - (b || 0)).map(dayNum => {
+                {/* 取得所有天數（包含泰服天數） */}
+                {Array.from(new Set([...tickets.map(t => t.dayNumber), thaiDressDay].filter(Boolean))).sort((a, b) => (a || 0) - (b || 0)).map(dayNum => {
                   const dayTickets = tickets.filter(t => t.dayNumber === dayNum)
-                  if (dayTickets.length === 0) return null
+                  const isThaiDressDay = thaiDressDay === dayNum
+                  // 如果這天沒有門票也沒有泰服，跳過
+                  if (dayTickets.length === 0 && !isThaiDressDay) return null
                   return (
                     <div key={dayNum || 'other'} style={{ background: '#f9f8f6', padding: 12, borderRadius: 8, border: '1px solid #e0e0e0' }}>
                       <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#5c4a2a', fontSize: 13 }}>
@@ -2714,17 +2726,47 @@ Day 5｜送機
                         {carFees[dayNum ? dayNum - 1 : 0]?.date && <span style={{ fontWeight: 'normal', marginLeft: 8, color: '#666' }}>({carFees[dayNum ? dayNum - 1 : 0]?.date})</span>}
                         {carFees[dayNum ? dayNum - 1 : 0]?.name && <span style={{ fontWeight: 'normal', marginLeft: 8, color: '#999' }}>- {carFees[dayNum ? dayNum - 1 : 0]?.name}</span>}
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 6 }}>
-                        {dayTickets.map(t => (
-                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: t.checked ? '#fff' : '#f0f0f0', borderRadius: 4, opacity: t.checked ? 1 : 0.6 }}>
-                            <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
-                            <label style={{ flex: 1, fontSize: 13 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
-                            <span style={{ color: '#666', fontSize: 12 }}>
-                              {t.price > 0 ? `${fmt(t.price - t.rebate)}` : '免費'}
-                            </span>
+                      {dayTickets.length > 0 && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 6 }}>
+                          {dayTickets.map(t => (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: t.checked ? '#fff' : '#f0f0f0', borderRadius: 4, opacity: t.checked ? 1 : 0.6 }}>
+                              <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
+                              <label style={{ flex: 1, fontSize: 13 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
+                              <span style={{ color: '#666', fontSize: 12 }}>
+                                {t.price > 0 ? `${fmt(t.price - t.rebate)}` : '免費'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* 泰服體驗（在偵測到的天數內顯示） */}
+                      {isThaiDressDay && (
+                        <div style={{ marginTop: 10, padding: 10, background: '#fff9e6', borderRadius: 6, border: '1px solid #f0d000' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 13 }}>👘</span>
+                            <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
+                            <label style={{ fontSize: 13 }}>泰服衣服</label>
+                            <span style={{ ...noteStyle, fontSize: 11 }}>500/人</span>
                           </div>
-                        ))}
-                      </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                            <span style={{ fontSize: 13, opacity: 0 }}>👘</span>
+                            <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
+                            <label style={{ fontSize: 13 }}>攝影師</label>
+                            <span style={{ ...noteStyle, fontSize: 11 }}>2,500/位</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, opacity: 0 }}>👘</span>
+                            <label style={{ fontSize: 13 }}>化妝</label>
+                            <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={{ ...inputStyle, width: 50, padding: '2px 4px' }} />
+                            <span style={{ ...noteStyle, fontSize: 11 }}>人 × 1,000</span>
+                          </div>
+                          {calculation.thaiDressPrice > 0 && (
+                            <div style={{ marginTop: 6, fontSize: 12, color: '#666', textAlign: 'right' }}>
+                              泰服小計：{fmt(calculation.thaiDressPrice)}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -2747,28 +2789,30 @@ Day 5｜送機
               已選 {calculation.selectedTickets.length}/{tickets.length} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖
             </p>
 
-            {/* 泰服體驗（整合進門票區塊） */}
-            <div style={{ marginTop: 16, padding: 12, background: '#fff9e6', borderRadius: 8, border: '1px solid #f0d000' }}>
-              <div style={{ fontWeight: 'bold', marginBottom: 10, color: '#5c4a2a', fontSize: 13 }}>
-                👘 泰服體驗
+            {/* 泰服體驗（僅在預設門票模式時顯示，有日期分組時在 Day 1 內顯示） */}
+            {(useDefaultTickets || !tickets.some(t => t.dayNumber)) && (
+              <div style={{ marginTop: 16, padding: 12, background: '#fff9e6', borderRadius: 8, border: '1px solid #f0d000' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: 10, color: '#5c4a2a', fontSize: 13 }}>
+                  👘 泰服體驗
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
+                  <label>泰服衣服</label>
+                  <span style={noteStyle}>售價 500 / 成本 200 /人（全員）</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
+                  <label>攝影師</label>
+                  <span style={noteStyle}>售價 2,500 / 成本 500 /位（1位可拍10人）</span>
+                </div>
+                <Row style={{ marginTop: 8 }}>
+                  <label>化妝人數</label>
+                  <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
+                  <span style={noteStyle}>售價 1,000 / 成本 500 /人</span>
+                </Row>
+                <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
-                <label>泰服衣服</label>
-                <span style={noteStyle}>售價 500 / 成本 200 /人（全員）</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
-                <label>攝影師</label>
-                <span style={noteStyle}>售價 2,500 / 成本 500 /位（1位可拍10人）</span>
-              </div>
-              <Row style={{ marginTop: 8 }}>
-                <label>化妝人數</label>
-                <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
-                <span style={noteStyle}>售價 1,000 / 成本 500 /人</span>
-              </Row>
-              <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
-            </div>
+            )}
           </Section>
 
           {/* Result - 移除 sticky，改為一般區塊 */}
