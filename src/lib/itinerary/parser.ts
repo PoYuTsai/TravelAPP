@@ -165,7 +165,10 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     }
 
     const dateInfo = parseDateLine(trimmedLine, detectedYear)
-    if (dateInfo) {
+    const dayTitle = parseDayTitle(trimmedLine)
+
+    // 新的一天開始：有日期格式 或 有 Day X 格式
+    if (dateInfo || (dayTitle && !currentDay)) {
       if (currentDay) {
         const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
         currentDay.morning = distributed.morning
@@ -175,11 +178,39 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
         days.push(currentDay)
       }
 
-      const dateStr = `${detectedYear}-${String(dateInfo.month).padStart(2, '0')}-${String(dateInfo.day).padStart(2, '0')}`
+      const dateStr = dateInfo
+        ? `${detectedYear}-${String(dateInfo.month).padStart(2, '0')}-${String(dateInfo.day).padStart(2, '0')}`
+        : ''
       currentDay = {
         date: dateStr,
-        dayNumber: days.length + 1,
-        title: '',
+        dayNumber: dayTitle?.dayNumber || days.length + 1,
+        title: dayTitle?.title || '',
+        morning: '',
+        afternoon: '',
+        evening: '',
+        activities: [],
+        rawText: '',
+      }
+      dayRawLines = [line]
+      dayActivities = []
+      continue
+    }
+
+    // 如果遇到 Day X 格式且已有 currentDay，開始新的一天
+    if (dayTitle && currentDay) {
+      // 先儲存前一天
+      const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
+      currentDay.morning = distributed.morning
+      currentDay.afternoon = distributed.afternoon
+      currentDay.evening = distributed.evening
+      currentDay.rawText = dayRawLines.join('\n')
+      days.push(currentDay)
+
+      // 開始新的一天
+      currentDay = {
+        date: '',
+        dayNumber: dayTitle.dayNumber,
+        title: dayTitle.title,
         morning: '',
         afternoon: '',
         evening: '',
@@ -194,13 +225,6 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     if (!currentDay) continue
 
     dayRawLines.push(line)
-
-    const dayTitle = parseDayTitle(trimmedLine)
-    if (dayTitle) {
-      currentDay.dayNumber = dayTitle.dayNumber
-      currentDay.title = dayTitle.title
-      continue
-    }
 
     const meal = parseMealLine(trimmedLine)
     if (meal) {
