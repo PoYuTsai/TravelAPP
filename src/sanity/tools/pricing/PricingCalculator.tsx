@@ -7,6 +7,7 @@ import { useClient } from 'sanity'
 import {
   parseItineraryText,
   matchActivitiesToDatabase,
+  generateConsecutiveDates,
   type ActivityRecord,
   type ActivityMatchResult,
 } from '@/lib/itinerary'
@@ -914,11 +915,37 @@ export function PricingCalculator() {
 
     // 1. 根據解析的天數產生車費欄位
     if (parsed.days.length > 0) {
+      // 找到第一個有日期的天，產生連續日期
+      let generatedDates: { dateStr: string }[] = []
+      const firstDayWithDate = parsed.days.find(d => d.date)
+      if (firstDayWithDate) {
+        const [year, month, day] = firstDayWithDate.date.split('-').map(Number)
+        const firstDayIndex = parsed.days.indexOf(firstDayWithDate)
+        // 從第一天往前推算起始日期
+        let startYear = year
+        let startMonth = month
+        let startDay = day - firstDayIndex
+        // 處理日期往前推算時的月份邊界
+        while (startDay < 1) {
+          startMonth--
+          if (startMonth < 1) {
+            startMonth = 12
+            startYear--
+          }
+          const daysInPrevMonth = [31, startYear % 4 === 0 && (startYear % 100 !== 0 || startYear % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][startMonth - 1]
+          startDay += daysInPrevMonth
+        }
+        generatedDates = generateConsecutiveDates(startYear, startMonth, startDay, parsed.days.length)
+      }
+
       const newCarFees = parsed.days.map((day, index) => {
         const dayNum = index + 1
         const isFirstDay = dayNum === 1
         const isLastDay = dayNum === parsed.days.length
-        const dateStr = day.date ? `${parseInt(day.date.split('-')[1])}/${parseInt(day.date.split('-')[2])}` : ''
+
+        // 優先使用生成的連續日期，否則用解析到的日期
+        const dateStr = generatedDates[index]?.dateStr ||
+          (day.date ? `${parseInt(day.date.split('-')[1])}/${parseInt(day.date.split('-')[2])}` : '')
 
         // 智能判斷路線類型
         let type = 'suburban'
@@ -1043,8 +1070,8 @@ export function PricingCalculator() {
     })
     setParsedItinerary(newItinerary)
 
-    // 重置確認狀態，等待用戶確認
-    setIsParseConfirmed(false)
+    // 解析完成直接生效（不需要確認按鈕）
+    setIsParseConfirmed(true)
   }, [itineraryText, dbActivities])
 
   // 車費管理函數
@@ -1441,8 +1468,8 @@ export function PricingCalculator() {
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', maxWidth: 1100, margin: '0 auto', padding: 20, background: '#f5f5f5', minHeight: '100vh' }}>
-      <h1 style={{ color: '#5c4a2a', marginBottom: 5 }}>🚐 清邁 6天5夜 報價計算器</h1>
-      <p style={{ color: '#666', marginBottom: 20 }}>內部工具 v3 — 含車導明細</p>
+      <h1 style={{ color: '#5c4a2a', marginBottom: 5 }}>🚐 清邁 {tripDays}天{tripNights}夜 報價計算器</h1>
+      <p style={{ color: '#666', marginBottom: 20 }}>內部工具 v4 — 智能解析 + 車導明細</p>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -1455,54 +1482,155 @@ export function PricingCalculator() {
       {/* Input Tab */}
       {activeTab === 'input' && (
         <>
-          {/* 行程綁定狀態指示 */}
-          {isParseConfirmed && parsedItinerary.length > 0 && (
-            <div style={{ marginBottom: 16, padding: 12, background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', borderRadius: 8, border: '1px solid #4caf50' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 14, fontWeight: 'bold', color: '#2e7d32' }}>
-                  ✅ 行程已綁定
-                </span>
-                <span style={{ fontSize: 13, color: '#555' }}>
-                  {parsedItinerary.length} 天行程 | {carFees.length} 天車費 | 已匹配 {parseResult?.matched.length || 0} 項活動
-                </span>
-                <button
-                  onClick={() => setShowParser(true)}
-                  style={{ marginLeft: 'auto', padding: '4px 12px', background: '#fff', color: '#2e7d32', border: '1px solid #4caf50', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
-                >
-                  查看詳情
-                </button>
-              </div>
+          {/* 1️⃣ 快速開始（可收合） */}
+          <Section title="📋 快速開始" style={{ background: '#e3f2fd', border: '1px solid #90caf9' }}>
+            <div style={{ marginBottom: 8 }}>
+              <button
+                onClick={() => setShowParser(!showParser)}
+                style={{
+                  padding: '8px 16px',
+                  background: showParser ? '#1565c0' : '#1976d2',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                {showParser ? '收起' : '📋 貼入行程文字'}
+              </button>
+              <span style={{ marginLeft: 12, fontSize: 13, color: '#666' }}>
+                {parsedItinerary.length > 0
+                  ? `✅ 已解析 ${carFees.length} 天行程`
+                  : '可選 — 貼入行程快速帶入天數、日期、活動'}
+              </span>
             </div>
-          )}
 
-          {/* 報價類型 */}
-          <Section title="📋 報價類型">
-            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={includeAccommodation} onChange={e => setIncludeAccommodation(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 15 }}>🏨 含住宿</span>
+            {showParser && (
+              <div style={{ marginTop: 12 }}>
+                <textarea
+                  value={itineraryText}
+                  onChange={e => setItineraryText(e.target.value)}
+                  placeholder={`貼入行程文字，例如：
+
+2/12 (四)
+Day 1｜抵達清邁
+・機場接機
+・泰服拍攝體驗
+住宿: 香格里拉酒店
+
+2/13 (五)
+Day 2｜大象保護營
+・大象保護營
+・射擊
+住宿: 香格里拉酒店`}
+                  style={{
+                    width: '100%',
+                    height: 150,
+                    padding: 12,
+                    border: '1px solid #bbdefb',
+                    borderRadius: 6,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    resize: 'vertical',
+                    background: '#fff',
+                  }}
+                />
+                <div style={{ marginTop: 10, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={handleParseItinerary}
+                    disabled={!itineraryText.trim()}
+                    style={{
+                      padding: '10px 24px',
+                      background: !itineraryText.trim() ? '#ccc' : '#4caf50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: !itineraryText.trim() ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    🚀 解析並帶入
+                  </button>
+                  {parsedItinerary.length > 0 && (
+                    <button
+                      onClick={resetParsedItinerary}
+                      style={{
+                        padding: '10px 16px',
+                        background: '#fff',
+                        color: '#f44336',
+                        border: '1px solid #f44336',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      🔄 清除重來
+                    </button>
+                  )}
+                  {parseResult && (
+                    <span style={{ fontSize: 12, color: '#666' }}>
+                      ✅ {parseResult.matched.length} 項活動匹配
+                      {parseResult.unmatched.length > 0 && ` | ⚠️ ${parseResult.unmatched.length} 項未匹配`}
+                    </span>
+                  )}
+                </div>
+                {/* 解析結果摘要 */}
+                {parsedItinerary.length > 0 && (
+                  <div style={{ marginTop: 12, padding: 10, background: '#e8f5e9', borderRadius: 6, fontSize: 13 }}>
+                    <strong>已帶入：</strong>
+                    {carFees.length} 天行程
+                    {carFees[0]?.date && ` (${carFees[0].date} ~ ${carFees[carFees.length-1]?.date})`}
+                    {parseResult?.hotels && parseResult.hotels.length > 0 && (
+                      <> | 🏨 {parseResult.hotels.map(h => h.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </Section>
+
+          {/* 2️⃣ 基本設定 */}
+          <Section title="👥 基本設定">
+            <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontWeight: 'bold' }}>人數</label>
+                <input type="number" value={people} onChange={e => setPeople(Number(e.target.value) || 4)} style={{ ...inputStyle, width: 80 }} />
+                <span style={noteStyle}>人</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontWeight: 'bold' }}>匯率</label>
+                <input type="number" value={exchangeRate} onChange={e => setExchangeRate(Number(e.target.value))} min={0.85} max={1.05} step={0.01} style={{ ...inputStyle, width: 80 }} />
+              </div>
+              {people < 4 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 4 人</span>}
+            </div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeAccommodation} onChange={e => setIncludeAccommodation(e.target.checked)} style={{ width: 16, height: 16 }} />
+                <span>🏨 含住宿</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={includeMeals} onChange={e => setIncludeMeals(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 15 }}>🍜 含餐費</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeMeals} onChange={e => setIncludeMeals(e.target.checked)} style={{ width: 16, height: 16 }} />
+                <span>🍜 含餐費</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={allActivitiesSelected} onChange={e => e.target.checked ? selectAllActivities() : deselectAllActivities()} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 15 }}>🎫 含門票/活動</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={allActivitiesSelected} onChange={e => e.target.checked ? selectAllActivities() : deselectAllActivities()} style={{ width: 16, height: 16 }} />
+                <span>🎫 含門票</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={includeGuide} onChange={e => setIncludeGuide(e.target.checked)} style={{ width: 18, height: 18 }} />
-                <span style={{ fontSize: 15 }}>🧑‍💼 含導遊</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeGuide} onChange={e => setIncludeGuide(e.target.checked)} style={{ width: 16, height: 16 }} />
+                <span>🧑‍💼 含導遊</span>
               </label>
               {calculation.totalDeposit > 0 && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={collectDeposit} onChange={e => setCollectDeposit(e.target.checked)} style={{ width: 18, height: 18 }} />
-                  <span style={{ fontSize: 15, color: collectDeposit ? '#9a6b2a' : '#666' }}>💳 代收押金</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={collectDeposit} onChange={e => setCollectDeposit(e.target.checked)} style={{ width: 16, height: 16 }} />
+                  <span style={{ color: collectDeposit ? '#9a6b2a' : '#666' }}>💳 代收押金</span>
                 </label>
               )}
             </div>
             {(!includeAccommodation || !includeMeals || noActivitiesSelected || !includeGuide) && (
-              <div style={{ marginTop: 8, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
+              <div style={{ marginTop: 10, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
                 💡 {[
                   !includeAccommodation && '住宿',
                   !includeMeals && '餐費',
@@ -1511,21 +1639,6 @@ export function PricingCalculator() {
                 ].filter(Boolean).join('、')}由客人自理
               </div>
             )}
-          </Section>
-
-          {/* 人數 */}
-          <Section title="👥 人數">
-            <Row>
-              <label style={{ minWidth: 100 }}>總人數</label>
-              <input type="number" value={people} onChange={e => setPeople(Number(e.target.value) || 4)} style={{ ...inputStyle, width: 100 }} />
-              <span style={noteStyle}>4人起</span>
-            </Row>
-            {people < 4 && <div style={warningStyle}>⚠️ 最低 4 人成團</div>}
-            <Row style={{ marginTop: 12 }}>
-              <label style={{ minWidth: 100 }}>匯率</label>
-              <input type="number" value={exchangeRate} onChange={e => setExchangeRate(Number(e.target.value))} min={0.85} max={1.05} step={0.01} style={{ ...inputStyle, width: 100 }} />
-              <span style={noteStyle}>泰銖 ÷ 匯率 = 台幣</span>
-            </Row>
           </Section>
 
           {/* 住宿 */}
@@ -2088,237 +2201,6 @@ export function PricingCalculator() {
               <p style={{ fontSize: 12, color: '#666', margin: 0 }}>
                 💡 儲存報價後可以隨時載入或複製修改
               </p>
-            )}
-          </Section>
-
-          {/* 智能解析器 */}
-          <Section title="🤖 智能行程解析" style={{ background: '#e8f4fd', border: '1px solid #90caf9' }}>
-            <div style={{ marginBottom: 12 }}>
-              <button
-                onClick={() => setShowParser(!showParser)}
-                style={{
-                  padding: '8px 16px',
-                  background: showParser ? '#1976d2' : '#2196f3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                  fontSize: 14,
-                }}
-              >
-                {showParser ? '📝 收起解析器' : '📋 貼入行程文字'}
-              </button>
-              {dbActivities.length > 0 && (
-                <span style={{ marginLeft: 12, fontSize: 12, color: '#666' }}>
-                  ✅ 已載入 {dbActivities.length} 項活動資料
-                </span>
-              )}
-            </div>
-
-            {showParser && (
-              <div style={{ marginTop: 12 }}>
-                <textarea
-                  value={itineraryText}
-                  onChange={e => setItineraryText(e.target.value)}
-                  placeholder={`貼入行程文字，例如：
-
-2/12 (四)
-Day 1｜抵達清邁
-・機場接機
-・泰服拍攝體驗
-・夜間動物園
-住宿: 香格里拉酒店
-
-2/13 (五)
-Day 2｜大象保護營
-・大象保護營（不含餐）
-・射擊（基本）
-・人妖秀（VIP）
-住宿: 香格里拉酒店`}
-                  style={{
-                    width: '100%',
-                    height: 200,
-                    padding: 12,
-                    border: '1px solid #ccc',
-                    borderRadius: 6,
-                    fontFamily: 'monospace',
-                    fontSize: 13,
-                    resize: 'vertical',
-                  }}
-                />
-                <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <button
-                    onClick={handleParseItinerary}
-                    disabled={!itineraryText.trim()}
-                    style={{
-                      padding: '10px 20px',
-                      background: !itineraryText.trim() ? '#ccc' : '#4caf50',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: !itineraryText.trim() ? 'not-allowed' : 'pointer',
-                      fontSize: 14,
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    🔍 解析行程
-                  </button>
-                  {parseResult && (
-                    <span style={{ fontSize: 13, color: '#666' }}>
-                      ✅ 匹配 {parseResult.matched.length} 項活動，
-                      ⚠️ {parseResult.unmatched.length} 項未匹配
-                    </span>
-                  )}
-                </div>
-
-                {/* 解析結果 */}
-                {parseResult && (
-                  <div style={{ marginTop: 16 }}>
-                    {/* 匹配的活動 */}
-                    {parseResult.matched.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <h4 style={{ fontSize: 13, color: '#2e7d32', marginBottom: 8 }}>✅ 已匹配活動（自動勾選）</h4>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {parseResult.matched.map((m, i) => (
-                            <span
-                              key={i}
-                              style={{
-                                padding: '4px 8px',
-                                background: '#c8e6c9',
-                                borderRadius: 4,
-                                fontSize: 12,
-                              }}
-                            >
-                              D{m.dayNumber} {m.activityName}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 未匹配的活動 */}
-                    {parseResult.unmatched.length > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <h4 style={{ fontSize: 13, color: '#f57c00', marginBottom: 8 }}>⚠️ 未匹配活動（需手動處理）</h4>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {parseResult.unmatched.map((u, i) => (
-                            <span
-                              key={i}
-                              style={{
-                                padding: '4px 8px',
-                                background: '#ffe0b2',
-                                borderRadius: 4,
-                                fontSize: 12,
-                              }}
-                              title={`建議關鍵字：${u.suggestedKeywords.join(', ')}`}
-                            >
-                              D{u.dayNumber} {u.text.substring(0, 20)}{u.text.length > 20 ? '...' : ''}
-                            </span>
-                          ))}
-                        </div>
-                        <p style={{ fontSize: 11, color: '#666', marginTop: 6 }}>
-                          💡 未匹配的活動可在 Sanity Studio → 活動資料庫 新增
-                        </p>
-                      </div>
-                    )}
-
-                    {/* 偵測到的日期和住宿 */}
-                    {(parseResult.dates.length > 0 || parseResult.hotels.length > 0) && (
-                      <div style={{ marginTop: 12, padding: 10, background: '#f5f5f5', borderRadius: 6 }}>
-                        {parseResult.dates.length > 0 && (
-                          <p style={{ fontSize: 12, margin: '0 0 4px 0' }}>
-                            📅 天數：{parseResult.dates.length} 天
-                            （{parseResult.dates.map(d => d.dayLabel).join(', ')}）
-                          </p>
-                        )}
-                        {parseResult.hotels.length > 0 && (
-                          <p style={{ fontSize: 12, margin: 0 }}>
-                            🏨 住宿：{parseResult.hotels.map(h => h.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 行程概覽預覽 */}
-                    {parsedItinerary.length > 0 && (
-                      <div style={{ marginTop: 16, padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
-                        <h4 style={{ fontSize: 13, color: '#333', marginBottom: 8 }}>📅 行程概覽預覽（將顯示在報價單）</h4>
-                        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
-                          {parsedItinerary.map((day, i) => (
-                            <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < parsedItinerary.length - 1 ? '1px dashed #ddd' : 'none' }}>
-                              <div style={{ fontWeight: 'bold', fontSize: 12, color: '#5c4a2a' }}>{day.day}｜{day.title}</div>
-                              <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{day.items.slice(0, 5).join('　')}{day.items.length > 5 ? '...' : ''}</div>
-                              {day.hotel && <div style={{ fontSize: 11, color: '#1976d2', marginTop: 2 }}>🏨 {day.hotel}</div>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 確認按鈕 */}
-                    <div style={{ marginTop: 16, padding: 12, background: isParseConfirmed ? '#e8f5e9' : '#fff8e1', borderRadius: 6, border: `2px solid ${isParseConfirmed ? '#4caf50' : '#ffc107'}` }}>
-                      {isParseConfirmed ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
-                          <span style={{ fontSize: 14, color: '#2e7d32', fontWeight: 'bold' }}>
-                            ✅ 已確認 - 行程已綁定到報價單
-                          </span>
-                          <button
-                            onClick={resetParsedItinerary}
-                            style={{
-                              padding: '6px 12px',
-                              background: '#f44336',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: 4,
-                              cursor: 'pointer',
-                              fontSize: 13,
-                            }}
-                          >
-                            🔄 重新解析
-                          </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <p style={{ fontSize: 13, margin: '0 0 8px 0', color: '#f57c00' }}>
-                            ⚠️ 請確認上方解析結果無誤後，點擊下方按鈕完成綁定
-                          </p>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              onClick={confirmParsedItinerary}
-                              style={{
-                                padding: '10px 20px',
-                                background: '#4caf50',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: 4,
-                                cursor: 'pointer',
-                                fontSize: 14,
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              ✅ 確認調整完成
-                            </button>
-                            <button
-                              onClick={resetParsedItinerary}
-                              style={{
-                                padding: '10px 20px',
-                                background: '#9e9e9e',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: 4,
-                                cursor: 'pointer',
-                                fontSize: 14,
-                              }}
-                            >
-                              ❌ 取消
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
           </Section>
 

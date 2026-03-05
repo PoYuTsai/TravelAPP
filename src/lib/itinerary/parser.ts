@@ -4,6 +4,64 @@
 import type { ParsedDay, ParseResult, ParsedBasicInfo, ParsedQuotation, ParsedQuotationItem } from './types'
 
 /**
+ * 判斷是否為閏年
+ */
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0)
+}
+
+/**
+ * 取得某月份的天數
+ */
+export function getDaysInMonth(year: number, month: number): number {
+  const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (month === 2 && isLeapYear(year)) {
+    return 29
+  }
+  return daysInMonth[month - 1]
+}
+
+/**
+ * 取得下一天的日期
+ */
+export function getNextDate(year: number, month: number, day: number): { year: number; month: number; day: number } {
+  const daysInCurrentMonth = getDaysInMonth(year, month)
+
+  if (day < daysInCurrentMonth) {
+    return { year, month, day: day + 1 }
+  } else if (month < 12) {
+    return { year, month: month + 1, day: 1 }
+  } else {
+    return { year: year + 1, month: 1, day: 1 }
+  }
+}
+
+/**
+ * 從起始日期產生連續 N 天的日期陣列
+ */
+export function generateConsecutiveDates(
+  startYear: number,
+  startMonth: number,
+  startDay: number,
+  numDays: number
+): { year: number; month: number; day: number; dateStr: string }[] {
+  const dates: { year: number; month: number; day: number; dateStr: string }[] = []
+  let current = { year: startYear, month: startMonth, day: startDay }
+
+  for (let i = 0; i < numDays; i++) {
+    dates.push({
+      ...current,
+      dateStr: `${current.month}/${current.day}`,
+    })
+    if (i < numDays - 1) {
+      current = getNextDate(current.year, current.month, current.day)
+    }
+  }
+
+  return dates
+}
+
+/**
  * 解析日期字串，例如 "2/1 (日)" 或 "2/1(日)"
  */
 function parseDateLine(line: string, year: number): { month: number; day: number } | null {

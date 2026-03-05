@@ -19,6 +19,9 @@ export {
   parseItineraryText,
   parseBasicInfoText,
   parseQuotationText,
+  getDaysInMonth,
+  getNextDate,
+  generateConsecutiveDates,
 } from './parser'
 
 // 格式化函數
