@@ -95,6 +95,7 @@ const ACTIVITY_INDICATORS = [
   '烹飪', 'cooking',
   '豬豬', '溜滑梯',
   '泰拳', 'muay thai',
+  '騎馬', 'horse', '馬場',
 ]
 
 /**

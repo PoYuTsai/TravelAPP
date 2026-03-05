@@ -86,6 +86,7 @@ const TICKET_KEYWORDS: Record<string, string[]> = {
   'muaythai-vip': ['泰拳', 'muay thai', '泰拳體驗', '泰拳vip'],
   'muaythai': ['泰拳', 'muay thai', '泰拳體驗', '泰拳一般'],
   'massage': ['按摩', 'massage', 'spa', '泰式按摩'],
+  'horseRiding': ['騎馬', 'horse', 'horseback', '馬場'],
   // 泰服
   'thaiDress': ['泰服', 'thai dress', '泰服體驗', '攝影師'],
 }
@@ -121,6 +122,8 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   { id: 'muaythai', name: '泰拳一般（第6排）', price: 600, rebate: 400, split: true, checked: false, source: 'default', exclusiveGroup: 'muaythai' },
   // 按摩
   { id: 'massage', name: '泰式按摩', price: 500, rebate: 100, split: true, checked: false, source: 'default' },
+  // 騎馬（90公斤以上不得騎乘）
+  { id: 'horseRiding', name: '騎馬', price: 1400, rebate: 210, split: true, checked: false, source: 'default' },
 ]
 
 // 將 DEFAULT_TICKETS 轉換為 ActivityRecord 格式（供匹配器使用）
