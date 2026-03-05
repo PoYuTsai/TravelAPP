@@ -20,10 +20,17 @@ export interface ParsedDay {
   rawText: string
 }
 
+export interface ParseWarning {
+  type: 'day_skip' | 'date_skip' | 'date_invalid' | 'day_mismatch'
+  message: string
+  dayIndex?: number
+}
+
 export interface ParseResult {
   success: boolean
   days: ParsedDay[]
   errors: string[]
+  warnings: ParseWarning[]
   year: number
 }
 

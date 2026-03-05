@@ -1,7 +1,7 @@
 // src/lib/itinerary/parser.ts
 // 行程解析核心邏輯
 
-import type { ParsedDay, ParseResult, ParsedBasicInfo, ParsedQuotation, ParsedQuotationItem } from './types'
+import type { ParsedDay, ParseResult, ParsedBasicInfo, ParsedQuotation, ParsedQuotationItem, ParseWarning } from './types'
 
 /**
  * 判斷是否為閏年
@@ -324,12 +324,114 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
     days.push(currentDay)
   }
 
+  // 驗證 Day 編號和日期的連續性
+  const warnings = validateItinerary(days, detectedYear)
+
   return {
     success: days.length > 0,
     days,
     errors,
+    warnings,
     year: detectedYear,
   }
+}
+
+/**
+ * 驗證行程的連續性
+ * - Day 編號應該是連續的 (1, 2, 3...)
+ * - 日期應該是連續的 (2/12, 2/13, 2/14...)
+ */
+function validateItinerary(days: ParsedDay[], year: number): ParseWarning[] {
+  const warnings: ParseWarning[] = []
+
+  if (days.length === 0) return warnings
+
+  // 1. 驗證 Day 編號連續性
+  for (let i = 0; i < days.length; i++) {
+    const expectedDayNumber = i + 1
+    const actualDayNumber = days[i].dayNumber
+
+    if (actualDayNumber !== expectedDayNumber) {
+      if (i > 0) {
+        const prevDayNumber = days[i - 1].dayNumber
+        if (actualDayNumber !== prevDayNumber + 1) {
+          warnings.push({
+            type: 'day_skip',
+            message: `Day ${prevDayNumber} 後面接 Day ${actualDayNumber}，跳過了 Day ${prevDayNumber + 1}`,
+            dayIndex: i,
+          })
+        }
+      }
+    }
+  }
+
+  // 2. 驗證日期連續性（只有當有日期時才驗證）
+  const daysWithDates = days.filter(d => d.date)
+
+  for (let i = 1; i < daysWithDates.length; i++) {
+    const prevDay = daysWithDates[i - 1]
+    const currDay = daysWithDates[i]
+
+    if (!prevDay.date || !currDay.date) continue
+
+    // 解析日期
+    const prevParts = prevDay.date.split('-')
+    const currParts = currDay.date.split('-')
+
+    if (prevParts.length !== 3 || currParts.length !== 3) continue
+
+    const prevYear = parseInt(prevParts[0], 10)
+    const prevMonth = parseInt(prevParts[1], 10)
+    const prevDayNum = parseInt(prevParts[2], 10)
+
+    const currYear = parseInt(currParts[0], 10)
+    const currMonth = parseInt(currParts[1], 10)
+    const currDayNum = parseInt(currParts[2], 10)
+
+    // 計算預期的下一天
+    const expectedNext = getNextDate(prevYear, prevMonth, prevDayNum)
+
+    if (
+      expectedNext.year !== currYear ||
+      expectedNext.month !== currMonth ||
+      expectedNext.day !== currDayNum
+    ) {
+      const prevDateStr = `${prevMonth}/${prevDayNum}`
+      const currDateStr = `${currMonth}/${currDayNum}`
+      const expectedDateStr = `${expectedNext.month}/${expectedNext.day}`
+
+      warnings.push({
+        type: 'date_skip',
+        message: `${prevDateStr} 的下一天應該是 ${expectedDateStr}，但寫的是 ${currDateStr}`,
+        dayIndex: days.indexOf(currDay),
+      })
+    }
+  }
+
+  // 3. 驗證日期的合理性（例如 2/30 不存在）
+  for (let i = 0; i < days.length; i++) {
+    const day = days[i]
+    if (!day.date) continue
+
+    const parts = day.date.split('-')
+    if (parts.length !== 3) continue
+
+    const dateYear = parseInt(parts[0], 10)
+    const dateMonth = parseInt(parts[1], 10)
+    const dateDay = parseInt(parts[2], 10)
+
+    const maxDays = getDaysInMonth(dateYear, dateMonth)
+
+    if (dateDay > maxDays) {
+      warnings.push({
+        type: 'date_invalid',
+        message: `${dateMonth}/${dateDay} 不是有效日期（${dateMonth} 月只有 ${maxDays} 天）`,
+        dayIndex: i,
+      })
+    }
+  }
+
+  return warnings
 }
 
 /**

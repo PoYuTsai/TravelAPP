@@ -9,6 +9,7 @@ export type {
   ParsedBasicInfo,
   ParsedQuotationItem,
   ParsedQuotation,
+  ParseWarning,
   HotelBooking,
 } from './types'
 
