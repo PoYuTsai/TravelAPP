@@ -91,8 +91,10 @@ function downloadExternalQuote(
   babySeatCount: number,
   childSeatCount: number,
   collectDeposit: boolean,
+  tripDays: number,
   customItinerary?: { day: string; title: string; items: string[]; hotel: string | null }[]
 ) {
+  const tripNights = tripDays - 1
   const fmt = (n: number) => n.toLocaleString()
   const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
 
@@ -351,7 +353,7 @@ function downloadExternalQuote(
       <p class="tagline">台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
       <div class="trip-info">
         <div class="trip-label">行程報價單</div>
-        <div class="trip-title">清邁 ${totalNights + 1}天${totalNights}夜 親子包車</div>
+        <div class="trip-title">清邁 ${tripDays}天${tripNights}夜 親子包車</div>
       </div>
     </div>
 
@@ -371,7 +373,7 @@ function downloadExternalQuote(
     <div class="section">
       <h3 class="section-title">💰 費用明細</h3>
       <div class="price-meta">
-        👥 <strong>${people} 人</strong>　｜　🗓️ <strong>${totalNights + 1}天${totalNights}夜</strong>
+        👥 <strong>${people} 人</strong>　｜　🗓️ <strong>${tripDays}天${tripNights}夜</strong>
       </div>
       <div class="price-summary">
 
@@ -1198,6 +1200,10 @@ export function PricingCalculator() {
   // 計算總住宿晚數
   const totalNights = hotels.reduce((sum, h) => sum + h.nights, 0)
 
+  // 行程天數（優先使用解析後的車費天數）
+  const tripDays = carFees.length
+  const tripNights = tripDays - 1 // 天數 - 1 = 晚數
+
   // Auto-adjust luggage car based on max passengers per car
   // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
   useEffect(() => {
@@ -1443,7 +1449,7 @@ export function PricingCalculator() {
         <button onClick={() => setActiveTab('input')} style={{ padding: '10px 20px', background: activeTab === 'input' ? '#5c4a2a' : '#ddd', color: activeTab === 'input' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📝 輸入</button>
         <button onClick={() => setActiveTab('internal')} style={{ padding: '10px 20px', background: activeTab === 'internal' ? '#5c4a2a' : '#ddd', color: activeTab === 'internal' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📊 內部明細</button>
         <button onClick={() => setActiveTab('external')} style={{ padding: '10px 20px', background: activeTab === 'external' ? '#5c4a2a' : '#ddd', color: activeTab === 'external' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📄 對外報價單</button>
-        <button onClick={() => downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, isParseConfirmed ? parsedItinerary : undefined)} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
+        <button onClick={() => downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, isParseConfirmed ? parsedItinerary : undefined)} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
       </div>
 
       {/* Input Tab */}
@@ -1806,9 +1812,9 @@ export function PricingCalculator() {
                   </p>
                 </div>
 
-                {totalNights !== config.nights && (
+                {tripNights !== totalNights && (
                   <div style={{ ...warningStyle, marginTop: 12 }}>
-                    ⚠️ 總晚數 {totalNights} 晚，與預設 {config.nights} 晚不同（行程天數會自動調整）
+                    ⚠️ 行程 {tripDays} 天（{tripNights} 晚），但住宿只有 {totalNights} 晚。請調整飯店晚數！
                   </div>
                 )}
               </>
@@ -2143,19 +2149,19 @@ Day 2｜大象保護營
                 <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
                   <button
                     onClick={handleParseItinerary}
-                    disabled={!itineraryText.trim() || isLoadingActivities}
+                    disabled={!itineraryText.trim()}
                     style={{
                       padding: '10px 20px',
-                      background: !itineraryText.trim() || isLoadingActivities ? '#ccc' : '#4caf50',
+                      background: !itineraryText.trim() ? '#ccc' : '#4caf50',
                       color: 'white',
                       border: 'none',
                       borderRadius: 4,
-                      cursor: !itineraryText.trim() || isLoadingActivities ? 'not-allowed' : 'pointer',
+                      cursor: !itineraryText.trim() ? 'not-allowed' : 'pointer',
                       fontSize: 14,
                       fontWeight: 'bold',
                     }}
                   >
-                    {isLoadingActivities ? '⏳ 載入中...' : '🔍 解析行程'}
+                    🔍 解析行程
                   </button>
                   {parseResult && (
                     <span style={{ fontSize: 13, color: '#666' }}>
@@ -2573,7 +2579,7 @@ Day 2｜大象保護營
             <div style={{ fontSize: 32, marginBottom: 8 }}>🚐</div>
             <h2 style={{ margin: 0, fontSize: 24 }}>清微旅行 Chiangway Travel</h2>
             <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: 14 }}>台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 'bold' }}>清邁 {totalNights + 1}天{totalNights}夜 親子包車行程</div>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 'bold' }}>清邁 {tripDays}天{tripNights}夜 親子包車行程</div>
           </div>
 
           {/* Itinerary */}
@@ -2593,7 +2599,7 @@ Day 2｜大象保護營
             <h3 style={{ margin: '0 0 12px 0', color: '#5c4a2a', fontSize: 16, borderBottom: '2px solid #5c4a2a', paddingBottom: 8 }}>💰 費用明細</h3>
 
             <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
-              👥 <strong>{people} 人</strong>｜🗓️ {totalNights + 1}天{totalNights}夜
+              👥 <strong>{people} 人</strong>｜🗓️ {tripDays}天{tripNights}夜
             </div>
 
             {/* Detailed Breakdown */}
