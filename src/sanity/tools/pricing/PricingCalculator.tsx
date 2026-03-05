@@ -1017,12 +1017,38 @@ export function PricingCalculator() {
     // 如果 Sanity 資料庫是空的，用 DEFAULT_TICKETS 來匹配
     const activitiesToMatch = dbActivities.length > 0 ? dbActivities : getDefaultActivitiesForMatching()
     const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
-    setParseResult(result)
+
+    // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
+    const thaiDressKeywords = ['泰服', 'thai dress', '泰服體驗', '攝影師拍攝']
+
+    // 檢查是否有泰服相關活動
+    const hasThaiDress = result.unmatched.some(u =>
+      thaiDressKeywords.some(kw => u.text.toLowerCase().includes(kw.toLowerCase()))
+    ) || itineraryText.toLowerCase().includes('泰服')
+
+    // 過濾掉泰服相關的未匹配項目（因為有獨立 UI 處理）
+    const filteredUnmatched = result.unmatched.filter(u =>
+      !thaiDressKeywords.some(kw => u.text.toLowerCase().includes(kw.toLowerCase()))
+    )
+
+    // 建立新的結果物件（避免修改原物件）
+    const filteredResult = {
+      ...result,
+      unmatched: filteredUnmatched
+    }
+    setParseResult(filteredResult)
+
+    // 自動勾選泰服（如果偵測到）
+    if (hasThaiDress) {
+      setThaiDressCloth(true)
+      console.log('[Thai Dress] 偵測到泰服，自動勾選')
+    }
 
     // DEBUG: 顯示匹配結果
     console.log('=== 解析結果 ===')
     console.log('匹配到的活動:', result.matched.map(m => `${m.activityName} (D${m.dayNumber})`))
-    console.log('未匹配的活動:', result.unmatched.map(u => u.text))
+    console.log('未匹配的活動:', filteredUnmatched.map(u => u.text))
+    if (hasThaiDress) console.log('泰服: ✓ 偵測到')
 
     // 儲存解析警告
     setParseWarnings(parsed.warnings || [])
@@ -2720,26 +2746,29 @@ Day 5｜送機
             <p style={{ ...noteStyle, marginTop: 12 }}>
               已選 {calculation.selectedTickets.length}/{tickets.length} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖
             </p>
-          </Section>
 
-          {/* 泰服 */}
-          <Section title={`👘 D1 泰服體驗${!includeTickets ? '（客人自理）' : ''}`} style={{ background: '#fff9e6', border: '1px solid #f0d000', ...(includeTickets ? {} : { opacity: 0.5 }) }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
-              <label>泰服衣服</label>
-              <span style={noteStyle}>售價 500 / 成本 200 /人（全員）</span>
+            {/* 泰服體驗（整合進門票區塊） */}
+            <div style={{ marginTop: 16, padding: 12, background: '#fff9e6', borderRadius: 8, border: '1px solid #f0d000' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: 10, color: '#5c4a2a', fontSize: 13 }}>
+                👘 泰服體驗
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
+                <label>泰服衣服</label>
+                <span style={noteStyle}>售價 500 / 成本 200 /人（全員）</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
+                <label>攝影師</label>
+                <span style={noteStyle}>售價 2,500 / 成本 500 /位（1位可拍10人）</span>
+              </div>
+              <Row style={{ marginTop: 8 }}>
+                <label>化妝人數</label>
+                <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
+                <span style={noteStyle}>售價 1,000 / 成本 500 /人</span>
+              </Row>
+              <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
-              <label>攝影師</label>
-              <span style={noteStyle}>售價 2,500 / 成本 500 /位（1位可拍10人）</span>
-            </div>
-            <Row style={{ marginTop: 8 }}>
-              <label>化妝人數</label>
-              <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
-              <span style={noteStyle}>售價 1,000 / 成本 500 /人</span>
-            </Row>
-            <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
           </Section>
 
           {/* Result - 移除 sticky，改為一般區塊 */}
