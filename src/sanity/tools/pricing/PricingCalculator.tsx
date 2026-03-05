@@ -425,16 +425,22 @@ function downloadExternalQuote(
       </div>
     </div>
 
-    <!-- 行程概覽 -->
+    <!-- 行程概覽 - 以 tripDays 為準 -->
     <div class="section">
       <h3 class="section-title">📅 行程概覽</h3>
-      ${(customItinerary && customItinerary.length > 0 ? customItinerary : ITINERARY).map(day => `
-        <div class="itinerary-day">
-          <div class="title">${day.day}｜${day.title}</div>
-          <div class="items">${day.items.join('　')}</div>
-          ${day.hotel ? `<div class="hotel">🏨 ${day.hotel}</div>` : ''}
-        </div>
-      `).join('')}
+      ${(() => {
+        // 優先使用自訂行程，否則用預設行程但限制天數
+        const itineraryToShow = customItinerary && customItinerary.length > 0
+          ? customItinerary.slice(0, tripDays)
+          : ITINERARY.slice(0, tripDays)
+        return itineraryToShow.map(day => `
+          <div class="itinerary-day">
+            <div class="title">${day.day}｜${day.title}</div>
+            ${day.items.length > 0 ? `<div class="items">${day.items.join('　')}</div>` : ''}
+            ${day.hotel ? `<div class="hotel">🏨 ${day.hotel}</div>` : ''}
+          </div>
+        `).join('')
+      })()}
     </div>
 
     <!-- 費用明細 -->
@@ -3015,16 +3021,27 @@ Day 5｜送機
             <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 'bold' }}>清邁 {tripDays}天{tripNights}夜 親子包車行程</div>
           </div>
 
-          {/* Itinerary */}
+          {/* Itinerary - 以車費天數為準 */}
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ margin: '0 0 12px 0', color: '#5c4a2a', fontSize: 16, borderBottom: '2px solid #5c4a2a', paddingBottom: 8 }}>📅 行程概覽</h3>
-            {(isParseConfirmed && parsedItinerary.length > 0 ? parsedItinerary : ITINERARY).map((day, i) => (
-              <div key={i} style={{ background: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
-                <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 6 }}>{day.day}｜{day.title}</div>
-                <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('　')}</div>
-                {day.hotel && <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>🏨 {day.hotel}</div>}
-              </div>
-            ))}
+            {(() => {
+              // 優先使用解析的行程，否則用車費天數產生預設行程
+              const itineraryToShow = parsedItinerary.length > 0
+                ? parsedItinerary.slice(0, tripDays)  // 限制為車費天數
+                : carFees.map((cf, i) => ({
+                    day: `DAY ${i + 1}${cf.date ? ` (${cf.date})` : ''}`,
+                    title: cf.name || `第 ${i + 1} 天`,
+                    items: [],
+                    hotel: hotels[0]?.name || null
+                  }))
+              return itineraryToShow.map((day, i) => (
+                <div key={i} style={{ background: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
+                  <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 6 }}>{day.day}｜{day.title}</div>
+                  {day.items.length > 0 && <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('　')}</div>}
+                  {day.hotel && <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>🏨 {day.hotel}</div>}
+                </div>
+              ))
+            })()}
           </div>
 
           {/* Price Summary */}
