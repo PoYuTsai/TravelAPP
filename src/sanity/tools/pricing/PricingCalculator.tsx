@@ -46,33 +46,95 @@ const DEFAULT_CONFIG = {
   },
 }
 
-// 門票資料
-const DEFAULT_TICKETS = [
-  // D2 大象保護營（二擇一）
-  { id: 'elephant-meal', name: 'D2 大象保護營（含餐）', price: 1600, rebate: 1000, split: true, checked: false },
-  { id: 'elephant', name: 'D2 大象保護營（不含餐）', price: 1600, rebate: 1100, split: true, checked: true },
-  // D2 射擊（二擇一）
-  { id: 'shooting', name: 'D2 射擊（基本）', price: 1700, rebate: 500, split: true, checked: true },
-  { id: 'shooting-pro', name: 'D2 射擊（進階）', price: 5000, rebate: 1000, split: true, checked: false },
-  // D2 人妖秀（二擇一）
-  { id: 'cabaret-vip', name: 'D2 人妖秀（VIP）', price: 1000, rebate: 500, split: true, checked: true },
-  { id: 'cabaret', name: 'D2 人妖秀（普通）', price: 800, rebate: 350, split: true, checked: false },
-  // D3
-  { id: 'whiteTemple', name: 'D3 白廟', price: 200, rebate: 0, split: false, checked: true },
-  { id: 'blueTemple', name: 'D3 藍廟', price: 0, rebate: 0, split: false, checked: true },
-  { id: 'blackTemple', name: 'D3 黑廟', price: 80, rebate: 0, split: false, checked: true },
-  { id: 'longNeck', name: 'D3 長頸村', price: 300, rebate: 200, split: true, checked: true },
-  // D4
-  { id: 'waterPark', name: 'D4 水上樂園', price: 950, rebate: 250, split: true, checked: true },
-  { id: 'nightSafari', name: 'D4 夜間動物園', price: 1200, rebate: 550, split: true, checked: true },
-  // D5 叢林飛索（三擇一）
-  { id: 'zipline-a', name: 'D5 叢林飛索 A', price: 2400, rebate: 500, split: true, checked: true },
-  { id: 'zipline-b', name: 'D5 叢林飛索 B', price: 2200, rebate: 450, split: true, checked: false },
-  { id: 'zipline-c', name: 'D5 叢林飛索 C', price: 2000, rebate: 400, split: true, checked: false },
-  // D5
-  { id: 'snakeFarm', name: 'D5 蛇園', price: 200, rebate: 100, split: true, checked: true },
-  { id: 'pigSlide', name: 'D5 豬豬溜滑梯', price: 200, rebate: 30, split: true, checked: true },
+// 門票類型（含日期）
+interface DynamicTicket {
+  id: string
+  name: string
+  price: number
+  rebate: number
+  split: boolean
+  checked: boolean
+  dayNumber?: number  // 來自哪一天（動態解析時設定）
+  source: 'parsed' | 'manual' | 'default'  // 來源
+  exclusiveGroup?: string  // 互斥群組
+}
+
+// 門票關鍵字對照表 - 用於智能匹配
+const TICKET_KEYWORDS: Record<string, string[]> = {
+  // 大象
+  'elephant-meal': ['大象', 'elephant', '保護營', '湄登', '含餐', 'maetang'],
+  'elephant': ['大象', 'elephant', '保護營', '湄登', '不含餐', 'maetang'],
+  // 射擊
+  'shooting': ['射擊', 'shooting', '靶場', 'mae rim', '基本'],
+  'shooting-pro': ['射擊', 'shooting', '靶場', '進階', 'pro'],
+  // 人妖秀
+  'cabaret-vip': ['人妖秀', '人妖', 'cabaret', 'miracle', 'vip'],
+  'cabaret': ['人妖秀', '人妖', 'cabaret', 'miracle', '普通'],
+  // 清萊
+  'whiteTemple': ['白廟', 'white temple', '龍昆'],
+  'blueTemple': ['藍廟', 'blue temple'],
+  'blackTemple': ['黑廟', 'black temple', '黑屋'],
+  'longNeck': ['長頸', 'long neck', '長頸族', '長頸村'],
+  // 其他活動
+  'waterPark': ['水上樂園', '大峽谷', 'grand canyon', 'waterpark'],
+  'nightSafari': ['夜間動物園', 'night safari', '動物園'],
+  'zipline-a': ['叢林飛索', '叢林飛越', 'zipline', 'coaster', 'pong yang', '飛索'],
+  'zipline-b': ['叢林飛索', '叢林飛越', 'zipline', 'eagle track'],
+  'zipline-c': ['叢林飛索', '叢林飛越', 'zipline', 'flight of gibbon'],
+  'snakeFarm': ['蛇園', 'snake', '蛇園表演'],
+  'pigSlide': ['豬豬', '溜滑梯', '豬豬溜滑梯'],
+  'muaythai': ['泰拳', 'muay thai', '泰拳體驗'],
+  'massage': ['按摩', 'massage', 'spa', '泰式按摩'],
+  // 泰服
+  'thaiDress': ['泰服', 'thai dress', '泰服體驗', '攝影師'],
+}
+
+// 預設門票範本（當沒有解析行程時使用）
+const DEFAULT_TICKETS: DynamicTicket[] = [
+  // 大象保護營（二擇一）
+  { id: 'elephant-meal', name: '大象保護營（含餐）', price: 1600, rebate: 1000, split: true, checked: false, source: 'default', exclusiveGroup: 'elephant' },
+  { id: 'elephant', name: '大象保護營（不含餐）', price: 1600, rebate: 1100, split: true, checked: false, source: 'default', exclusiveGroup: 'elephant' },
+  // 射擊（二擇一）
+  { id: 'shooting', name: '射擊（基本）', price: 1700, rebate: 500, split: true, checked: false, source: 'default', exclusiveGroup: 'shooting' },
+  { id: 'shooting-pro', name: '射擊（進階）', price: 5000, rebate: 1000, split: true, checked: false, source: 'default', exclusiveGroup: 'shooting' },
+  // 人妖秀（二擇一）
+  { id: 'cabaret-vip', name: '人妖秀（VIP）', price: 1000, rebate: 500, split: true, checked: false, source: 'default', exclusiveGroup: 'cabaret' },
+  { id: 'cabaret', name: '人妖秀（普通）', price: 800, rebate: 350, split: true, checked: false, source: 'default', exclusiveGroup: 'cabaret' },
+  // 清萊一日遊
+  { id: 'whiteTemple', name: '白廟', price: 200, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'blueTemple', name: '藍廟', price: 0, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'blackTemple', name: '黑廟', price: 80, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'longNeck', name: '長頸村', price: 300, rebate: 200, split: true, checked: false, source: 'default' },
+  // 其他活動
+  { id: 'waterPark', name: '水上樂園', price: 950, rebate: 250, split: true, checked: false, source: 'default' },
+  { id: 'nightSafari', name: '夜間動物園', price: 1200, rebate: 550, split: true, checked: false, source: 'default' },
+  // 叢林飛索（三擇一）
+  { id: 'zipline-a', name: '叢林飛索 A', price: 2400, rebate: 500, split: true, checked: false, source: 'default', exclusiveGroup: 'zipline' },
+  { id: 'zipline-b', name: '叢林飛索 B', price: 2200, rebate: 450, split: true, checked: false, source: 'default', exclusiveGroup: 'zipline' },
+  { id: 'zipline-c', name: '叢林飛索 C', price: 2000, rebate: 400, split: true, checked: false, source: 'default', exclusiveGroup: 'zipline' },
+  // 其他
+  { id: 'snakeFarm', name: '蛇園', price: 200, rebate: 100, split: true, checked: false, source: 'default' },
+  { id: 'pigSlide', name: '豬豬溜滑梯', price: 200, rebate: 30, split: true, checked: false, source: 'default' },
+  // 泰拳
+  { id: 'muaythai', name: '泰拳體驗', price: 1500, rebate: 300, split: true, checked: false, source: 'default' },
+  // 按摩
+  { id: 'massage', name: '泰式按摩', price: 500, rebate: 100, split: true, checked: false, source: 'default' },
 ]
+
+// 將 DEFAULT_TICKETS 轉換為 ActivityRecord 格式（供匹配器使用）
+function getDefaultActivitiesForMatching(): ActivityRecord[] {
+  return DEFAULT_TICKETS.map(ticket => ({
+    _id: ticket.id,
+    name: ticket.name,
+    keywords: TICKET_KEYWORDS[ticket.id] || [],
+    activityType: 'ticket' as const,
+    adultPrice: ticket.price,
+    rebate: ticket.rebate,
+    splitRebate: ticket.split,
+    exclusiveGroup: ticket.exclusiveGroup,
+    isActive: true,
+  }))
+}
 
 // 下載對外報價單
 function downloadExternalQuote(
@@ -97,7 +159,7 @@ function downloadExternalQuote(
 ) {
   const tripNights = tripDays - 1
   const fmt = (n: number) => n.toLocaleString()
-  const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
+  const mealLabels: Record<number, string> = { 600: '簡餐', 900: '平價', 1200: '精選', 1500: '高級' }
 
   const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
   // 只有勾選住宿時才考慮飯店押金
@@ -402,7 +464,7 @@ function downloadExternalQuote(
         ${c.needLuggageCar ? `<div class="price-detail">• 行李車（接機＋送機）</div>` : ''}
         ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天</div>` : ''}
 
-        ${c.selectedTickets.length > 0 ? `
+        ${c.includeTickets && c.selectedTickets.length > 0 ? `
         <div class="price-row category">
           <span>🎫 門票活動（${c.selectedTickets.length}項）</span>
           <span>${fmt(c.ticketPrice)} 泰銖</span>
@@ -449,8 +511,8 @@ function downloadExternalQuote(
           ${includeMeals ? `<li>• ${c.mealDays}天午晚餐</li>` : ''}
           <li>• 全程包車（${c.carCount}台）</li>
           ${includeGuide ? `<li>• 專業中文導遊</li>` : ''}
-          ${c.selectedTickets.length > 0 ? `<li>• ${c.selectedTickets.length}項門票活動</li>` : ''}
-          ${c.thaiDressPrice > 0 ? `<li>• 泰服體驗</li>` : ''}
+          ${c.includeTickets && c.selectedTickets.length > 0 ? `<li>• ${c.selectedTickets.length}項門票活動</li>` : ''}
+          ${c.includeTickets && c.thaiDressPrice > 0 ? `<li>• 泰服體驗</li>` : ''}
           ${c.insuranceCost > 0 ? `<li>• 旅遊保險</li>` : ''}
         </ul>
       </div>
@@ -693,6 +755,7 @@ interface Hotel {
   id: number
   name: string
   nights: number
+  startNight: number  // 從第幾晚開始入住（1-indexed），預設 1。用於處理分批住宿
   // 4 種房型分類，每種有 3 個子房型
   rooms: {
     double: CategoryRooms
@@ -724,7 +787,22 @@ interface SavedQuote {
     itineraryText: string
     people: number
     carFees: CarFeeDay[]
-    tickets: typeof DEFAULT_TICKETS
+    tickets: DynamicTicket[]
+    useDefaultTickets?: boolean  // 是否使用預設門票
+    // 新增欄位
+    hotels?: Hotel[]
+    exchangeRate?: number
+    includeAccommodation?: boolean
+    includeMeals?: boolean
+    includeGuide?: boolean
+    luggageCar?: boolean
+    childSeatCount?: number
+    babySeatCount?: number  // 嬰兒座椅
+    thaiDressCloth?: boolean
+    thaiDressPhoto?: boolean
+    makeupCount?: number
+    mealLevel?: number  // 餐費等級
+    collectDeposit?: boolean
   }
 }
 
@@ -737,6 +815,7 @@ export function PricingCalculator() {
   const [itineraryText, setItineraryText] = useState('')
   const [dbActivities, setDbActivities] = useState<ActivityRecord[]>([])
   const [parseResult, setParseResult] = useState<ActivityMatchResult | null>(null)
+  const [parseWarnings, setParseWarnings] = useState<{ type: string; message: string }[]>([])
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [isParseConfirmed, setIsParseConfirmed] = useState(false)
 
@@ -776,70 +855,95 @@ export function PricingCalculator() {
     family: createEmptySubRooms(4500),
   })
 
+  // 根據人數計算預設房間數量（人數 ÷ 2，無條件進位）
+  const calculateDefaultRoomCount = (peopleCount: number) => Math.ceil(peopleCount / 2)
+
+  // 建立有預設房間的飯店房型（用於解析行程時）
+  const createDefaultRooms = (hotelName: string, roomCount?: number) => {
+    // 根據飯店名稱給不同的預設房型名稱
+    const isShangri = hotelName.includes('香格里拉')
+    const roomName = isShangri ? '豪華客房（大床）' : '經典客房（大床）'
+    const defaultQuantity = roomCount ?? 2  // 預設 2 間，或指定數量
+    return {
+      double: [
+        { name: roomName, quantity: defaultQuantity, price: 2500, hasExtraBed: false },
+        { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+        { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+      ] as CategoryRooms,
+      twin: createEmptySubRooms(2500),
+      triple: createEmptySubRooms(3500),
+      family: createEmptySubRooms(4500),
+    }
+  }
+
   const [hotels, setHotels] = useState<Hotel[]>([
     {
       id: 1,
       name: '香格里拉酒店',
       nights: 3,
+      startNight: 1,  // 從第 1 晚開始
       rooms: {
         double: [
-          { name: 'Horizon俱樂部豪華雙人間', quantity: 2, price: 3500, hasExtraBed: true },
-          { name: '行政樓層俱樂部尊貴雙人間', quantity: 3, price: 3000, hasExtraBed: false },
+          { name: '豪華客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
           { name: '', quantity: 0, price: 2500, hasExtraBed: false },
         ],
         twin: [
-          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '高級客房（雙床）', quantity: 0, price: 2500, hasExtraBed: false },
           { name: '', quantity: 0, price: 2500, hasExtraBed: false },
           { name: '', quantity: 0, price: 2500, hasExtraBed: false },
         ],
         triple: [
-          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '豪華三人房', quantity: 0, price: 3500, hasExtraBed: false },
           { name: '', quantity: 0, price: 3500, hasExtraBed: false },
           { name: '', quantity: 0, price: 3500, hasExtraBed: false },
         ],
         family: [
-          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '家庭房', quantity: 0, price: 4500, hasExtraBed: false },
           { name: '', quantity: 0, price: 4500, hasExtraBed: false },
           { name: '', quantity: 0, price: 4500, hasExtraBed: false },
         ],
       },
-      hasDeposit: true,
+      hasDeposit: false,
       depositPerRoom: 3000
     },
     {
       id: 2,
-      name: '美平洲際酒店',
+      name: '清邁美平洲際酒店',
       nights: 2,
+      startNight: 4,  // 從第 4 晚開始（香格里拉 3 晚之後）
       rooms: {
         double: [
-          { name: '豪華雙人房', quantity: 5, price: 3000, hasExtraBed: false },
-          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
-          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+          { name: '經典客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
         ],
         twin: [
-          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
-          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
-          { name: '', quantity: 0, price: 3000, hasExtraBed: false },
+          { name: '經典客房（雙床）', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          { name: '', quantity: 0, price: 2500, hasExtraBed: false },
         ],
         triple: [
-          { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          { name: '高級三人房', quantity: 0, price: 3500, hasExtraBed: false },
           { name: '', quantity: 0, price: 3500, hasExtraBed: false },
           { name: '', quantity: 0, price: 3500, hasExtraBed: false },
         ],
         family: [
-          { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          { name: '家庭套房', quantity: 0, price: 4500, hasExtraBed: false },
           { name: '', quantity: 0, price: 4500, hasExtraBed: false },
           { name: '', quantity: 0, price: 4500, hasExtraBed: false },
         ],
       },
-      hasDeposit: true,
+      hasDeposit: false,
       depositPerRoom: 3000
     },
   ])
   const [nextHotelId, setNextHotelId] = useState(3)
 
   const [mealLevel, setMealLevel] = useState(900)
-  const [tickets, setTickets] = useState(DEFAULT_TICKETS)
+  const [tickets, setTickets] = useState<DynamicTicket[]>(DEFAULT_TICKETS)
+  const [useDefaultTickets, setUseDefaultTickets] = useState(true)  // 是否使用預設門票（vs 解析後動態門票）
+  const [savedParsedTickets, setSavedParsedTickets] = useState<DynamicTicket[]>([])  // 保存解析後的門票，用於切換回去
   const [thaiDressCloth, setThaiDressCloth] = useState(true)
   const [thaiDressPhoto, setThaiDressPhoto] = useState(true)  // 攝影師預設勾選
   const [makeupCount, setMakeupCount] = useState(0)
@@ -910,8 +1014,18 @@ export function PricingCalculator() {
     if (!itineraryText.trim()) return
 
     const parsed = parseItineraryText(itineraryText)
-    const result = matchActivitiesToDatabase(parsed, dbActivities)
+    // 如果 Sanity 資料庫是空的，用 DEFAULT_TICKETS 來匹配
+    const activitiesToMatch = dbActivities.length > 0 ? dbActivities : getDefaultActivitiesForMatching()
+    const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
     setParseResult(result)
+
+    // DEBUG: 顯示匹配結果
+    console.log('=== 解析結果 ===')
+    console.log('匹配到的活動:', result.matched.map(m => `${m.activityName} (D${m.dayNumber})`))
+    console.log('未匹配的活動:', result.unmatched.map(u => u.text))
+
+    // 儲存解析警告
+    setParseWarnings(parsed.warnings || [])
 
     // 1. 根據解析的天數產生車費欄位
     if (parsed.days.length > 0) {
@@ -982,58 +1096,107 @@ export function PricingCalculator() {
       setCarFees(newCarFees)
     }
 
-    // 2. 根據匹配結果更新門票勾選
+    // 2. 根據匹配結果生成動態門票
     if (result.matched.length > 0) {
-      setTickets(prev => {
-        const newTickets = prev.map(t => ({ ...t, checked: false })) // 先全部取消
+      // 從匹配結果生成動態門票列表
+      const dynamicTickets: DynamicTicket[] = []
+      const addedGroups = new Set<string>()  // 追蹤已加入的互斥群組
 
-        // 對每個匹配到的活動，找對應的 DEFAULT_TICKET 並勾選
-        for (const matched of result.matched) {
-          // 用活動名稱匹配 DEFAULT_TICKETS
-          const matchedTicket = newTickets.find(t =>
-            matched.activityName.includes(t.name.replace(/^D\d+ /, '')) ||
-            t.name.replace(/^D\d+ /, '').includes(matched.activityName)
-          )
-          if (matchedTicket) {
-            // 檢查互斥群組
-            const exclusiveGroup = Object.entries(EXCLUSIVE_GROUPS).find(([_, ids]) => ids.includes(matchedTicket.id))
-            if (exclusiveGroup) {
-              const [_, groupIds] = exclusiveGroup
-              // 取消同群組其他票
-              groupIds.forEach(gid => {
-                const idx = newTickets.findIndex(t => t.id === gid)
-                if (idx !== -1 && gid !== matchedTicket.id) {
-                  newTickets[idx].checked = false
-                }
+      for (const matched of result.matched) {
+        // 找對應的 DEFAULT_TICKET 範本
+        const template = DEFAULT_TICKETS.find(t =>
+          matched.activityName.includes(t.name) ||
+          t.name.includes(matched.activityName) ||
+          // 也嘗試用 id 匹配
+          matched.activityId.includes(t.id) ||
+          t.id.includes(matched.activityId.replace(/-/g, ''))
+        )
+
+        if (template) {
+          // 檢查互斥群組
+          if (template.exclusiveGroup) {
+            if (addedGroups.has(template.exclusiveGroup)) {
+              // 同群組已有項目，跳過
+              continue
+            }
+            addedGroups.add(template.exclusiveGroup)
+
+            // 加入整個互斥群組的所有選項
+            const groupTickets = DEFAULT_TICKETS.filter(t => t.exclusiveGroup === template.exclusiveGroup)
+            groupTickets.forEach(gt => {
+              dynamicTickets.push({
+                ...gt,
+                dayNumber: matched.dayNumber,
+                source: 'parsed',
+                checked: gt.id === template.id,  // 只勾選匹配到的那個
               })
-            }
-            const idx = newTickets.findIndex(t => t.id === matchedTicket.id)
-            if (idx !== -1) {
-              newTickets[idx].checked = true
-            }
+            })
+          } else {
+            // 非互斥群組，直接加入
+            dynamicTickets.push({
+              ...template,
+              dayNumber: matched.dayNumber,
+              source: 'parsed',
+              checked: true,
+            })
           }
+        } else {
+          // 沒有範本，從資料庫資料建立新門票
+          dynamicTickets.push({
+            id: matched.activityId,
+            name: matched.activityName,
+            price: matched.price,
+            rebate: matched.rebate,
+            split: matched.splitRebate,
+            checked: true,
+            dayNumber: matched.dayNumber,
+            source: 'parsed',
+            exclusiveGroup: matched.exclusiveGroup,
+          })
         }
+      }
 
-        return newTickets
-      })
+      // 按 dayNumber 排序
+      dynamicTickets.sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
+
+      // DEBUG: 顯示動態門票（勾選狀態）
+      console.log('生成的動態門票:', dynamicTickets.map(t => `${t.name} (checked: ${t.checked})`))
+
+      setTickets(dynamicTickets)
+      setSavedParsedTickets(dynamicTickets)  // 保存解析結果，用於切換回去
+      setUseDefaultTickets(false)
+    } else {
+      // 沒有匹配到任何活動，保持現有門票但全部取消勾選
+      console.log('無匹配活動，重置所有門票為未勾選')
+      setTickets(prev => prev.map(t => ({ ...t, checked: false })))
+      setSavedParsedTickets([])
     }
 
     // 3. 根據解析的住宿更新飯店（如果有的話）
     if (result.hotels.length > 0) {
-      // 統計每間飯店的住宿天數
-      const hotelNights: Record<string, number> = {}
+      // 統計每間飯店的住宿天數和起始晚數
+      // hotelInfo: { name: string, nights: number, startNight: number }
+      const hotelStats: Record<string, { nights: number; startNight: number }> = {}
       result.hotels.forEach(h => {
-        hotelNights[h.name] = (hotelNights[h.name] || 0) + 1
+        if (!hotelStats[h.name]) {
+          hotelStats[h.name] = { nights: 1, startNight: h.dayNumber }
+        } else {
+          hotelStats[h.name].nights += 1
+          // 更新最早的起始晚數
+          hotelStats[h.name].startNight = Math.min(hotelStats[h.name].startNight, h.dayNumber)
+        }
       })
 
-      // 建立飯店列表
-      const uniqueHotels = Object.entries(hotelNights)
+      // 建立飯店列表（帶有預設房間，根據人數計算）
+      const uniqueHotels = Object.entries(hotelStats)
       if (uniqueHotels.length > 0) {
-        const newHotels = uniqueHotels.map(([name, nights], index) => ({
+        const defaultRoomCount = calculateDefaultRoomCount(people)
+        const newHotels = uniqueHotels.map(([name, stats], index) => ({
           id: index + 1,
           name,
-          nights,
-          rooms: createEmptyRooms(),
+          nights: stats.nights,
+          startNight: stats.startNight,  // 使用解析到的起始晚數
+          rooms: createDefaultRooms(name, defaultRoomCount),  // 根據人數計算房間數
           hasDeposit: false,
           depositPerRoom: 3000,
         }))
@@ -1111,6 +1274,7 @@ export function PricingCalculator() {
   const resetParsedItinerary = useCallback(() => {
     setParsedItinerary([])
     setParseResult(null)
+    setParseWarnings([])
     setIsParseConfirmed(false)
     setItineraryText('')
     // 重置為預設車費
@@ -1118,6 +1282,9 @@ export function PricingCalculator() {
       ...d,
       date: '',
     })))
+    // 重置為預設門票
+    setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+    setUseDefaultTickets(true)
   }, [])
 
   // 報價儲存/載入/複製功能
@@ -1147,6 +1314,21 @@ export function PricingCalculator() {
         people,
         carFees,
         tickets: tickets.map(t => ({ ...t })),
+        useDefaultTickets,
+        // 新增欄位
+        hotels: hotels.map(h => ({ ...h })),
+        exchangeRate,
+        includeAccommodation,
+        includeMeals,
+        includeGuide,
+        luggageCar,
+        childSeatCount,
+        babySeatCount,
+        thaiDressCloth,
+        thaiDressPhoto,
+        makeupCount,
+        mealLevel,
+        collectDeposit,
       },
     }
     const updated = [...savedQuotes, newQuote]
@@ -1162,14 +1344,130 @@ export function PricingCalculator() {
     setPeople(quote.data.people || 10)
     if (quote.data.carFees) setCarFees(quote.data.carFees)
     if (quote.data.tickets) setTickets(quote.data.tickets)
+    if (quote.data.useDefaultTickets !== undefined) setUseDefaultTickets(quote.data.useDefaultTickets)
+    // 載入新增欄位
+    if (quote.data.hotels) setHotels(quote.data.hotels)
+    if (quote.data.exchangeRate !== undefined) setExchangeRate(quote.data.exchangeRate)
+    if (quote.data.includeAccommodation !== undefined) setIncludeAccommodation(quote.data.includeAccommodation)
+    if (quote.data.includeMeals !== undefined) setIncludeMeals(quote.data.includeMeals)
+    if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
+    if (quote.data.luggageCar !== undefined) setLuggageCar(quote.data.luggageCar)
+    if (quote.data.childSeatCount !== undefined) setChildSeatCount(quote.data.childSeatCount)
+    if (quote.data.babySeatCount !== undefined) setBabySeatCount(quote.data.babySeatCount)
+    if (quote.data.thaiDressCloth !== undefined) setThaiDressCloth(quote.data.thaiDressCloth)
+    if (quote.data.thaiDressPhoto !== undefined) setThaiDressPhoto(quote.data.thaiDressPhoto)
+    if (quote.data.makeupCount !== undefined) setMakeupCount(quote.data.makeupCount)
+    if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
+    if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
     setCurrentQuoteName(quote.name)
-    alert(`✅ 已載入「${quote.name}」`)
+    // 如果有行程文字，自動打開解析器
+    if (quote.data.itineraryText) {
+      setShowParser(true)
+    }
+    alert(`✅ 已載入「${quote.name}」\n${quote.data.itineraryText ? '💡 請點「解析行程」重新解析' : ''}`)
   }
 
   // 複製報價（Fork）
   const forkQuote = (quote: SavedQuote) => {
     loadQuote(quote)
     setCurrentQuoteName(`${quote.name} (複製)`)
+  }
+
+  // 全部清空（新增全新報價）
+  const resetAllFields = () => {
+    if (!confirm('確定要清空所有欄位，開始新報價嗎？')) return
+    // 清空解析器
+    setItineraryText('')
+    setParsedItinerary([])
+    setParseResult(null)
+    setParseWarnings([])
+    setIsParseConfirmed(false)
+    // 重置基本設定
+    setPeople(10)
+    setExchangeRate(0.93)
+    setIncludeAccommodation(true)
+    setIncludeMeals(true)
+    setIncludeGuide(true)
+    setCollectDeposit(true)
+    // 重置車費
+    setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({ ...d, date: '' })))
+    setLuggageCar(true)
+    setChildSeatCount(0)
+    // 重置飯店（預設香格里拉3晚 + 美平2晚，10人=5間大床房）
+    setHotels([
+      {
+        id: 1,
+        name: '香格里拉酒店',
+        nights: 3,
+        startNight: 1,  // 從第 1 晚開始
+        rooms: {
+          double: [
+            { name: '豪華客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          ],
+          twin: [
+            { name: '高級客房（雙床）', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          ],
+          triple: [
+            { name: '豪華三人房', quantity: 0, price: 3500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          ],
+          family: [
+            { name: '家庭房', quantity: 0, price: 4500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          ],
+        },
+        hasDeposit: false,
+        depositPerRoom: 3000
+      },
+      {
+        id: 2,
+        name: '清邁美平洲際酒店',
+        nights: 2,
+        startNight: 4,  // 從第 4 晚開始
+        rooms: {
+          double: [
+            { name: '經典客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          ],
+          twin: [
+            { name: '經典客房（雙床）', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+          ],
+          triple: [
+            { name: '高級三人房', quantity: 0, price: 3500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 3500, hasExtraBed: false },
+          ],
+          family: [
+            { name: '家庭套房', quantity: 0, price: 4500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+            { name: '', quantity: 0, price: 4500, hasExtraBed: false },
+          ],
+        },
+        hasDeposit: false,
+        depositPerRoom: 3000
+      },
+    ])
+    setNextHotelId(3)
+    // 重置門票
+    setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+    setUseDefaultTickets(true)
+    setSavedParsedTickets([])  // 清除保存的解析門票
+    // 重置泰服
+    setThaiDressCloth(false)
+    setThaiDressPhoto(false)
+    setMakeupCount(0)
+    // 清空報價名稱
+    setCurrentQuoteName('')
+    alert('✅ 已清空所有欄位，可以開始新報價')
   }
 
   // 刪除報價
@@ -1189,10 +1487,17 @@ export function PricingCalculator() {
 
   // 飯店管理函數
   const addHotel = () => {
+    // 計算新飯店應該從第幾晚開始（預設接在最後一間飯店之後）
+    const lastEndNight = hotels.length > 0
+      ? Math.max(...hotels.map(h => (h.startNight || 1) + h.nights - 1))
+      : 0
+    const newStartNight = lastEndNight + 1
+
     setHotels(prev => [...prev, {
       id: nextHotelId,
       name: '新飯店',
       nights: 1,
+      startNight: newStartNight,  // 接在最後一間之後
       rooms: createEmptyRooms(),
       hasDeposit: false,
       depositPerRoom: 3000
@@ -1224,8 +1529,15 @@ export function PricingCalculator() {
     }))
   }
 
-  // 計算總住宿晚數
-  const totalNights = hotels.reduce((sum, h) => sum + h.nights, 0)
+  // 計算總住宿晚數（使用最大結束晚數，正確處理平行住宿）
+  // 例：香格里拉 D1-3 (startNight=1, nights=3, endNight=3)
+  //     美平洲際 D4-5 (startNight=4, nights=2, endNight=5)
+  //     總晚數 = max(3, 5) = 5
+  // 分批住宿例：飯店A D1-2 (startNight=1, nights=2)，飯店B D1-2 (startNight=1, nights=2)
+  //     總晚數 = max(2, 2) = 2（而非 4）
+  const totalNights = hotels.length > 0
+    ? Math.max(...hotels.map(h => (h.startNight || 1) + h.nights - 1))
+    : 0
 
   // 行程天數（優先使用解析後的車費天數）
   const tripDays = carFees.length
@@ -1393,15 +1705,21 @@ export function PricingCalculator() {
     }
 
     // Insurance（只有包套行程才含保險，純包車不含）
-    const hasPackageServices = includeAccommodation || includeMeals || selectedTickets.length > 0
+    const hasPackageServices = includeAccommodation || includeMeals || (includeTickets && selectedTickets.length > 0)
     const insuranceCost = hasPackageServices ? insurancePerPerson * people : 0
 
-    // Totals
-    const totalCost = accommodationCost + mealCost + transportCost + ticketCost + thaiDressCost + insuranceCost + luggageCost
-    const totalPrice = accommodationCost + mealCost + transportPrice + ticketPrice + thaiDressPrice + insuranceCost
+    // 門票費用（只有勾選「含門票」才計入）
+    const effectiveTicketCost = includeTickets ? ticketCost : 0
+    const effectiveTicketPrice = includeTickets ? ticketPrice : 0
+    const effectiveThaiDressCost = includeTickets ? thaiDressCost : 0
+    const effectiveThaiDressPrice = includeTickets ? thaiDressPrice : 0
 
-    const yourTotalProfit = transportProfit + ticketYourProfit + thaiDressYourProfit
-    const partnerTotalProfit = ticketPartnerProfit + thaiDressPartnerProfit
+    // Totals
+    const totalCost = accommodationCost + mealCost + transportCost + effectiveTicketCost + effectiveThaiDressCost + insuranceCost + luggageCost
+    const totalPrice = accommodationCost + mealCost + transportPrice + effectiveTicketPrice + effectiveThaiDressPrice + insuranceCost
+
+    const yourTotalProfit = transportProfit + (includeTickets ? ticketYourProfit : 0) + (includeTickets ? thaiDressYourProfit : 0)
+    const partnerTotalProfit = (includeTickets ? ticketPartnerProfit : 0) + (includeTickets ? thaiDressPartnerProfit : 0)
 
     const perPersonTHB = totalPrice / people
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
@@ -1429,15 +1747,17 @@ export function PricingCalculator() {
 
       // 如果要勾選這個票，檢查互斥群組
       if (!ticket.checked) {
-        // 找到這個票所屬的互斥群組
-        const exclusiveGroup = Object.entries(EXCLUSIVE_GROUPS).find(([_, ids]) => ids.includes(id))
+        // 使用 ticket 自身的 exclusiveGroup 或從 EXCLUSIVE_GROUPS 查找
+        const group = ticket.exclusiveGroup || Object.entries(EXCLUSIVE_GROUPS).find(([_, ids]) => ids.includes(id))?.[0]
 
-        if (exclusiveGroup) {
-          const [_, groupIds] = exclusiveGroup
-          // 取消同群組的其他票，只勾選這個
+        if (group) {
+          // 找出同一天、同群組的票（動態門票）或同群組的票（預設門票）
           return prev.map(t => {
             if (t.id === id) return { ...t, checked: true }
-            if (groupIds.includes(t.id)) return { ...t, checked: false }
+            // 同群組且同一天（或都沒有 dayNumber）的票要取消
+            const sameGroup = t.exclusiveGroup === group || EXCLUSIVE_GROUPS[group]?.includes(t.id)
+            const sameDay = ticket.dayNumber === undefined || t.dayNumber === undefined || t.dayNumber === ticket.dayNumber
+            if (sameGroup && sameDay && t.id !== id) return { ...t, checked: false }
             return t
           })
         }
@@ -1482,6 +1802,89 @@ export function PricingCalculator() {
       {/* Input Tab */}
       {activeTab === 'input' && (
         <>
+          {/* 📦 套餐行程管理 - 放在最上方 */}
+          <Section title="📦 套餐行程管理" style={{ background: '#f3e5f5', border: '1px solid #ce93d8' }}>
+            <p style={{ fontSize: 12, color: '#666', margin: '0 0 12px 0' }}>
+              儲存完整報價設定，下次可快速載入或複製修改
+            </p>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <input
+                type="text"
+                value={currentQuoteName}
+                onChange={e => setCurrentQuoteName(e.target.value)}
+                placeholder="輸入名稱（例：王先生 6天5夜 2/12-17）"
+                style={{ flex: 1, minWidth: 200, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
+              />
+              <button
+                onClick={saveCurrentQuote}
+                style={{ padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
+              >
+                💾 儲存
+              </button>
+              <button
+                onClick={resetAllFields}
+                style={{ padding: '8px 16px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
+              >
+                ✨ 新建
+              </button>
+            </div>
+
+            {savedQuotes.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong style={{ fontSize: 13 }}>📂 已儲存（{savedQuotes.length}）</strong>
+                  <button
+                    onClick={clearAllQuotes}
+                    style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                  >
+                    🗑️ 清空全部
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
+                  {savedQuotes.map(q => (
+                    <div
+                      key={q.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: 8,
+                        background: '#fff',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 6,
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: 13 }}>
+                        📄 {q.name}
+                        <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
+                          {new Date(q.createdAt).toLocaleDateString('zh-TW')}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => loadQuote(q)}
+                        style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        📥 載入
+                      </button>
+                      <button
+                        onClick={() => forkQuote(q)}
+                        style={{ padding: '4px 8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        📋 複製
+                      </button>
+                      <button
+                        onClick={() => deleteQuote(q.id)}
+                        style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Section>
+
           {/* 1️⃣ 快速開始（可收合） */}
           <Section title="📋 快速開始" style={{ background: '#e3f2fd', border: '1px solid #90caf9' }}>
             <div style={{ marginBottom: 8 }}>
@@ -1508,6 +1911,9 @@ export function PricingCalculator() {
 
             {showParser && (
               <div style={{ marginTop: 12 }}>
+                <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
+                  💡 貼入完整行程文字，系統會自動解析天數、日期、活動、飯店
+                </div>
                 <textarea
                   value={itineraryText}
                   onChange={e => setItineraryText(e.target.value)}
@@ -1521,19 +1927,40 @@ Day 1｜抵達清邁
 
 2/13 (五)
 Day 2｜大象保護營
-・大象保護營
-・射擊
-住宿: 香格里拉酒店`}
+・大象保護營（含餐）
+・射擊體驗
+住宿: 香格里拉酒店
+
+2/14 (六)
+Day 3｜茵他儂國家公園
+・茵他儂一日遊
+・雙龍塔
+住宿: 香格里拉酒店
+
+2/15 (日)
+Day 4｜清萊一日遊
+・白廟
+・藍廟
+・黑廟
+住宿: 香格里拉酒店
+
+2/16 (一)
+Day 5｜送機
+・自由活動
+・機場送機`}
                   style={{
                     width: '100%',
-                    height: 150,
-                    padding: 12,
-                    border: '1px solid #bbdefb',
-                    borderRadius: 6,
-                    fontFamily: 'monospace',
+                    minHeight: 350,
+                    maxHeight: 600,
+                    padding: 16,
+                    border: '1px solid #90caf9',
+                    borderRadius: 8,
+                    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
                     fontSize: 13,
+                    lineHeight: 1.6,
                     resize: 'vertical',
-                    background: '#fff',
+                    background: '#fafafa',
+                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
                   }}
                 />
                 <div style={{ marginTop: 10, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1576,6 +2003,61 @@ Day 2｜大象保護營
                     </span>
                   )}
                 </div>
+                {/* 解析警告 */}
+                {parseWarnings.length > 0 && (
+                  <div style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: '#fff3e0',
+                    border: '1px solid #ffb74d',
+                    borderRadius: 6,
+                    fontSize: 13,
+                  }}>
+                    <strong style={{ color: '#e65100' }}>⚠️ 發現問題：</strong>
+                    <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
+                      {parseWarnings.map((w, i) => (
+                        <li key={i} style={{ color: '#bf360c', marginBottom: 4 }}>
+                          {w.message}
+                        </li>
+                      ))}
+                    </ul>
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                      請修正上方行程文字後重新解析
+                    </div>
+                  </div>
+                )}
+
+                {/* 未匹配活動（可展開） */}
+                {parseResult && parseResult.unmatched.length > 0 && (
+                  <details style={{
+                    marginTop: 12,
+                    padding: 12,
+                    background: '#fce4ec',
+                    border: '1px solid #f48fb1',
+                    borderRadius: 6,
+                    fontSize: 13,
+                  }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 'bold', color: '#c2185b' }}>
+                      ⚠️ {parseResult.unmatched.length} 項活動未匹配資料庫（點擊展開）
+                    </summary>
+                    <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
+                      {parseResult.unmatched.map((u, i) => (
+                        <li key={i} style={{ marginBottom: 4 }}>
+                          <span style={{ color: '#880e4f' }}>Day {u.dayNumber}:</span> {u.text}
+                          {u.suggestedKeywords.length > 0 && (
+                            <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
+                              (建議關鍵字: {u.suggestedKeywords.join(', ')})
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                      💡 這些活動不在資料庫，可能是：免費景點、自由活動、或需要新增到資料庫
+                    </div>
+                  </details>
+                )}
+
                 {/* 解析結果摘要 */}
                 {parsedItinerary.length > 0 && (
                   <div style={{ marginTop: 12, padding: 10, background: '#e8f5e9', borderRadius: 6, fontSize: 13 }}>
@@ -1615,7 +2097,7 @@ Day 2｜大象保護營
                 <span>🍜 含餐費</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={allActivitiesSelected} onChange={e => e.target.checked ? selectAllActivities() : deselectAllActivities()} style={{ width: 16, height: 16 }} />
+                <input type="checkbox" checked={includeTickets} onChange={e => setIncludeTickets(e.target.checked)} style={{ width: 16, height: 16 }} />
                 <span>🎫 含門票</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -1671,6 +2153,18 @@ Day 2｜大象保護營
                             style={{ flex: 1, minWidth: 150, padding: 8, border: '1px solid #ddd', borderRadius: 6, fontWeight: 'bold' }}
                           />
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <label style={{ fontSize: 13, color: '#666' }}>起始</label>
+                            <input
+                              type="number"
+                              value={hotel.startNight || 1}
+                              onChange={e => updateHotel(hotel.id, 'startNight', Math.max(1, Number(e.target.value)))}
+                              min={1}
+                              max={30}
+                              style={{ width: 50, padding: 6, border: '1px solid #ddd', borderRadius: 6, textAlign: 'center' }}
+                              title="從第幾晚開始入住"
+                            />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                             <label style={{ fontSize: 13, color: '#666' }}>晚數</label>
                             <input
                               type="number"
@@ -1681,6 +2175,9 @@ Day 2｜大象保護營
                               style={{ width: 50, padding: 6, border: '1px solid #ddd', borderRadius: 6, textAlign: 'center' }}
                             />
                           </div>
+                          <span style={{ fontSize: 12, color: '#888' }}>
+                            D{hotel.startNight || 1}-D{(hotel.startNight || 1) + hotel.nights - 1}
+                          </span>
                           {hotels.length > 1 && (
                             <button
                               onClick={() => removeHotel(hotel.id)}
@@ -1945,6 +2442,7 @@ Day 2｜大象保護營
                 <Row>
                   <label style={{ minWidth: 100 }}>餐費等級</label>
                   <select value={mealLevel} onChange={e => setMealLevel(Number(e.target.value))} style={{ ...inputStyle, minWidth: 150 }}>
+                    <option value={600}>簡餐 - 600/人/天</option>
                     <option value={900}>平價 - 900/人/天</option>
                     <option value={1200}>精選 - 1,200/人/天</option>
                     <option value={1500}>高級 - 1,500/人/天</option>
@@ -2124,90 +2622,36 @@ Day 2｜大象保護營
             </div>
           </Section>
 
-          {/* 報價管理 */}
-          <Section title="💾 報價管理" style={{ background: '#f3e5f5', border: '1px solid #ce93d8' }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-              <input
-                type="text"
-                value={currentQuoteName}
-                onChange={e => setCurrentQuoteName(e.target.value)}
-                placeholder="輸入報價名稱（例：王先生 2/12-17）"
-                style={{ flex: 1, minWidth: 200, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
-              />
-              <button
-                onClick={saveCurrentQuote}
-                style={{ padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
-              >
-                💾 儲存報價
-              </button>
-            </div>
-
-            {savedQuotes.length > 0 && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <strong style={{ fontSize: 13 }}>📂 已儲存的報價（{savedQuotes.length}）</strong>
-                  <button
-                    onClick={clearAllQuotes}
-                    style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                  >
-                    🗑️ 清空全部
-                  </button>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
-                  {savedQuotes.map(q => (
-                    <div
-                      key={q.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: 8,
-                        background: '#fff',
-                        border: '1px solid #e0e0e0',
-                        borderRadius: 6,
-                      }}
-                    >
-                      <span style={{ flex: 1, fontSize: 13 }}>
-                        📄 {q.name}
-                        <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
-                          {new Date(q.createdAt).toLocaleDateString('zh-TW')}
-                        </span>
-                      </span>
-                      <button
-                        onClick={() => loadQuote(q)}
-                        style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                      >
-                        📥 載入
-                      </button>
-                      <button
-                        onClick={() => forkQuote(q)}
-                        style={{ padding: '4px 8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                      >
-                        📋 複製
-                      </button>
-                      <button
-                        onClick={() => deleteQuote(q.id)}
-                        style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {savedQuotes.length === 0 && (
-              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>
-                💡 儲存報價後可以隨時載入或複製修改
-              </p>
-            )}
-          </Section>
 
           {/* 門票 */}
-          <Section title="🎫 門票活動">
+          <Section title={`🎫 門票活動${!useDefaultTickets ? '（解析自行程）' : ''}${!includeTickets ? '（客人自理）' : ''}`} style={!includeTickets ? { opacity: 0.5 } : {}}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <p style={{ ...noteStyle, margin: 0 }}>格式：成本｜★ 表示有退款對分（含泰服）</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <p style={{ ...noteStyle, margin: 0 }}>★ = 退款對分</p>
+                {/* 切換按鈕：解析門票 ↔ 預設門票 */}
+                {!useDefaultTickets && (
+                  <button
+                    onClick={() => {
+                      setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+                      setUseDefaultTickets(true)
+                    }}
+                    style={{ padding: '4px 8px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                  >
+                    🔄 回預設門票
+                  </button>
+                )}
+                {useDefaultTickets && savedParsedTickets.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setTickets(savedParsedTickets)
+                      setUseDefaultTickets(false)
+                    }}
+                    style={{ padding: '4px 8px', background: '#1976d2', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                  >
+                    📋 回解析門票
+                  </button>
+                )}
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
                   onClick={selectAllActivities}
@@ -2230,24 +2674,56 @@ Day 2｜大象保護營
                 💡 門票/活動由客人現場付給導遊
               </div>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
-              {tickets.map(t => (
-                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: t.checked ? '#f9f8f6' : '#f5f5f5', borderRadius: 6, opacity: t.checked ? 1 : 0.7 }}>
-                  <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
-                  <label style={{ flex: 1 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
-                  <span style={{ color: '#666', fontSize: 13 }}>
-                    {t.price > 0 ? `成本 ${fmt(t.price - t.rebate)}` : '免費'}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {/* 按日期分組顯示（當有解析結果時） */}
+            {!useDefaultTickets && tickets.some(t => t.dayNumber) ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* 按 dayNumber 分組 */}
+                {Array.from(new Set(tickets.map(t => t.dayNumber))).sort((a, b) => (a || 0) - (b || 0)).map(dayNum => {
+                  const dayTickets = tickets.filter(t => t.dayNumber === dayNum)
+                  if (dayTickets.length === 0) return null
+                  return (
+                    <div key={dayNum || 'other'} style={{ background: '#f9f8f6', padding: 12, borderRadius: 8, border: '1px solid #e0e0e0' }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: 8, color: '#5c4a2a', fontSize: 13 }}>
+                        📅 Day {dayNum}
+                        {carFees[dayNum ? dayNum - 1 : 0]?.date && <span style={{ fontWeight: 'normal', marginLeft: 8, color: '#666' }}>({carFees[dayNum ? dayNum - 1 : 0]?.date})</span>}
+                        {carFees[dayNum ? dayNum - 1 : 0]?.name && <span style={{ fontWeight: 'normal', marginLeft: 8, color: '#999' }}>- {carFees[dayNum ? dayNum - 1 : 0]?.name}</span>}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 6 }}>
+                        {dayTickets.map(t => (
+                          <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: t.checked ? '#fff' : '#f0f0f0', borderRadius: 4, opacity: t.checked ? 1 : 0.6 }}>
+                            <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
+                            <label style={{ flex: 1, fontSize: 13 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
+                            <span style={{ color: '#666', fontSize: 12 }}>
+                              {t.price > 0 ? `${fmt(t.price - t.rebate)}` : '免費'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              /* 預設門票列表 */
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
+                {tickets.map(t => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: t.checked ? '#f9f8f6' : '#f5f5f5', borderRadius: 6, opacity: t.checked ? 1 : 0.7 }}>
+                    <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
+                    <label style={{ flex: 1 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
+                    <span style={{ color: '#666', fontSize: 13 }}>
+                      {t.price > 0 ? `成本 ${fmt(t.price - t.rebate)}` : '免費'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p style={{ ...noteStyle, marginTop: 12 }}>
               已選 {calculation.selectedTickets.length}/{tickets.length} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖
             </p>
           </Section>
 
           {/* 泰服 */}
-          <Section title="👘 D1 泰服體驗" style={{ background: '#fff9e6', border: '1px solid #f0d000' }}>
+          <Section title={`👘 D1 泰服體驗${!includeTickets ? '（客人自理）' : ''}`} style={{ background: '#fff9e6', border: '1px solid #f0d000', ...(includeTickets ? {} : { opacity: 0.5 }) }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
               <label>泰服衣服</label>
@@ -2266,8 +2742,8 @@ Day 2｜大象保護營
             <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
           </Section>
 
-          {/* Result */}
-          <div style={{ background: '#5c4a2a', color: 'white', textAlign: 'center', padding: 24, position: 'sticky', bottom: 0, borderRadius: 12 }}>
+          {/* Result - 移除 sticky，改為一般區塊 */}
+          <div style={{ background: '#5c4a2a', color: 'white', textAlign: 'center', padding: 24, borderRadius: 12, marginTop: 16 }}>
             <div style={{ fontSize: 14, opacity: 0.9 }}>每人報價（台幣）</div>
             <div style={{ fontSize: 36, fontWeight: 'bold' }}>NT$ {fmt(calculation.perPersonTWD)}</div>
             <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8, fontSize: 12 }}>
@@ -2510,7 +2986,7 @@ Day 2｜大象保護營
                     <span style={{ fontWeight: 'bold' }}>{fmt(calculation.mealCost)} 泰銖</span>
                   </div>
                   <div style={{ paddingLeft: 16, fontSize: 12, color: '#555' }}>
-                    • {mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}餐廳 {fmt(mealLevel)}/人/天 × {people}人 × {calculation.mealDays}天
+                    • {mealLevel === 600 ? '簡餐' : mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}餐廳 {fmt(mealLevel)}/人/天 × {people}人 × {calculation.mealDays}天
                   </div>
                 </>
               )}
@@ -2528,7 +3004,7 @@ Day 2｜大象保護營
               </div>
 
               {/* 門票明細 */}
-              {calculation.selectedTickets.length > 0 && (
+              {includeTickets && calculation.selectedTickets.length > 0 && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8, marginTop: 12 }}>
                     <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🎫 門票活動（{calculation.selectedTickets.length}項）</span>
@@ -2589,8 +3065,8 @@ Day 2｜大象保護營
                 {includeMeals && <>• {calculation.mealDays}天午晚餐<br /></>}
                 • 全程包車（{calculation.carCount}台）<br />
                 {includeGuide && <>• 專業中文導遊<br /></>}
-                {calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
-                {calculation.thaiDressPrice > 0 && <>• 泰服體驗<br /></>}
+                {includeTickets && calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
+                {includeTickets && calculation.thaiDressPrice > 0 && <>• 泰服體驗<br /></>}
                 {calculation.insuranceCost > 0 && <>• 旅遊保險</>}
               </div>
             </div>

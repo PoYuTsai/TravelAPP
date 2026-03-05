@@ -94,6 +94,7 @@ const ACTIVITY_INDICATORS = [
   '按摩', 'spa', 'massage',
   '烹飪', 'cooking',
   '豬豬', '溜滑梯',
+  '泰拳', 'muay thai',
 ]
 
 /**
@@ -114,7 +115,108 @@ function extractPossibleActivities(line: string): string[] {
 }
 
 /**
- * 計算兩個字串的匹配分數
+ * 計算編輯距離（Levenshtein Distance）
+ * 用於處理打錯字的情況
+ */
+function levenshteinDistance(a: string, b: string): number {
+  const matrix: number[][] = []
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i]
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // 替換
+          matrix[i][j - 1] + 1,     // 插入
+          matrix[i - 1][j] + 1      // 刪除
+        )
+      }
+    }
+  }
+
+  return matrix[b.length][a.length]
+}
+
+/**
+ * 常見中文打錯字映射（同音字、形近字）
+ */
+const TYPO_MAPPINGS: Record<string, string[]> = {
+  // 活動相關
+  '泰拳': ['太拳', '太全', '泰全', '台拳'],
+  '射擊': ['設擊', '涉擊', '社擊'],
+  '大象': ['大相', '大像'],
+  '飛索': ['飛鎖', '非索'],
+  '夜市': ['葉市', '業市'],
+  '按摩': ['安摩', '暗摩'],
+  '白廟': ['白苗', '拜廟'],
+  '藍廟': ['蘭廟', '蘭苗'],
+  '黑廟': ['黑苗', '嘿廟'],
+  '長頸族': ['長頸足', '長莖族'],
+  '泰服': ['台服', '太服'],
+  '動物園': ['動物原', '動物元'],
+  '保護營': ['保護贏', '保護銀'],
+  '叢林': ['從林', '蔥林'],
+  '國家公園': ['國家公源', '國家功園'],
+  '瀑布': ['瀑不', '瀑步'],
+  '溫泉': ['溫全', '溫泉'],
+}
+
+/**
+ * 檢查是否有常見打錯字
+ */
+function checkTypoMatch(text: string, keyword: string): boolean {
+  // 先檢查直接包含
+  if (text.includes(keyword)) return true
+
+  // 檢查是否有已知的打錯字
+  const typos = TYPO_MAPPINGS[keyword]
+  if (typos) {
+    for (const typo of typos) {
+      if (text.includes(typo)) return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * 模糊匹配 - 只處理已知打錯字，不使用 Levenshtein 距離
+ *
+ * 原因：Levenshtein 距離會造成語義不同的詞誤判
+ * 例如「泰服體驗」和「泰拳體驗」距離=1，但完全是不同活動
+ *
+ * 只允許：
+ * 1. 精確包含匹配
+ * 2. TYPO_MAPPINGS 中定義的已知打錯字
+ */
+function fuzzyMatch(text: string, keyword: string): { matched: boolean; score: number } {
+  const normalizedText = text.toLowerCase()
+  const normalizedKeyword = keyword.toLowerCase()
+
+  // 直接包含（精確匹配）
+  if (normalizedText.includes(normalizedKeyword)) {
+    return { matched: true, score: normalizedKeyword.length * 2 }
+  }
+
+  // 對於中文，只檢查已知的打錯字映射
+  // 不使用 Levenshtein 距離，避免「泰服」→「泰拳」這類誤判
+  if (checkTypoMatch(text, keyword)) {
+    return { matched: true, score: keyword.length * 1.5 }
+  }
+
+  return { matched: false, score: 0 }
+}
+
+/**
+ * 計算兩個字串的匹配分數（含模糊匹配）
  */
 function calculateMatchScore(text: string, keywords: string[]): number {
   const normalizedText = text.toLowerCase()
@@ -123,9 +225,18 @@ function calculateMatchScore(text: string, keywords: string[]): number {
 
   for (const keyword of keywords) {
     const normalizedKeyword = keyword.toLowerCase()
+
+    // 先嘗試精確匹配
     if (normalizedText.includes(normalizedKeyword)) {
-      // 關鍵字越長，分數越高
-      score += normalizedKeyword.length
+      score += normalizedKeyword.length * 2
+      matchedKeywords++
+      continue
+    }
+
+    // 嘗試模糊匹配
+    const fuzzyResult = fuzzyMatch(text, keyword)
+    if (fuzzyResult.matched) {
+      score += fuzzyResult.score
       matchedKeywords++
     }
   }
@@ -199,6 +310,9 @@ export function matchActivitiesToDatabase(
       // 嘗試匹配資料庫中的活動
       let bestMatch: { activity: ActivityRecord; score: number } | null = null
 
+      // DEBUG: 顯示正在匹配的文字
+      console.log(`[Matcher] 嘗試匹配: "${activityText.slice(0, 30)}..."`)
+
       for (const activity of activeActivities) {
         const score = calculateMatchScore(activityText, activity.keywords || [])
 
@@ -209,9 +323,21 @@ export function matchActivitiesToDatabase(
 
         const totalScore = score + nameScore
 
+        // DEBUG: 只顯示有分數的活動
+        if (totalScore > 0) {
+          console.log(`  → ${activity.name}: keywordScore=${score}, nameScore=${nameScore}, total=${totalScore}`)
+        }
+
         if (totalScore > 0 && (!bestMatch || totalScore > bestMatch.score)) {
           bestMatch = { activity, score: totalScore }
         }
+      }
+
+      // DEBUG: 顯示最終匹配結果
+      if (bestMatch) {
+        console.log(`  ✓ 最佳匹配: ${bestMatch.activity.name} (score=${bestMatch.score}, threshold=3)`)
+      } else {
+        console.log(`  ✗ 無匹配`)
       }
 
       if (bestMatch && bestMatch.score >= 3) {
