@@ -2791,7 +2791,8 @@ Day 5｜送機
               </div>
             )}
             <p style={{ ...noteStyle, marginTop: 12 }}>
-              已選 {calculation.selectedTickets.length}/{tickets.length} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0))} 泰銖
+              {/* 計數包含泰服（如有勾選） */}
+              已選 {calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}/{tickets.length + 1} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0) + calculation.thaiDressCost / people)} 泰銖
             </p>
 
             {/* 泰服體驗（僅在預設門票模式時顯示，有日期分組時在 Day 1 內顯示） */}
