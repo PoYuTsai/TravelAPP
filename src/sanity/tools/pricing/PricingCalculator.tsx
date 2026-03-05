@@ -90,7 +90,8 @@ function downloadExternalQuote(
   totalNights: number,
   babySeatCount: number,
   childSeatCount: number,
-  collectDeposit: boolean
+  collectDeposit: boolean,
+  customItinerary?: { day: string; title: string; items: string[]; hotel: string | null }[]
 ) {
   const fmt = (n: number) => n.toLocaleString()
   const mealLabels: Record<number, string> = { 900: '平價', 1200: '精選', 1500: '高級' }
@@ -357,7 +358,7 @@ function downloadExternalQuote(
     <!-- 行程概覽 -->
     <div class="section">
       <h3 class="section-title">📅 行程概覽</h3>
-      ${ITINERARY.map(day => `
+      ${(customItinerary && customItinerary.length > 0 ? customItinerary : ITINERARY).map(day => `
         <div class="itinerary-day">
           <div class="title">${day.day}｜${day.title}</div>
           <div class="items">${day.items.join('　')}</div>
@@ -734,6 +735,15 @@ export function PricingCalculator() {
   const [dbActivities, setDbActivities] = useState<ActivityRecord[]>([])
   const [parseResult, setParseResult] = useState<ActivityMatchResult | null>(null)
   const [isLoadingActivities, setIsLoadingActivities] = useState(false)
+  const [isParseConfirmed, setIsParseConfirmed] = useState(false)
+
+  // 解析後的行程（用於 PDF 輸出）
+  const [parsedItinerary, setParsedItinerary] = useState<{
+    day: string
+    title: string
+    items: string[]
+    hotel: string | null
+  }[]>([])
 
   // 動態車費（解析行程後自動產生）
   const [carFees, setCarFees] = useState<CarFeeDay[]>(DEFAULT_CONFIG.dailyCarFees.map(d => ({
@@ -1002,6 +1012,37 @@ export function PricingCalculator() {
         setNextHotelId(uniqueHotels.length + 1)
       }
     }
+
+    // 4. 產生行程概覽格式（用於 PDF）
+    const newItinerary = parsed.days.map((day, index) => {
+      const dayNum = index + 1
+      const dateStr = day.date ? `${parseInt(day.date.split('-')[1])}/${parseInt(day.date.split('-')[2])}` : ''
+
+      // 從活動中提取項目
+      const items: string[] = []
+      day.activities.forEach(act => {
+        if (act.content && !act.content.match(/^(早餐|午餐|晚餐|住宿)[：:]/)) {
+          items.push(act.content.replace(/^[・\-•·]\s*/, ''))
+        }
+      })
+      if (day.morning) items.push(day.morning)
+      if (day.afternoon) items.push(day.afternoon)
+      if (day.evening) items.push(day.evening)
+
+      // 找該天的住宿
+      const hotelForDay = result.hotels.find(h => h.dayNumber === dayNum)
+
+      return {
+        day: `DAY ${dayNum}${dateStr ? ` (${dateStr})` : ''}`,
+        title: day.title || `第 ${dayNum} 天`,
+        items: items.slice(0, 8), // 最多顯示 8 個項目
+        hotel: hotelForDay?.name || day.accommodation || null,
+      }
+    })
+    setParsedItinerary(newItinerary)
+
+    // 重置確認狀態，等待用戶確認
+    setIsParseConfirmed(false)
   }, [itineraryText, dbActivities])
 
   // 車費管理函數
@@ -1028,6 +1069,27 @@ export function PricingCalculator() {
       day: `D${i + 1}`,
     })))
   }
+
+  // 確認解析結果 - 綁定到內部明細和對外報價
+  const confirmParsedItinerary = useCallback(() => {
+    if (parsedItinerary.length === 0) return
+    setIsParseConfirmed(true)
+    // 關閉解析器面板（可選）
+    // setShowParser(false)
+  }, [parsedItinerary])
+
+  // 重置解析（清空所有解析結果）
+  const resetParsedItinerary = useCallback(() => {
+    setParsedItinerary([])
+    setParseResult(null)
+    setIsParseConfirmed(false)
+    setItineraryText('')
+    // 重置為預設車費
+    setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({
+      ...d,
+      date: '',
+    })))
+  }, [])
 
   // 報價儲存/載入/複製功能
   const STORAGE_KEY = 'chiangway-pricing-quotes'
@@ -1381,12 +1443,32 @@ export function PricingCalculator() {
         <button onClick={() => setActiveTab('input')} style={{ padding: '10px 20px', background: activeTab === 'input' ? '#5c4a2a' : '#ddd', color: activeTab === 'input' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📝 輸入</button>
         <button onClick={() => setActiveTab('internal')} style={{ padding: '10px 20px', background: activeTab === 'internal' ? '#5c4a2a' : '#ddd', color: activeTab === 'internal' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📊 內部明細</button>
         <button onClick={() => setActiveTab('external')} style={{ padding: '10px 20px', background: activeTab === 'external' ? '#5c4a2a' : '#ddd', color: activeTab === 'external' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📄 對外報價單</button>
-        <button onClick={() => downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit)} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
+        <button onClick={() => downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, isParseConfirmed ? parsedItinerary : undefined)} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
       </div>
 
       {/* Input Tab */}
       {activeTab === 'input' && (
         <>
+          {/* 行程綁定狀態指示 */}
+          {isParseConfirmed && parsedItinerary.length > 0 && (
+            <div style={{ marginBottom: 16, padding: 12, background: 'linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%)', borderRadius: 8, border: '1px solid #4caf50' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14, fontWeight: 'bold', color: '#2e7d32' }}>
+                  ✅ 行程已綁定
+                </span>
+                <span style={{ fontSize: 13, color: '#555' }}>
+                  {parsedItinerary.length} 天行程 | {carFees.length} 天車費 | 已匹配 {parseResult?.matched.length || 0} 項活動
+                </span>
+                <button
+                  onClick={() => setShowParser(true)}
+                  style={{ marginLeft: 'auto', padding: '4px 12px', background: '#fff', color: '#2e7d32', border: '1px solid #4caf50', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                >
+                  查看詳情
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 報價類型 */}
           <Section title="📋 報價類型">
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -2150,6 +2232,84 @@ Day 2｜大象保護營
                         )}
                       </div>
                     )}
+
+                    {/* 行程概覽預覽 */}
+                    {parsedItinerary.length > 0 && (
+                      <div style={{ marginTop: 16, padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #e0e0e0' }}>
+                        <h4 style={{ fontSize: 13, color: '#333', marginBottom: 8 }}>📅 行程概覽預覽（將顯示在報價單）</h4>
+                        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                          {parsedItinerary.map((day, i) => (
+                            <div key={i} style={{ marginBottom: 8, paddingBottom: 8, borderBottom: i < parsedItinerary.length - 1 ? '1px dashed #ddd' : 'none' }}>
+                              <div style={{ fontWeight: 'bold', fontSize: 12, color: '#5c4a2a' }}>{day.day}｜{day.title}</div>
+                              <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>{day.items.slice(0, 5).join('　')}{day.items.length > 5 ? '...' : ''}</div>
+                              {day.hotel && <div style={{ fontSize: 11, color: '#1976d2', marginTop: 2 }}>🏨 {day.hotel}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 確認按鈕 */}
+                    <div style={{ marginTop: 16, padding: 12, background: isParseConfirmed ? '#e8f5e9' : '#fff8e1', borderRadius: 6, border: `2px solid ${isParseConfirmed ? '#4caf50' : '#ffc107'}` }}>
+                      {isParseConfirmed ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                          <span style={{ fontSize: 14, color: '#2e7d32', fontWeight: 'bold' }}>
+                            ✅ 已確認 - 行程已綁定到報價單
+                          </span>
+                          <button
+                            onClick={resetParsedItinerary}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#f44336',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 4,
+                              cursor: 'pointer',
+                              fontSize: 13,
+                            }}
+                          >
+                            🔄 重新解析
+                          </button>
+                        </div>
+                      ) : (
+                        <div>
+                          <p style={{ fontSize: 13, margin: '0 0 8px 0', color: '#f57c00' }}>
+                            ⚠️ 請確認上方解析結果無誤後，點擊下方按鈕完成綁定
+                          </p>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={confirmParsedItinerary}
+                              style={{
+                                padding: '10px 20px',
+                                background: '#4caf50',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                fontSize: 14,
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              ✅ 確認調整完成
+                            </button>
+                            <button
+                              onClick={resetParsedItinerary}
+                              style={{
+                                padding: '10px 20px',
+                                background: '#9e9e9e',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: 4,
+                                cursor: 'pointer',
+                                fontSize: 14,
+                              }}
+                            >
+                              ❌ 取消
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -2413,13 +2573,13 @@ Day 2｜大象保護營
             <div style={{ fontSize: 32, marginBottom: 8 }}>🚐</div>
             <h2 style={{ margin: 0, fontSize: 24 }}>清微旅行 Chiangway Travel</h2>
             <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: 14 }}>台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 'bold' }}>清邁 6天5夜 親子包車行程</div>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.3)', fontSize: 18, fontWeight: 'bold' }}>清邁 {totalNights + 1}天{totalNights}夜 親子包車行程</div>
           </div>
 
           {/* Itinerary */}
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ margin: '0 0 12px 0', color: '#5c4a2a', fontSize: 16, borderBottom: '2px solid #5c4a2a', paddingBottom: 8 }}>📅 行程概覽</h3>
-            {ITINERARY.map((day, i) => (
+            {(isParseConfirmed && parsedItinerary.length > 0 ? parsedItinerary : ITINERARY).map((day, i) => (
               <div key={i} style={{ background: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
                 <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 6 }}>{day.day}｜{day.title}</div>
                 <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('　')}</div>
