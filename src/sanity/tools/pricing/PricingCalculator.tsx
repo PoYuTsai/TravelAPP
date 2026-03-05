@@ -218,10 +218,11 @@ function downloadExternalQuote(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>清微旅行報價單</title>
   <style>
-    /* 清微旅行 - PDF 專業報價單樣式 */
+    /* 清微旅行 - PDF 專業報價單樣式（棕色主題，與 UI 一致） */
     :root {
-      --brand-primary: #2d5a3d;
-      --brand-dark: #1e3d2a;
+      --brand-primary: #5c4a2a;
+      --brand-dark: #4a3a1e;
+      --brand-light: #a08060;
       --gold-accent: #b89b4d;
       --cream-bg: #fefcf8;
       --cream-light: #fffdf9;
@@ -250,7 +251,7 @@ function downloadExternalQuote(
       background: white;
     }
     .header {
-      background: linear-gradient(135deg, #2d5a3d 0%, #1e3d2a 100%);
+      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
       color: white;
       padding: 24px 20px;
       border-radius: 8px;
@@ -321,7 +322,7 @@ function downloadExternalQuote(
       font-size: 14px;
     }
     .price-box {
-      background: linear-gradient(135deg, #2d5a3d 0%, #1e3d2a 100%);
+      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
       color: white;
       padding: 20px;
       border-radius: 8px;
@@ -333,7 +334,7 @@ function downloadExternalQuote(
     .price-box .sub { font-size: 11px; opacity: 0.85; }
     .includes { display: flex; gap: 10px; margin: 16px 0; }
     .includes .box { flex: 1; padding: 10px; border-radius: 6px; }
-    .includes .yes { background: #f4f9f5; border: 1px solid #c8e6c9; }
+    .includes .yes { background: #faf8f5; border: 1px solid #d4c4a8; }
     .includes .no { background: #faf8f5; border: 1px solid #d4c4a8; }
     .includes .box h4 { font-size: 11px; margin-bottom: 6px; font-weight: 600; }
     .includes .yes h4 { color: var(--brand-primary); }
@@ -1835,7 +1836,18 @@ export function PricingCalculator() {
         <button onClick={() => setActiveTab('input')} style={{ padding: '10px 20px', background: activeTab === 'input' ? '#5c4a2a' : '#ddd', color: activeTab === 'input' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📝 輸入</button>
         <button onClick={() => setActiveTab('internal')} style={{ padding: '10px 20px', background: activeTab === 'internal' ? '#5c4a2a' : '#ddd', color: activeTab === 'internal' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📊 內部明細</button>
         <button onClick={() => setActiveTab('external')} style={{ padding: '10px 20px', background: activeTab === 'external' ? '#5c4a2a' : '#ddd', color: activeTab === 'external' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📄 對外報價單</button>
-        <button onClick={() => downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, isParseConfirmed ? parsedItinerary : undefined)} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
+        <button onClick={() => {
+          // 使用與 UI 相同的行程邏輯
+          const itineraryForPdf = parsedItinerary.length > 0
+            ? parsedItinerary.slice(0, tripDays)
+            : carFees.map((cf, i) => ({
+                day: `DAY ${i + 1}${cf.date ? ` (${cf.date})` : ''}`,
+                title: cf.name || `第 ${i + 1} 天`,
+                items: [],
+                hotel: hotels[0]?.name || null
+              }))
+          downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
+        }} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
       </div>
 
       {/* Input Tab */}
