@@ -2910,22 +2910,17 @@ Day 5｜送機
               {calculation.selectedTickets.map((t: any, i: number) => (
                 <DataRow key={i} name={`${t.name}${t.split && t.rebate > 0 ? ' ★' : ''}`} cost={(t.price - t.rebate) * people} price={t.price * people} profit={t.rebate * people} className="day-row" />
               ))}
-              {/* 泰服體驗（整合進門票區塊） */}
-              {calculation.thaiDressPrice > 0 && (
-                <>
-                  <tr><td colSpan={4} style={{ ...tdStyle, background: '#fff9e6', fontWeight: 'bold', fontSize: 12 }}>👘 泰服體驗 {thaiDressDay ? `(Day ${thaiDressDay})` : ''}</td></tr>
-                  {thaiDressCloth && (
-                    <DataRow name={`　泰服衣服 ★ (${people}人)`} cost={(config.thaiDress.cloth.price - config.thaiDress.cloth.rebate) * people} price={config.thaiDress.cloth.price * people} profit={config.thaiDress.cloth.rebate * people} className="day-row" />
-                  )}
-                  {makeupCount > 0 && (
-                    <DataRow name={`　化妝 ★ (${makeupCount}人)`} cost={(config.thaiDress.makeup.price - config.thaiDress.makeup.rebate) * makeupCount} price={config.thaiDress.makeup.price * makeupCount} profit={config.thaiDress.makeup.rebate * makeupCount} className="day-row" />
-                  )}
-                  {thaiDressPhoto && (() => {
-                    const photographerCount = people <= 10 ? 1 : 2
-                    return <DataRow name={`　攝影師 ★ (${photographerCount}位)`} cost={(config.thaiDress.photo.price - config.thaiDress.photo.rebate) * photographerCount} price={config.thaiDress.photo.price * photographerCount} profit={config.thaiDress.photo.rebate * photographerCount} className="day-row" />
-                  })()}
-                </>
+              {/* 泰服體驗（整合進門票區塊，無標題行） */}
+              {thaiDressCloth && (
+                <DataRow name={`泰服衣服 ★ (${people}人)`} cost={(config.thaiDress.cloth.price - config.thaiDress.cloth.rebate) * people} price={config.thaiDress.cloth.price * people} profit={config.thaiDress.cloth.rebate * people} className="day-row" />
               )}
+              {makeupCount > 0 && (
+                <DataRow name={`化妝 ★ (${makeupCount}人)`} cost={(config.thaiDress.makeup.price - config.thaiDress.makeup.rebate) * makeupCount} price={config.thaiDress.makeup.price * makeupCount} profit={config.thaiDress.makeup.rebate * makeupCount} className="day-row" />
+              )}
+              {thaiDressPhoto && (() => {
+                const photographerCount = people <= 10 ? 1 : 2
+                return <DataRow name={`攝影師 ★ (${photographerCount}位)`} cost={(config.thaiDress.photo.price - config.thaiDress.photo.rebate) * photographerCount} price={config.thaiDress.photo.price * photographerCount} profit={config.thaiDress.photo.rebate * photographerCount} className="day-row" />
+              })()}
               <SubtotalRow name="門票+泰服總計" cost={calculation.ticketCost + calculation.thaiDressCost} price={calculation.ticketPrice + calculation.thaiDressPrice} profit={calculation.ticketYourProfit + calculation.ticketPartnerProfit + calculation.thaiDressYourProfit + calculation.thaiDressPartnerProfit} />
               <tr style={{ background: '#c8e6c9' }}>
                 <td style={{ ...tdStyle, textAlign: 'left' }}>　→ 你的利潤（退款½）</td>
