@@ -1,8 +1,23 @@
 // src/sanity/tools/pricing/PricingCalculator.tsx
 // 報價計算器 - 複製 HTML prototype 的 UI
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import html2pdf from 'html2pdf.js'
+import { useClient } from 'sanity'
+import {
+  parseItineraryText,
+  matchActivitiesToDatabase,
+  type ActivityRecord,
+  type ActivityMatchResult,
+} from '@/lib/itinerary'
+
+// 互斥群組定義 - 同群組只能選一個
+const EXCLUSIVE_GROUPS: Record<string, string[]> = {
+  elephant: ['elephant-meal', 'elephant'],
+  shooting: ['shooting', 'shooting-pro'],
+  cabaret: ['cabaret-vip', 'cabaret'],
+  zipline: ['zipline-a', 'zipline-b', 'zipline-c'],
+}
 
 // 預設資料（跟 HTML prototype v3 一樣）
 const DEFAULT_CONFIG = {
@@ -686,7 +701,50 @@ interface Hotel {
   depositPerRoom: number  // 每間房押金（check-in 時收取）
 }
 
+// 動態車費類型
+interface CarFeeDay {
+  day: string      // D1, D2, ...
+  date: string     // 2/12, 2/13, ...
+  name: string     // 行程標題
+  cost: number     // 成本
+  price: number    // 報價
+  type: string     // city, suburban, chiangrai, airport
+}
+
+// 儲存的報價設定類型
+interface SavedQuote {
+  id: string
+  name: string
+  createdAt: string
+  data: {
+    itineraryText: string
+    people: number
+    carFees: CarFeeDay[]
+    tickets: typeof DEFAULT_TICKETS
+  }
+}
+
 export function PricingCalculator() {
+  // Sanity client for fetching activities
+  const client = useClient({ apiVersion: '2024-01-01' })
+
+  // 智能解析器狀態
+  const [showParser, setShowParser] = useState(false)
+  const [itineraryText, setItineraryText] = useState('')
+  const [dbActivities, setDbActivities] = useState<ActivityRecord[]>([])
+  const [parseResult, setParseResult] = useState<ActivityMatchResult | null>(null)
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false)
+
+  // 動態車費（解析行程後自動產生）
+  const [carFees, setCarFees] = useState<CarFeeDay[]>(DEFAULT_CONFIG.dailyCarFees.map(d => ({
+    ...d,
+    date: '',
+  })))
+
+  // 儲存的報價設定
+  const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
+  const [currentQuoteName, setCurrentQuoteName] = useState('')
+
   // Form states
   const [people, setPeople] = useState(10)
   const [exchangeRate, setExchangeRate] = useState(0.93)
@@ -798,6 +856,246 @@ export function PricingCalculator() {
   }
   const config = DEFAULT_CONFIG
 
+  // 載入活動資料庫
+  const loadActivities = useCallback(async () => {
+    setIsLoadingActivities(true)
+    try {
+      const activities = await client.fetch<ActivityRecord[]>(`
+        *[_type == "activity" && isActive == true] | order(sortOrder asc) {
+          _id,
+          name,
+          keywords,
+          activityType,
+          location,
+          "adultPrice": adultPrice,
+          "childPrice": childPrice,
+          "rebate": rebate,
+          "splitRebate": splitRebate,
+          exclusiveGroup,
+          isDefaultInGroup,
+          isActive,
+          sortOrder
+        }
+      `)
+      setDbActivities(activities)
+    } catch (error) {
+      console.error('Failed to load activities:', error)
+    } finally {
+      setIsLoadingActivities(false)
+    }
+  }, [client])
+
+  // 打開解析器時載入活動
+  useEffect(() => {
+    if (showParser && dbActivities.length === 0) {
+      loadActivities()
+    }
+  }, [showParser, dbActivities.length, loadActivities])
+
+  // 智能解析行程
+  const handleParseItinerary = useCallback(() => {
+    if (!itineraryText.trim()) return
+
+    const parsed = parseItineraryText(itineraryText)
+    const result = matchActivitiesToDatabase(parsed, dbActivities)
+    setParseResult(result)
+
+    // 1. 根據解析的天數產生車費欄位
+    if (parsed.days.length > 0) {
+      const newCarFees = parsed.days.map((day, index) => {
+        const dayNum = index + 1
+        const isFirstDay = dayNum === 1
+        const isLastDay = dayNum === parsed.days.length
+        const dateStr = day.date ? `${parseInt(day.date.split('-')[1])}/${parseInt(day.date.split('-')[2])}` : ''
+
+        // 智能判斷路線類型
+        let type = 'suburban'
+        let defaultPrice = 3800
+        let defaultCost = 3300
+
+        if (isFirstDay && day.title?.includes('抵達')) {
+          type = 'city'
+          defaultPrice = 3200
+          defaultCost = 2700
+        } else if (isLastDay && (day.title?.includes('送機') || day.rawText?.includes('送機'))) {
+          type = 'airport'
+          defaultPrice = 600
+          defaultCost = 500
+        } else if (day.title?.includes('清萊') || day.rawText?.includes('清萊')) {
+          type = 'chiangrai'
+          defaultPrice = 4500
+          defaultCost = 4000
+        } else if (day.title?.includes('市區') || day.title?.includes('市集')) {
+          type = 'city'
+          defaultPrice = 3500
+          defaultCost = 3000
+        }
+
+        return {
+          day: `D${dayNum}`,
+          date: dateStr,
+          name: day.title || `第 ${dayNum} 天`,
+          cost: defaultCost,
+          price: defaultPrice,
+          type,
+        }
+      })
+      setCarFees(newCarFees)
+    }
+
+    // 2. 根據匹配結果更新門票勾選
+    if (result.matched.length > 0) {
+      setTickets(prev => {
+        const newTickets = prev.map(t => ({ ...t, checked: false })) // 先全部取消
+
+        // 對每個匹配到的活動，找對應的 DEFAULT_TICKET 並勾選
+        for (const matched of result.matched) {
+          // 用活動名稱匹配 DEFAULT_TICKETS
+          const matchedTicket = newTickets.find(t =>
+            matched.activityName.includes(t.name.replace(/^D\d+ /, '')) ||
+            t.name.replace(/^D\d+ /, '').includes(matched.activityName)
+          )
+          if (matchedTicket) {
+            // 檢查互斥群組
+            const exclusiveGroup = Object.entries(EXCLUSIVE_GROUPS).find(([_, ids]) => ids.includes(matchedTicket.id))
+            if (exclusiveGroup) {
+              const [_, groupIds] = exclusiveGroup
+              // 取消同群組其他票
+              groupIds.forEach(gid => {
+                const idx = newTickets.findIndex(t => t.id === gid)
+                if (idx !== -1 && gid !== matchedTicket.id) {
+                  newTickets[idx].checked = false
+                }
+              })
+            }
+            const idx = newTickets.findIndex(t => t.id === matchedTicket.id)
+            if (idx !== -1) {
+              newTickets[idx].checked = true
+            }
+          }
+        }
+
+        return newTickets
+      })
+    }
+
+    // 3. 根據解析的住宿更新飯店（如果有的話）
+    if (result.hotels.length > 0) {
+      // 統計每間飯店的住宿天數
+      const hotelNights: Record<string, number> = {}
+      result.hotels.forEach(h => {
+        hotelNights[h.name] = (hotelNights[h.name] || 0) + 1
+      })
+
+      // 建立飯店列表
+      const uniqueHotels = Object.entries(hotelNights)
+      if (uniqueHotels.length > 0) {
+        const newHotels = uniqueHotels.map(([name, nights], index) => ({
+          id: index + 1,
+          name,
+          nights,
+          rooms: createEmptyRooms(),
+          hasDeposit: false,
+          depositPerRoom: 3000,
+        }))
+        setHotels(newHotels)
+        setNextHotelId(uniqueHotels.length + 1)
+      }
+    }
+  }, [itineraryText, dbActivities])
+
+  // 車費管理函數
+  const updateCarFee = (index: number, field: keyof CarFeeDay, value: any) => {
+    setCarFees(prev => prev.map((cf, i) => i === index ? { ...cf, [field]: value } : cf))
+  }
+
+  const addCarFeeDay = () => {
+    const newDay = carFees.length + 1
+    setCarFees(prev => [...prev, {
+      day: `D${newDay}`,
+      date: '',
+      name: `第 ${newDay} 天`,
+      cost: 3300,
+      price: 3800,
+      type: 'suburban',
+    }])
+  }
+
+  const removeCarFeeDay = (index: number) => {
+    if (carFees.length <= 1) return
+    setCarFees(prev => prev.filter((_, i) => i !== index).map((cf, i) => ({
+      ...cf,
+      day: `D${i + 1}`,
+    })))
+  }
+
+  // 報價儲存/載入/複製功能
+  const STORAGE_KEY = 'chiangway-pricing-quotes'
+
+  // 從 localStorage 載入已儲存的報價
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY)
+      if (saved) {
+        setSavedQuotes(JSON.parse(saved))
+      }
+    } catch (e) {
+      console.error('Failed to load saved quotes:', e)
+    }
+  }, [])
+
+  // 儲存當前報價
+  const saveCurrentQuote = () => {
+    const name = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
+    const newQuote: SavedQuote = {
+      id: Date.now().toString(),
+      name,
+      createdAt: new Date().toISOString(),
+      data: {
+        itineraryText,
+        people,
+        carFees,
+        tickets: tickets.map(t => ({ ...t })),
+      },
+    }
+    const updated = [...savedQuotes, newQuote]
+    setSavedQuotes(updated)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    setCurrentQuoteName('')
+    alert(`✅ 已儲存「${name}」`)
+  }
+
+  // 載入報價
+  const loadQuote = (quote: SavedQuote) => {
+    setItineraryText(quote.data.itineraryText || '')
+    setPeople(quote.data.people || 10)
+    if (quote.data.carFees) setCarFees(quote.data.carFees)
+    if (quote.data.tickets) setTickets(quote.data.tickets)
+    setCurrentQuoteName(quote.name)
+    alert(`✅ 已載入「${quote.name}」`)
+  }
+
+  // 複製報價（Fork）
+  const forkQuote = (quote: SavedQuote) => {
+    loadQuote(quote)
+    setCurrentQuoteName(`${quote.name} (複製)`)
+  }
+
+  // 刪除報價
+  const deleteQuote = (id: string) => {
+    if (!confirm('確定要刪除這個報價嗎？')) return
+    const updated = savedQuotes.filter(q => q.id !== id)
+    setSavedQuotes(updated)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  }
+
+  // 清空所有報價
+  const clearAllQuotes = () => {
+    if (!confirm('確定要清空所有儲存的報價嗎？此操作無法復原。')) return
+    setSavedQuotes([])
+    localStorage.removeItem(STORAGE_KEY)
+  }
+
   // 飯店管理函數
   const addHotel = () => {
     setHotels(prev => [...prev, {
@@ -850,7 +1148,9 @@ export function PricingCalculator() {
 
   // Calculations
   const calculation = useMemo(() => {
-    const { mealDays, guideDays, dailyCarFees, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    const { mealDays, guideDays, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    // 使用動態車費（carFees state）而非 config.dailyCarFees
+    const dailyCarFees = carFees
     // 使用多飯店的總晚數
     const nights = totalNights
 
@@ -1023,12 +1323,34 @@ export function PricingCalculator() {
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide])
+  }, [config, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
 
   const toggleTicket = (id: string) => {
-    setTickets(prev => prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t))
+    setTickets(prev => {
+      const ticket = prev.find(t => t.id === id)
+      if (!ticket) return prev
+
+      // 如果要勾選這個票，檢查互斥群組
+      if (!ticket.checked) {
+        // 找到這個票所屬的互斥群組
+        const exclusiveGroup = Object.entries(EXCLUSIVE_GROUPS).find(([_, ids]) => ids.includes(id))
+
+        if (exclusiveGroup) {
+          const [_, groupIds] = exclusiveGroup
+          // 取消同群組的其他票，只勾選這個
+          return prev.map(t => {
+            if (t.id === id) return { ...t, checked: true }
+            if (groupIds.includes(t.id)) return { ...t, checked: false }
+            return t
+          })
+        }
+      }
+
+      // 沒有互斥群組，直接切換
+      return prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t)
+    })
   }
 
   // 門票 + 泰服 統一控制
@@ -1514,6 +1836,80 @@ export function PricingCalculator() {
               )}
             </div>
 
+            {/* 每日車費明細 */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <strong style={{ fontSize: 13 }}>📅 每日車費（{carFees.length} 天）</strong>
+                <button
+                  onClick={addCarFeeDay}
+                  style={{ padding: '4px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                >
+                  ➕ 新增天數
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {carFees.map((cf, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '50px 60px 1fr 80px 80px 30px',
+                      gap: 8,
+                      alignItems: 'center',
+                      padding: 8,
+                      background: '#fff',
+                      border: '1px solid #e0e0e0',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{cf.day}</span>
+                    <input
+                      type="text"
+                      value={cf.date}
+                      onChange={e => updateCarFee(index, 'date', e.target.value)}
+                      placeholder="2/12"
+                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="text"
+                      value={cf.name}
+                      onChange={e => updateCarFee(index, 'name', e.target.value)}
+                      placeholder="行程名稱"
+                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+                    />
+                    <input
+                      type="number"
+                      value={cf.price}
+                      onChange={e => updateCarFee(index, 'price', Number(e.target.value))}
+                      placeholder="報價"
+                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
+                    />
+                    <span style={{ fontSize: 11, color: '#666' }}>
+                      ×{calculation.carCount}台
+                    </span>
+                    <button
+                      onClick={() => removeCarFeeDay(index)}
+                      disabled={carFees.length <= 1}
+                      style={{
+                        padding: 4,
+                        background: carFees.length <= 1 ? '#eee' : '#ffebee',
+                        color: carFees.length <= 1 ? '#999' : '#c62828',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: carFees.length <= 1 ? 'not-allowed' : 'pointer',
+                        fontSize: 12,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <p style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
+                💡 解析行程後會自動產生每日車費，你可以手動調整報價
+              </p>
+            </div>
+
             {/* 車導總計 */}
             <div style={{ marginTop: 12, padding: 12, background: '#f9f8f6', borderRadius: 8 }}>
               <p style={{ margin: 0, fontWeight: 'bold', color: '#5c4a2a', fontSize: 14 }}>
@@ -1525,6 +1921,239 @@ export function PricingCalculator() {
                 {calculation.childSeatCost > 0 ? ` + 座椅 ${fmt(calculation.childSeatCost)}` : ''}
               </p>
             </div>
+          </Section>
+
+          {/* 報價管理 */}
+          <Section title="💾 報價管理" style={{ background: '#f3e5f5', border: '1px solid #ce93d8' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <input
+                type="text"
+                value={currentQuoteName}
+                onChange={e => setCurrentQuoteName(e.target.value)}
+                placeholder="輸入報價名稱（例：王先生 2/12-17）"
+                style={{ flex: 1, minWidth: 200, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
+              />
+              <button
+                onClick={saveCurrentQuote}
+                style={{ padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
+              >
+                💾 儲存報價
+              </button>
+            </div>
+
+            {savedQuotes.length > 0 && (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <strong style={{ fontSize: 13 }}>📂 已儲存的報價（{savedQuotes.length}）</strong>
+                  <button
+                    onClick={clearAllQuotes}
+                    style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                  >
+                    🗑️ 清空全部
+                  </button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                  {savedQuotes.map(q => (
+                    <div
+                      key={q.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: 8,
+                        background: '#fff',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 6,
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: 13 }}>
+                        📄 {q.name}
+                        <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
+                          {new Date(q.createdAt).toLocaleDateString('zh-TW')}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => loadQuote(q)}
+                        style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        📥 載入
+                      </button>
+                      <button
+                        onClick={() => forkQuote(q)}
+                        style={{ padding: '4px 8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        📋 複製
+                      </button>
+                      <button
+                        onClick={() => deleteQuote(q.id)}
+                        style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {savedQuotes.length === 0 && (
+              <p style={{ fontSize: 12, color: '#666', margin: 0 }}>
+                💡 儲存報價後可以隨時載入或複製修改
+              </p>
+            )}
+          </Section>
+
+          {/* 智能解析器 */}
+          <Section title="🤖 智能行程解析" style={{ background: '#e8f4fd', border: '1px solid #90caf9' }}>
+            <div style={{ marginBottom: 12 }}>
+              <button
+                onClick={() => setShowParser(!showParser)}
+                style={{
+                  padding: '8px 16px',
+                  background: showParser ? '#1976d2' : '#2196f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                }}
+              >
+                {showParser ? '📝 收起解析器' : '📋 貼入行程文字'}
+              </button>
+              {dbActivities.length > 0 && (
+                <span style={{ marginLeft: 12, fontSize: 12, color: '#666' }}>
+                  ✅ 已載入 {dbActivities.length} 項活動資料
+                </span>
+              )}
+            </div>
+
+            {showParser && (
+              <div style={{ marginTop: 12 }}>
+                <textarea
+                  value={itineraryText}
+                  onChange={e => setItineraryText(e.target.value)}
+                  placeholder={`貼入行程文字，例如：
+
+2/12 (四)
+Day 1｜抵達清邁
+・機場接機
+・泰服拍攝體驗
+・夜間動物園
+住宿: 香格里拉酒店
+
+2/13 (五)
+Day 2｜大象保護營
+・大象保護營（不含餐）
+・射擊（基本）
+・人妖秀（VIP）
+住宿: 香格里拉酒店`}
+                  style={{
+                    width: '100%',
+                    height: 200,
+                    padding: 12,
+                    border: '1px solid #ccc',
+                    borderRadius: 6,
+                    fontFamily: 'monospace',
+                    fontSize: 13,
+                    resize: 'vertical',
+                  }}
+                />
+                <div style={{ marginTop: 12, display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <button
+                    onClick={handleParseItinerary}
+                    disabled={!itineraryText.trim() || isLoadingActivities}
+                    style={{
+                      padding: '10px 20px',
+                      background: !itineraryText.trim() || isLoadingActivities ? '#ccc' : '#4caf50',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: !itineraryText.trim() || isLoadingActivities ? 'not-allowed' : 'pointer',
+                      fontSize: 14,
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {isLoadingActivities ? '⏳ 載入中...' : '🔍 解析行程'}
+                  </button>
+                  {parseResult && (
+                    <span style={{ fontSize: 13, color: '#666' }}>
+                      ✅ 匹配 {parseResult.matched.length} 項活動，
+                      ⚠️ {parseResult.unmatched.length} 項未匹配
+                    </span>
+                  )}
+                </div>
+
+                {/* 解析結果 */}
+                {parseResult && (
+                  <div style={{ marginTop: 16 }}>
+                    {/* 匹配的活動 */}
+                    {parseResult.matched.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <h4 style={{ fontSize: 13, color: '#2e7d32', marginBottom: 8 }}>✅ 已匹配活動（自動勾選）</h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {parseResult.matched.map((m, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#c8e6c9',
+                                borderRadius: 4,
+                                fontSize: 12,
+                              }}
+                            >
+                              D{m.dayNumber} {m.activityName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 未匹配的活動 */}
+                    {parseResult.unmatched.length > 0 && (
+                      <div style={{ marginBottom: 12 }}>
+                        <h4 style={{ fontSize: 13, color: '#f57c00', marginBottom: 8 }}>⚠️ 未匹配活動（需手動處理）</h4>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {parseResult.unmatched.map((u, i) => (
+                            <span
+                              key={i}
+                              style={{
+                                padding: '4px 8px',
+                                background: '#ffe0b2',
+                                borderRadius: 4,
+                                fontSize: 12,
+                              }}
+                              title={`建議關鍵字：${u.suggestedKeywords.join(', ')}`}
+                            >
+                              D{u.dayNumber} {u.text.substring(0, 20)}{u.text.length > 20 ? '...' : ''}
+                            </span>
+                          ))}
+                        </div>
+                        <p style={{ fontSize: 11, color: '#666', marginTop: 6 }}>
+                          💡 未匹配的活動可在 Sanity Studio → 活動資料庫 新增
+                        </p>
+                      </div>
+                    )}
+
+                    {/* 偵測到的日期和住宿 */}
+                    {(parseResult.dates.length > 0 || parseResult.hotels.length > 0) && (
+                      <div style={{ marginTop: 12, padding: 10, background: '#f5f5f5', borderRadius: 6 }}>
+                        {parseResult.dates.length > 0 && (
+                          <p style={{ fontSize: 12, margin: '0 0 4px 0' }}>
+                            📅 天數：{parseResult.dates.length} 天
+                            （{parseResult.dates.map(d => d.dayLabel).join(', ')}）
+                          </p>
+                        )}
+                        {parseResult.hotels.length > 0 && (
+                          <p style={{ fontSize: 12, margin: 0 }}>
+                            🏨 住宿：{parseResult.hotels.map(h => h.name).filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </Section>
 
           {/* 門票 */}

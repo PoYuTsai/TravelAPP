@@ -31,3 +31,20 @@ export {
 
 // 飯店處理
 export { generateHotelsFromDays } from './hotels'
+
+// 活動匹配器
+export type {
+  ActivityRecord,
+  MatchedActivity,
+  UnmatchedActivity,
+  ExtractedDate,
+  ExtractedHotel,
+  ActivityMatchResult,
+} from './activity-matcher'
+
+export {
+  matchActivitiesToDatabase,
+  parseAndMatchActivities,
+  handleExclusiveGroup,
+  getDefaultSelections,
+} from './activity-matcher'
