@@ -2945,7 +2945,12 @@ Day 5｜送機
               <DataRow name={`旅遊保險 (${people}人)`} cost={calculation.insuranceCost} price={calculation.insuranceCost} profit={0} />
 
               <SectionRow title="💰 總計" />
-              <SubtotalRow name="總計" cost={calculation.totalCost} price={calculation.totalPrice} profit={calculation.yourTotalProfit + calculation.partnerTotalProfit} />
+              <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>
+                <td style={{ ...tdStyle, textAlign: 'left' }}>總計</td>
+                <td style={tdStyle}>{calculation.totalCost.toLocaleString()}</td>
+                <td style={tdStyle}>{calculation.totalPrice.toLocaleString()}</td>
+                <td style={tdStyle}></td>
+              </tr>
 
               <SectionRow title="📈 利潤分配" />
               <tr style={{ background: '#c8e6c9' }}>
@@ -3073,32 +3078,21 @@ Day 5｜送機
                 {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {babySeatCount + childSeatCount}張 × {calculation.guideDays}天</>}
               </div>
 
-              {/* 門票明細 */}
-              {includeTickets && calculation.selectedTickets.length > 0 && (
+              {/* 門票+泰服明細（合併顯示） */}
+              {includeTickets && (calculation.selectedTickets.length > 0 || calculation.thaiDressPrice > 0) && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8, marginTop: 12 }}>
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🎫 門票活動（{calculation.selectedTickets.length}項）</span>
-                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice)} 泰銖</span>
+                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🎫 門票活動（{calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
+                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice + calculation.thaiDressPrice)} 泰銖</span>
                   </div>
                   <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
                     {calculation.selectedTickets.map((t: any, idx: number) => (
                       <div key={idx}>• {t.name.replace(/^D\d /, '')}{t.price > 0 ? ` ${fmt(t.price)}/人` : '（免費）'}</div>
                     ))}
-                  </div>
-                </>
-              )}
-
-              {/* 泰服明細 */}
-              {calculation.thaiDressPrice > 0 && (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8, marginTop: 12 }}>
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>👘 泰服體驗</span>
-                    <span style={{ fontWeight: 'bold' }}>{fmt(calculation.thaiDressPrice)} 泰銖</span>
-                  </div>
-                  <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
-                    {thaiDressCloth && <>• 泰服衣服 500/人 × {people}人<br /></>}
-                    {makeupCount > 0 && <>• 專業化妝 1,000/人 × {makeupCount}人<br /></>}
-                    {thaiDressPhoto && <>• 攝影師 2,500/位 × {people <= 10 ? 1 : 2}位</>}
+                    {/* 泰服項目 */}
+                    {thaiDressCloth && <div>• 泰服衣服 500/人 × {people}人</div>}
+                    {makeupCount > 0 && <div>• 專業化妝 1,000/人 × {makeupCount}人</div>}
+                    {thaiDressPhoto && <div>• 攝影師 2,500/位 × {people <= 10 ? 1 : 2}位</div>}
                   </div>
                 </>
               )}
