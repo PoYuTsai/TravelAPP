@@ -33,6 +33,7 @@
 | Phase 6.6 | 審查 #8 A11y/資安優化 | ✅ 完成 |
 | Phase 6.7 | 審查 #10 SEO/行銷追蹤優化 | ✅ 完成 |
 | Phase 6.8 | 報價計算系統 | ✅ 完成 |
+| 維護 | CSP 更新 (Google Ads) | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -240,6 +241,15 @@ Sanity Studio 內部報價計算工具：
   - Footer 官網 + LINE 連結
   - 直接下載 PDF（html2pdf.js 客戶端產生）
 
+### 維護：CSP 更新 (2026-03-10)
+Google Ads 轉換追蹤修復（Case #9-1473000040755）：
+
+- **CSP 更新**：新增 Google Ads 所需域名至 Content-Security-Policy
+  - `script-src`: googleads.g.doubleclick.net, googleadservices.com
+  - `img-src`: googleadservices.com, doubleclick.net, google.com.tw
+  - `connect-src`: analytics.google.com, stats.g.doubleclick.net
+  - `frame-src`: td.doubleclick.net, googletagmanager.com
+
 ## 技術架構
 
 ```
@@ -292,4 +302,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-06 Phase 6.8: 智能行程解析 + PDF/UI 配色統一 -->
+<!-- Last build trigger: 2026-03-10 維護: CSP 更新允許 Google Ads 轉換追蹤 -->
