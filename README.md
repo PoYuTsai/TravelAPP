@@ -302,4 +302,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-10 維護: CSP 更新允許 Google Ads 轉換追蹤 -->
+<!-- Last build trigger: 2026-03-12 報價計算器大改版: 門票GUI管理+成人兒童分開+住宿Bug修復 -->
