@@ -52,9 +52,6 @@ export const structure: StructureResolver = (S) =>
       // 客戶行程表（新增）
       S.documentTypeListItem('itinerary').title('客戶行程表'),
 
-      // 活動資料庫
-      S.documentTypeListItem('activity').title('活動資料庫'),
-
       S.divider(),
 
       // 部落格文章

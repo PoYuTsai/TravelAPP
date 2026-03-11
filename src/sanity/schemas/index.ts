@@ -5,7 +5,6 @@ import homestay from './homestay'
 import itinerary from './itinerary'
 import tourPackage from './tourPackage'
 import dayTour from './dayTour'
-import activity from './activity'
 
 export const schemaTypes = [
   post,
@@ -15,5 +14,4 @@ export const schemaTypes = [
   itinerary,
   tourPackage,
   dayTour,
-  activity,
 ]

@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import html2pdf from 'html2pdf.js'
-import { useClient } from 'sanity'
 import {
   parseItineraryText,
   matchActivitiesToDatabase,
@@ -50,14 +49,19 @@ const DEFAULT_CONFIG = {
 interface DynamicTicket {
   id: string
   name: string
-  price: number
-  rebate: number
-  split: boolean
+  price: number           // 成人售價
+  childPrice?: number     // 兒童售價（undefined = 同成人價，0 = 免費）
+  rebate: number          // 退佣
+  split: boolean          // 利潤對分
   checked: boolean
-  dayNumber?: number  // 來自哪一天（動態解析時設定）
+  dayNumber?: number      // 來自哪一天（動態解析時設定）
   source: 'parsed' | 'manual' | 'default'  // 來源
-  exclusiveGroup?: string  // 互斥群組
+  exclusiveGroup?: string // 互斥群組
+  priceNote?: string      // 價格備註（如「身高 90-120cm」）
 }
+
+// 小孩定義：12歲以下（含）
+const CHILD_AGE_THRESHOLD = 12
 
 // 門票關鍵字對照表 - 用於智能匹配
 const TICKET_KEYWORDS: Record<string, string[]> = {
@@ -133,48 +137,70 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   // 騎馬（90公斤以上不得騎乘）
   { id: 'horseRiding', name: '騎馬', price: 1400, rebate: 210, split: true, checked: false, source: 'default' },
   // 鳳凰冒險公園
-  { id: 'phoenixPark', name: '鳳凰冒險公園', price: 1500, rebate: 300, split: true, checked: false, source: 'default' },
+  { id: 'phoenixPark', name: '鳳凰冒險公園', price: 90, rebate: 0, split: false, checked: false, source: 'default' },
   // 大象粑粑造紙公園
   { id: 'elephantPoop', name: '大象粑粑造紙公園', price: 200, rebate: 0, split: false, checked: false, source: 'default' },
   // 康托克帝王餐
   { id: 'khantoke', name: '康托克帝王餐', price: 800, rebate: 150, split: true, checked: false, source: 'default' },
   // 天使瀑布
-  { id: 'dantewada', name: '天使瀑布', price: 100, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'dantewada', name: '天使瀑布', price: 80, rebate: 0, split: false, checked: false, source: 'default' },
 ]
 
-// 將 DEFAULT_TICKETS 轉換為 ActivityRecord 格式（供匹配器使用）
-function getDefaultActivitiesForMatching(): ActivityRecord[] {
-  return DEFAULT_TICKETS.map(ticket => ({
+// 門票 localStorage 儲存機制
+const TICKETS_STORAGE_KEY = 'chiangway-pricing-tickets-v1'
+
+interface TicketConfig {
+  version: 1
+  lastUpdated: string
+  tickets: DynamicTicket[]
+}
+
+// 從 localStorage 載入自訂門票
+function loadTicketsFromStorage(): DynamicTicket[] | null {
+  try {
+    const stored = localStorage.getItem(TICKETS_STORAGE_KEY)
+    if (!stored) return null
+    const config: TicketConfig = JSON.parse(stored)
+    if (config.version !== 1) return null
+    return config.tickets
+  } catch {
+    return null
+  }
+}
+
+// 儲存自訂門票到 localStorage
+function saveTicketsToStorage(tickets: DynamicTicket[]) {
+  const config: TicketConfig = {
+    version: 1,
+    lastUpdated: new Date().toISOString(),
+    tickets: tickets.map(t => ({ ...t, checked: false })), // 儲存時不保存 checked 狀態
+  }
+  localStorage.setItem(TICKETS_STORAGE_KEY, JSON.stringify(config))
+}
+
+// 重置門票為預設值
+function resetTicketsToDefault() {
+  localStorage.removeItem(TICKETS_STORAGE_KEY)
+  return DEFAULT_TICKETS.map(t => ({ ...t }))
+}
+
+// 將門票轉換為 ActivityRecord 格式（供匹配器使用）
+// 優先使用 localStorage 的自訂門票，否則用 DEFAULT_TICKETS
+function getActivitiesForMatching(): ActivityRecord[] {
+  const storedTickets = loadTicketsFromStorage()
+  const tickets = storedTickets || DEFAULT_TICKETS
+  return tickets.map(ticket => ({
     _id: ticket.id,
     name: ticket.name,
     keywords: TICKET_KEYWORDS[ticket.id] || [],
     activityType: 'ticket' as const,
     adultPrice: ticket.price,
+    childPrice: ticket.childPrice,
     rebate: ticket.rebate,
     splitRebate: ticket.split,
     exclusiveGroup: ticket.exclusiveGroup,
     isActive: true,
   }))
-}
-
-// 合併 Sanity 資料庫和 DEFAULT_TICKETS（避免二擇一導致匹配不完整）
-function mergeActivitiesForMatching(dbActivities: ActivityRecord[]): ActivityRecord[] {
-  const defaultActivities = getDefaultActivitiesForMatching()
-
-  // 建立 ID 索引，Sanity 資料優先
-  const merged = new Map<string, ActivityRecord>()
-
-  // 先加入 DEFAULT_TICKETS（作為基底）
-  for (const activity of defaultActivities) {
-    merged.set(activity._id, activity)
-  }
-
-  // 再用 Sanity 資料覆蓋或新增
-  for (const activity of dbActivities) {
-    merged.set(activity._id, activity)
-  }
-
-  return Array.from(merged.values())
 }
 
 // 下載對外報價單
@@ -484,7 +510,7 @@ function downloadExternalQuote(
     <div class="section">
       <h3 class="section-title">💰 費用明細</h3>
       <div class="price-meta">
-        👥 <strong>${people} 人</strong>　｜　🗓️ <strong>${tripDays}天${tripNights}夜</strong>
+        👥 <strong>${c.adults} 成人${c.children > 0 ? ` + ${c.children} 小孩` : ''}</strong>　｜　🗓️ <strong>${tripDays}天${tripNights}夜</strong>
       </div>
       <div class="price-summary">
 
@@ -539,9 +565,9 @@ function downloadExternalQuote(
 
     <!-- 每人費用 -->
     <div class="price-box">
-      <div class="label">每人費用</div>
+      <div class="label">每位成人費用</div>
       <div class="amount">NT$ ${fmt(c.perPersonTWD)}</div>
-      <div class="sub">約 ${fmt(Math.round(c.perPersonTHB))} 泰銖</div>
+      <div class="sub">約 ${fmt(Math.round(c.perPersonTHB))} 泰銖 ÷ ${c.adults}成人${c.children > 0 ? `<br>（${c.children}位小孩已計入總費用）` : ''}</div>
     </div>
 
     <!-- 費用包含/不含 -->
@@ -826,7 +852,9 @@ interface SavedQuote {
   createdAt: string
   data: {
     itineraryText: string
-    people: number
+    people: number  // 保留舊欄位向後相容
+    adults?: number
+    children?: number
     carFees: CarFeeDay[]
     tickets: DynamicTicket[]
     useDefaultTickets?: boolean  // 是否使用預設門票
@@ -848,16 +876,11 @@ interface SavedQuote {
 }
 
 export function PricingCalculator() {
-  // Sanity client for fetching activities
-  const client = useClient({ apiVersion: '2024-01-01' })
-
   // 智能解析器狀態
   const [showParser, setShowParser] = useState(false)
   const [itineraryText, setItineraryText] = useState('')
-  const [dbActivities, setDbActivities] = useState<ActivityRecord[]>([])
   const [parseResult, setParseResult] = useState<ActivityMatchResult | null>(null)
   const [parseWarnings, setParseWarnings] = useState<{ type: string; message: string }[]>([])
-  const [isLoadingActivities, setIsLoadingActivities] = useState(false)
   const [isParseConfirmed, setIsParseConfirmed] = useState(false)
 
   // 解析後的行程（用於 PDF 輸出）
@@ -878,8 +901,10 @@ export function PricingCalculator() {
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
   const [currentQuoteName, setCurrentQuoteName] = useState('')
 
-  // Form states
-  const [people, setPeople] = useState(10)
+  // Form states - 成人/小孩分開計算
+  const [adults, setAdults] = useState(8)
+  const [children, setChildren] = useState(2)
+  const people = adults + children  // 總人數（用於配車、房間計算）
   const [exchangeRate, setExchangeRate] = useState(0.93)
 
   // 多飯店住宿（每飯店 4 種固定房型分類，每種 3 個子房型）
@@ -982,7 +1007,16 @@ export function PricingCalculator() {
   const [nextHotelId, setNextHotelId] = useState(3)
 
   const [mealLevel, setMealLevel] = useState(900)
-  const [tickets, setTickets] = useState<DynamicTicket[]>(DEFAULT_TICKETS)
+  // 門票狀態 - 優先從 localStorage 載入
+  const [tickets, setTickets] = useState<DynamicTicket[]>(() => {
+    const stored = loadTicketsFromStorage()
+    return stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+  })
+  const [baseTickets, setBaseTickets] = useState<DynamicTicket[]>(() => {
+    const stored = loadTicketsFromStorage()
+    return stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+  })  // 基礎門票列表（用於管理面板編輯）
+  const [showTicketManager, setShowTicketManager] = useState(false)  // 門票管理面板開關
   const [useDefaultTickets, setUseDefaultTickets] = useState(true)  // 是否使用預設門票（vs 解析後動態門票）
   const [savedParsedTickets, setSavedParsedTickets] = useState<DynamicTicket[]>([])  // 保存解析後的門票，用於切換回去
   const [thaiDressCloth, setThaiDressCloth] = useState(true)
@@ -1015,49 +1049,13 @@ export function PricingCalculator() {
   }
   const config = DEFAULT_CONFIG
 
-  // 載入活動資料庫
-  const loadActivities = useCallback(async () => {
-    setIsLoadingActivities(true)
-    try {
-      const activities = await client.fetch<ActivityRecord[]>(`
-        *[_type == "activity" && isActive == true] | order(sortOrder asc) {
-          _id,
-          name,
-          keywords,
-          activityType,
-          location,
-          "adultPrice": adultPrice,
-          "childPrice": childPrice,
-          "rebate": rebate,
-          "splitRebate": splitRebate,
-          exclusiveGroup,
-          isDefaultInGroup,
-          isActive,
-          sortOrder
-        }
-      `)
-      setDbActivities(activities)
-    } catch (error) {
-      console.error('Failed to load activities:', error)
-    } finally {
-      setIsLoadingActivities(false)
-    }
-  }, [client])
-
-  // 打開解析器時載入活動（每次打開都重新載入，確保資料是最新的）
-  useEffect(() => {
-    if (showParser) {
-      loadActivities()
-    }
-  }, [showParser, loadActivities])
-
-  // 智能解析行程
+  // 智能解析行程 - 直接使用本地門票資料庫（不再依賴 Sanity）
   const handleParseItinerary = useCallback(() => {
     if (!itineraryText.trim()) return
 
     const parsed = parseItineraryText(itineraryText)
-    // 合併 Sanity 資料庫和 DEFAULT_TICKETS（避免二擇一導致匹配不完整）
-    const activitiesToMatch = mergeActivitiesForMatching(dbActivities)
+    // 使用本地門票資料庫（localStorage 或 DEFAULT_TICKETS）
+    const activitiesToMatch = getActivitiesForMatching()
     const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
 
     // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
@@ -1310,7 +1308,7 @@ export function PricingCalculator() {
 
     // 解析完成直接生效（不需要確認按鈕）
     setIsParseConfirmed(true)
-  }, [itineraryText, dbActivities])
+  }, [itineraryText, baseTickets])  // baseTickets 變更時重新解析
 
   // 車費管理函數
   const updateCarFee = (index: number, field: keyof CarFeeDay, value: any) => {
@@ -1357,8 +1355,11 @@ export function PricingCalculator() {
       ...d,
       date: '',
     })))
-    // 重置為預設門票
-    setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+    // 重置為本地儲存的門票（或預設）
+    const stored = loadTicketsFromStorage()
+    const baseList = stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    setTickets(baseList.map(t => ({ ...t, checked: false })))
+    setBaseTickets(baseList)
     setUseDefaultTickets(true)
   }, [])
 
@@ -1386,7 +1387,9 @@ export function PricingCalculator() {
       createdAt: new Date().toISOString(),
       data: {
         itineraryText,
-        people,
+        people,  // 保留舊欄位向後相容
+        adults,
+        children,
         carFees,
         tickets: tickets.map(t => ({ ...t })),
         useDefaultTickets,
@@ -1416,7 +1419,15 @@ export function PricingCalculator() {
   // 載入報價
   const loadQuote = (quote: SavedQuote) => {
     setItineraryText(quote.data.itineraryText || '')
-    setPeople(quote.data.people || 10)
+    // 向後相容：新格式用 adults/children，舊格式用 people
+    if (quote.data.adults !== undefined) {
+      setAdults(quote.data.adults)
+      setChildren(quote.data.children || 0)
+    } else {
+      // 舊格式：假設全部是成人
+      setAdults(quote.data.people || 8)
+      setChildren(0)
+    }
     if (quote.data.carFees) setCarFees(quote.data.carFees)
     if (quote.data.tickets) setTickets(quote.data.tickets)
     if (quote.data.useDefaultTickets !== undefined) setUseDefaultTickets(quote.data.useDefaultTickets)
@@ -1458,7 +1469,8 @@ export function PricingCalculator() {
     setParseWarnings([])
     setIsParseConfirmed(false)
     // 重置基本設定
-    setPeople(10)
+    setAdults(8)
+    setChildren(2)
     setExchangeRate(0.93)
     setIncludeAccommodation(true)
     setIncludeMeals(true)
@@ -1532,8 +1544,11 @@ export function PricingCalculator() {
       },
     ])
     setNextHotelId(3)
-    // 重置門票
-    setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+    // 重置門票（使用本地儲存的門票或預設）
+    const stored = loadTicketsFromStorage()
+    const baseList = stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    setTickets(baseList.map(t => ({ ...t, checked: false })))
+    setBaseTickets(baseList)
     setUseDefaultTickets(true)
     setSavedParsedTickets([])  // 清除保存的解析門票
     // 重置泰服
@@ -1734,15 +1749,24 @@ export function PricingCalculator() {
     const transportPrice = carPriceTotal + guidePrice + luggageCost + childSeatCost
     const transportProfit = transportPrice - transportCost - luggageCost - childSeatCost
 
-    // Tickets
+    // Tickets - 成人/兒童分開計算
     let ticketCost = 0, ticketPrice = 0, ticketYourProfit = 0, ticketPartnerProfit = 0
     const selectedTickets = tickets.filter(t => t.checked)
     selectedTickets.forEach(t => {
-      const cost = (t.price - t.rebate) * people
-      const price = t.price * people
+      // 成人
+      const adultCost = (t.price - t.rebate) * adults
+      const adultPriceTotal = t.price * adults
+      // 兒童（childPrice undefined = 同成人價，0 = 免費）
+      const effectiveChildPrice = t.childPrice ?? t.price
+      const childCost = (effectiveChildPrice - t.rebate) * children
+      const childPriceTotal = effectiveChildPrice * children
+      // 合計
+      const cost = adultCost + childCost
+      const price = adultPriceTotal + childPriceTotal
       ticketCost += cost
       ticketPrice += price
-      const profit = t.rebate * people
+      // 利潤分潤
+      const profit = t.rebate * people  // 退佣仍以總人數計算
       if (t.split && t.rebate > 0) {
         ticketYourProfit += profit / 2
         ticketPartnerProfit += profit / 2
@@ -1797,11 +1821,12 @@ export function PricingCalculator() {
     const yourTotalProfit = transportProfit + (includeTickets ? ticketYourProfit : 0) + (includeTickets ? thaiDressYourProfit : 0)
     const partnerTotalProfit = (includeTickets ? ticketPartnerProfit : 0) + (includeTickets ? thaiDressPartnerProfit : 0)
 
-    const perPersonTHB = totalPrice / people
+    // 每人報價只除以成人（小孩不計入每人報價）
+    const perPersonTHB = totalPrice / adults
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, mealLevel,
+      people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, mealLevel,
       includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
@@ -1812,7 +1837,7 @@ export function PricingCalculator() {
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
 
@@ -2214,15 +2239,22 @@ Day 5｜送機
           <Section title="👥 基本設定">
             <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <label style={{ fontWeight: 'bold' }}>人數</label>
-                <input type="number" value={people} onChange={e => setPeople(Number(e.target.value) || 4)} style={{ ...inputStyle, width: 80 }} />
+                <label style={{ fontWeight: 'bold' }}>成人</label>
+                <input type="number" value={adults} onChange={e => setAdults(Math.max(1, Number(e.target.value) || 1))} min={1} style={{ ...inputStyle, width: 60 }} />
                 <span style={noteStyle}>人</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontWeight: 'bold' }}>小孩</label>
+                <input type="number" value={children} onChange={e => setChildren(Math.max(0, Number(e.target.value) || 0))} min={0} style={{ ...inputStyle, width: 60 }} />
+                <span style={noteStyle}>人</span>
+                <span style={{ ...noteStyle, color: '#888' }}>（{CHILD_AGE_THRESHOLD}歲以下）</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ fontWeight: 'bold' }}>匯率</label>
                 <input type="number" value={exchangeRate} onChange={e => setExchangeRate(Number(e.target.value))} min={0.85} max={1.05} step={0.01} style={{ ...inputStyle, width: 80 }} />
               </div>
-              {people < 4 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 4 人</span>}
+              {people < 4 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 4 人（目前 {people} 人）</span>}
+              <span style={{ ...noteStyle, fontWeight: 'bold', color: '#5c4a2a' }}>共 {people} 人</span>
             </div>
             <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -2765,11 +2797,19 @@ Day 5｜送機
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <p style={{ ...noteStyle, margin: 0 }}>★ = 退款對分</p>
+                {/* 門票管理按鈕 */}
+                <button
+                  onClick={() => setShowTicketManager(!showTicketManager)}
+                  style={{ padding: '4px 8px', background: showTicketManager ? '#5c4a2a' : '#9e9e9e', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                >
+                  ⚙️ 管理門票
+                </button>
                 {/* 切換按鈕：解析門票 ↔ 預設門票 */}
                 {!useDefaultTickets && (
                   <button
                     onClick={() => {
-                      setTickets(DEFAULT_TICKETS.map(t => ({ ...t, checked: false })))
+                      const stored = loadTicketsFromStorage()
+                      setTickets((stored || DEFAULT_TICKETS).map(t => ({ ...t, checked: false })))
                       setUseDefaultTickets(true)
                     }}
                     style={{ padding: '4px 8px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
@@ -2811,6 +2851,157 @@ Day 5｜送機
                 💡 門票/活動由客人現場付給導遊
               </div>
             )}
+
+            {/* 門票管理面板 */}
+            {showTicketManager && (
+              <div style={{ background: '#f5f5f5', border: '2px solid #5c4a2a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h4 style={{ margin: 0, color: '#5c4a2a' }}>⚙️ 門票管理</h4>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={() => {
+                        const newTicket: DynamicTicket = {
+                          id: `custom-${Date.now()}`,
+                          name: '新門票',
+                          price: 0,
+                          childPrice: undefined,
+                          rebate: 0,
+                          split: false,
+                          checked: false,
+                          source: 'manual',
+                        }
+                        const updated = [...baseTickets, newTicket]
+                        setBaseTickets(updated)
+                        setTickets(updated.map(t => ({ ...t, checked: tickets.find(x => x.id === t.id)?.checked || false })))
+                        saveTicketsToStorage(updated)
+                      }}
+                      style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                    >
+                      ➕ 新增門票
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('確定要重置為預設門票嗎？所有自訂的門票都會被清除。')) {
+                          const defaults = resetTicketsToDefault()
+                          setBaseTickets(defaults)
+                          setTickets(defaults.map(t => ({ ...t, checked: false })))
+                        }
+                      }}
+                      style={{ padding: '6px 12px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
+                    >
+                      🔄 重置預設
+                    </button>
+                  </div>
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: '#e0e0e0' }}>
+                        <th style={{ padding: 8, textAlign: 'left', borderBottom: '1px solid #ccc' }}>名稱</th>
+                        <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 80 }}>成人價</th>
+                        <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 80 }}>兒童價</th>
+                        <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 70 }}>退佣</th>
+                        <th style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #ccc', width: 50 }}>對分</th>
+                        <th style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #ccc', width: 60 }}>操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {baseTickets.map((t, idx) => (
+                        <tr key={t.id} style={{ background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="text"
+                              value={t.name}
+                              onChange={e => {
+                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, name: e.target.value } : x)
+                                setBaseTickets(updated)
+                                setTickets(tickets.map(x => x.id === t.id ? { ...x, name: e.target.value } : x))
+                                saveTicketsToStorage(updated)
+                              }}
+                              style={{ width: '100%', padding: 4, border: '1px solid #ddd', borderRadius: 3 }}
+                            />
+                          </td>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="number"
+                              value={t.price}
+                              onChange={e => {
+                                const val = Number(e.target.value) || 0
+                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, price: val } : x)
+                                setBaseTickets(updated)
+                                setTickets(tickets.map(x => x.id === t.id ? { ...x, price: val } : x))
+                                saveTicketsToStorage(updated)
+                              }}
+                              style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
+                            />
+                          </td>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="number"
+                              value={t.childPrice ?? ''}
+                              placeholder="同成人"
+                              onChange={e => {
+                                const val = e.target.value === '' ? undefined : Number(e.target.value)
+                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, childPrice: val } : x)
+                                setBaseTickets(updated)
+                                setTickets(tickets.map(x => x.id === t.id ? { ...x, childPrice: val } : x))
+                                saveTicketsToStorage(updated)
+                              }}
+                              style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
+                            />
+                          </td>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+                            <input
+                              type="number"
+                              value={t.rebate}
+                              onChange={e => {
+                                const val = Number(e.target.value) || 0
+                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, rebate: val } : x)
+                                setBaseTickets(updated)
+                                setTickets(tickets.map(x => x.id === t.id ? { ...x, rebate: val } : x))
+                                saveTicketsToStorage(updated)
+                              }}
+                              style={{ width: 50, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
+                            />
+                          </td>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee', textAlign: 'center' }}>
+                            <input
+                              type="checkbox"
+                              checked={t.split}
+                              onChange={e => {
+                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x)
+                                setBaseTickets(updated)
+                                setTickets(tickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x))
+                                saveTicketsToStorage(updated)
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: 6, borderBottom: '1px solid #eee', textAlign: 'center' }}>
+                            <button
+                              onClick={() => {
+                                if (confirm(`確定要刪除「${t.name}」嗎？`)) {
+                                  const updated = baseTickets.filter(x => x.id !== t.id)
+                                  setBaseTickets(updated)
+                                  setTickets(tickets.filter(x => x.id !== t.id))
+                                  saveTicketsToStorage(updated)
+                                }
+                              }}
+                              style={{ padding: '2px 6px', background: '#f44336', color: 'white', border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}
+                            >
+                              🗑️
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p style={{ ...noteStyle, marginTop: 8, marginBottom: 0 }}>
+                  💾 變更會自動儲存到瀏覽器 | 兒童價留空 = 同成人價 | 對分 = 退佣利潤對半分
+                </p>
+              </div>
+            )}
+
             {/* 按日期分組顯示（當有解析結果時） */}
             {!useDefaultTickets && tickets.some(t => t.dayNumber) ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -2920,10 +3111,11 @@ Day 5｜送機
 
           {/* Result - 移除 sticky，改為一般區塊 */}
           <div style={{ background: '#5c4a2a', color: 'white', textAlign: 'center', padding: 24, borderRadius: 12, marginTop: 16 }}>
-            <div style={{ fontSize: 14, opacity: 0.9 }}>每人報價（台幣）</div>
+            <div style={{ fontSize: 14, opacity: 0.9 }}>每位成人報價（台幣）</div>
             <div style={{ fontSize: 36, fontWeight: 'bold' }}>NT$ {fmt(calculation.perPersonTWD)}</div>
             <p style={{ color: 'rgba(255,255,255,0.7)', marginTop: 8, fontSize: 12 }}>
-              總計 {fmt(calculation.totalPrice)} 泰銖 ÷ {people}人 ÷ {exchangeRate}
+              總計 {fmt(calculation.totalPrice)} 泰銖 ÷ {adults}成人 ÷ {exchangeRate}
+              {children > 0 && <span style={{ display: 'block' }}>（{children}位小孩已計入總費用）</span>}
             </p>
             {calculation.totalDeposit > 0 && (
               <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.3)' }}>
@@ -2949,24 +3141,28 @@ Day 5｜送機
               </tr>
             </thead>
             <tbody>
-              <SectionRow title={`🏨 住宿 (${totalNights}晚)`} />
-              {hotels.map(h => {
-                const hotelCost = calculation.getHotelCost(h)
-                // 遍歷每個房型分類，計算該分類下所有子房型的總數量
-                const roomInfo = ROOM_CATEGORIES
-                  .filter(cat => h.rooms[cat.key].some(sr => sr.quantity > 0))
-                  .map(cat => {
-                    const totalQty = h.rooms[cat.key].reduce((sum, sr) => sum + sr.quantity, 0)
-                    return `${cat.label.replace(/（.*）/, '')}x${totalQty}`
-                  })
-                  .join('+')
-                return (
-                  <DataRow key={h.id} name={`${h.name} (${h.nights}晚) ${roomInfo}${h.hasDeposit ? ' 💳' : ''}`} cost={hotelCost} price={hotelCost} profit={0} className="day-row" />
-                )
-              })}
-              <SubtotalRow name="住宿小計" cost={calculation.accommodationCost} price={calculation.accommodationCost} profit={0} />
-              {calculation.hotelsWithDeposit.length > 0 && (
-                <InfoRow text={`💳 需押金飯店：${calculation.hotelsWithDeposit.map(h => h.name).join('、')}`} />
+              {includeAccommodation && (
+                <>
+                  <SectionRow title={`🏨 住宿 (${totalNights}晚)`} />
+                  {hotels.map(h => {
+                    const hotelCost = calculation.getHotelCost(h)
+                    // 遍歷每個房型分類，計算該分類下所有子房型的總數量
+                    const roomInfo = ROOM_CATEGORIES
+                      .filter(cat => h.rooms[cat.key].some(sr => sr.quantity > 0))
+                      .map(cat => {
+                        const totalQty = h.rooms[cat.key].reduce((sum, sr) => sum + sr.quantity, 0)
+                        return `${cat.label.replace(/（.*）/, '')}x${totalQty}`
+                      })
+                      .join('+')
+                    return (
+                      <DataRow key={h.id} name={`${h.name} (${h.nights}晚) ${roomInfo}${h.hasDeposit ? ' 💳' : ''}`} cost={hotelCost} price={hotelCost} profit={0} className="day-row" />
+                    )
+                  })}
+                  <SubtotalRow name="住宿小計" cost={calculation.accommodationCost} price={calculation.accommodationCost} profit={0} />
+                  {calculation.hotelsWithDeposit.length > 0 && (
+                    <InfoRow text={`💳 需押金飯店：${calculation.hotelsWithDeposit.map(h => h.name).join('、')}`} />
+                  )}
+                </>
               )}
 
               <SectionRow title={`🍜 餐費 (${calculation.mealDays}天午晚餐)`} />
@@ -3123,7 +3319,7 @@ Day 5｜送機
                     day: `DAY ${i + 1}${cf.date ? ` (${cf.date})` : ''}`,
                     title: cf.name || `第 ${i + 1} 天`,
                     items: [],
-                    hotel: hotels[0]?.name || null
+                    hotel: includeAccommodation ? (hotels[0]?.name || null) : null
                   }))
               return itineraryToShow.map((day, i) => (
                 <div key={i} style={{ background: '#fafafa', borderRadius: 8, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
@@ -3140,7 +3336,7 @@ Day 5｜送機
             <h3 style={{ margin: '0 0 12px 0', color: '#5c4a2a', fontSize: 16, borderBottom: '2px solid #5c4a2a', paddingBottom: 8 }}>💰 費用明細</h3>
 
             <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
-              👥 <strong>{people} 人</strong>｜🗓️ {tripDays}天{tripNights}夜
+              👥 <strong>{adults} 成人{children > 0 ? ` + ${children} 小孩` : ''}</strong>｜🗓️ {tripDays}天{tripNights}夜
             </div>
 
             {/* Detailed Breakdown */}
@@ -3223,9 +3419,12 @@ Day 5｜送機
 
           {/* Per Person Price */}
           <div style={{ background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)', color: 'white', padding: 20, borderRadius: 12, textAlign: 'center' }}>
-            <div style={{ fontSize: 14, opacity: 0.9 }}>每人費用</div>
+            <div style={{ fontSize: 14, opacity: 0.9 }}>每位成人費用</div>
             <div style={{ fontSize: 36, fontWeight: 'bold', margin: '8px 0' }}>NT$ {fmt(calculation.perPersonTWD)}</div>
-            <div style={{ fontSize: 12, opacity: 0.8 }}>約 {fmt(Math.round(calculation.perPersonTHB))} 泰銖 ÷ {people}人</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              約 {fmt(Math.round(calculation.perPersonTHB))} 泰銖 ÷ {adults}成人
+              {children > 0 && <span style={{ display: 'block', marginTop: 4 }}>（{children}位小孩已計入總費用）</span>}
+            </div>
           </div>
 
           {/* Includes/Excludes */}
