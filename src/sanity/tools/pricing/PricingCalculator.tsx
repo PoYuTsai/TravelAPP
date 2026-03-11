@@ -49,7 +49,7 @@ const DEFAULT_CONFIG = {
 interface DynamicTicket {
   id: string
   name: string
-  price: number           // 成人售價
+  price: number           // 成人售價（全域預設）
   childPrice?: number     // 兒童售價（undefined = 同成人價，0 = 免費）
   rebate: number          // 退佣
   split: boolean          // 利潤對分
@@ -58,9 +58,14 @@ interface DynamicTicket {
   source: 'parsed' | 'manual' | 'default'  // 來源
   exclusiveGroup?: string // 互斥群組
   priceNote?: string      // 價格備註（如「身高 90-120cm」）
+  // 當前報價覆寫（不影響全域預設）
+  adultCount?: number     // 成人票數量（預設用 adults state）
+  childCount?: number     // 兒童票數量（預設用 children state）
+  adultPriceOverride?: number   // 成人價覆寫
+  childPriceOverride?: number   // 兒童價覆寫
 }
 
-// 小孩定義：12歲以下（含）
+// 小孩定義：12歲以下（含）- 僅供 UI 顯示參考
 const CHILD_AGE_THRESHOLD = 12
 
 // 門票關鍵字對照表 - 用於智能匹配
@@ -1749,24 +1754,30 @@ export function PricingCalculator() {
     const transportPrice = carPriceTotal + guidePrice + luggageCost + childSeatCost
     const transportProfit = transportPrice - transportCost - luggageCost - childSeatCost
 
-    // Tickets - 成人/兒童分開計算
+    // Tickets - 成人/兒童分開計算（支援覆寫數量和價格）
     let ticketCost = 0, ticketPrice = 0, ticketYourProfit = 0, ticketPartnerProfit = 0
     const selectedTickets = tickets.filter(t => t.checked)
     selectedTickets.forEach(t => {
+      // 使用覆寫值或預設值
+      const adultNum = t.adultCount ?? adults
+      const childNum = t.childCount ?? children
+      const adultUnitPrice = t.adultPriceOverride ?? t.price
+      const childUnitPrice = t.childPriceOverride ?? (t.childPrice ?? t.price)
+
       // 成人
-      const adultCost = (t.price - t.rebate) * adults
-      const adultPriceTotal = t.price * adults
-      // 兒童（childPrice undefined = 同成人價，0 = 免費）
-      const effectiveChildPrice = t.childPrice ?? t.price
-      const childCost = (effectiveChildPrice - t.rebate) * children
-      const childPriceTotal = effectiveChildPrice * children
+      const adultCost = (adultUnitPrice - t.rebate) * adultNum
+      const adultPriceTotal = adultUnitPrice * adultNum
+      // 兒童
+      const childCost = (childUnitPrice - t.rebate) * childNum
+      const childPriceTotal = childUnitPrice * childNum
       // 合計
       const cost = adultCost + childCost
       const price = adultPriceTotal + childPriceTotal
       ticketCost += cost
       ticketPrice += price
-      // 利潤分潤
-      const profit = t.rebate * people  // 退佣仍以總人數計算
+      // 利潤分潤（以實際票數計算）
+      const totalTickets = adultNum + childNum
+      const profit = t.rebate * totalTickets
       if (t.split && t.rebate > 0) {
         ticketYourProfit += profit / 2
         ticketPartnerProfit += profit / 2
@@ -1867,6 +1878,11 @@ export function PricingCalculator() {
       // 沒有互斥群組，直接切換
       return prev.map(t => t.id === id ? { ...t, checked: !t.checked } : t)
     })
+  }
+
+  // 更新門票覆寫值（只影響當前報價，不影響全域預設）
+  const updateTicketOverride = (id: string, field: 'adultCount' | 'childCount' | 'adultPriceOverride' | 'childPriceOverride', value: number | undefined) => {
+    setTickets(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t))
   }
 
   // 門票 + 泰服 統一控制
@@ -3020,16 +3036,75 @@ Day 5｜送機
                         {carFees[dayNum ? dayNum - 1 : 0]?.name && <span style={{ fontWeight: 'normal', marginLeft: 8, color: '#999' }}>- {carFees[dayNum ? dayNum - 1 : 0]?.name}</span>}
                       </div>
                       {dayTickets.length > 0 && (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 6 }}>
-                          {dayTickets.map(t => (
-                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6, background: t.checked ? '#fff' : '#f0f0f0', borderRadius: 4, opacity: t.checked ? 1 : 0.6 }}>
-                              <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
-                              <label style={{ flex: 1, fontSize: 13 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
-                              <span style={{ color: '#666', fontSize: 12 }}>
-                                {t.price > 0 ? `${fmt(t.price - t.rebate)}` : '免費'}
-                              </span>
-                            </div>
-                          ))}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {dayTickets.map(t => {
+                            const adultNum = t.adultCount ?? adults
+                            const childNum = t.childCount ?? children
+                            const adultPrice = t.adultPriceOverride ?? t.price
+                            const childPrice = t.childPriceOverride ?? (t.childPrice ?? t.price)
+                            const subtotal = (adultPrice * adultNum) + (childPrice * childNum)
+                            return (
+                              <div key={t.id} style={{ background: t.checked ? '#fff' : '#f0f0f0', borderRadius: 4, opacity: t.checked ? 1 : 0.6, border: t.checked ? '1px solid #d0c0a0' : '1px solid transparent' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 6 }}>
+                                  <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
+                                  <label style={{ flex: 1, fontSize: 13, fontWeight: t.checked ? 'bold' : 'normal' }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
+                                  {!t.checked && (
+                                    <span style={{ color: '#666', fontSize: 12 }}>
+                                      {t.price > 0 ? `${fmt(t.price)}/人` : '免費'}
+                                    </span>
+                                  )}
+                                </div>
+                                {/* 勾選後顯示成人/兒童票數和價格 */}
+                                {t.checked && (
+                                  <div style={{ padding: '0 6px 6px 28px', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                      <span style={{ color: '#666', width: 40 }}>成人</span>
+                                      <input
+                                        type="number"
+                                        value={adultNum}
+                                        onChange={e => updateTicketOverride(t.id, 'adultCount', Number(e.target.value) || 0)}
+                                        min={0}
+                                        style={{ width: 40, padding: '2px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'center', fontSize: 11 }}
+                                      />
+                                      <span style={{ color: '#999' }}>×</span>
+                                      <input
+                                        type="number"
+                                        value={adultPrice}
+                                        onChange={e => updateTicketOverride(t.id, 'adultPriceOverride', Number(e.target.value) || 0)}
+                                        min={0}
+                                        style={{ width: 55, padding: '2px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'right', fontSize: 11 }}
+                                      />
+                                      <span style={{ color: '#999' }}>=</span>
+                                      <span style={{ fontWeight: 'bold' }}>{fmt(adultPrice * adultNum)}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                                      <span style={{ color: '#666', width: 40 }}>兒童</span>
+                                      <input
+                                        type="number"
+                                        value={childNum}
+                                        onChange={e => updateTicketOverride(t.id, 'childCount', Number(e.target.value) || 0)}
+                                        min={0}
+                                        style={{ width: 40, padding: '2px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'center', fontSize: 11 }}
+                                      />
+                                      <span style={{ color: '#999' }}>×</span>
+                                      <input
+                                        type="number"
+                                        value={childPrice}
+                                        onChange={e => updateTicketOverride(t.id, 'childPriceOverride', Number(e.target.value) || 0)}
+                                        min={0}
+                                        style={{ width: 55, padding: '2px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'right', fontSize: 11 }}
+                                      />
+                                      <span style={{ color: '#999' }}>=</span>
+                                      <span>{fmt(childPrice * childNum)}</span>
+                                    </div>
+                                    <div style={{ textAlign: 'right', color: '#5c4a2a', fontWeight: 'bold', fontSize: 12 }}>
+                                      小計: {fmt(subtotal)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                       {/* 泰服體驗（在偵測到的天數內顯示） */}
@@ -3066,16 +3141,75 @@ Day 5｜送機
               </div>
             ) : (
               /* 預設門票列表 */
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 8 }}>
-                {tickets.map(t => (
-                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8, background: t.checked ? '#f9f8f6' : '#f5f5f5', borderRadius: 6, opacity: t.checked ? 1 : 0.7 }}>
-                    <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
-                    <label style={{ flex: 1 }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
-                    <span style={{ color: '#666', fontSize: 13 }}>
-                      {t.price > 0 ? `成本 ${fmt(t.price - t.rebate)}` : '免費'}
-                    </span>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {tickets.map(t => {
+                  const adultNum = t.adultCount ?? adults
+                  const childNum = t.childCount ?? children
+                  const adultPrice = t.adultPriceOverride ?? t.price
+                  const childPrice = t.childPriceOverride ?? (t.childPrice ?? t.price)
+                  const subtotal = (adultPrice * adultNum) + (childPrice * childNum)
+                  return (
+                    <div key={t.id} style={{ background: t.checked ? '#f9f8f6' : '#f5f5f5', borderRadius: 6, opacity: t.checked ? 1 : 0.7, border: t.checked ? '1px solid #d0c0a0' : '1px solid transparent' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 8 }}>
+                        <input type="checkbox" checked={t.checked} onChange={() => toggleTicket(t.id)} />
+                        <label style={{ flex: 1, fontWeight: t.checked ? 'bold' : 'normal' }}>{t.name}{t.split && t.rebate > 0 ? ' ★' : ''}</label>
+                        {!t.checked && (
+                          <span style={{ color: '#666', fontSize: 13 }}>
+                            {t.price > 0 ? `${fmt(t.price)}/人` : '免費'}
+                          </span>
+                        )}
+                      </div>
+                      {/* 勾選後顯示成人/兒童票數和價格 */}
+                      {t.checked && (
+                        <div style={{ padding: '0 8px 8px 28px', display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ color: '#666', width: 45 }}>成人票</span>
+                            <input
+                              type="number"
+                              value={adultNum}
+                              onChange={e => updateTicketOverride(t.id, 'adultCount', Number(e.target.value) || 0)}
+                              min={0}
+                              style={{ width: 45, padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'center' }}
+                            />
+                            <span style={{ color: '#999' }}>×</span>
+                            <input
+                              type="number"
+                              value={adultPrice}
+                              onChange={e => updateTicketOverride(t.id, 'adultPriceOverride', Number(e.target.value) || 0)}
+                              min={0}
+                              style={{ width: 60, padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'right' }}
+                            />
+                            <span style={{ color: '#999' }}>=</span>
+                            <span style={{ fontWeight: 'bold', minWidth: 60 }}>{fmt(adultPrice * adultNum)}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span style={{ color: '#666', width: 45 }}>兒童票</span>
+                            <input
+                              type="number"
+                              value={childNum}
+                              onChange={e => updateTicketOverride(t.id, 'childCount', Number(e.target.value) || 0)}
+                              min={0}
+                              style={{ width: 45, padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'center' }}
+                            />
+                            <span style={{ color: '#999' }}>×</span>
+                            <input
+                              type="number"
+                              value={childPrice}
+                              onChange={e => updateTicketOverride(t.id, 'childPriceOverride', Number(e.target.value) || 0)}
+                              min={0}
+                              style={{ width: 60, padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3, textAlign: 'right' }}
+                            />
+                            <span style={{ color: '#999' }}>=</span>
+                            <span style={{ minWidth: 60 }}>{fmt(childPrice * childNum)}</span>
+                          </div>
+                          <div style={{ textAlign: 'right', color: '#5c4a2a', fontWeight: 'bold', paddingTop: 4, borderTop: '1px dashed #ddd' }}>
+                            小計: {fmt(subtotal)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
             <p style={{ ...noteStyle, marginTop: 12 }}>
