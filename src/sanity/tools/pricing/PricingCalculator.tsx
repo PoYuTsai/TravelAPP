@@ -89,6 +89,14 @@ const TICKET_KEYWORDS: Record<string, string[]> = {
   'horseRiding': ['騎馬', 'horse', 'horseback', '馬場'],
   // 泰服
   'thaiDress': ['泰服', 'thai dress', '泰服體驗', '攝影師'],
+  // 鳳凰冒險公園
+  'phoenixPark': ['鳳凰', 'phoenix', '冒險公園', 'adventure park', 'phoenix adventure'],
+  // 大象粑粑造紙公園
+  'elephantPoop': ['粑粑', '造紙', 'poop', 'paper', '大象粑粑', '造紙公園', 'elephant poop'],
+  // 康托克帝王餐
+  'khantoke': ['康托克', 'khantoke', '帝王餐', '帝王宴', '文化表演秀'],
+  // 天使瀑布
+  'dantewada': ['天使瀑布', 'dantewada', '仙境造景', '人工瀑布'],
 }
 
 // 預設門票範本（當沒有解析行程時使用）
@@ -124,6 +132,14 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   { id: 'massage', name: '泰式按摩', price: 500, rebate: 100, split: true, checked: false, source: 'default' },
   // 騎馬（90公斤以上不得騎乘）
   { id: 'horseRiding', name: '騎馬', price: 1400, rebate: 210, split: true, checked: false, source: 'default' },
+  // 鳳凰冒險公園
+  { id: 'phoenixPark', name: '鳳凰冒險公園', price: 1500, rebate: 300, split: true, checked: false, source: 'default' },
+  // 大象粑粑造紙公園
+  { id: 'elephantPoop', name: '大象粑粑造紙公園', price: 200, rebate: 0, split: false, checked: false, source: 'default' },
+  // 康托克帝王餐
+  { id: 'khantoke', name: '康托克帝王餐', price: 800, rebate: 150, split: true, checked: false, source: 'default' },
+  // 天使瀑布
+  { id: 'dantewada', name: '天使瀑布', price: 100, rebate: 0, split: false, checked: false, source: 'default' },
 ]
 
 // 將 DEFAULT_TICKETS 轉換為 ActivityRecord 格式（供匹配器使用）
@@ -139,6 +155,26 @@ function getDefaultActivitiesForMatching(): ActivityRecord[] {
     exclusiveGroup: ticket.exclusiveGroup,
     isActive: true,
   }))
+}
+
+// 合併 Sanity 資料庫和 DEFAULT_TICKETS（避免二擇一導致匹配不完整）
+function mergeActivitiesForMatching(dbActivities: ActivityRecord[]): ActivityRecord[] {
+  const defaultActivities = getDefaultActivitiesForMatching()
+
+  // 建立 ID 索引，Sanity 資料優先
+  const merged = new Map<string, ActivityRecord>()
+
+  // 先加入 DEFAULT_TICKETS（作為基底）
+  for (const activity of defaultActivities) {
+    merged.set(activity._id, activity)
+  }
+
+  // 再用 Sanity 資料覆蓋或新增
+  for (const activity of dbActivities) {
+    merged.set(activity._id, activity)
+  }
+
+  return Array.from(merged.values())
 }
 
 // 下載對外報價單
@@ -1020,8 +1056,8 @@ export function PricingCalculator() {
     if (!itineraryText.trim()) return
 
     const parsed = parseItineraryText(itineraryText)
-    // 如果 Sanity 資料庫是空的，用 DEFAULT_TICKETS 來匹配
-    const activitiesToMatch = dbActivities.length > 0 ? dbActivities : getDefaultActivitiesForMatching()
+    // 合併 Sanity 資料庫和 DEFAULT_TICKETS（避免二擇一導致匹配不完整）
+    const activitiesToMatch = mergeActivitiesForMatching(dbActivities)
     const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
 
     // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
@@ -1821,6 +1857,38 @@ export function PricingCalculator() {
     setMakeupCount(0)
   }
 
+  // 從未匹配活動新增到門票列表
+  const addUnmatchedAsTicket = (unmatchedText: string, dayNumber: number) => {
+    // 生成唯一 ID
+    const id = `manual-${Date.now()}-${Math.random().toString(36).substring(7)}`
+    // 提取活動名稱（移除前綴符號）
+    const name = unmatchedText.replace(/^[・\-•·]\s*/, '').split(/[（(]/)[0].trim()
+
+    const newTicket: DynamicTicket = {
+      id,
+      name,
+      price: 0,  // 預設 0，用戶可手動調整
+      rebate: 0,
+      split: false,
+      checked: true,
+      dayNumber,
+      source: 'manual',
+    }
+
+    setTickets(prev => [...prev, newTicket])
+    setSavedParsedTickets(prev => [...prev, newTicket])
+
+    // 從未匹配列表移除
+    if (parseResult) {
+      setParseResult({
+        ...parseResult,
+        unmatched: parseResult.unmatched.filter(u => u.text !== unmatchedText || u.dayNumber !== dayNumber)
+      })
+    }
+
+    console.log(`[手動新增] ${name} (Day ${dayNumber})`)
+  }
+
   const allTicketsSelected = tickets.every(t => t.checked)
   const noTicketsSelected = tickets.every(t => !t.checked)
   const allActivitiesSelected = allTicketsSelected && thaiDressCloth
@@ -2091,20 +2159,38 @@ Day 5｜送機
                     <summary style={{ cursor: 'pointer', fontWeight: 'bold', color: '#c2185b' }}>
                       ⚠️ {parseResult.unmatched.length} 項活動未匹配資料庫（點擊展開）
                     </summary>
-                    <ul style={{ margin: '8px 0 0 0', paddingLeft: 20 }}>
+                    <ul style={{ margin: '8px 0 0 0', paddingLeft: 20, listStyle: 'none' }}>
                       {parseResult.unmatched.map((u, i) => (
-                        <li key={i} style={{ marginBottom: 4 }}>
-                          <span style={{ color: '#880e4f' }}>Day {u.dayNumber}:</span> {u.text}
+                        <li key={i} style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <button
+                            onClick={() => addUnmatchedAsTicket(u.text, u.dayNumber)}
+                            style={{
+                              padding: '2px 8px',
+                              background: '#4caf50',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: 4,
+                              cursor: 'pointer',
+                              fontSize: 11,
+                              flexShrink: 0,
+                            }}
+                            title="新增到門票列表"
+                          >
+                            ➕ 新增
+                          </button>
+                          <span>
+                            <span style={{ color: '#880e4f', fontWeight: 'bold' }}>Day {u.dayNumber}:</span> {u.text}
+                          </span>
                           {u.suggestedKeywords.length > 0 && (
-                            <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
-                              (建議關鍵字: {u.suggestedKeywords.join(', ')})
+                            <span style={{ fontSize: 11, color: '#999' }}>
+                              ({u.suggestedKeywords.slice(0, 2).join(', ')})
                             </span>
                           )}
                         </li>
                       ))}
                     </ul>
                     <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
-                      💡 這些活動不在資料庫，可能是：免費景點、自由活動、或需要新增到資料庫
+                      💡 點擊「➕ 新增」可將未匹配活動加入門票列表（價格預設為 0，可手動調整）
                     </div>
                   </details>
                 )}

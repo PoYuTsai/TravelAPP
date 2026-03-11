@@ -97,6 +97,11 @@ const ACTIVITY_INDICATORS = [
   '豬豬', '溜滑梯',
   '泰拳', 'muay thai',
   '騎馬', 'horse', '馬場',
+
+  // 特色景點/活動
+  '康托克', 'khantoke', '帝王餐', '帝王宴', '文化表演',
+  '天使瀑布', 'dantewada', '仙境造景',
+  '造紙', '粑粑', 'poop', 'paper park',
 ]
 
 /**
