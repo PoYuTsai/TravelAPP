@@ -549,7 +549,7 @@ function downloadExternalQuote(
           <span>🎫 門票活動（${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
           <span>${fmt(c.ticketPrice + c.thaiDressPrice)} 泰銖</span>
         </div>
-        ${c.selectedTickets.slice(0, 6).map((t: any) => `<div class="price-detail">• ${t.name.replace(/^D\\d /, '')}${t.price > 0 ? ` ${fmt(t.price)}/人` : ''}</div>`).join('')}
+        ${c.selectedTickets.slice(0, 6).map((t: any) => `<div class="price-detail">• ${t.name.replace(/^D\\d /, '')} (成人${t.adultNum}+兒童${t.childNum}) ${fmt(t.calculatedPrice)}</div>`).join('')}
         ${c.selectedTickets.length > 6 ? `<div class="price-detail">• ...及其他 ${c.selectedTickets.length - 6} 項</div>` : ''}
         ${thaiDressCloth ? `<div class="price-detail">• 泰服衣服 500/人 × ${people}人</div>` : ''}
         ${makeupCount > 0 ? `<div class="price-detail">• 專業化妝 1,000/人 × ${makeupCount}人</div>` : ''}
@@ -1756,8 +1756,7 @@ export function PricingCalculator() {
 
     // Tickets - 成人/兒童分開計算（支援覆寫數量和價格）
     let ticketCost = 0, ticketPrice = 0, ticketYourProfit = 0, ticketPartnerProfit = 0
-    const selectedTickets = tickets.filter(t => t.checked)
-    selectedTickets.forEach(t => {
+    const selectedTickets = tickets.filter(t => t.checked).map(t => {
       // 使用覆寫值或預設值
       const adultNum = t.adultCount ?? adults
       const childNum = t.childCount ?? children
@@ -1781,6 +1780,17 @@ export function PricingCalculator() {
       if (t.split && t.rebate > 0) {
         ticketYourProfit += profit / 2
         ticketPartnerProfit += profit / 2
+      }
+      // 回傳包含計算結果的門票物件
+      return {
+        ...t,
+        adultNum,
+        childNum,
+        adultUnitPrice,
+        childUnitPrice,
+        calculatedCost: cost,
+        calculatedPrice: price,
+        calculatedProfit: profit,
       }
     })
 
@@ -2868,11 +2878,14 @@ Day 5｜送機
               </div>
             )}
 
-            {/* 門票管理面板 */}
+            {/* 門票管理面板 - 全域設定 */}
             {showTicketManager && (
-              <div style={{ background: '#f5f5f5', border: '2px solid #5c4a2a', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ background: '#e8f5e9', border: '2px solid #4caf50', borderRadius: 8, padding: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                  <h4 style={{ margin: 0, color: '#5c4a2a' }}>⚙️ 門票管理</h4>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#2e7d32' }}>💾 全域門票設定</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#666' }}>修改此處 = 儲存為新行程的預設值（自動儲存）</p>
+                  </div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
                       onClick={() => {
@@ -3012,11 +3025,18 @@ Day 5｜送機
                     </tbody>
                   </table>
                 </div>
-                <p style={{ ...noteStyle, marginTop: 8, marginBottom: 0 }}>
-                  💾 變更會自動儲存到瀏覽器 | 兒童價留空 = 同成人價 | 對分 = 退佣利潤對半分
+                <p style={{ ...noteStyle, marginTop: 8, marginBottom: 0, color: '#2e7d32' }}>
+                  ✅ 修改會立即儲存 → 下次解析新行程會用這裡的價格
                 </p>
               </div>
             )}
+
+            {/* 當前報價標題（區分全域設定） */}
+            <div style={{ background: '#fff3e0', padding: 8, borderRadius: 6, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 14 }}>📋</span>
+              <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e65100' }}>當前報價</span>
+              <span style={{ fontSize: 11, color: '#666' }}>— 勾選門票後可調整數量和價格（不影響全域設定）</span>
+            </div>
 
             {/* 按日期分組顯示（當有解析結果時） */}
             {!useDefaultTickets && tickets.some(t => t.dayNumber) ? (
@@ -3333,9 +3353,16 @@ Day 5｜送機
               </tr>
             </thead>
             <tbody>
-              <SectionRow title={`🎫 門票活動（${people}人）`} />
+              <SectionRow title={`🎫 門票活動`} />
               {calculation.selectedTickets.map((t: any, i: number) => (
-                <DataRow key={i} name={`${t.name}${t.split && t.rebate > 0 ? ' ★' : ''}`} cost={(t.price - t.rebate) * people} price={t.price * people} profit={t.rebate * people} className="day-row" />
+                <DataRow
+                  key={i}
+                  name={`${t.name}${t.split && t.rebate > 0 ? ' ★' : ''} (成人${t.adultNum}+兒童${t.childNum})`}
+                  cost={t.calculatedCost}
+                  price={t.calculatedPrice}
+                  profit={t.calculatedProfit}
+                  className="day-row"
+                />
               ))}
               {/* 泰服體驗（整合進門票區塊，無標題行） */}
               {thaiDressCloth && (
@@ -3525,10 +3552,10 @@ Day 5｜送機
                   </div>
                   <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
                     {calculation.selectedTickets.map((t: any, idx: number) => (
-                      <div key={idx}>• {t.name.replace(/^D\d /, '')}{t.price > 0 ? ` ${fmt(t.price)}/人` : '（免費）'}</div>
+                      <div key={idx}>• {t.name.replace(/^D\d /, '')} (成人{t.adultNum}+兒童{t.childNum}) {fmt(t.calculatedPrice)}</div>
                     ))}
                     {/* 泰服項目 */}
-                    {thaiDressCloth && <div>• 泰服衣服 500/人 × {people}人</div>}
+                    {thaiDressCloth && <div>• 泰服衣服 {fmt(config.thaiDress.cloth.price)}/人 × {people}人</div>}
                     {makeupCount > 0 && <div>• 專業化妝 1,000/人 × {makeupCount}人</div>}
                     {thaiDressPhoto && <div>• 攝影師 2,500/位 × {people <= 10 ? 1 : 2}位</div>}
                   </div>
