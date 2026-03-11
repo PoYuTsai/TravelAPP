@@ -198,6 +198,9 @@ function distributeActivities(
   return result
 }
 
+// Parser version: 2026-03-11-v2 (修復日期行與 Day 標題合併)
+console.log('[Parser] Version: 2026-03-11-v2')
+
 /**
  * 判斷是否為純日期行（只有日期，沒有其他內容）
  * 例如: "4/30 (四)" 或 "5/1 (五)" 或 "2/12"
