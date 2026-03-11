@@ -1008,12 +1008,12 @@ export function PricingCalculator() {
     }
   }, [client])
 
-  // 打開解析器時載入活動
+  // 打開解析器時載入活動（每次打開都重新載入，確保資料是最新的）
   useEffect(() => {
-    if (showParser && dbActivities.length === 0) {
+    if (showParser) {
       loadActivities()
     }
-  }, [showParser, dbActivities.length, loadActivities])
+  }, [showParser, loadActivities])
 
   // 智能解析行程
   const handleParseItinerary = useCallback(() => {
