@@ -199,6 +199,16 @@ function distributeActivities(
 }
 
 /**
+ * 判斷是否為純日期行（只有日期，沒有其他內容）
+ * 例如: "4/30 (四)" 或 "5/1 (五)" 或 "2/12"
+ */
+function isStandaloneDateLine(line: string): boolean {
+  const trimmed = line.trim()
+  // 匹配: 數字/數字 可選的 (星期)
+  return /^\d{1,2}\/\d{1,2}\s*(\([一二三四五六日]\))?$/.test(trimmed)
+}
+
+/**
  * 主解析函數 - 解析行程文字
  */
 export function parseItineraryText(text: string, year?: number): ParseResult {
@@ -212,6 +222,7 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
   let currentDay: ParsedDay | null = null
   let dayRawLines: string[] = []
   let dayActivities: string[] = []
+  let pendingDate: { month: number; day: number } | null = null // 暫存日期，等待與 Day X 合併
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -224,9 +235,30 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
 
     const dateInfo = parseDateLine(trimmedLine, detectedYear)
     const dayTitle = parseDayTitle(trimmedLine)
+    const isStandaloneDate = isStandaloneDateLine(trimmedLine)
 
-    // 新的一天開始：有日期格式 或 有 Day X 格式
-    if (dateInfo || (dayTitle && !currentDay)) {
+    // 情況 1: 純日期行（如 "4/30 (四)"），暫存等待下一行的 Day X
+    if (isStandaloneDate && dateInfo) {
+      // 如果已有暫存日期但沒遇到 Day X，先用暫存日期創建新的一天
+      if (pendingDate && currentDay) {
+        const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
+        currentDay.morning = distributed.morning
+        currentDay.afternoon = distributed.afternoon
+        currentDay.evening = distributed.evening
+        currentDay.rawText = dayRawLines.join('\n')
+        days.push(currentDay)
+        currentDay = null
+        dayRawLines = []
+        dayActivities = []
+      }
+      pendingDate = dateInfo
+      if (currentDay) dayRawLines.push(line)
+      continue
+    }
+
+    // 情況 2: Day X 標題行
+    if (dayTitle) {
+      // 儲存前一天
       if (currentDay) {
         const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
         currentDay.morning = distributed.morning
@@ -236,37 +268,14 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
         days.push(currentDay)
       }
 
-      const dateStr = dateInfo
-        ? `${detectedYear}-${String(dateInfo.month).padStart(2, '0')}-${String(dateInfo.day).padStart(2, '0')}`
+      // 使用暫存日期（如果有）或空字串
+      const dateToUse = pendingDate || dateInfo
+      const dateStr = dateToUse
+        ? `${detectedYear}-${String(dateToUse.month).padStart(2, '0')}-${String(dateToUse.day).padStart(2, '0')}`
         : ''
+
       currentDay = {
         date: dateStr,
-        dayNumber: dayTitle?.dayNumber || days.length + 1,
-        title: dayTitle?.title || '',
-        morning: '',
-        afternoon: '',
-        evening: '',
-        activities: [],
-        rawText: '',
-      }
-      dayRawLines = [line]
-      dayActivities = []
-      continue
-    }
-
-    // 如果遇到 Day X 格式且已有 currentDay，開始新的一天
-    if (dayTitle && currentDay) {
-      // 先儲存前一天
-      const distributed = distributeActivities(dayActivities, currentDay.lunch, currentDay.dinner)
-      currentDay.morning = distributed.morning
-      currentDay.afternoon = distributed.afternoon
-      currentDay.evening = distributed.evening
-      currentDay.rawText = dayRawLines.join('\n')
-      days.push(currentDay)
-
-      // 開始新的一天
-      currentDay = {
-        date: '',
         dayNumber: dayTitle.dayNumber,
         title: dayTitle.title,
         morning: '',
@@ -275,10 +284,14 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
         activities: [],
         rawText: '',
       }
-      dayRawLines = [line]
+      dayRawLines = pendingDate ? [lines[i - 1] || '', line] : [line]
       dayActivities = []
+      pendingDate = null // 清除暫存日期
       continue
     }
+
+    // 情況 3: 有日期但不是純日期行（內容中包含日期），視為活動
+    // 這樣可以避免把 "午餐：..." 等行誤判為新的一天
 
     if (!currentDay) continue
 

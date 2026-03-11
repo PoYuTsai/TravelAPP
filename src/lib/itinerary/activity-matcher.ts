@@ -79,6 +79,7 @@ const ACTIVITY_INDICATORS = [
   '飛索', 'zipline', 'coaster', '叢林',
   '水上樂園', 'waterpark',
   'atv', '越野',
+  '鳳凰冒險', 'phoenix', 'adventure park',
 
   // 表演
   '人妖秀', '人妖', 'cabaret',
@@ -99,11 +100,41 @@ const ACTIVITY_INDICATORS = [
 ]
 
 /**
+ * 備註關鍵字 - 這些詞出現時表示該活動應該被忽略
+ * 用於處理「老虎園關園」這類備註
+ */
+const IGNORE_INDICATORS = [
+  '關園', '關閉', '停業', '暫停',
+  '休息', '整修', '維修', '取消',
+  'closed', 'closed temporarily',
+]
+
+/**
+ * 檢查行程文字是否應該被忽略（備註）
+ */
+function shouldIgnoreActivity(line: string): boolean {
+  const normalized = line.toLowerCase()
+
+  for (const indicator of IGNORE_INDICATORS) {
+    if (normalized.includes(indicator.toLowerCase())) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
  * 從單行文字中提取可能的活動
  */
 function extractPossibleActivities(line: string): string[] {
   const activities: string[] = []
   const normalized = line.toLowerCase()
+
+  // 先檢查是否應該忽略（備註中的關園、關閉等）
+  if (shouldIgnoreActivity(line)) {
+    return activities
+  }
 
   for (const indicator of ACTIVITY_INDICATORS) {
     if (normalized.includes(indicator.toLowerCase())) {
