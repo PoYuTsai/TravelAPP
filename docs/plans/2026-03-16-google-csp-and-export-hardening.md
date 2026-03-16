@@ -1,65 +1,90 @@
-# Google CSP 與匯出權限加固
+# Google CSP 與 Studio Session 驗證加固
 
 **日期**: 2026-03-16  
 **狀態**: 已完成
 
 ## 背景
 
-Google 團隊回報網站的 Google Ads 轉換追蹤因 CSP 設定不完整而無法正常運作，要求依據 Google Tag Platform 的 CSP 文件補齊設定。
+Google 團隊通知網站的 Google Ads 轉換追蹤因 CSP 設定不足而無法正常運作。  
+在修補 CSP 的過程中，也同步檢查了 Sanity Studio 內部匯出、Dashboard、Accounting 的驗證流程，並把原本可被偽造的 email header 改為真正的 token 驗證流程。
 
-在處理過程中，同步檢查到 `/api/sign-url` 權限控制過鬆，因此一併做安全加固。
+## 本次完成項目
 
-## 本次完成
+### 1. Google Ads / GTM / GA4 CSP 修復
 
-### 1. Google Ads / GTM CSP 修復
+更新 `next.config.js` 的 CSP 白名單，補齊 Google 官方文件需要的來源：
 
-更新 `next.config.js`：
+- `script-src`: `pagead2.googlesyndication.com`, `googletagmanager.com`, `google.com`, `google.com.tw`
+- `img-src`: `*.g.doubleclick.net`, `pagead2.googlesyndication.com`, `google.com.tw`
+- `connect-src`: `*.googletagmanager.com`, `*.google-analytics.com`, `*.g.doubleclick.net`
+- `frame-src`: `td.doubleclick.net`, `googletagmanager.com`
 
-- 補上 Google Ads / GTM / GA4 所需來源
-- 納入台灣地區網域 `google.com.tw`
-- 新增基礎安全指令：
-  - `base-uri 'self'`
-  - `object-src 'none'`
-  - `frame-ancestors 'none'`
+另外補上基礎安全指令：
 
-### 2. 匯出簽名 URL 權限加固
+- `base-uri 'self'`
+- `object-src 'none'`
+- `frame-ancestors 'none'`
 
-更新：
+### 2. Studio 驗證改為 Sanity token-backed session
 
-- `src/app/api/sign-url/route.ts`
-- `src/lib/signed-url.ts`
+調整檔案：
+
+- `src/app/api/auth/session/route.ts`
+- `src/lib/api-auth.ts`
+- `src/lib/sanity-auth.ts`
+- `src/lib/session-token.ts`
+- `src/sanity/hooks/useSessionToken.ts`
 - `src/sanity/actions/exportPdfAction.tsx`
 - `src/sanity/actions/exportExcelAction.tsx`
 - `src/sanity/actions/exportTextAction.tsx`
-- `src/lib/api-auth.ts`
+- `src/sanity/tools/dashboard/DashboardTool.tsx`
+- `src/sanity/tools/accounting/AccountingTool.tsx`
 
-處理內容：
+調整內容：
 
-- `/api/sign-url` 新增 dashboard whitelist 驗證
-- Sanity 匯出 action 帶入 `x-user-email`
-- 簽名 secret 僅允許使用 server-side `REVALIDATE_SECRET`
-- email whitelist 統一轉小寫比對
+- Sanity Studio 前端先取得 Sanity auth token
+- `/api/auth/session` 以 Sanity `users/me` 驗證目前登入者
+- 驗證通過後，才簽發 1 小時有效的短期 session token
+- Dashboard / Accounting / `/api/sign-url` 改為只接受已簽發的 session token
+- `x-user-email` 僅保留 development fallback，不再是 production 驗證依據
+- `DASHBOARD_ALLOWED_EMAILS` 集中在 `src/lib/api-auth.ts` 統一正規化與比對
+
+### 3. 報價 PDF 匯出 XSS 面收斂
+
+調整檔案：
+
+- `src/sanity/tools/pricing/PricingCalculator.tsx`
+
+調整內容：
+
+- 保留現有 `html2pdf` 匯出流程
+- 在 HTML append 到 DOM 前先跑 `sanitizeQuoteHtml()`
+- 移除 `script`、`iframe`、`svg`、`img`、`form` 等高風險標籤
+- 移除所有 `on*` 事件屬性
+- 移除 `javascript:` / `data:` 類型的危險 URL 屬性
 
 ## 驗證結果
 
-- `npm run build`：通過
-- `npm run test:run`：未全綠
-  - 既有失敗：`src/lib/__tests__/itinerary-parser.test.ts`
-  - 失敗項目：`處理沒有 Day 標題的行程`
-  - 判斷為既有問題，非本次修改引入
+- `npm run build`: 通過
+- `npm run test:run`: 仍有 1 個既有失敗
+  - 檔案：`src/lib/__tests__/itinerary-parser.test.ts`
+  - 測試：`處理沒有 Day 標題的行程`
+  - 此失敗與本次 CSP / auth / pricing sanitizer 修補無直接關聯
 
-## 仍待後續處理的風險
+## 目前剩餘風險
 
-1. `/api/dashboard`、`/api/accounting`、`/api/sign-url` 目前仍信任前端送來的 `x-user-email`
-2. `src/sanity/tools/pricing/PricingCalculator.tsx` 仍有 `container.innerHTML = html`
-3. `npm audit` 仍有 32 個依賴漏洞待排程處理
-4. owner whitelist 前後端多處重複硬編碼
+1. `npm audit` 仍有既有依賴漏洞需要後續盤點與升級
+2. `PricingCalculator` 目前仍是 `html2pdf` + HTML 字串架構
+   - 雖然實際 XSS 面已先用 sanitizer 收斂
+   - 若後續要再往上加固，建議改成純 DOM API 或 React render 後再輸出
+3. itinerary parser 既有測試失敗仍待獨立修復
 
-## 新增檔案
+## 相關文件
 
 - `CLAUDE_CODE_HANDOFF_2026-03-16.md`
-- `docs/plans/2026-03-16-google-csp-and-export-hardening.md`
+- `README.md`
 
 ## Commit
 
 - `7851312` `fix: harden google csp and signed exports`
+- `74edf64` `fix: verify studio sessions and sanitize pricing export`

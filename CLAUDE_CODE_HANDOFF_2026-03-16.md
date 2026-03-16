@@ -1,113 +1,95 @@
 # Claude Code Handoff - 2026-03-16
 
-## 本次任務背景
+## 目前狀態
 
-使用者回報 Google 團隊通知：
+本次原本是處理 Google 團隊通知的 CSP 問題，後來延伸把 Studio 內部驗證與報價匯出的安全面一起補強。  
+目前 Google Ads CSP 修復、Studio session 驗證加固、PricingCalculator 的 XSS 面收斂都已完成，並已通過 production build。
 
-- Google Ads / 轉換追蹤因為 CSP 設定不完整而無法正常運作
-- 需要依照 Google Tag Platform CSP 文件修正網站設定
-- 修完後再做一輪隱性漏洞與風險盤點
+## 這次已完成
 
-## 已完成項目
+### 1. Google Ads / GTM / GA4 CSP 修復
 
-### 1. Google Ads / GTM CSP 修復
-
-已更新 `next.config.js` 的全站 CSP 設定，補上 Google Ads / GTM / GA4 需要的來源，包含：
+已依 Google 官方文件補齊 `next.config.js` 的 CSP 白名單，包含：
 
 - `pagead2.googlesyndication.com`
-- `www.googletagmanager.com`
-- `*.googletagmanager.com`
-- `www.google.com`
+- `googletagmanager.com`
 - `google.com`
-- `www.google.com.tw`
 - `google.com.tw`
 - `*.google-analytics.com`
 - `*.g.doubleclick.net`
+- `td.doubleclick.net`
 
-另外也補上：
+另外加上：
 
 - `base-uri 'self'`
 - `object-src 'none'`
 - `frame-ancestors 'none'`
 
-說明：
+### 2. Studio 驗證不再信任 `x-user-email`
 
-- 這次沒有改成 nonce-based CSP
-- 原因是目前網站大量使用 SSG / ISR，若整站改成 nonce 流程，Next.js 會迫使頁面改成動態渲染，會直接影響既有 SEO / 效能策略
-- 因此本次採用「維持靜態 headers + 補齊 Google 官方要求來源」的穩健修法
+已完成的架構：
 
-### 2. 匯出簽名 URL 權限加固
+- Sanity Studio 前端先取 Sanity auth token
+- 呼叫 `/api/auth/session`
+- 後端用 Sanity `users/me` 驗證目前登入者
+- 驗證通過後，簽發 1 小時有效的短期 session token
+- Dashboard / Accounting / `/api/sign-url` 改成只接受這個 session token
 
-在檢查過程中發現 `/api/sign-url` 有實際風險：
+重點：
 
-- 原本只做 rate limit
-- 任何知道 itinerary id 的人理論上都能請求簽名匯出 URL
+- production 不再把 `x-user-email` 當作正式驗證依據
+- `x-user-email` 只保留 development fallback
+- `DASHBOARD_ALLOWED_EMAILS` 已集中在 `src/lib/api-auth.ts` 統一處理
 
-已修正為：
+### 3. PricingCalculator 匯出前先 sanitize HTML
 
-- `/api/sign-url` 現在會走 `validateDashboardAccess()`
-- Sanity 匯出 action（PDF / Excel / LINE 文字）會附帶 `x-user-email`
-- `getSigningSecret()` 現在只允許使用 server-side `REVALIDATE_SECRET`
-- 移除 `NEXT_PUBLIC_SIGNING_SECRET` fallback，避免設計上把簽名密鑰公開化
+`src/sanity/tools/pricing/PricingCalculator.tsx` 仍維持現有 `html2pdf` 流程，但在 append 到 DOM 前新增 `sanitizeQuoteHtml()`：
 
-### 3. Email whitelist 正規化
+- 移除 `script` / `iframe` / `svg` / `img` / `form` 等高風險標籤
+- 移除所有 `on*` 事件屬性
+- 移除 `javascript:` / `data:` 類型 URL
 
-`src/lib/api-auth.ts` 已將 `DASHBOARD_ALLOWED_EMAILS` 做 `trim().toLowerCase()`，避免大小寫或空白造成誤判。
+這一版先把可直接利用的 DOM XSS 面收斂住，避免大改報價工具 UI 結構。
 
 ## 已驗證
 
-- `npm run build`：成功
-- Google Ads CSP 相關修改已通過 production build
+- `npm run build`: 通過
+- `npm run test:run`: 仍有 1 個既有失敗
+  - `src/lib/__tests__/itinerary-parser.test.ts`
+  - 測試名稱：`處理沒有 Day 標題的行程`
+  - 這不是本次安全修補引入的新問題
 
-## 目前仍存在的風險 / 建議 Claude 接手處理
+## 建議 Claude 下一步優先處理
 
-### 高優先
+1. 依賴漏洞盤點與升級
+   - `npm audit` 仍有既有風險
+   - 建議先看 high / critical 是否可直接升版或只需調整 transitive dependencies
 
-1. `x-user-email` 仍是可偽造 header
-   - 目前 `/api/dashboard`、`/api/accounting`、`/api/sign-url` 都信任前端送來的 `x-user-email`
-   - 雖然 Sanity UI 前端有做 owner gate，但 API 層仍缺真正的 server-side 身份驗證
-   - 建議改成：
-     - Sanity session / token-based server verification
-     - 或至少改成伺服器可驗證的簽章 / JWT
+2. PricingCalculator 長期重構
+   - 目前已加 sanitizer，短期風險已下降
+   - 長期仍建議改成純 DOM API / React render，而不是整段 HTML 字串 + `innerHTML`
 
-2. 報價工具仍有 `innerHTML`
-   - `src/sanity/tools/pricing/PricingCalculator.tsx` 仍使用 `container.innerHTML = html`
-   - 若未來更多動態欄位直接拼進模板，存在 DOM XSS 風險
-   - 建議中期改成：
-     - 更嚴格的 escape
-     - 或改用 DOM API / React render 而不是直接 innerHTML
+3. itinerary parser 既有失敗測試
+   - 單獨開一條線修 `處理沒有 Day 標題的行程`
 
-### 中優先
-
-3. 依賴漏洞數量偏高
-   - `npm audit --json` 顯示 32 個漏洞
-   - 其中包含：
-     - `next` 14.2.35
-     - `sanity` 3.99.0 / `next-sanity` 9.12.3
-     - 以及多個 transitive packages
-   - 這不代表站一定已被利用，但屬於應排程處理的技術債
-
-4. Dashboard / Accounting 前端白名單重複硬編碼
-   - `DashboardTool.tsx` 與 `AccountingTool.tsx` 內都各自硬編碼 owner email
-   - 後端也另有 `DASHBOARD_ALLOWED_EMAILS`
-   - 建議集中成單一設定來源，避免前後端 whitelist 漂移
-
-## 本次功能 commit
-
-- `7851312` `fix: harden google csp and signed exports`
-
-## 檔案變更（功能）
+## 這次關鍵檔案
 
 - `next.config.js`
+- `src/app/api/auth/session/route.ts`
 - `src/app/api/sign-url/route.ts`
 - `src/lib/api-auth.ts`
-- `src/lib/signed-url.ts`
+- `src/lib/sanity-auth.ts`
+- `src/lib/session-token.ts`
+- `src/sanity/hooks/useSessionToken.ts`
+- `src/sanity/tools/pricing/PricingCalculator.tsx`
 - `src/sanity/actions/exportPdfAction.tsx`
 - `src/sanity/actions/exportExcelAction.tsx`
 - `src/sanity/actions/exportTextAction.tsx`
+- `src/sanity/tools/dashboard/DashboardTool.tsx`
+- `src/sanity/tools/accounting/AccountingTool.tsx`
 
-## 備註
+## 先前 commit
 
-- `vitest` 目前有一個既有失敗測試：`src/lib/__tests__/itinerary-parser.test.ts`
-- 失敗案例是「處理沒有 Day 標題的行程」
-- 這個失敗在本次 CSP 修復之前就存在，與本次改動無直接關係
+- `7851312` `fix: harden google csp and signed exports`
+- `650b80b` `docs: add csp security handoff`
+- `74edf64` `fix: verify studio sessions and sanitize pricing export`
