@@ -12,7 +12,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 // Dashboard allowed emails (trim spaces from each email)
 const DASHBOARD_ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS || '')
   .split(',')
-  .map((email) => email.trim())
+  .map((email) => email.trim().toLowerCase())
   .filter(Boolean)
 
 /**

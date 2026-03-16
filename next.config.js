@@ -1,3 +1,94 @@
+const isDevelopment = process.env.NODE_ENV === 'development'
+
+// Google 文件要求 Google TLD 必須逐一列出，不能用右側萬用字元。
+// 目前站點主要服務台灣用戶，因此先納入 .com.tw。
+const googleRegionalDomains = [
+  'https://www.google.com.tw',
+  'https://google.com.tw',
+]
+
+const uniqueSources = (sources) => [...new Set(sources)].join(' ')
+
+const siteScriptSources = uniqueSources([
+  "'self'",
+  "'unsafe-inline'",
+  ...(isDevelopment ? ["'unsafe-eval'"] : []),
+  'https://www.googletagmanager.com',
+  'https://*.googletagmanager.com',
+  'https://www.google-analytics.com',
+  'https://www.googleadservices.com',
+  'https://googleads.g.doubleclick.net',
+  'https://pagead2.googlesyndication.com',
+  'https://www.google.com',
+  'https://google.com',
+  ...googleRegionalDomains,
+])
+
+const siteStyleSources = uniqueSources([
+  "'self'",
+  "'unsafe-inline'",
+  'https://fonts.googleapis.com',
+])
+
+const siteFontSources = uniqueSources([
+  "'self'",
+  'https://fonts.gstatic.com',
+])
+
+const siteImageSources = uniqueSources([
+  "'self'",
+  'data:',
+  'blob:',
+  'https://cdn.sanity.io',
+  'https://img.youtube.com',
+  'https://www.googletagmanager.com',
+  'https://*.googletagmanager.com',
+  'https://www.google-analytics.com',
+  'https://*.google-analytics.com',
+  'https://www.googleadservices.com',
+  'https://googleads.g.doubleclick.net',
+  'https://*.g.doubleclick.net',
+  'https://pagead2.googlesyndication.com',
+  'https://www.google.com',
+  'https://google.com',
+  ...googleRegionalDomains,
+  'https://res.cloudinary.com',
+])
+
+const siteConnectSources = uniqueSources([
+  "'self'",
+  'https://www.googletagmanager.com',
+  'https://*.googletagmanager.com',
+  'https://www.google-analytics.com',
+  'https://*.google-analytics.com',
+  'https://analytics.google.com',
+  'https://*.analytics.google.com',
+  'https://www.googleadservices.com',
+  'https://googleads.g.doubleclick.net',
+  'https://stats.g.doubleclick.net',
+  'https://*.g.doubleclick.net',
+  'https://pagead2.googlesyndication.com',
+  'https://www.google.com',
+  'https://google.com',
+  ...googleRegionalDomains,
+  'https://*.sanity.io',
+  'https://res.cloudinary.com',
+])
+
+const siteFrameSources = uniqueSources([
+  "'self'",
+  'https://www.youtube.com',
+  'https://www.youtube-nocookie.com',
+  'https://td.doubleclick.net',
+  'https://www.googletagmanager.com',
+])
+
+const siteMediaSources = uniqueSources([
+  "'self'",
+  'https://cdn.sanity.io',
+  'https://res.cloudinary.com',
+])
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // www to non-www redirect (SEO: 統一網域)
@@ -36,7 +127,7 @@ const nextConfig = {
     const allowedOrigins = [
       'https://chiangway-travel.com',
       'https://www.chiangway-travel.com',
-      process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : null,
+      isDevelopment ? 'http://localhost:3000' : null,
     ].filter(Boolean).join(', ')
 
     return [
@@ -60,6 +151,9 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
@@ -80,6 +174,9 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
@@ -113,13 +210,16 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com https://googleads.g.doubleclick.net https://www.googleadservices.com`,
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: blob: https://cdn.sanity.io https://img.youtube.com https://www.google-analytics.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.com.tw https://res.cloudinary.com",
-              "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://stats.g.doubleclick.net https://googleads.g.doubleclick.net https://*.sanity.io https://res.cloudinary.com",
-              "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://td.doubleclick.net https://www.googletagmanager.com",
-              "media-src 'self' https://cdn.sanity.io https://res.cloudinary.com",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
+              `script-src ${siteScriptSources}`,
+              `style-src ${siteStyleSources}`,
+              `font-src ${siteFontSources}`,
+              `img-src ${siteImageSources}`,
+              `connect-src ${siteConnectSources}`,
+              `frame-src ${siteFrameSources}`,
+              `media-src ${siteMediaSources}`,
             ].join('; '),
           },
         ],

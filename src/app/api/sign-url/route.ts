@@ -1,7 +1,7 @@
 // src/app/api/sign-url/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { generateSignedUrl, getSigningSecret } from '@/lib/signed-url'
-import { checkRateLimit, getClientIP } from '@/lib/api-auth'
+import { checkRateLimit, getClientIP, validateDashboardAccess } from '@/lib/api-auth'
 import { apiLogger } from '@/lib/logger'
 
 // Valid export types
@@ -13,6 +13,10 @@ export async function GET(request: NextRequest) {
   const clientIP = getClientIP(request)
   const rateLimitError = checkRateLimit(clientIP, 60, 60000) // 60 requests per minute
   if (rateLimitError) return rateLimitError
+
+  // Only allow authenticated/whitelisted Studio users to mint signed export URLs
+  const authError = validateDashboardAccess(request)
+  if (authError) return authError
 
   try {
     const { searchParams } = new URL(request.url)

@@ -1,6 +1,6 @@
 // src/sanity/actions/exportPdfAction.tsx
 import { useState } from 'react'
-import { DocumentActionComponent } from 'sanity'
+import { DocumentActionComponent, useCurrentUser } from 'sanity'
 import { useToast } from '@sanity/ui'
 import { DownloadIcon } from '@sanity/icons'
 
@@ -8,6 +8,8 @@ export const exportPdfAction: DocumentActionComponent = (props) => {
   const { id, type, published } = props
   const toast = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const currentUser = useCurrentUser()
+  const userEmail = currentUser?.email || ''
 
   // 只在 itinerary 類型顯示
   if (type !== 'itinerary') {
@@ -25,8 +27,15 @@ export const exportPdfAction: DocumentActionComponent = (props) => {
     onHandle: async () => {
       setIsLoading(true)
       try {
-        // 取得簽名 URL
-        const response = await fetch(`/api/sign-url?id=${publishedId}&type=pdf`)
+        if (!userEmail) {
+          throw new Error('Missing current user email')
+        }
+
+        const response = await fetch(`/api/sign-url?id=${publishedId}&type=pdf`, {
+          headers: {
+            'x-user-email': userEmail,
+          },
+        })
         if (!response.ok) {
           throw new Error('Failed to generate signed URL')
         }

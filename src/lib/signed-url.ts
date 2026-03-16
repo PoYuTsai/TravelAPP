@@ -90,10 +90,10 @@ function timingSafeEqual(a: string, b: string): boolean {
 
 /**
  * Get the signing secret from environment
- * Uses REVALIDATE_SECRET which is already configured
+ * Server-side only: never fall back to public environment variables
  */
 export function getSigningSecret(): string {
-  const secret = process.env.REVALIDATE_SECRET || process.env.NEXT_PUBLIC_SIGNING_SECRET
+  const secret = process.env.REVALIDATE_SECRET
   if (!secret) {
     throw new Error('REVALIDATE_SECRET environment variable is required for signed URLs')
   }

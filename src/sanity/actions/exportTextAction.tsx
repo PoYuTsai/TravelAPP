@@ -1,6 +1,6 @@
 // src/sanity/actions/exportTextAction.tsx
 import { useState } from 'react'
-import { DocumentActionComponent } from 'sanity'
+import { DocumentActionComponent, useCurrentUser } from 'sanity'
 import { useToast } from '@sanity/ui'
 import { DocumentTextIcon } from '@sanity/icons'
 
@@ -8,6 +8,8 @@ export const exportTextAction: DocumentActionComponent = (props) => {
   const { id, type, published } = props
   const toast = useToast()
   const [isLoading, setIsLoading] = useState(false)
+  const currentUser = useCurrentUser()
+  const userEmail = currentUser?.email || ''
 
   // 只在 itinerary 類型顯示
   if (type !== 'itinerary') {
@@ -25,8 +27,16 @@ export const exportTextAction: DocumentActionComponent = (props) => {
     onHandle: async () => {
       setIsLoading(true)
       try {
+        if (!userEmail) {
+          throw new Error('Missing current user email')
+        }
+
         // 取得簽名 URL
-        const response = await fetch(`/api/sign-url?id=${publishedId}&type=text`)
+        const response = await fetch(`/api/sign-url?id=${publishedId}&type=text`, {
+          headers: {
+            'x-user-email': userEmail,
+          },
+        })
         if (!response.ok) {
           throw new Error('Failed to generate signed URL')
         }
