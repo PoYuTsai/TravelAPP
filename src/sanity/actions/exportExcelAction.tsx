@@ -1,15 +1,15 @@
 // src/sanity/actions/exportExcelAction.tsx
 import { useState } from 'react'
-import { DocumentActionComponent, useCurrentUser } from 'sanity'
+import { DocumentActionComponent } from 'sanity'
 import { useToast } from '@sanity/ui'
 import { DocumentSheetIcon } from '@sanity/icons'
+import { useSessionToken } from '../hooks/useSessionToken'
 
 export const exportExcelAction: DocumentActionComponent = (props) => {
   const { id, type, published } = props
   const toast = useToast()
   const [isLoading, setIsLoading] = useState(false)
-  const currentUser = useCurrentUser()
-  const userEmail = currentUser?.email || ''
+  const { getAuthHeaders, isAuthenticated, email } = useSessionToken()
 
   // 只在 itinerary 類型顯示
   if (type !== 'itinerary') {
@@ -22,20 +22,14 @@ export const exportExcelAction: DocumentActionComponent = (props) => {
   return {
     label: isLoading ? '產生中...' : '匯出 Excel',
     icon: DocumentSheetIcon,
-    disabled: !published || isLoading,
+    disabled: !published || isLoading || (!isAuthenticated() && !email),
     title: published ? '下載行程表 Excel' : '請先發布文件',
     onHandle: async () => {
       setIsLoading(true)
       try {
-        if (!userEmail) {
-          throw new Error('Missing current user email')
-        }
-
         // 取得簽名 URL
         const response = await fetch(`/api/sign-url?id=${publishedId}&type=excel`, {
-          headers: {
-            'x-user-email': userEmail,
-          },
+          headers: getAuthHeaders(),
         })
         if (!response.ok) {
           throw new Error('Failed to generate signed URL')

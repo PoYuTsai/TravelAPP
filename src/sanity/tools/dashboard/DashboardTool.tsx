@@ -1,22 +1,17 @@
 // src/sanity/tools/dashboard/DashboardTool.tsx
 
 import React, { useEffect, useState, useCallback } from 'react'
-import { useCurrentUser } from 'sanity'
 import type { DashboardData } from '@/lib/notion/types'
 import { StatCard } from './components/StatCard'
 import { PendingTable } from './components/PendingTable'
 import { YearMonthSelector } from './components/YearMonthSelector'
 import { YearComparison } from './components/YearComparison'
 import { YearlyTrendChart } from './components/YearlyTrendChart'
+import { useSessionToken } from '../../hooks/useSessionToken'
 import './styles.css'
 
-// Email 白名單
-const ALLOWED_EMAILS: string[] = [
-  'eric19921204@gmail.com',
-]
-
 export function DashboardTool() {
-  const currentUser = useCurrentUser()
+  const { email, getAuthHeaders, isAuthenticated, isLoading: authLoading, error: authError } = useSessionToken()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,22 +21,19 @@ export function DashboardTool() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
 
-  const userEmail = currentUser?.email || ''
-
-  // 白名單檢查
-  const hasAccess = ALLOWED_EMAILS.length === 0 || ALLOWED_EMAILS.includes(userEmail)
+  // 認證狀態決定存取權限
+  const hasAccess = isAuthenticated() || (!authLoading && !authError && email)
 
   const fetchData = useCallback(async (year: number, month: number) => {
     setLoading(true)
     setError(null)
     try {
       const response = await fetch(`/api/dashboard?year=${year}&month=${month}`, {
-        headers: {
-          'x-user-email': userEmail,
-        },
+        headers: getAuthHeaders(),
       })
       if (!response.ok) {
-        throw new Error('無法取得資料')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '無法取得資料')
       }
       const result = await response.json()
       setData(result)
@@ -50,13 +42,13 @@ export function DashboardTool() {
     } finally {
       setLoading(false)
     }
-  }, [userEmail])
+  }, [getAuthHeaders])
 
   useEffect(() => {
-    if (hasAccess) {
+    if (hasAccess && !authLoading) {
       fetchData(selectedYear, selectedMonth)
     }
-  }, [hasAccess, selectedYear, selectedMonth, fetchData])
+  }, [hasAccess, authLoading, selectedYear, selectedMonth, fetchData])
 
   const handleYearChange = (year: number) => {
     setSelectedYear(year)
@@ -70,13 +62,22 @@ export function DashboardTool() {
     fetchData(selectedYear, selectedMonth)
   }
 
-  if (!hasAccess) {
+  if (authLoading) {
+    return (
+      <div className="dashboard-container">
+        <div className="loading">驗證中...</div>
+      </div>
+    )
+  }
+
+  if (authError || !hasAccess) {
     return (
       <div className="dashboard-container">
         <div className="access-denied">
           <h2>🔒 無權限存取</h2>
           <p>此 Dashboard 僅限授權人員使用。</p>
-          <p className="email-info">目前登入：{userEmail || '未知'}</p>
+          <p className="email-info">目前登入：{email || '未知'}</p>
+          {authError && <p className="error-info">錯誤：{authError}</p>}
         </div>
       </div>
     )

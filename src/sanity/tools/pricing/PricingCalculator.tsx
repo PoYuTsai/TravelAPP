@@ -208,6 +208,57 @@ function getActivitiesForMatching(): ActivityRecord[] {
   }))
 }
 
+function sanitizeQuoteHtml(html: string): string {
+  const container = document.createElement('div')
+  container.innerHTML = html
+
+  container.querySelectorAll([
+    'script',
+    'iframe',
+    'object',
+    'embed',
+    'svg',
+    'math',
+    'form',
+    'input',
+    'textarea',
+    'button',
+    'select',
+    'option',
+    'img',
+    'audio',
+    'video',
+    'source',
+    'track',
+    'base',
+    'link',
+  ].join(',')).forEach((element) => element.remove())
+
+  const styleTags = Array.from(container.querySelectorAll('style'))
+  styleTags.slice(1).forEach((element) => element.remove())
+
+  container.querySelectorAll('*').forEach((element) => {
+    for (const attr of Array.from(element.attributes)) {
+      const name = attr.name.toLowerCase()
+      const value = attr.value.trim().toLowerCase()
+
+      if (name.startsWith('on')) {
+        element.removeAttribute(attr.name)
+        continue
+      }
+
+      if (
+        ['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
+        (value.startsWith('javascript:') || value.startsWith('data:'))
+      ) {
+        element.removeAttribute(attr.name)
+      }
+    }
+  })
+
+  return container.innerHTML
+}
+
 // 下載對外報價單
 function downloadExternalQuote(
   c: any,
@@ -749,7 +800,7 @@ function downloadExternalQuote(
 
   // 使用 html2pdf.js 直接產生 PDF（不需要列印對話框，沒有瀏覽器頁首頁尾）
   const container = document.createElement('div')
-  container.innerHTML = html
+  container.innerHTML = sanitizeQuoteHtml(html)
   document.body.appendChild(container)
 
   const element = container.querySelector('.pdf-container') as HTMLElement

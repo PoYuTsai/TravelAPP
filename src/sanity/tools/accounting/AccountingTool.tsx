@@ -1,7 +1,6 @@
 // src/sanity/tools/accounting/AccountingTool.tsx
 
 import React, { useState, useCallback } from 'react'
-import { useCurrentUser } from 'sanity'
 import type { AccountingFormData, AccountingResult, TransferRecord, OrderCost } from '@/lib/accounting'
 import {
   calculateAccounting,
@@ -10,19 +9,14 @@ import {
   formatCurrency,
   formatRate,
 } from '@/lib/accounting'
+import { useSessionToken } from '../../hooks/useSessionToken'
 import './styles.css'
 
-// Email 白名單（只有 Owner 可以存取）
-const ALLOWED_EMAILS: string[] = [
-  'eric19921204@gmail.com',
-]
-
 export function AccountingTool() {
-  const currentUser = useCurrentUser()
-  const userEmail = currentUser?.email || ''
+  const { email, getAuthHeaders, isAuthenticated, isLoading: authLoading, error: authError } = useSessionToken()
 
-  // 白名單檢查
-  const hasAccess = ALLOWED_EMAILS.length === 0 || ALLOWED_EMAILS.includes(userEmail)
+  // 認證狀態決定存取權限
+  const hasAccess = isAuthenticated() || (!authLoading && !authError && email)
 
   // 表單狀態
   const [form, setForm] = useState<AccountingFormData>({
@@ -96,7 +90,7 @@ export function AccountingTool() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-email': userEmail,
+          ...getAuthHeaders(),
         },
         body: JSON.stringify({
           startDate: form.startDate,
@@ -120,16 +114,25 @@ export function AccountingTool() {
     } finally {
       setLoading(false)
     }
-  }, [form, userEmail])
+  }, [form, getAuthHeaders])
 
   // 權限檢查
-  if (!hasAccess) {
+  if (authLoading) {
+    return (
+      <div className="accounting-container">
+        <div className="loading">驗證中...</div>
+      </div>
+    )
+  }
+
+  if (authError || !hasAccess) {
     return (
       <div className="accounting-container">
         <div className="access-denied">
           <h2>🔒 無權限存取</h2>
           <p>此記帳系統僅限授權人員使用。</p>
-          <p className="email-info">目前登入：{userEmail || '未知'}</p>
+          <p className="email-info">目前登入：{email || '未知'}</p>
+          {authError && <p className="error-info">錯誤：{authError}</p>}
         </div>
       </div>
     )
