@@ -2,8 +2,8 @@
 
 ## 目前狀態
 
-本次原本是處理 Google 團隊通知的 CSP 問題，後來延伸把 Studio 內部驗證與報價匯出的安全面一起補強。  
-目前 Google Ads CSP 修復、Studio session 驗證加固、PricingCalculator 的 XSS 面收斂都已完成，並已通過 production build。
+本次原本是處理 Google 團隊通知的 CSP 問題，後來延伸把 Studio 內部驗證與報價匯出的安全面一起補強。
+Google Ads CSP 修復、Studio session 驗證加固、PricingCalculator 的 XSS 面收斂、npm 依賴漏洞盤點都已完成，並已通過 production build。
 
 ## 這次已完成
 
@@ -56,15 +56,33 @@
 - `npm run build`: 通過
 - `npm run test:run`: 通過，54/54 tests passed
 
+### 4. NPM 依賴漏洞盤點與修復
+
+**起始狀態**: 33 個漏洞 (1 critical, 14 high, 18 moderate)
+**修復後**: 22 個漏洞 (0 critical, 8 high, 14 moderate)
+
+已修復:
+- critical: basic-ftp Path Traversal
+- high: undici (透過 npm overrides 強制升級到 ^7.24.4)
+- high/moderate: rollup, tar, flatted, dompurify, ajv, @isaacs/brace-expansion
+
+剩餘漏洞評估（詳見 `docs/plans/2026-03-16-npm-audit-assessment.md`）:
+- glob CLI 漏洞: 僅影響 CLI，不影響網站 runtime
+- Next.js DoS: Image Optimizer 有平台防護，RSC 漏洞不適用（本站未使用 Server Actions）
+- prismjs: 僅影響 Studio 程式碼高亮，有身份驗證保護
+- yauzl: 僅在 PDF 生成時使用，無使用者直接存取
+
+**結論**: 剩餘漏洞整體風險可接受，建議 Q2 規劃 Sanity v5 / Next.js 16 升級
+
 ## 建議 Claude 下一步優先處理
 
-1. 依賴漏洞盤點與升級
-   - `npm audit` 仍有既有風險
-   - 建議先看 high / critical 是否可直接升版或只需調整 transitive dependencies
-
-2. PricingCalculator 長期重構
+1. PricingCalculator 長期重構
    - 目前已加 sanitizer，短期風險已下降
    - 長期仍建議改成純 DOM API / React render，而不是整段 HTML 字串 + `innerHTML`
+
+2. 主要依賴升級規劃
+   - Sanity 3.x → 5.x: 等 GA 後 1-2 個月評估
+   - Next.js 14.x → 16.x: 評估 breaking changes 後規劃 sprint
 
 ## 這次關鍵檔案
 
