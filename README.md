@@ -33,7 +33,7 @@
 | Phase 6.6 | 審查 #8 A11y/資安優化 | ✅ 完成 |
 | Phase 6.7 | 審查 #10 SEO/行銷追蹤優化 | ✅ 完成 |
 | Phase 6.8 | 報價計算系統 | ✅ 完成 |
-| 維護 | CSP 更新 (Google Ads) | ✅ 完成 |
+| 維護 | Google CSP / 匯出權限加固 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -241,14 +241,18 @@ Sanity Studio 內部報價計算工具：
   - Footer 官網 + LINE 連結
   - 直接下載 PDF（html2pdf.js 客戶端產生）
 
-### 維護：CSP 更新 (2026-03-10)
-Google Ads 轉換追蹤修復（Case #9-1473000040755）：
+### 維護：Google CSP / 匯出權限加固 (2026-03-16)
+Google Ads 轉換追蹤與內部匯出 API 安全加固：
 
-- **CSP 更新**：新增 Google Ads 所需域名至 Content-Security-Policy
-  - `script-src`: googleads.g.doubleclick.net, googleadservices.com
-  - `img-src`: googleadservices.com, doubleclick.net, google.com.tw
-  - `connect-src`: analytics.google.com, stats.g.doubleclick.net
-  - `frame-src`: td.doubleclick.net, googletagmanager.com
+- **Google CSP 修復**：補齊 Google Ads / GTM / GA4 所需來源
+  - `script-src`: `pagead2.googlesyndication.com`, `googletagmanager.com`, `google.com`, `google.com.tw`
+  - `img-src`: `*.g.doubleclick.net`, `pagead2.googlesyndication.com`, `google.com.tw`
+  - `connect-src`: `*.googletagmanager.com`, `*.google-analytics.com`, `*.g.doubleclick.net`
+  - `frame-src`: `td.doubleclick.net`, `googletagmanager.com`
+- **基礎 CSP 加固**：新增 `base-uri 'self'`、`object-src 'none'`、`frame-ancestors 'none'`
+- **匯出安全加固**：`/api/sign-url` 現在需要白名單驗證，Sanity 匯出 action 會帶入登入者 email
+- **簽名密鑰收斂**：移除 public env fallback，簽名僅允許使用 server-side `REVALIDATE_SECRET`
+- **驗證結果**：`npm run build` 通過
 
 ## 技術架構
 
@@ -302,4 +306,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-12 報價計算器大改版: 門票GUI管理+成人兒童分開+住宿Bug修復 -->
+<!-- Last build trigger: 2026-03-16 維護：Google Ads CSP 修復 + 匯出簽名權限加固 -->
