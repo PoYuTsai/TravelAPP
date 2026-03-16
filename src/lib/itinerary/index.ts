@@ -17,13 +17,14 @@ export { WEEKDAY_MAP, WEEKDAYS } from './types'
 
 // 解析函數
 export {
-  parseItineraryText,
   parseBasicInfoText,
   parseQuotationText,
   getDaysInMonth,
   getNextDate,
   generateConsecutiveDates,
 } from './parser'
+
+export { parseItineraryText } from './parse-itinerary-with-fallback'
 
 // 格式化函數
 export {

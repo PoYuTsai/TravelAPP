@@ -452,7 +452,7 @@ export function parseAndMatchActivities(
   year?: number
 ): ActivityMatchResult {
   // 動態導入避免循環依賴
-  const { parseItineraryText } = require('./parser')
+  const { parseItineraryText } = require('./parse-itinerary-with-fallback')
   const parseResult = parseItineraryText(text, year)
   return matchActivitiesToDatabase(parseResult, activities)
 }
