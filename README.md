@@ -252,6 +252,7 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - **基礎 CSP 加固**：新增 `base-uri 'self'`、`object-src 'none'`、`frame-ancestors 'none'`
 - **Studio 驗證加固**：`/api/auth/session` 會先用 Sanity `users/me` 驗證目前登入者，再簽發短期 session token
 - **匯出安全加固**：`/api/sign-url`、Dashboard、Accounting 現在只接受已驗證的 session token，不再依賴可偽造 email header
+- **Parser 相容修復**：行程文字在只有日期、缺少 `Day X` 標題時，現在會自動 fallback 解析
 - **簽名密鑰收斂**：移除 public env fallback，簽名僅允許使用 server-side `REVALIDATE_SECRET`
 - **驗證結果**：`npm run build` 通過
 
@@ -307,4 +308,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-16 維護：Google Ads CSP 修復 + Studio session 驗證加固 -->
+<!-- Last build trigger: 2026-03-16 維護：Studio session 驗證加固 + itinerary parser fallback -->

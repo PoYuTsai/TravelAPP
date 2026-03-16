@@ -54,10 +54,7 @@
 ## 已驗證
 
 - `npm run build`: 通過
-- `npm run test:run`: 仍有 1 個既有失敗
-  - `src/lib/__tests__/itinerary-parser.test.ts`
-  - 測試名稱：`處理沒有 Day 標題的行程`
-  - 這不是本次安全修補引入的新問題
+- `npm run test:run`: 通過，54/54 tests passed
 
 ## 建議 Claude 下一步優先處理
 
@@ -69,15 +66,13 @@
    - 目前已加 sanitizer，短期風險已下降
    - 長期仍建議改成純 DOM API / React render，而不是整段 HTML 字串 + `innerHTML`
 
-3. itinerary parser 既有失敗測試
-   - 單獨開一條線修 `處理沒有 Day 標題的行程`
-
 ## 這次關鍵檔案
 
 - `next.config.js`
 - `src/app/api/auth/session/route.ts`
 - `src/app/api/sign-url/route.ts`
 - `src/lib/api-auth.ts`
+- `src/lib/itinerary/parse-itinerary-with-fallback.ts`
 - `src/lib/sanity-auth.ts`
 - `src/lib/session-token.ts`
 - `src/sanity/hooks/useSessionToken.ts`
@@ -93,3 +88,4 @@
 - `7851312` `fix: harden google csp and signed exports`
 - `650b80b` `docs: add csp security handoff`
 - `74edf64` `fix: verify studio sessions and sanitize pricing export`
+- `996968a` `fix: fallback parse itineraries without day titles`
