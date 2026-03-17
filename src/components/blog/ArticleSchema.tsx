@@ -2,7 +2,7 @@ interface ArticleSchemaProps {
   title: string
   description: string
   slug: string
-  datePublished?: string
+  datePublished: string
   dateModified?: string
   image?: string
 }
@@ -17,17 +17,14 @@ export default function ArticleSchema({
   dateModified,
   image = '/images/og-image.png',
 }: ArticleSchemaProps) {
-  const published = datePublished || new Date().toISOString()
-  const normalizedImage = image.startsWith('http') ? image : `${SITE_URL}${image}`
-
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
     headline: title,
     description: description,
-    image: normalizedImage,
-    datePublished: published,
-    dateModified: dateModified || published,
+    image: `${SITE_URL}${image}`,
+    datePublished: datePublished,
+    dateModified: dateModified || datePublished,
     author: {
       '@type': 'Organization',
       name: '清微旅行 Chiangway Travel',

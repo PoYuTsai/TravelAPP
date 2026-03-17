@@ -3,12 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { trackLineClick } from '@/lib/analytics'
-import { footerNavLinks, legalLinks } from '@/lib/navigation'
-import {
-  defaultSiteSettings,
-  type SiteFooterSettings,
-  type SiteSettings,
-} from '@/lib/site-settings'
+import { footerNavLinks, legalLinks, socialLinks } from '@/lib/navigation'
 import { CATEGORY_NAMES } from '@/lib/constants'
 import { LineIcon, InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/SocialIcons'
 
@@ -20,32 +15,8 @@ const socialIconMap: Record<string, React.ReactNode> = {
   TikTok: <TikTokIcon className="w-5 h-5" />,
 }
 
-const defaultFooterSettings: SiteFooterSettings = defaultSiteSettings.footer
-const defaultSocialLinks: SiteSettings['socialLinks'] = defaultSiteSettings.socialLinks
-
-interface FooterProps {
-  businessName?: string
-  socialLinks?: SiteSettings['socialLinks']
-  footer?: SiteFooterSettings
-}
-
-function toTelHref(phone: string) {
-  const normalized = phone.replace(/[^\d+]/g, '')
-  return normalized.startsWith('+') ? normalized : `+${normalized}`
-}
-
-export default function Footer({
-  businessName = '清微旅行 Chiangway Travel',
-  socialLinks = defaultSocialLinks,
-  footer = defaultFooterSettings,
-}: FooterProps) {
+export default function Footer() {
   const currentYear = new Date().getFullYear()
-  const socialItems = [
-    { label: 'LINE', href: socialLinks.line, trackingLabel: 'Footer - Social Icon' },
-    { label: 'Instagram', href: socialLinks.instagram },
-    { label: 'Facebook', href: socialLinks.facebook },
-    { label: 'TikTok', href: socialLinks.tiktok },
-  ].filter((item) => Boolean(item.href))
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -56,14 +27,14 @@ export default function Footer({
             <div className="mb-4">
               <Image
                 src="/images/logo.png"
-                alt={businessName}
+                alt="清微旅行 Chiangway Travel"
                 width={160}
                 height={53}
                 className="h-14 w-auto"
               />
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
-              {footer.description}
+              清邁親子包車首選！我們是台灣爸爸 Eric ＋ 泰國媽媽 Min，住在清邁的在地家庭，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。
             </p>
           </div>
 
@@ -103,7 +74,7 @@ export default function Footer({
           <div>
             <h3 className="font-bold text-lg mb-4">聯繫我們</h3>
             <div className="flex space-x-2 mb-4">
-              {socialItems.map((social) => (
+              {socialLinks.map((social) => (
                 <a
                   key={social.label}
                   href={social.href}
@@ -111,37 +82,31 @@ export default function Footer({
                   rel="noopener noreferrer"
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-primary transition-colors"
                   aria-label={social.label}
-                  onClick={social.label === 'LINE' ? () => trackLineClick(social.trackingLabel || 'Footer - Social Icon', social.href) : undefined}
+                  onClick={social.label === 'LINE' ? () => trackLineClick('Footer - Social Icon') : undefined}
                 >
                   {socialIconMap[social.label]}
                 </a>
               ))}
             </div>
             <address className="not-italic text-gray-400 text-sm space-y-1">
-              {footer.addressText && footer.addressUrl && (
-                <p>
-                  📍 <a
-                    href={footer.addressUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-primary transition-colors"
-                  >
-                    {footer.addressText}
-                  </a>
-                </p>
-              )}
-              {footer.taiwanPhone && (
-                <p>
-                  📞 <a href={`tel:${toTelHref(footer.taiwanPhone)}`} className="hover:text-primary transition-colors">{footer.taiwanPhone}</a>
-                  {footer.taiwanPhoneLabel && <span className="text-gray-600">（{footer.taiwanPhoneLabel}）</span>}
-                </p>
-              )}
-              {footer.thailandPhone && (
-                <p>
-                  📞 <a href={`tel:${toTelHref(footer.thailandPhone)}`} className="hover:text-primary transition-colors">{footer.thailandPhone}</a>
-                  {footer.thailandPhoneLabel && <span className="text-gray-600">（{footer.thailandPhoneLabel}）</span>}
-                </p>
-              )}
+              <p>
+                📍 <a
+                  href="https://share.google/p6anNFwTvi9Sc7JAt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-primary transition-colors"
+                >
+                  444, Wiang, Fang District, Chiang Mai 50110
+                </a>
+              </p>
+              <p>
+                📞 <a href="tel:+886987591322" className="hover:text-primary transition-colors">+886 987-591-322</a>
+                <span className="text-gray-600">（台灣）</span>
+              </p>
+              <p>
+                📞 <a href="tel:+66637900666" className="hover:text-primary transition-colors">+66 63-790-0666</a>
+                <span className="text-gray-600">（泰國）</span>
+              </p>
             </address>
           </div>
         </div>
@@ -158,7 +123,7 @@ export default function Footer({
               </span>
             ))}
           </div>
-          <p>&copy; {currentYear} {businessName}. All rights reserved.</p>
+          <p>&copy; {currentYear} 清微旅行 Chiangway Travel. All rights reserved.</p>
           <p className="mt-2 text-gray-600">
             由 Eric 與{' '}
             <a

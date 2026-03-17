@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { SiteTrustCard } from '@/lib/site-settings'
 
 // Animated counter hook
 function useCountAnimation(end: number, duration: number = 1500, startCounting: boolean = false) {
@@ -35,6 +34,20 @@ function useCountAnimation(end: number, duration: number = 1500, startCounting: 
   }, [end, duration, startCounting])
 
   return count
+}
+
+// Pulsing ring animation component - continuous glow effect
+function PulseRing({ delay = 0 }: { delay?: number }) {
+  return (
+    <span
+      className="absolute inset-0 rounded-full border-2 border-primary/50 animate-ping pointer-events-none"
+      style={{
+        animationDuration: '2s',
+        animationDelay: `${delay}ms`,
+        animationIterationCount: 'infinite', // Keep pulsing forever
+      }}
+    />
+  )
 }
 
 // Star icon component
@@ -98,104 +111,9 @@ interface TrustNumbersProps {
   compact?: boolean
   // Dynamic family count from Notion (defaults to 114 if not provided)
   familyCountValue?: number
-  reviewCount?: number
-  ratingValue?: number
-  sectionEyebrow?: string
-  sectionTitle?: string
-  sectionDescription?: string
-  cards?: SiteTrustCard[]
 }
 
-interface TrustCardProps {
-  href: string
-  title: string
-  value: string
-  description: string
-  tone: 'warm' | 'light'
-  external?: boolean
-  compact?: boolean
-  children?: React.ReactNode
-}
-
-function TrustCard({
-  href,
-  title,
-  value,
-  description,
-  tone,
-  external = false,
-  compact = false,
-  children,
-}: TrustCardProps) {
-  const baseClassName = compact
-    ? 'group rounded-3xl border px-4 py-4 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg'
-    : 'group rounded-[28px] border px-5 py-6 md:px-6 md:py-7 text-left shadow-[0_22px_60px_-35px_rgba(0,0,0,0.45)] transition-all duration-300 hover:-translate-y-1.5 hover:shadow-[0_28px_80px_-35px_rgba(0,0,0,0.6)]'
-
-  const toneClassName = tone === 'warm'
-    ? 'border-amber-200/70 bg-gradient-to-br from-amber-50 via-white to-amber-100/80'
-    : 'border-white/15 bg-white/95'
-
-  const content = (
-    <div className={`${baseClassName} ${toneClassName}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-stone-500">{title}</p>
-          <p className={`mt-2 font-bold text-stone-900 ${compact ? 'text-2xl' : 'text-3xl md:text-4xl'}`}>
-            {value}
-          </p>
-        </div>
-        {children}
-      </div>
-      <p className={`mt-3 text-stone-600 ${compact ? 'text-sm leading-6' : 'text-base leading-7'}`}>
-        {description}
-      </p>
-    </div>
-  )
-
-  if (external) {
-    return (
-      <a href={href} target="_blank" rel="noopener noreferrer">
-        {content}
-      </a>
-    )
-  }
-
-  return <Link href={href}>{content}</Link>
-}
-
-const defaultCards: SiteTrustCard[] = [
-  {
-    metric: 'families',
-    title: '真實行程案例',
-    description: '不是展示漂亮文案而已，而是真的有家庭實際出發、留下旅程紀錄。',
-    href: '/tours',
-  },
-  {
-    metric: 'reviews',
-    title: 'Google 公開評價',
-    description: '先看公開平台上的真實回饋，再決定這樣的服務方式適不適合你們家。',
-    href: 'https://maps.app.goo.gl/8MbRV4PPBggwj2pF6',
-    external: true,
-  },
-  {
-    metric: 'brand',
-    title: '在地台泰家庭',
-    description: '不是轉單業者，而是住在清邁、理解親子節奏的家庭自己接手服務。',
-    href: '/homestay',
-    valueOverride: 'Eric + Min',
-  },
-]
-
-export default function TrustNumbers({
-  compact = false,
-  familyCountValue = 114,
-  reviewCount = 110,
-  ratingValue = 5,
-  sectionEyebrow = '先看可被驗證的信任感',
-  sectionTitle = '不用先相信廣告文案',
-  sectionDescription = '先看公開評價、真實家庭出發紀錄，以及我們是怎麼把這趟旅程顧好的。',
-  cards,
-}: TrustNumbersProps) {
+export default function TrustNumbers({ compact = false, familyCountValue = 114 }: TrustNumbersProps) {
   const [isVisible, setIsVisible] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
 
@@ -219,100 +137,94 @@ export default function TrustNumbers({
   }, [])
 
   const familyCount = useCountAnimation(familyCountValue, 1500, isVisible)
-  const revealClassName = isVisible
-    ? 'opacity-100 translate-y-0'
-    : 'opacity-0 translate-y-4'
-  const cardsToRender = cards?.length ? cards : defaultCards
 
-  const renderCardValue = (card: SiteTrustCard) => {
-    switch (card.metric) {
-      case 'families':
-        return `${familyCount}+`
-      case 'reviews':
-        return `${ratingValue.toFixed(1)} / ${reviewCount}+`
-      case 'brand':
-      default:
-        return card.valueOverride?.trim() || 'Eric + Min'
-    }
-  }
+  // Pulse animation always shows when section is visible
+  const showPulse = isVisible
 
-  const renderCardAdornment = (card: SiteTrustCard, isExternal: boolean) => {
-    if (card.metric === 'reviews') {
-      return (
-        <div className="flex items-center gap-0.5">
-          {[...Array(5)].map((_, i) => (
-            <StarIcon key={i} className="h-4 w-4 text-yellow-400" />
-          ))}
-          {isExternal ? (
-            <ExternalLinkIcon className="ml-1 h-4 w-4 text-stone-400 transition-transform duration-300 group-hover:scale-110" />
-          ) : (
-            <ArrowIcon className="ml-1 h-4 w-4 text-primary transition-transform duration-300 group-hover:translate-x-1" />
-          )}
-        </div>
-      )
-    }
+  // Badge base classes - py-3 for better mobile touch target (44px+)
+  const badgeBase = "relative flex items-center gap-2 px-4 py-3 bg-white border-2 rounded-full transition-all duration-300 ease-out"
 
-    return isExternal ? (
-      <ExternalLinkIcon className="h-5 w-5 text-stone-400 transition-transform duration-300 group-hover:scale-110" />
-    ) : (
-      <ArrowIcon className="h-5 w-5 text-primary transition-transform duration-300 group-hover:translate-x-1" />
-    )
-  }
+  // Animation classes for scroll reveal with bounce effect
+  const animationClass = isVisible
+    ? "opacity-100 translate-y-0 scale-100"
+    : "opacity-0 translate-y-4 scale-95"
 
-  const cardsMarkup = (
-    <div className={`grid gap-4 md:grid-cols-3 md:gap-5 transition-all duration-500 ${revealClassName}`}>
-      {cardsToRender.map((card) => {
-        const isExternal = card.external ?? card.metric === 'reviews'
-        const tone = card.metric === 'families' ? 'warm' : 'light'
+  // Glow shadow for more obvious clickable state
+  const glowShadow = "shadow-[0_0_0_0_rgba(var(--color-primary-rgb,74,189,130),0.4)]"
+  const hoverGlow = "hover:shadow-[0_4px_20px_-2px_rgba(var(--color-primary-rgb,74,189,130),0.4)]"
 
-        return (
-          <TrustCard
-            key={`${card.metric}-${card.title}`}
-            href={card.href}
-            title={card.title}
-            value={renderCardValue(card)}
-            description={card.description}
-            tone={tone}
-            compact={compact}
-            external={isExternal}
-          >
-            {renderCardAdornment(card, isExternal)}
-          </TrustCard>
-        )
-      })}
+  const badges = (
+    <div className="flex flex-col items-center gap-4">
+      {/* Mobile hint text - larger and more visible */}
+      <p className="text-sm font-medium text-primary/80 md:hidden animate-pulse">
+        👆 點擊探索更多
+      </p>
+
+      <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6">
+        {/* Badge 1: 服務 N+ 家庭 */}
+        <Link
+          href="/tours"
+          className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
+          style={{ transitionDelay: '0ms' }}
+        >
+          {/* Animated pulse ring on mobile */}
+          {showPulse && <PulseRing delay={0} />}
+
+          <span className="text-sm text-gray-700 font-medium">服務</span>
+          <span className="text-base md:text-lg font-bold text-primary">
+            {familyCount}+
+          </span>
+          <span className="text-sm text-gray-700 font-medium">家庭</span>
+          <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
+        </Link>
+
+        {/* Badge 2: 5.0 滿分好評 - Link to Google Reviews */}
+        <a
+          href="https://maps.app.goo.gl/8MbRV4PPBggwj2pF6"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`group ${badgeBase} border-yellow-300 cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 hover:shadow-[0_8px_30px_-4px_rgba(250,204,21,0.5)] hover:-translate-y-1 active:scale-95 ${animationClass}`}
+          style={{ transitionDelay: '100ms' }}
+        >
+          {/* Animated pulse ring on mobile */}
+          {showPulse && <PulseRing delay={200} />}
+
+          <div className="flex items-center gap-0.5 group-hover:drop-shadow-[0_0_8px_rgba(250,204,21,0.6)] transition-all duration-300">
+            {[...Array(5)].map((_, i) => (
+              <StarIcon key={i} className="w-4 h-4 text-yellow-400" />
+            ))}
+          </div>
+          <span className="text-base md:text-lg font-bold text-gray-900">5.0</span>
+          <span className="text-sm text-gray-600 font-medium hidden sm:inline">滿分好評</span>
+          <ExternalLinkIcon className="w-4 h-4 text-yellow-500/60 transition-all duration-300 group-hover:text-yellow-600 group-hover:scale-110" />
+        </a>
+
+        {/* Badge 3: 在地台泰家庭 */}
+        <Link
+          href="/homestay"
+          className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
+          style={{ transitionDelay: '200ms' }}
+        >
+          {/* Animated pulse ring on mobile */}
+          {showPulse && <PulseRing delay={400} />}
+
+          <span className="text-base md:text-lg font-bold text-primary">在地台泰</span>
+          <span className="text-sm text-gray-700 font-medium">家庭</span>
+          <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
+        </Link>
+      </div>
     </div>
   )
 
   // Compact mode: render badges directly without section wrapper
   if (compact) {
-    return (
-      <div ref={sectionRef as React.RefObject<HTMLDivElement>} className="w-full">
-        {cardsMarkup}
-      </div>
-    )
+    return <div ref={sectionRef as React.RefObject<HTMLDivElement>}>{badges}</div>
   }
 
   return (
-    <section ref={sectionRef} className="relative overflow-hidden py-16 md:py-20">
-      <div className="absolute inset-0 bg-gradient-to-br from-stone-900 via-stone-800 to-[#6d5217]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(247,192,9,0.22),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.14),transparent_24%)]" />
-
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary-light/90">
-            {sectionEyebrow}
-          </p>
-          <h2 className="mt-4 text-3xl font-bold text-white md:text-4xl">
-            {sectionTitle}
-          </h2>
-          <p className="mt-4 text-base leading-7 text-white/72 md:text-lg">
-            {sectionDescription}
-          </p>
-        </div>
-
-        <div className="mt-10">
-          {cardsMarkup}
-        </div>
+    <section ref={sectionRef} className="py-8 bg-gray-50 border-y border-gray-100">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {badges}
       </div>
     </section>
   )

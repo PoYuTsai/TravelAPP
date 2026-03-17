@@ -1,11 +1,5 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
-import { client } from '@/sanity/client'
-import {
-  extractLineHandle,
-  mergeSiteSettings,
-  siteSettingsQuery,
-} from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: '取消與退款政策',
@@ -25,20 +19,7 @@ export const metadata: Metadata = {
   },
 }
 
-async function getSiteSettings() {
-  try {
-    const settings = await client.fetch(siteSettingsQuery)
-    return mergeSiteSettings(settings)
-  } catch {
-    return mergeSiteSettings(null)
-  }
-}
-
-export default async function CancellationPage() {
-  const siteSettings = await getSiteSettings()
-  const lineUrl = siteSettings.socialLinks.line
-  const lineHandle = extractLineHandle(lineUrl)
-
+export default function CancellationPage() {
   // Static schema - no user input, safe to use
   const webPageSchema = {
     '@context': 'https://schema.org',
@@ -314,12 +295,12 @@ export default async function CancellationPage() {
             <p className="text-gray-700 mt-4">
               LINE 聯繫：
               <a
-                href={lineUrl}
+                href="https://line.me/R/ti/p/@037nyuwk"
                 className="text-primary hover:underline ml-1"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                {lineHandle}
+                @037nyuwk
               </a>
             </p>
           </section>

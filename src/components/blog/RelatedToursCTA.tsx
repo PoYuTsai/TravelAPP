@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import LineCTAButton from '@/components/ui/LineCTAButton'
+import Button from '@/components/ui/Button'
 
 interface Tour {
   title: string
@@ -49,9 +49,9 @@ export default function RelatedToursCTA({ tours = defaultTours }: RelatedToursCT
       </div>
 
       <div className="text-center">
-        <LineCTAButton location="Related Tours CTA" size="lg">
+        <Button href="https://line.me/R/ti/p/@037nyuwk" external size="lg">
           LINE 免費諮詢
-        </LineCTAButton>
+        </Button>
       </div>
     </div>
   )

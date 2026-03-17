@@ -2,7 +2,6 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import { fetchTotalFamilyCount } from '@/lib/notion'
-import { mergeSiteSettings, siteSettingsQuery } from '@/lib/site-settings'
 import ToursPageClient from './ToursPageClient'
 import ToursPageSchema from '@/components/schema/ToursPageSchema'
 
@@ -66,34 +65,17 @@ async function getDayTours() {
   }
 }
 
-async function getSiteSettings() {
-  try {
-    const settings = await client.fetch(siteSettingsQuery)
-    return mergeSiteSettings(settings)
-  } catch {
-    return mergeSiteSettings(null)
-  }
-}
-
 export default async function ToursPage() {
-  const [packages, dayTours, familyCount, siteSettings] = await Promise.all([
+  const [packages, dayTours, familyCount] = await Promise.all([
     getPackages(),
     getDayTours(),
     fetchTotalFamilyCount(),
-    getSiteSettings(),
   ])
 
   return (
     <>
       <ToursPageSchema packages={packages} dayTours={dayTours} />
-      <ToursPageClient
-        packages={packages}
-        dayTours={dayTours}
-        familyCount={familyCount}
-        reviewCount={siteSettings.aggregateRating.reviewCount}
-        ratingValue={siteSettings.aggregateRating.ratingValue}
-        trustCards={siteSettings.trustSection.cards}
-      />
+      <ToursPageClient packages={packages} dayTours={dayTours} familyCount={familyCount} />
     </>
   )
 }

@@ -1,19 +1,19 @@
 'use client'
 
-import { PortableText, type PortableTextComponents } from '@portabletext/react'
+import { PortableText, PortableTextComponents } from '@portabletext/react'
 import type { PortableTextBlock } from '@portabletext/types'
 import type { SanityImageSource } from '@sanity/image-url'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
-import LineCTAButton from '@/components/ui/LineCTAButton'
 
+// 圖片燈箱元件（完整無障礙支援）
 const ImageLightbox = ({
   src,
   alt,
-  onClose,
+  onClose
 }: {
   src: string
   alt: string
@@ -22,29 +22,37 @@ const ImageLightbox = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
-      }
-
-      if (e.key === 'Tab') {
-        e.preventDefault()
-        closeButtonRef.current?.focus()
-      }
-    },
-    [onClose]
-  )
+  // Handle keyboard events (Esc to close)
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+    // Focus trap - keep focus on close button
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      closeButtonRef.current?.focus()
+    }
+  }, [onClose])
 
   useEffect(() => {
+    // Store previous active element for focus restoration
     previousActiveElement.current = document.activeElement as HTMLElement
+
+    // Prevent background scrolling
     document.body.style.overflow = 'hidden'
+
+    // Add keyboard listener
     document.addEventListener('keydown', handleKeyDown)
+
+    // Focus the close button on mount
     closeButtonRef.current?.focus()
 
     return () => {
+      // Restore scrolling
       document.body.style.overflow = ''
+      // Remove keyboard listener
       document.removeEventListener('keydown', handleKeyDown)
+      // Restore focus
       previousActiveElement.current?.focus()
     }
   }, [handleKeyDown])
@@ -53,14 +61,15 @@ const ImageLightbox = ({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`檢視圖片：${alt}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      aria-label={`圖片放大檢視：${alt}`}
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* 關閉按鈕 - 48px 觸控目標 (WCAG) */}
       <button
         ref={closeButtonRef}
         onClick={onClose}
-        className="absolute right-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+        className="absolute top-4 right-4 text-white bg-black/50 hover:bg-black/70 rounded-full w-12 h-12 flex items-center justify-center transition-colors z-10"
         aria-label="關閉圖片"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,79 +77,59 @@ const ImageLightbox = ({
         </svg>
       </button>
 
-      <div className="relative max-h-full max-w-full">
+      {/* 圖片 - 點擊圖片也會關閉燈箱 */}
+      <div className="relative max-w-full max-h-full">
         <Image
           src={src}
           alt={alt}
           width={1920}
           height={1920}
-          className="h-auto max-h-[90vh] w-auto max-w-full object-contain"
+          className="max-w-full max-h-[90vh] w-auto h-auto object-contain"
           quality={90}
         />
       </div>
 
-      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-white/70">
-        按下 `Esc` 可關閉
+      {/* 提示文字 */}
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/70 text-sm">
+        點擊任意處或按 Esc 關閉
       </p>
     </div>
   )
 }
 
+// 自訂區塊元件
 const CTABlock = ({ value }: { value: { title?: string; description?: string } }) => (
-  <div className="my-10 rounded-[28px] border border-amber-100 bg-amber-50 px-6 py-6 not-prose shadow-[0_24px_70px_-50px_rgba(0,0,0,0.25)]">
-    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">Need Help</p>
-    <h3 className="mt-2 text-2xl font-bold text-stone-900">
-      {value.title || '如果你想把文章內容變成實際行程，現在就可以開始'}
-    </h3>
-    <p className="mt-3 text-sm leading-7 text-stone-600">
-      {value.description || '把日期、人數或想去的地方傳來，我們會先幫你看怎麼排比較順。'}
-    </p>
-    <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-      <LineCTAButton location="PortableText CTA Block" size="sm">
-        LINE 直接聊清邁行程
-      </LineCTAButton>
-      <Button href="/tours" variant="outline" size="sm">
-        先看行程案例
-      </Button>
-    </div>
+  <div className="my-8 p-6 bg-primary-light border-l-4 border-primary rounded-r-lg not-prose">
+    <p className="font-medium text-gray-900 mb-1">{value.title || '需要行程規劃協助嗎？'}</p>
+    <p className="text-gray-600 text-sm mb-3">{value.description || '免費諮詢，讓在地人幫你規劃最適合的行程'}</p>
+    <Button href="https://line.me/R/ti/p/@037nyuwk" external size="sm">
+      LINE 諮詢
+    </Button>
   </div>
 )
 
-const ToursBlock = ({
-  value,
-}: {
-  value: {
-    title?: string
-    tours?: Array<{ title: string; slug: { current: string }; excerpt?: string }>
-  }
-}) => (
-  <div className="my-12 rounded-[28px] bg-gradient-to-br from-primary-light to-primary/10 p-6 not-prose shadow-[0_24px_70px_-50px_rgba(0,0,0,0.25)]">
-    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">Suggested Tours</p>
-    <h3 className="mt-2 text-2xl font-bold text-stone-900">{value.title || '可以一起參考的行程'}</h3>
-    <p className="mt-3 text-sm leading-7 text-stone-600">
-      如果你看完文章已經開始想像實際怎麼玩，下面這幾個行程會是很好銜接的下一步。
-    </p>
+const ToursBlock = ({ value }: { value: { title?: string; tours?: Array<{ title: string; slug: { current: string }; excerpt?: string }> } }) => (
+  <div className="my-12 p-6 bg-gradient-to-br from-primary-light to-primary/10 rounded-2xl not-prose">
+    <h3 className="text-xl font-bold text-gray-900 mb-2">{value.title || '推薦行程'}</h3>
+    <p className="text-gray-600 mb-6">精選適合親子的清邁行程，專車接送、中文溝通</p>
     {value.tours && value.tours.length > 0 && (
-      <div className="mb-6 mt-6 grid gap-4">
+      <div className="grid gap-4 mb-6">
         {value.tours.map((tour) => (
           <Link
             key={tour.slug?.current}
-            href={`/tours/${tour.slug?.current}`}
-            className="block rounded-2xl bg-white p-4 transition-shadow hover:shadow-md"
+            href={`/tours#${tour.slug?.current}`}
+            className="block p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
           >
             <h4 className="font-medium text-gray-900">{tour.title}</h4>
-            {tour.excerpt && <p className="mt-1 text-sm leading-6 text-gray-600">{tour.excerpt}</p>}
+            {tour.excerpt && <p className="text-sm text-gray-600">{tour.excerpt}</p>}
           </Link>
         ))}
       </div>
     )}
-    <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-      <Button href="/tours" size="lg">
-        看更多行程案例
+    <div className="text-center">
+      <Button href="https://line.me/R/ti/p/@037nyuwk" external size="lg">
+        LINE 免費諮詢
       </Button>
-      <LineCTAButton location="PortableText Tours Block" variant="outline" size="lg">
-        LINE 問適合怎麼排
-      </LineCTAButton>
     </div>
   </div>
 )
@@ -161,7 +150,7 @@ const TipBox = ({ value }: { value: { type?: string; content?: string } }) => {
   const type = (value.type || 'tip') as keyof typeof styles
 
   return (
-    <div className={`my-6 rounded-r-lg border-l-4 p-4 not-prose ${styles[type]}`}>
+    <div className={`my-6 p-4 border-l-4 rounded-r-lg not-prose ${styles[type]}`}>
       <p className="flex items-start gap-2">
         <span>{icons[type]}</span>
         <span>{value.content}</span>
@@ -170,14 +159,10 @@ const TipBox = ({ value }: { value: { type?: string; content?: string } }) => {
   )
 }
 
-const TableBlock = ({
-  value,
-}: {
-  value: { caption?: string; rows?: Array<{ cells?: string[]; isHeader?: boolean }> }
-}) => (
+const TableBlock = ({ value }: { value: { caption?: string; rows?: Array<{ cells?: string[]; isHeader?: boolean }> } }) => (
   <div className="my-8 overflow-x-auto not-prose -mx-4 px-4 md:mx-0 md:px-0">
-    {value.caption && <p className="mb-2 text-sm text-gray-600">{value.caption}</p>}
-    <table className="min-w-[400px] w-full border-collapse text-sm md:text-base">
+    {value.caption && <p className="text-sm text-gray-600 mb-2">{value.caption}</p>}
+    <table className="w-full border-collapse text-sm md:text-base min-w-[400px]">
       <tbody>
         {value.rows?.map((row, rowIndex) => (
           <tr key={rowIndex} className={row.isHeader ? 'bg-gray-100' : ''}>
@@ -187,7 +172,7 @@ const TableBlock = ({
                 <Tag
                   key={cellIndex}
                   className={`border border-gray-200 px-3 py-2 text-left md:px-4 ${
-                    row.isHeader ? 'whitespace-nowrap font-semibold' : ''
+                    row.isHeader ? 'font-semibold whitespace-nowrap' : ''
                   }`}
                 >
                   {cell}
@@ -201,34 +186,45 @@ const TableBlock = ({
   </div>
 )
 
-const ImageBlock = ({
-  value,
-}: {
-  value: { asset: SanityImageSource & { _ref?: string }; alt?: string; caption?: string }
-}) => {
+// 圖片區塊（直式圖限制寬度，支援點擊放大）
+const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: string }; alt?: string; caption?: string } }) => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [isPortrait, setIsPortrait] = useState(false)
 
   if (!value?.asset) return null
 
-  const thumbnailUrl = urlFor(value).width(800).fit('max').auto('format').url()
-  const fullSizeUrl = urlFor(value).width(1920).fit('max').auto('format').quality(90).url()
+  const thumbnailUrl = urlFor(value)
+    .width(800)
+    .fit('max')
+    .auto('format')
+    .url()
+
+  const fullSizeUrl = urlFor(value)
+    .width(1920)
+    .fit('max')
+    .auto('format')
+    .quality(90)
+    .url()
+
   const altText = value.alt || '文章圖片'
 
+  // 從 Sanity asset ref 判斷圖片比例（格式：image-{id}-{width}x{height}-{format}）
   const assetRef = (value.asset as { _ref?: string })?._ref || ''
   const dimensionMatch = assetRef.match(/-(\d+)x(\d+)-/)
   const detectedPortrait = dimensionMatch
-    ? parseInt(dimensionMatch[2], 10) > parseInt(dimensionMatch[1], 10)
+    ? parseInt(dimensionMatch[2]) > parseInt(dimensionMatch[1])
     : false
 
   return (
     <>
       <figure className="my-10 not-prose">
+        {/* 直式圖片限制寬度 50%，置中顯示 */}
         <div className={detectedPortrait ? 'flex justify-center' : ''}>
           <div
-            className={`cursor-zoom-in overflow-hidden rounded-xl shadow-md transition-shadow hover:shadow-lg ${
-              detectedPortrait ? 'w-full max-w-[50%] md:max-w-[40%]' : 'w-full'
-            }`}
+            className={`
+              rounded-xl overflow-hidden shadow-md cursor-zoom-in hover:shadow-lg transition-shadow
+              ${detectedPortrait ? 'w-full max-w-[50%] md:max-w-[40%]' : 'w-full'}
+            `}
             onClick={() => setIsLightboxOpen(true)}
           >
             <Image
@@ -236,9 +232,10 @@ const ImageBlock = ({
               alt={altText}
               width={800}
               height={1200}
-              className="h-auto w-full"
+              className="w-full h-auto"
               sizes={detectedPortrait ? '(max-width: 768px) 50vw, 320px' : '(max-width: 768px) 100vw, 800px'}
               onLoad={(e) => {
+                // 備用：圖片載入後檢測比例
                 const img = e.target as HTMLImageElement
                 if (img.naturalHeight > img.naturalWidth) {
                   setIsPortrait(true)
@@ -248,51 +245,50 @@ const ImageBlock = ({
           </div>
         </div>
         {value.caption && (
-          <figcaption className="mt-3 rounded-lg bg-gray-50 px-4 py-2 text-center text-sm text-gray-600">
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-lg">
             📷 {value.caption}
           </figcaption>
         )}
-        <p className="mt-1 text-center text-xs text-gray-400">
-          {detectedPortrait || isPortrait ? '點擊查看完整直式圖片' : '點擊查看完整圖片'}
+        <p className="text-center text-xs text-gray-400 mt-1">
+          {detectedPortrait || isPortrait ? '點擊查看完整圖片' : '點擊圖片放大'}
         </p>
       </figure>
 
+      {/* 燈箱 */}
       {isLightboxOpen && (
-        <ImageLightbox src={fullSizeUrl} alt={altText} onClose={() => setIsLightboxOpen(false)} />
+        <ImageLightbox
+          src={fullSizeUrl}
+          alt={altText}
+          onClose={() => setIsLightboxOpen(false)}
+        />
       )}
     </>
   )
 }
 
-const VideoBlock = ({
-  value,
-}: {
-  value: { url?: string; caption?: string; provider?: string; posterTime?: number }
-}) => {
+// 影片/GIF 區塊
+const VideoBlock = ({ value }: { value: { url?: string; caption?: string; provider?: string; posterTime?: number } }) => {
   if (!value?.url) return null
 
-  const isCloudflare =
-    value.url.includes('cloudflarestream.com') || value.url.includes('videodelivery.net')
-  const isDirectVideo =
-    value.url.includes('.mp4') ||
-    value.url.includes('.webm') ||
-    value.url.includes('.mov') ||
-    value.url.includes('cloudinary.com')
+  // 判斷影片類型
+  const isCloudflare = value.url.includes('cloudflarestream.com') || value.url.includes('videodelivery.net')
+  const isDirectVideo = value.url.includes('.mp4') || value.url.includes('.webm') || value.url.includes('.mov') || value.url.includes('cloudinary.com')
 
   if (isCloudflare) {
+    // Cloudflare Stream iframe
     const videoId = value.url.split('/').pop()?.replace('.m3u8', '') || ''
     return (
       <figure className="my-10 not-prose">
-        <div className="aspect-video overflow-hidden rounded-xl shadow-md">
+        <div className="rounded-xl overflow-hidden shadow-md aspect-video">
           <iframe
             src={`https://iframe.videodelivery.net/${videoId}`}
             allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
             allowFullScreen
-            className="h-full w-full"
+            className="w-full h-full"
           />
         </div>
         {value.caption && (
-          <figcaption className="mt-3 rounded-b-lg bg-gray-50 px-4 py-2 text-center text-sm text-gray-600">
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg">
             🎬 {value.caption}
           </figcaption>
         )}
@@ -301,29 +297,36 @@ const VideoBlock = ({
   }
 
   if (isDirectVideo) {
+    // 直接影片連結（Cloudinary、MP4 等）
+    // 需要 <source> 標籤才能在 iOS Safari 正常播放
+
+    // Cloudinary 影片自動產生封面圖
+    // posterTime 有值 = 指定秒數，否則用 so_auto 自動選擇好看的幀
     const isCloudinary = value.url.includes('cloudinary.com')
     const timeParam = value.posterTime !== undefined ? `so_${value.posterTime}` : 'so_auto'
     const posterUrl = isCloudinary
-      ? value.url.replace('/upload/', `/upload/${timeParam}/`).replace(/\.(mp4|webm|mov)$/i, '.jpg')
+      ? value.url
+          .replace('/upload/', `/upload/${timeParam}/`)
+          .replace(/\.(mp4|webm|mov)$/i, '.jpg')
       : undefined
 
     return (
       <figure className="my-10 not-prose">
-        <div className="overflow-hidden rounded-xl bg-gray-900 shadow-md">
+        <div className="rounded-xl overflow-hidden shadow-md bg-gray-900">
           <video
             src={value.url}
             poster={posterUrl}
             controls
             playsInline
             preload="metadata"
-            className="h-auto max-h-[70vh] w-full"
+            className="w-full h-auto max-h-[70vh]"
           >
             <source src={value.url} type="video/mp4" />
-            你的瀏覽器不支援影片播放。
+            您的瀏覽器不支援影片播放
           </video>
         </div>
         {value.caption && (
-          <figcaption className="mt-3 rounded-lg bg-gray-50 px-4 py-2 text-center text-sm text-gray-600">
+          <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-lg">
             🎬 {value.caption}
           </figcaption>
         )}
@@ -331,18 +334,19 @@ const VideoBlock = ({
     )
   }
 
+  // 一般影片連結（YouTube 等）
   return (
     <figure className="my-10 not-prose">
-      <div className="aspect-video overflow-hidden rounded-xl shadow-md">
+      <div className="rounded-xl overflow-hidden shadow-md aspect-video">
         <iframe
           src={value.url}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          className="h-full w-full"
+          className="w-full h-full"
         />
       </div>
       {value.caption && (
-        <figcaption className="mt-3 rounded-b-lg bg-gray-50 px-4 py-2 text-center text-sm text-gray-600">
+        <figcaption className="text-center text-sm text-gray-600 mt-3 px-4 py-2 bg-gray-50 rounded-b-lg">
           🎬 {value.caption}
         </figcaption>
       )}
@@ -350,27 +354,7 @@ const VideoBlock = ({
   )
 }
 
-function getPlainText(children: ReactNode): string {
-  if (typeof children === 'string') return children
-  if (typeof children === 'number') return String(children)
-  if (Array.isArray(children)) return children.map(getPlainText).join('')
-  if (children && typeof children === 'object' && 'props' in children) {
-    const child = children as { props?: { children?: ReactNode } }
-    return getPlainText(child.props?.children)
-  }
-  return ''
-}
-
-function createHeadingId(children: ReactNode) {
-  const text = getPlainText(children).trim()
-  const normalized = text
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff\s-]/gi, '')
-    .replace(/\s+/g, '-')
-
-  return normalized || 'section-heading'
-}
-
+// PortableText 元件設定
 const components: PortableTextComponents = {
   types: {
     image: ImageBlock,
@@ -383,24 +367,26 @@ const components: PortableTextComponents = {
   block: {
     h2: ({ children }) => (
       <h2
-        id={createHeadingId(children)}
-        className="scroll-mt-20 !mb-6 !mt-12 border-b-2 border-primary/30 pb-2"
+        id={children?.toString().toLowerCase().replace(/\s+/g, '-')}
+        className="scroll-mt-20 !mt-12 !mb-6 pb-2 border-b-2 border-primary/30"
       >
         {children}
       </h2>
     ),
     h3: ({ children }) => (
       <h3
-        id={createHeadingId(children)}
-        className="scroll-mt-20 !mb-4 !mt-8 border-l-4 border-primary pl-3"
+        id={children?.toString().toLowerCase().replace(/\s+/g, '-')}
+        className="scroll-mt-20 !mt-8 !mb-4 pl-3 border-l-4 border-primary"
       >
         {children}
       </h3>
     ),
-    h4: ({ children }) => <h4 className="scroll-mt-20 !mb-3 !mt-6">{children}</h4>,
-    normal: ({ children }) => <p className="!mb-6 !leading-relaxed">{children}</p>,
+    h4: ({ children }) => <h4 className="scroll-mt-20 !mt-6 !mb-3">{children}</h4>,
+    normal: ({ children }) => (
+      <p className="!mb-6 !leading-relaxed">{children}</p>
+    ),
     blockquote: ({ children }) => (
-      <blockquote className="!my-8 rounded-r-lg border-l-4 border-primary bg-primary-light/50 py-4 pl-6 pr-4 italic text-gray-700">
+      <blockquote className="!my-8 border-l-4 border-primary bg-primary-light/50 pl-6 pr-4 py-4 italic text-gray-700 rounded-r-lg">
         {children}
       </blockquote>
     ),
@@ -430,12 +416,12 @@ const components: PortableTextComponents = {
       )
     },
     highlight: ({ children }) => (
-      <mark className="rounded bg-yellow-200 px-1.5 py-0.5 text-lg font-semibold">{children}</mark>
+      <mark className="bg-yellow-200 px-1.5 py-0.5 rounded text-lg font-semibold">{children}</mark>
     ),
   },
   list: {
-    bullet: ({ children }) => <ul className="list-disc space-y-2 pl-6">{children}</ul>,
-    number: ({ children }) => <ol className="list-decimal space-y-2 pl-6">{children}</ol>,
+    bullet: ({ children }) => <ul className="list-disc pl-6 space-y-2">{children}</ul>,
+    number: ({ children }) => <ol className="list-decimal pl-6 space-y-2">{children}</ol>,
   },
 }
 

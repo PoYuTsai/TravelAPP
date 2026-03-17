@@ -1,3 +1,4 @@
+// src/app/tours/[slug]/page.tsx
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
@@ -10,7 +11,8 @@ import RelatedTours from '@/components/tours/RelatedTours'
 import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import OverviewVideo from '@/components/tours/OverviewVideo'
-import { mergeSiteSettings, siteSettingsQuery } from '@/lib/site-settings'
+
+// === Types ===
 
 interface DailySchedule {
   day: number
@@ -23,7 +25,7 @@ interface Stop {
   emoji?: string
   name: string
   description?: string
-  image?: unknown
+  image?: any
 }
 
 interface TourPackage {
@@ -31,7 +33,7 @@ interface TourPackage {
   title: string
   slug: string
   subtitle?: string
-  coverImage?: { alt?: string }
+  coverImage?: any
   duration?: string
   highlights?: string[]
   suitableFor?: string[]
@@ -49,7 +51,7 @@ interface DayTour {
   slug: string
   subtitle?: string
   description?: string
-  coverImage?: { alt?: string }
+  coverImage?: any
   highlights?: string[]
   stops?: Stop[]
   tips?: string[]
@@ -63,6 +65,8 @@ interface DayTour {
 }
 
 type TourData = TourPackage | DayTour
+
+// === Queries ===
 
 const packageQuery = `*[_type == "tourPackage" && slug.current == $slug][0]{
   _type,
@@ -102,10 +106,12 @@ const dayTourQuery = `*[_type == "dayTour" && slug.current == $slug][0]{
 
 async function getTourData(slug: string): Promise<TourData | null> {
   try {
-    const pkg = await client.fetch<TourPackage | null>(packageQuery, { slug })
+    // Try tourPackage first
+    const pkg = await client.fetch(packageQuery, { slug })
     if (pkg) return pkg
 
-    const dayTour = await client.fetch<DayTour | null>(dayTourQuery, { slug })
+    // Then try dayTour
+    const dayTour = await client.fetch(dayTourQuery, { slug })
     if (dayTour) return dayTour
 
     return null
@@ -114,14 +120,7 @@ async function getTourData(slug: string): Promise<TourData | null> {
   }
 }
 
-async function getSiteSettings() {
-  try {
-    return await client.fetch(siteSettingsQuery)
-  } catch {
-    return null
-  }
-}
-
+// Generate static params for SSG
 const allSlugsQuery = `{
   "packages": *[_type == "tourPackage" && defined(slug.current)][].slug.current,
   "dayTours": *[_type == "dayTour" && defined(slug.current)][].slug.current
@@ -137,6 +136,8 @@ export async function generateStaticParams() {
   }
 }
 
+// === Metadata ===
+
 export async function generateMetadata({
   params,
 }: {
@@ -146,16 +147,11 @@ export async function generateMetadata({
   const tour = await getTourData(slug)
 
   if (!tour) {
-    return { title: '找不到行程' }
+    return { title: '找不到頁面' }
   }
 
-  const description =
-    tour.subtitle ||
-    ('description' in tour && tour.description) ||
-    `${tour.title} - 清微旅行清邁在地包車行程`
-  const imageUrl = tour.coverImage
-    ? urlFor(tour.coverImage).width(1200).height(630).url()
-    : undefined
+  const description = tour.subtitle || `${tour.title} - 清微旅行精選行程`
+  const imageUrl = tour.coverImage ? urlFor(tour.coverImage).width(1200).height(630).url() : undefined
 
   return {
     title: tour.title,
@@ -180,33 +176,7 @@ export async function generateMetadata({
   }
 }
 
-function getTourTypeLabel(tour: TourData) {
-  return tour._type === 'tourPackage' ? '多日包車套裝' : '包車一日遊'
-}
-
-function getPriceLabel(tour: TourData) {
-  if (tour._type === 'tourPackage') {
-    return tour.priceRange || '依日期、人數與住宿位置客製報價'
-  }
-
-  if (!tour.basePrice) {
-    return '依日期與路線客製報價'
-  }
-
-  return `THB ${tour.basePrice.toLocaleString()}${tour.priceUnit || '/車'}`
-}
-
-function getSecondaryAnchor(tour: TourData) {
-  if (tour._type === 'tourPackage' && tour.dailySchedule?.length) {
-    return '#itinerary'
-  }
-
-  if (tour._type === 'dayTour' && tour.stops?.length) {
-    return '#stops'
-  }
-
-  return '#pricing'
-}
+// === Page Component ===
 
 export default async function TourDetailPage({
   params,
@@ -214,81 +184,53 @@ export default async function TourDetailPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const [tour, rawSiteSettings] = await Promise.all([getTourData(slug), getSiteSettings()])
+  const tour = await getTourData(slug)
 
   if (!tour) {
     notFound()
   }
 
-  const siteSettings = mergeSiteSettings(rawSiteSettings)
   const isPackage = tour._type === 'tourPackage'
-  const packageTour = isPackage ? tour : null
-  const dayTour = !isPackage ? tour : null
-  const typeLabel = getTourTypeLabel(tour)
-  const priceLabel = getPriceLabel(tour)
-  const secondaryAnchor = getSecondaryAnchor(tour)
-  const highlightItems = tour.highlights?.slice(0, 5) || []
-  const reviewSummary = `${siteSettings.aggregateRating.ratingValue} / ${siteSettings.aggregateRating.reviewCount}+`
-  const heroSummaryCards = [
-    {
-      label: '行程型態',
-      value: typeLabel,
-    },
-    {
-      label: isPackage ? '價格參考' : '基礎價格',
-      value: priceLabel,
-    },
-    {
-      label: '旅客評價',
-      value: reviewSummary,
-    },
-  ]
+  const isDayTour = tour._type === 'dayTour'
 
-  const description =
-    tour.subtitle ||
-    (dayTour?.description ?? '') ||
-    '依家庭節奏安排的清邁在地行程，讓移動、景點和休息更平衡。'
-
+  // Generate TourPackage/Product Schema for SEO
   const tourSchema = {
     '@context': 'https://schema.org',
     '@type': isPackage ? 'TouristTrip' : 'Product',
     name: tour.title,
-    description,
+    description: tour.subtitle || `${tour.title} - 清微旅行精選行程`,
     ...(tour.coverImage && {
       image: urlFor(tour.coverImage).width(1200).height(630).url(),
     }),
     provider: {
       '@type': 'TravelAgency',
-      name: siteSettings.businessName,
+      name: '清微旅行 Chiangway Travel',
       url: 'https://chiangway-travel.com',
     },
+    ...(isPackage && (tour as TourPackage).duration && {
+      itinerary: {
+        '@type': 'ItemList',
+        numberOfItems: (tour as TourPackage).dailySchedule?.length || 0,
+      },
+    }),
+    ...(isDayTour && (tour as DayTour).basePrice && {
+      offers: {
+        '@type': 'Offer',
+        price: (tour as DayTour).basePrice,
+        priceCurrency: 'THB',
+        availability: 'https://schema.org/InStock',
+      },
+    }),
     aggregateRating: {
       '@type': 'AggregateRating',
-      ratingValue: String(siteSettings.aggregateRating.ratingValue),
-      reviewCount: String(siteSettings.aggregateRating.reviewCount),
+      ratingValue: '5',
+      reviewCount: '110',
       bestRating: '5',
       worstRating: '1',
     },
-    ...(isPackage && packageTour?.duration
-      ? {
-          itinerary: {
-            '@type': 'ItemList',
-            numberOfItems: packageTour.dailySchedule?.length || 0,
-          },
-        }
-      : {}),
-    ...(!isPackage && dayTour?.basePrice
-      ? {
-          offers: {
-            '@type': 'Offer',
-            price: dayTour.basePrice,
-            priceCurrency: 'THB',
-            availability: 'https://schema.org/InStock',
-          },
-        }
-      : {}),
   }
 
+  // BreadcrumbList Schema for SEO
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -302,7 +244,7 @@ export default async function TourDetailPage({
       {
         '@type': 'ListItem',
         position: 2,
-        name: '行程案例',
+        name: '行程',
         item: 'https://chiangway-travel.com/tours',
       },
       {
@@ -315,267 +257,182 @@ export default async function TourDetailPage({
   }
 
   return (
-    <div className="py-12 md:py-16">
+    <div className="py-20">
+      {/* Tour Schema for SEO */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(tourSchema) }}
       />
+      {/* BreadcrumbList Schema for SEO - safe usage, JSON.stringify of our own object */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
-
       <TourViewTracker
         title={tour.title}
         slug={tour.slug}
         type={isPackage ? 'package' : 'dayTour'}
       />
-
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
         <Breadcrumb
           items={[
             { label: '首頁', href: '/' },
-            { label: '行程案例', href: '/tours' },
+            { label: '行程', href: '/tours' },
             { label: tour.title },
           ]}
         />
 
-        <section className="relative mt-4 overflow-hidden rounded-[36px] bg-stone-950 px-6 py-8 shadow-[0_34px_100px_-45px_rgba(0,0,0,0.55)] md:px-10 md:py-12">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(247,192,9,0.28),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.12),transparent_24%)]" />
-          <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
-            <div className="max-w-3xl">
-              <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-sm font-medium text-white/82 backdrop-blur-sm">
-                  {typeLabel}
-                </span>
-                {isPackage && packageTour?.duration && (
-                  <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-sm font-medium text-white/82 backdrop-blur-sm">
-                    {packageTour.duration}
-                  </span>
-                )}
-                {!isPackage && dayTour?.basePrice && (
-                  <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-sm font-medium text-white/82 backdrop-blur-sm">
-                    {priceLabel}
-                  </span>
-                )}
-                <span className="rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-sm font-medium text-white/82 backdrop-blur-sm">
-                  {siteSettings.aggregateRating.reviewCount}+ 則旅客回饋
-                </span>
-              </div>
-
-              <h1 className="mt-5 text-4xl font-bold leading-tight text-white md:text-5xl">
-                {tour.title}
-              </h1>
-              <p className="mt-5 max-w-2xl text-lg leading-8 text-white/76 md:text-xl">
-                {description}
-              </p>
-
-              {highlightItems.length > 0 && (
-                <div className="mt-6 flex flex-wrap gap-2.5">
-                  {highlightItems.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-white/12 bg-white/8 px-3 py-2 text-sm text-white/82 backdrop-blur-sm"
-                    >
-                      #{item}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                <LineCTAButton
-                  location="Tour Detail Hero CTA"
-                  className="shadow-[0_20px_45px_-18px_rgba(247,192,9,0.88)]"
-                >
-                  LINE 詢問這個行程
-                </LineCTAButton>
-                <Button
-                  href={secondaryAnchor}
-                  variant="outline"
-                  size="lg"
-                  className="border-white/35 text-white hover:border-white hover:bg-white hover:text-stone-900"
-                >
-                  先看重點內容
-                </Button>
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-[28px] border border-white/12 bg-white/8 p-3 backdrop-blur-sm">
-              <div className="overflow-hidden rounded-[22px] bg-stone-900">
-                {tour.coverImage ? (
-                  <Image
-                    src={urlFor(tour.coverImage).width(1200).auto('format').url()}
-                    alt={tour.coverImage.alt || tour.title}
-                    width={1200}
-                    height={900}
-                    className="h-auto w-full object-cover"
-                    sizes="(max-width: 1024px) 100vw, 360px"
-                    priority
-                  />
-                ) : (
-                  <div className="flex aspect-[4/3] items-center justify-center bg-gradient-to-br from-primary-light to-primary/20">
-                    <span className="text-7xl">{isPackage ? '🧳' : '🚐'}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="-mt-6 grid gap-4 px-2 md:-mt-8 md:grid-cols-3">
-          {heroSummaryCards.map((item) => (
-            <div
-              key={item.label}
-              className="rounded-[24px] border border-stone-200 bg-white px-5 py-5 shadow-[0_24px_70px_-40px_rgba(0,0,0,0.35)]"
-            >
-              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-stone-400">
-                {item.label}
-              </p>
-              <p className="mt-2 text-base font-semibold leading-7 text-stone-900">{item.value}</p>
-            </div>
-          ))}
-        </div>
-
-        <section className="mt-16 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="rounded-[32px] bg-white px-6 py-6 shadow-[0_28px_90px_-45px_rgba(0,0,0,0.2)] md:px-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">
-              行程概覽
-            </p>
-            <h2 className="mt-3 text-2xl font-bold text-stone-900">
-              這趟旅程大致會是這種感覺
-            </h2>
-            <p className="mt-4 text-base leading-8 text-stone-700">
-              {isPackage
-                ? `${packageTour?.subtitle || '適合想把清邁周邊玩得更完整的旅客。'} 我們會把每天的節奏、移動距離與適合停留的時間都排順。`
-                : dayTour?.description || '這是一條從清邁出發、適合一日包車安排的路線，重點是把移動和停留感受抓得更舒服。'}
-            </p>
-
-            {isPackage && packageTour?.overviewVideo && (
-              <div className="mt-8">
-                <OverviewVideo src={packageTour.overviewVideo} />
+        {/* Hero Section */}
+        <div className="mb-8">
+          {/* Cover Image - Full Display (preserves original aspect ratio) */}
+          <div className="rounded-2xl overflow-hidden">
+            {tour.coverImage ? (
+              <Image
+                src={urlFor(tour.coverImage).width(1200).auto('format').url()}
+                alt={tour.coverImage.alt || tour.title}
+                width={1200}
+                height={800}
+                className="w-full h-auto"
+                sizes="(max-width: 768px) 100vw, 1200px"
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
+                <span className="text-8xl">{isDayTour ? '🌿' : '🌴'}</span>
               </div>
             )}
           </div>
 
-          <aside className="rounded-[32px] bg-amber-50 px-6 py-6 md:px-7">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
-              {isPackage ? '適合這樣的旅客' : '出發前提醒'}
+          {/* Title & Subtitle - Below Image */}
+          <div className="mt-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">{tour.title}</h1>
+            {tour.subtitle && (
+              <p className="text-lg md:text-xl text-gray-600">{tour.subtitle}</p>
+            )}
+          </div>
+
+          {/* Highlights Tags - Below Title */}
+          {tour.highlights && tour.highlights.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-4">
+              {tour.highlights.map((h) => (
+                <span
+                  key={h}
+                  className="text-sm bg-primary/10 text-primary px-3 py-1.5 rounded-full font-medium"
+                >
+                  #{h}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Description (Day Tour only) */}
+        {isDayTour && (tour as DayTour).description && (
+          <section className="mb-12">
+            <p className="text-lg text-gray-700 leading-relaxed">
+              {(tour as DayTour).description}
             </p>
-            <h2 className="mt-3 text-2xl font-bold text-stone-900">
-              {isPackage ? '如果你在找這種節奏，會很適合' : '先把這幾件事想好，體驗會更順'}
+          </section>
+        )}
+
+        {/* Suitable For Section (Package only) */}
+        {isPackage && (tour as TourPackage).suitableFor && (tour as TourPackage).suitableFor!.length > 0 && (
+          <section className="mb-12 bg-primary-light/30 rounded-2xl p-6 md:p-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              這趟旅程適合你，如果...
             </h2>
-            <ul className="mt-5 space-y-3">
-              {(isPackage ? packageTour?.suitableFor : dayTour?.tips)?.map((item) => (
-                <li key={item} className="flex items-start gap-3 text-stone-700">
-                  <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm font-semibold text-primary shadow-sm">
-                    ✓
-                  </span>
-                  <span className="leading-7">{item}</span>
+            <ul className="space-y-3">
+              {(tour as TourPackage).suitableFor!.map((item, i) => (
+                <li key={i} className="flex items-start gap-3 text-gray-700">
+                  <svg className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  {item}
                 </li>
               ))}
             </ul>
-            {!isPackage && dayTour?.additionalInfo && (
-              <div className="mt-6 rounded-2xl bg-white px-4 py-4">
-                <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">
-                  {dayTour.additionalInfo}
-                </p>
-              </div>
-            )}
-          </aside>
-        </section>
+          </section>
+        )}
 
-        {isPackage && packageTour?.dailySchedule && packageTour.dailySchedule.length > 0 && (
-          <section
-            id="itinerary"
-            className="mt-16 rounded-[32px] bg-stone-50 px-6 py-8 md:px-8 md:py-10"
-          >
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">
-                Itinerary
-              </p>
-              <h2 className="mt-3 text-3xl font-bold text-stone-900">每天大致怎麼安排</h2>
-              <p className="mt-4 text-base leading-7 text-stone-600">
-                先讓你抓到節奏與路線方向。細節仍會依日期、住宿與旅伴組成再做微調。
-              </p>
-            </div>
-            <div className="mt-8 space-y-4">
-              {packageTour.dailySchedule.map((day) => (
+        {/* Overview Video Section (Package only) */}
+        {isPackage && (tour as TourPackage).overviewVideo && (
+          <OverviewVideo src={(tour as TourPackage).overviewVideo!} />
+        )}
+
+        {/* Daily Schedule Section (Package only) */}
+        {isPackage && (tour as TourPackage).dailySchedule && (tour as TourPackage).dailySchedule!.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">每日行程</h2>
+            <div className="space-y-4">
+              {(tour as TourPackage).dailySchedule!.map((day) => (
                 <div
                   key={day.day}
-                  className="rounded-[28px] border border-stone-200 bg-white px-5 py-5 shadow-[0_24px_70px_-45px_rgba(0,0,0,0.25)] md:px-6"
+                  className="bg-white rounded-xl p-6 shadow-sm border border-gray-100"
                 >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start">
-                    <div className="flex items-center gap-3 md:min-w-[220px]">
-                      <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary text-lg font-bold text-stone-950 shadow-sm">
-                        {day.emoji || day.day}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold uppercase tracking-[0.14em] text-stone-400">
-                          Day {day.day}
-                        </p>
-                        <h3 className="mt-1 text-lg font-bold text-stone-900">{day.title}</h3>
-                      </div>
+                  <div className="flex items-center gap-3 mb-2">
+                    {day.emoji && <span className="text-2xl">{day.emoji}</span>}
+                    <div>
+                      <span className="text-sm text-primary font-medium">
+                        Day {day.day}
+                      </span>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {day.title}
+                      </h3>
                     </div>
-                    <p className="text-base leading-7 text-stone-700 md:flex-1">{day.activities}</p>
                   </div>
+                  <p className="text-gray-600 ml-10">{day.activities}</p>
                 </div>
               ))}
             </div>
           </section>
         )}
 
-        {!isPackage && dayTour?.stops && dayTour.stops.length > 0 && (
-          <section id="stops" className="mt-16 rounded-[32px] bg-stone-50 px-6 py-8 md:px-8 md:py-10">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">
-                Stops
-              </p>
-              <h2 className="mt-3 text-3xl font-bold text-stone-900">這趟會經過哪些點</h2>
-              <p className="mt-4 text-base leading-7 text-stone-600">
-                用滑動方式先看整體氣氛與停留重點，幫你快速判斷是不是喜歡的路線。
-              </p>
-            </div>
-            <div className="mt-8">
-              <StopsCarousel stops={dayTour.stops} />
-            </div>
+        {/* Stops Section (Day Tour only) - Carousel */}
+        {isDayTour && (tour as DayTour).stops && (tour as DayTour).stops!.length > 0 && (
+          <section className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">行程景點</h2>
+            <StopsCarousel stops={(tour as DayTour).stops!} />
           </section>
         )}
 
+        {/* Tips Section (Day Tour only) */}
+        {isDayTour && (tour as DayTour).tips && (tour as DayTour).tips!.length > 0 && (
+          <section className="mb-12 bg-amber-50 rounded-2xl p-6 md:p-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              💡 貼心建議
+            </h2>
+            <ul className="space-y-2">
+              {(tour as DayTour).tips!.map((tip, i) => (
+                <li key={i} className="text-gray-700">• {tip}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* Includes/Excludes Section */}
         {(tour.includes?.length || tour.excludes?.length) && (
-          <section className="mt-16 grid gap-6 lg:grid-cols-2">
+          <section className="mb-12 grid md:grid-cols-2 gap-6">
             {tour.includes && tour.includes.length > 0 && (
-              <div className="rounded-[28px] border border-emerald-100 bg-emerald-50/80 px-6 py-6">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-700/70">
-                  Includes
-                </p>
-                <h2 className="mt-3 text-2xl font-bold text-stone-900">這趟通常已包含</h2>
-                <ul className="mt-5 space-y-3">
-                  {tour.includes.map((item) => (
-                    <li key={item} className="flex items-start gap-3 text-stone-700">
-                      <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm font-semibold text-emerald-600 shadow-sm">
-                        ✓
-                      </span>
-                      <span className="leading-7">{item}</span>
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">費用包含</h3>
+                <ul className="space-y-2">
+                  {tour.includes.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-gray-700">
+                      <span className="text-green-500">✓</span>
+                      {item}
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-
             {tour.excludes && tour.excludes.length > 0 && (
-              <div className="rounded-[28px] border border-stone-200 bg-stone-50 px-6 py-6">
-                <p className="text-sm font-semibold uppercase tracking-[0.16em] text-stone-400">
-                  Excludes
-                </p>
-                <h2 className="mt-3 text-2xl font-bold text-stone-900">通常不含的項目</h2>
-                <ul className="mt-5 space-y-3">
-                  {tour.excludes.map((item) => (
-                    <li key={item} className="flex items-start gap-3 text-stone-700">
-                      <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-sm font-semibold text-stone-500 shadow-sm">
-                        −
-                      </span>
-                      <span className="leading-7">{item}</span>
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
+                <ul className="space-y-2">
+                  {tour.excludes.map((item, i) => (
+                    <li key={i} className="flex items-start gap-2 text-gray-500">
+                      <span className="text-gray-400">✗</span>
+                      {item}
                     </li>
                   ))}
                 </ul>
@@ -584,94 +441,72 @@ export default async function TourDetailPage({
           </section>
         )}
 
-        <section
-          id="pricing"
-          className="mt-16 rounded-[32px] bg-stone-950 px-6 py-8 md:px-8 md:py-10"
-        >
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
-            <div className="max-w-3xl">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-light/90">
-                Pricing
-              </p>
-              <h2 className="mt-3 text-3xl font-bold text-white">
-                {isPackage ? '這趟行程的費用會怎麼抓' : '這條路線的價格怎麼看'}
-              </h2>
-              <p className="mt-4 text-base leading-7 text-white/72">
-                {isPackage
-                  ? '多日包車通常會依日期、旅伴人數、住宿位置與實際路線一起估算，所以這裡先給你抓概念。'
-                  : '一日遊通常會有基礎價格，但若有跨區、加時或導遊搭配，也會再依需求調整。'}
-              </p>
-
-              <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                <LineCTAButton
-                  location="Tour Detail Pricing CTA"
-                  className="shadow-[0_20px_45px_-18px_rgba(247,192,9,0.88)]"
-                >
-                  LINE 詢問實際報價
-                </LineCTAButton>
-                <Button
-                  href="#related-content"
-                  variant="outline"
-                  className="border-white/35 text-white hover:border-white hover:bg-white hover:text-stone-900"
-                >
-                  看更多延伸內容
-                </Button>
-              </div>
+        {/* Pricing Section */}
+        {(isPackage && (tour as TourPackage).priceRange) && (
+          <section className="mb-12 bg-gray-50 rounded-2xl p-6 md:p-8 text-center">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">參考價格</h2>
+            <div className="text-3xl font-bold text-primary mb-2">
+              {(tour as TourPackage).priceRange}
             </div>
+            {(tour as TourPackage).priceNote && (
+              <p className="text-gray-500 text-sm">（{(tour as TourPackage).priceNote}）</p>
+            )}
+          </section>
+        )}
 
-            <div className="rounded-[28px] border border-white/12 bg-white/94 p-6 shadow-[0_26px_70px_-35px_rgba(0,0,0,0.45)]">
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-500">
-                費用摘要
-              </p>
-              <div className="mt-4 rounded-2xl bg-amber-50 px-4 py-4">
-                <p className="text-sm font-medium text-stone-500">
-                  {isPackage ? '整體價格參考' : '基礎價格'}
-                </p>
-                <p className="mt-1 text-2xl font-bold text-stone-900">{priceLabel}</p>
-              </div>
-
-              {(packageTour?.priceNote || dayTour?.priceNote) && (
-                <p className="mt-4 text-sm leading-6 text-stone-600">
-                  {packageTour?.priceNote || dayTour?.priceNote}
-                </p>
-              )}
-
-              {dayTour?.guidePrice && (
-                <div className="mt-4 rounded-2xl bg-stone-100 px-4 py-4">
-                  <p className="text-sm font-medium text-stone-500">中文導遊加價參考</p>
-                  <p className="mt-1 text-xl font-bold text-stone-900">
-                    THB {dayTour.guidePrice.toLocaleString()}
-                  </p>
-                </div>
-              )}
+        {isDayTour && (tour as DayTour).basePrice && (
+          <section className="mb-12 bg-gray-50 rounded-2xl p-6 md:p-8 text-center">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">包車費用</h2>
+            <div className="text-3xl font-bold text-primary mb-2">
+              ${(tour as DayTour).basePrice?.toLocaleString()}{(tour as DayTour).priceUnit || '/團'}
             </div>
-          </div>
-        </section>
+            {(tour as DayTour).priceNote && (
+              <p className="text-gray-500 text-sm">（{(tour as DayTour).priceNote}）</p>
+            )}
+            {(tour as DayTour).guidePrice && (
+              <p className="text-gray-600 mt-2 text-sm">
+                中文導遊加購：${(tour as DayTour).guidePrice?.toLocaleString()}/團
+              </p>
+            )}
+          </section>
+        )}
 
-        <section className="mt-16 rounded-[32px] bg-amber-50 px-8 py-10 text-center md:px-12 md:py-14">
-          <h2 className="text-3xl font-bold text-stone-900 md:text-4xl">
-            想知道這個行程適不適合你們家，直接問最快
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-stone-700 md:text-lg">
-            把日期、人數、孩子年齡或住宿位置丟給我們，我們可以先幫你判斷這條路線適不適合，再一起調整。
+        {/* Additional Info (Day Tour only) */}
+        {isDayTour && (tour as DayTour).additionalInfo && (
+          <section className="mb-12 bg-blue-50 rounded-2xl p-6 md:p-8">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              📋 詳細說明
+            </h2>
+            <div className="text-gray-700 whitespace-pre-line">
+              {(tour as DayTour).additionalInfo}
+            </div>
+          </section>
+        )}
+
+        {/* CTA Section */}
+        <section className="text-center bg-gradient-to-r from-primary-light to-primary/20 rounded-2xl p-8 md:p-12">
+          <p className="text-gray-700 mb-2">
+            {isDayTour ? '想了解更多細節？' : '這是範例行程，每個家庭的需求都不同'}
           </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <LineCTAButton
-              location="Tour Detail Bottom CTA"
-              className="shadow-[0_20px_45px_-18px_rgba(247,192,9,0.88)]"
-            >
-              LINE 詢問這個行程
-            </LineCTAButton>
-            <Button href="/tours" variant="secondary">
-              回行程列表再看看
-            </Button>
-          </div>
+          <p className="text-xl font-semibold text-gray-900 mb-6">
+            聊聊你們的想法，我們幫你規劃
+          </p>
+          <LineCTAButton location="Tour Detail CTA">
+            LINE 聊聊
+          </LineCTAButton>
         </section>
 
-        <div id="related-content" className="mt-16">
-          <RelatedTours currentSlug={tour.slug} currentType={tour._type} />
-          <RelatedBlogPosts tourTitle={tour.title} tourHighlights={tour.highlights} />
-        </div>
+        {/* Related Tours */}
+        <RelatedTours
+          currentSlug={tour.slug}
+          currentType={tour._type}
+        />
+
+        {/* Related Blog Posts */}
+        <RelatedBlogPosts
+          tourTitle={tour.title}
+          tourHighlights={tour.highlights}
+        />
       </div>
     </div>
   )

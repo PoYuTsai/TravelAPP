@@ -3,12 +3,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import SectionTitle from '@/components/ui/SectionTitle'
-import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
-import {
-  buildFacebookReviewsUrl,
-  defaultSiteSettings,
-  type SiteTestimonial,
-} from '@/lib/site-settings'
 
 // Star icon
 function StarIcon({ className }: { className?: string }) {
@@ -28,24 +22,73 @@ function QuoteIcon({ className }: { className?: string }) {
   )
 }
 
-interface TestimonialsProps {
-  testimonials?: SiteTestimonial[]
+interface Testimonial {
+  name: string
+  location?: string
+  kids?: string
+  content: string
+  highlight: string
+  source?: 'facebook' | 'google'
 }
 
-export default function Testimonials({
-  testimonials = defaultSiteSettings.homeTestimonials,
-}: TestimonialsProps) {
-  const siteSettings = useSiteSettings()
+// Real customer reviews from Facebook and Google (一字不漏)
+const defaultTestimonials: Testimonial[] = [
+  // Google Reviews
+  {
+    name: '魏文陽',
+    location: '台灣',
+    content: '第一次安排清邁自由行～行程排好後發現有幾天行程較遠需要包車上網找到微清旅行～包車含油12小時價格算偏高一點點，但有問題詢問老闆阿裕都能即時回覆親切，很快就敲定時間預約，安排去清萊的導遊郭姐也很熱情介紹當地文化景點，想要朝聖的餐廳訂位也可幫忙預訂，因為是自己安排的行程第一次造訪有些景點時間沒抓好較可惜停留時間不夠，基本上都蠻彈性的可以討論，老闆也會有建議的方向想法，有機會再次深度造訪清邁！！',
+    highlight: '即時回覆，彈性討論',
+    source: 'google',
+  },
+  {
+    name: 'Lu Lu',
+    location: '台灣',
+    content: '可以提供中文溝通、服務貼心，更棒的是有提供汽車座椅，這個服務在清邁少有。',
+    highlight: '有提供汽車座椅',
+    source: 'google',
+  },
+  {
+    name: 'Tsai Wei Wei',
+    location: '台灣',
+    content: '這次清邁郊區有包車三天，都開車大概一小時可到，第一天司機大哥人很好，雖然語言不通但很努力用翻譯跟我們溝通，開車也很小心謹慎。二、三天是開朗活潑會講中文的J導遊小姐帶我們遊玩，除了事前規劃的行程，中間有想去哪，J導遊都會給我們建議和安排，也很自由的帶我們去。這趟清邁旅遊真的是很美好😊',
+    highlight: '導遊開朗活潑，行程自由',
+    source: 'google',
+  },
+  // Facebook Reviews (最新 3 則，一字不漏)
+  {
+    name: '王薪驊',
+    location: '台灣',
+    content: '地陪跟司機人都超好的，親力親為，也超有耐心，真心推薦！',
+    highlight: '親力親為，超有耐心',
+    source: 'facebook',
+  },
+  {
+    name: 'Feather Chin',
+    location: '台灣',
+    content: '值得推薦的包車旅遊～地陪親力親為～很貼心和很棒～如果下次朋友要來玩一定會推薦你們家的包車行程。',
+    highlight: '值得推薦，很貼心',
+    source: 'facebook',
+  },
+  {
+    name: 'Vicky Lin',
+    location: '台灣',
+    content: '從行前的討論安排，都很細心，都能中文溝通完全不用擔心，還有中文解說的導遊，很盡責喔！全程陪伴走完解說不會到點了就把大家放生，超nice，推推～',
+    highlight: '中文溝通完全不用擔心',
+    source: 'facebook',
+  },
+]
+
+interface TestimonialsProps {
+  testimonials?: Testimonial[]
+}
+
+export default function Testimonials({ testimonials = defaultTestimonials }: TestimonialsProps) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     loop: true,
     align: 'center',
   })
   const [selectedIndex, setSelectedIndex] = useState(0)
-  const reviewCard =
-    siteSettings.trustSection.cards.find((card) => card.metric === 'reviews') ||
-    defaultSiteSettings.trustSection.cards.find((card) => card.metric === 'reviews')
-  const googleReviewsUrl = reviewCard?.href || 'https://maps.app.goo.gl/8MbRV4PPBggwj2pF6'
-  const facebookReviewsUrl = buildFacebookReviewsUrl(siteSettings.socialLinks.facebook)
 
   const scrollTo = useCallback(
     (index: number) => emblaApi && emblaApi.scrollTo(index),
@@ -75,7 +118,7 @@ export default function Testimonials({
   }, [emblaApi])
 
   // Testimonial card component
-  const TestimonialCard = ({ testimonial }: { testimonial: SiteTestimonial }) => (
+  const TestimonialCard = ({ testimonial }: { testimonial: Testimonial }) => (
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 relative h-full">
       <QuoteIcon className="absolute top-4 right-4 w-8 h-8 text-primary/20" />
 
@@ -198,7 +241,7 @@ export default function Testimonials({
         {/* Links to more reviews */}
         <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
           <a
-            href={googleReviewsUrl}
+            href="https://maps.app.goo.gl/8MbRV4PPBggwj2pF6"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium text-sm transition-colors"
@@ -213,7 +256,7 @@ export default function Testimonials({
           </a>
           <span className="hidden sm:block text-gray-300">|</span>
           <a
-            href={facebookReviewsUrl}
+            href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium text-sm transition-colors"

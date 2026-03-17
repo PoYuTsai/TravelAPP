@@ -2,7 +2,6 @@
 
 import Button from './Button'
 import { trackLineClick } from '@/lib/analytics'
-import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
 
 interface LineCTAButtonProps {
   children: React.ReactNode
@@ -24,16 +23,13 @@ export default function LineCTAButton({
   variant = 'primary',
   className,
 }: LineCTAButtonProps) {
-  const siteSettings = useSiteSettings()
-  const lineUrl = siteSettings.socialLinks.line
-
   const handleClick = () => {
-    trackLineClick(location, lineUrl)
+    trackLineClick(location)
   }
 
   return (
     <Button
-      href={lineUrl}
+      href="https://line.me/R/ti/p/@037nyuwk"
       external
       size={size}
       variant={variant}

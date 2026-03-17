@@ -1,21 +1,19 @@
 'use client'
 
 import { trackLineClick } from '@/lib/analytics'
-import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
+
+const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
 export default function StickyMobileCTA() {
-  const siteSettings = useSiteSettings()
-  const lineUrl = siteSettings.socialLinks.line
-
   const handleClick = () => {
-    trackLineClick('Sticky Mobile CTA', lineUrl)
+    trackLineClick('Sticky Mobile CTA')
   }
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] pb-safe">
       <div className="px-4 py-3">
         <a
-          href={lineUrl}
+          href={LINE_URL}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleClick}

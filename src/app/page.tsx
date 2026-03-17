@@ -1,25 +1,16 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import { fetchTotalFamilyCount } from '@/lib/notion'
-import { mergeSiteSettings, siteSettingsQuery } from '@/lib/site-settings'
-import Hero from '@/components/sections/Hero'
-import TrustNumbers from '@/components/sections/TrustNumbers'
-import WhoWeAre from '@/components/sections/WhoWeAre'
-import ToursPreview from '@/components/sections/ToursPreview'
-import Testimonials from '@/components/sections/Testimonials'
-import FeaturedArticles from '@/components/sections/FeaturedArticles'
-import CTA from '@/components/sections/CTA'
 
+// ISR: Revalidate every 60 seconds
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: '清邁親子包車與客製旅遊｜住在清邁的 Eric + Min 協助安排 | 清微旅行',
-  description:
-    '清微旅行由住在清邁的台灣爸爸 Eric 與泰國媽媽 Min 協助安排，專注親子包車、客製行程與中文導遊分工服務。',
+  title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
+  description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，在地家庭提供司機導遊分工服務。兒童座椅、中文溝通、客製行程，100+ 組家庭好評推薦。清邁一日 NT$3,200 起。',
   openGraph: {
-    title: '清邁親子包車與客製旅遊｜住在清邁的 Eric + Min 協助安排 | 清微旅行',
-    description:
-      '從清邁親子包車、自由行規劃到客製路線安排，幫家庭旅客把節奏、交通和在地體驗先整理順。',
+    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
+    description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
     url: 'https://chiangway-travel.com/',
     siteName: '清微旅行 Chiangway Travel',
     locale: 'zh_TW',
@@ -35,8 +26,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: '清邁親子包車與客製旅遊｜清微旅行',
-    description: '由住在清邁的在地家庭協助安排，讓親子清邁自由行不只是移動，而是更順的旅程。',
+    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽｜清微旅行',
+    description: '清邁親子包車首選！司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
     images: ['/images/og-image.png'],
   },
   alternates: {
@@ -44,17 +35,19 @@ export const metadata: Metadata = {
   },
 }
 
+import Hero from '@/components/sections/Hero'
+import TrustNumbers from '@/components/sections/TrustNumbers'
+import WhoWeAre from '@/components/sections/WhoWeAre'
+import ToursPreview from '@/components/sections/ToursPreview'
+import Testimonials from '@/components/sections/Testimonials'
+import FeaturedArticles from '@/components/sections/FeaturedArticles'
+import CTA from '@/components/sections/CTA'
+
 const landingPageQuery = `*[_type == "landingPage"][0]{
   heroBackgroundImage,
   heroTitle,
   heroSubtitle,
-  heroEyebrow,
   heroDescription,
-  heroProofItems,
-  heroHelperText,
-  heroPanelEyebrow,
-  heroPanelTitle,
-  heroPanelDescription,
   heroPrimaryCta,
   heroSecondaryCta,
   whoWeAreVideoUrl,
@@ -69,14 +62,8 @@ const landingPageQuery = `*[_type == "landingPage"][0]{
   articlesSectionTitle,
   articlesSectionSubtitle,
   articlesShowCount,
-  ctaEyebrow,
   ctaTitle,
   ctaDescription,
-  ctaHelperText,
-  ctaPlanningTitle,
-  ctaPlanningSteps,
-  ctaResponseTitle,
-  ctaResponseDescription,
   ctaPrimaryCta,
   ctaSecondaryCta
 }`
@@ -89,50 +76,24 @@ async function getLandingPageData() {
   }
 }
 
-async function getSiteSettings() {
-  try {
-    const settings = await client.fetch(siteSettingsQuery)
-    return mergeSiteSettings(settings)
-  } catch {
-    return mergeSiteSettings(null)
-  }
-}
-
 export default async function Home() {
-  const [data, familyCount, siteSettings] = await Promise.all([
+  // Fetch data in parallel
+  const [data, familyCount] = await Promise.all([
     getLandingPageData(),
     fetchTotalFamilyCount(),
-    getSiteSettings(),
   ])
 
   return (
     <>
       <Hero
         backgroundImage={data?.heroBackgroundImage}
-        eyebrow={data?.heroEyebrow}
-        title={data?.heroTitle}
-        subtitle={data?.heroSubtitle}
+        title={data?.heroTitle || '清邁親子包車，交給 Eric & Min'}
+        subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
         description={data?.heroDescription}
-        proofItems={data?.heroProofItems}
-        helperText={data?.heroHelperText}
-        panelEyebrow={data?.heroPanelEyebrow}
-        panelTitle={data?.heroPanelTitle}
-        panelDescription={data?.heroPanelDescription}
         primaryCta={data?.heroPrimaryCta}
         secondaryCta={data?.heroSecondaryCta}
-        familyCountValue={familyCount}
-        reviewCount={siteSettings.aggregateRating.reviewCount}
-        ratingValue={siteSettings.aggregateRating.ratingValue}
       />
-      <TrustNumbers
-        familyCountValue={familyCount}
-        reviewCount={siteSettings.aggregateRating.reviewCount}
-        ratingValue={siteSettings.aggregateRating.ratingValue}
-        sectionEyebrow={siteSettings.trustSection.eyebrow}
-        sectionTitle={siteSettings.trustSection.title}
-        sectionDescription={siteSettings.trustSection.description}
-        cards={siteSettings.trustSection.cards}
-      />
+      <TrustNumbers familyCountValue={familyCount} />
       <WhoWeAre
         videoUrl={data?.whoWeAreVideoUrl}
         videoPoster={data?.whoWeAreVideoPoster}
@@ -142,24 +103,18 @@ export default async function Home() {
         description={data?.whoWeAreDescription}
         trustPoints={data?.whoWeAreTrustPoints?.map((text: string) => ({ text }))}
         storyLink={data?.whoWeAreStoryLink || '/blog/eric-story-taiwan-to-chiang-mai'}
-        storyLinkText={data?.whoWeAreStoryLinkText || '看我們為什麼住在清邁'}
+        storyLinkText={data?.whoWeAreStoryLinkText || '閱讀我們的故事'}
       />
       <ToursPreview />
-      <Testimonials testimonials={siteSettings.homeTestimonials} />
+      <Testimonials />
       <FeaturedArticles
         sectionTitle={data?.articlesSectionTitle}
         sectionSubtitle={data?.articlesSectionSubtitle}
         showCount={data?.articlesShowCount}
       />
       <CTA
-        eyebrow={data?.ctaEyebrow}
-        title={data?.ctaTitle}
-        description={data?.ctaDescription}
-        helperText={data?.ctaHelperText}
-        planningTitle={data?.ctaPlanningTitle}
-        planningSteps={data?.ctaPlanningSteps}
-        responseTitle={data?.ctaResponseTitle}
-        responseDescription={data?.ctaResponseDescription}
+        title={data?.ctaTitle || '每個家庭都不一樣'}
+        description={data?.ctaDescription || '聊聊你們的想法，我們幫你規劃'}
         primaryCta={data?.ctaPrimaryCta}
         secondaryCta={data?.ctaSecondaryCta}
       />
