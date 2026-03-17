@@ -34,7 +34,7 @@
 | Phase 6.7 | 審查 #10 SEO/行銷追蹤優化 | ✅ 完成 |
 | Phase 6.8 | 報價計算系統 | ✅ 完成 |
 | 維護 2026-03-16 | Google CSP / Studio / Parser 穩定性 | ✅ 完成 |
-| 維護 2026-03-17 | 前台承接頁 + CMS 內容營運收斂 | ✅ 完成 |
+| 維護 2026-03-17 | CMS 內容營運收斂 + 前端回退原始設計 | ✅ 完成 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -257,16 +257,15 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - **簽名密鑰收斂**：移除 public env fallback，簽名僅允許使用 server-side `REVALIDATE_SECRET`
 - **驗證結果**：`npm run build` 通過
 
-### 維護：前台承接頁 + CMS 內容營運收斂 (2026-03-17)
-針對 AEO / SEO 導向展示站的對外承接力、內容維運效率與全站聯絡一致性做一輪收斂：
+### 維護：CMS 內容營運收斂 + 前端回退原始設計 (2026-03-17)
+針對內容結構、全站聯絡一致性與公開前端版本做收斂：
 
-- **首頁與列表頁升級**：首頁、`/tours`、`/blog` 補強 hero、信任區、卡片層級與 CTA，讓展示站更像真正的轉換 landing flow
-- **詳頁承接重做**：`/tours/[slug]`、`/blog/[slug]`、`/services/car-charter` 重做首屏、摘要、價格區、作者／FAQ／延伸閱讀承接
-- **全域 CMS 設定**：新增 `siteSettings` schema，集中管理品牌資訊、評論數、信任卡、Footer、作者卡與社群連結
-- **頁面欄位 CMS 化**：首頁 Hero / CTA、包車頁 hero highlights / checklist / CTA、民宿頁社會證明與 CTA 改為由 Sanity 驅動
-- **聯絡入口收斂**：Header、Footer、浮動 LINE、Sticky CTA、文章 CTA、ContactForm、法務頁面與 analytics 追蹤統一讀取實際 `siteSettings`
+- **CMS 結構保留**：`siteSettings`、首頁 / 包車 / 民宿欄位擴充與內容營運結構維持保留
+- **聯絡入口收斂**：全站 LINE / 社群入口、追蹤與內容模型仍維持統一來源
 - **品質閘恢復**：補上 `.eslintrc.json` 並讓 `npm run lint` 回到可用狀態
-- **驗證結果**：`npm run lint`、`npm run test:run`、`npm run build` 全數通過
+- **公開前端回退**：首頁、`/tours`、`/blog`、詳頁與包車頁的新版承接頁改動已完整 fallback 回原始設計與原本文字
+- **保留後端修正**：Google CSP、Studio session、`/api/sign-url`、parser fallback 等後端與安全修正不回退
+- **驗證結果**：`npm run lint`、`npm run build` 通過
 
 ## 技術架構
 
@@ -320,4 +319,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-17 維護：前台承接頁 + CMS 內容營運收斂 -->
+<!-- Last build trigger: 2026-03-17 維護：CMS 內容營運收斂 + 前端回退原始設計 -->
