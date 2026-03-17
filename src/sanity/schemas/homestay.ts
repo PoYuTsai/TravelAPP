@@ -11,7 +11,9 @@ export default defineType({
     { name: 'rooms', title: '房型價格' },
     { name: 'gallery', title: '環境照片' },
     { name: 'location', title: '位置資訊' },
+    { name: 'proof', title: '社會證明與季節活動' },
     { name: 'faq', title: '常見問題' },
+    { name: 'cta', title: '底部 CTA' },
   ],
   fields: [
     // === Hero 區塊 ===
@@ -173,6 +175,66 @@ export default defineType({
       type: 'url',
       group: 'location',
     }),
+    defineField({
+      name: 'socialProofTitle',
+      title: '社會證明標題',
+      type: 'string',
+      group: 'proof',
+      initialValue: '為什麼選擇我們',
+    }),
+    defineField({
+      name: 'socialProofSubtitle',
+      title: '社會證明副標',
+      type: 'string',
+      group: 'proof',
+      initialValue: '12 年在地經營',
+    }),
+    defineField({
+      name: 'socialProofStats',
+      title: '社會證明數據',
+      type: 'array',
+      group: 'proof',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({ name: 'value', title: '數值', type: 'string' }),
+            defineField({ name: 'label', title: '標籤', type: 'string' }),
+            defineField({ name: 'link', title: '連結（可選）', type: 'url' }),
+            defineField({ name: 'showStars', title: '顯示星星', type: 'boolean', initialValue: false }),
+          ],
+          preview: {
+            select: { title: 'value', subtitle: 'label' },
+          },
+        }),
+      ],
+    }),
+    defineField({
+      name: 'seasonalActivitiesTitle',
+      title: '季節活動標題',
+      type: 'string',
+      group: 'proof',
+      initialValue: '季節限定活動',
+    }),
+    defineField({
+      name: 'seasonalActivities',
+      title: '季節活動',
+      type: 'array',
+      group: 'proof',
+      of: [
+        defineArrayMember({
+          type: 'object',
+          fields: [
+            defineField({ name: 'icon', title: 'Icon (emoji)', type: 'string' }),
+            defineField({ name: 'title', title: '標題', type: 'string' }),
+            defineField({ name: 'description', title: '說明', type: 'string' }),
+          ],
+          preview: {
+            select: { title: 'title', subtitle: 'description' },
+          },
+        }),
+      ],
+    }),
 
     // === FAQ ===
     defineField({
@@ -192,6 +254,35 @@ export default defineType({
           },
         }),
       ],
+    }),
+    defineField({
+      name: 'bottomCtaTitle',
+      title: '底部 CTA 標題',
+      type: 'string',
+      group: 'cta',
+      initialValue: '不只是住宿，是在地家庭的款待',
+    }),
+    defineField({
+      name: 'bottomCtaDescription',
+      title: '底部 CTA 描述',
+      type: 'text',
+      group: 'cta',
+      rows: 2,
+      initialValue: '12 年來接待過上千組旅客，我們知道什麼是真正的泰北體驗',
+    }),
+    defineField({
+      name: 'bottomCtaHelperText',
+      title: '底部 CTA 補充文字',
+      type: 'string',
+      group: 'cta',
+      initialValue: '告訴我們你的旅行日期，我們幫你安排從清邁到芳縣的一切',
+    }),
+    defineField({
+      name: 'bottomCtaText',
+      title: '底部 CTA 按鈕文字',
+      type: 'string',
+      group: 'cta',
+      initialValue: 'LINE 詢問房況與接送',
     }),
 
     // === 棄用欄位（隱藏，僅為了避免 Unknown fields 警告）===

@@ -75,19 +75,29 @@ export default function CaseCard({ name, days, startDate, endDate, status }: Cas
   const { color, label, icon } = statusConfig[status]
 
   return (
-    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <div className="text-lg font-semibold text-gray-900">
-        {name}
+    <div className="rounded-[22px] border border-stone-200 bg-white p-4 shadow-[0_18px_45px_-35px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_60px_-35px_rgba(0,0,0,0.45)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-lg font-semibold text-stone-900">
+            {name}
+          </div>
+          <div className="mt-1 text-sm text-stone-500">
+            {dateDisplay}
+          </div>
+        </div>
+        <div className={`inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-xs font-medium ${color}`}>
+          {icon}
+          {label}
+        </div>
       </div>
-      <div className="text-sm text-gray-500 mt-1">
-        {days} 天
-      </div>
-      <div className="text-sm text-gray-400 mt-1">
-        {dateDisplay}
-      </div>
-      <div className={`text-xs mt-2 inline-flex items-center gap-1 ${color}`}>
-        {icon}
-        {label}
+
+      <div className="mt-4 border-t border-stone-100 pt-4">
+        <div className="text-xs uppercase tracking-[0.18em] text-stone-400">
+          行程長度
+        </div>
+        <div className="mt-1 text-base font-semibold text-stone-700">
+          {days} 天
+        </div>
       </div>
     </div>
   )

@@ -176,7 +176,7 @@ export function useSessionToken() {
     return {
       Authorization: `Bearer ${state.token}`,
     }
-  }, [state.token])
+  }, [state.expiresAt, state.token])
 
   const isAuthenticated = useCallback((): boolean => {
     if (!state.token || !state.expiresAt) return false

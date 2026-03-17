@@ -3,8 +3,7 @@ import ExcelJS from 'exceljs'
 
 // 只在開發環境輸出 debug log
 const isDev = process.env.NODE_ENV !== 'production'
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const debugLog = (...args: any[]): void => {
+const debugLog = (...args: unknown[]): void => {
   if (isDev) console.log(...args)
 }
 

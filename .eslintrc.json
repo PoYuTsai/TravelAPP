@@ -1,0 +1,15 @@
+{
+  "extends": [
+    "next/core-web-vitals"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "src/sanity/actions/**/*.tsx"
+      ],
+      "rules": {
+        "react-hooks/rules-of-hooks": "off"
+      }
+    }
+  ]
+}

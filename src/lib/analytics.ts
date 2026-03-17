@@ -29,11 +29,11 @@ export function trackEvent(
 
 // 追蹤 LINE 點擊
 // Google Ads 轉換由 GTM 觸發器處理（監聽 line.me 連結點擊）
-export function trackLineClick(location: string) {
+export function trackLineClick(location: string, linkUrl: string = 'https://line.me/R/ti/p/@037nyuwk') {
   trackEvent('line_click', {
     event_category: 'engagement',
     event_label: location,
-    link_url: 'https://line.me/R/ti/p/@037nyuwk',
+    link_url: linkUrl,
   })
 }
 

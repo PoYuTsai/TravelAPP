@@ -980,24 +980,6 @@ export function PricingCalculator() {
   // 根據人數計算預設房間數量（人數 ÷ 2，無條件進位）
   const calculateDefaultRoomCount = (peopleCount: number) => Math.ceil(peopleCount / 2)
 
-  // 建立有預設房間的飯店房型（用於解析行程時）
-  const createDefaultRooms = (hotelName: string, roomCount?: number) => {
-    // 根據飯店名稱給不同的預設房型名稱
-    const isShangri = hotelName.includes('香格里拉')
-    const roomName = isShangri ? '豪華客房（大床）' : '經典客房（大床）'
-    const defaultQuantity = roomCount ?? 2  // 預設 2 間，或指定數量
-    return {
-      double: [
-        { name: roomName, quantity: defaultQuantity, price: 2500, hasExtraBed: false },
-        { name: '', quantity: 0, price: 2500, hasExtraBed: false },
-        { name: '', quantity: 0, price: 2500, hasExtraBed: false },
-      ] as CategoryRooms,
-      twin: createEmptySubRooms(2500),
-      triple: createEmptySubRooms(3500),
-      family: createEmptySubRooms(4500),
-    }
-  }
-
   const [hotels, setHotels] = useState<Hotel[]>([
     {
       id: 1,
@@ -1320,15 +1302,29 @@ export function PricingCalculator() {
       const uniqueHotels = Object.entries(hotelStats)
       if (uniqueHotels.length > 0) {
         const defaultRoomCount = calculateDefaultRoomCount(people)
-        const newHotels = uniqueHotels.map(([name, stats], index) => ({
-          id: index + 1,
-          name,
-          nights: stats.nights,
-          startNight: stats.startNight,  // 使用解析到的起始晚數
-          rooms: createDefaultRooms(name, defaultRoomCount),  // 根據人數計算房間數
-          hasDeposit: false,
-          depositPerRoom: 3000,
-        }))
+        const newHotels = uniqueHotels.map(([name, stats], index) => {
+          const isShangri = name.includes('香格里拉')
+          const roomName = isShangri ? '豪華客房（大床）' : '經典客房（大床）'
+
+          return {
+            id: index + 1,
+            name,
+            nights: stats.nights,
+            startNight: stats.startNight,  // 使用解析到的起始晚數
+            rooms: {
+              double: [
+                { name: roomName, quantity: defaultRoomCount, price: 2500, hasExtraBed: false },
+                { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+                { name: '', quantity: 0, price: 2500, hasExtraBed: false },
+              ] as CategoryRooms,
+              twin: createEmptySubRooms(2500),
+              triple: createEmptySubRooms(3500),
+              family: createEmptySubRooms(4500),
+            },
+            hasDeposit: false,
+            depositPerRoom: 3000,
+          }
+        })
         setHotels(newHotels)
         setNextHotelId(uniqueHotels.length + 1)
       }
@@ -1364,7 +1360,7 @@ export function PricingCalculator() {
 
     // 解析完成直接生效（不需要確認按鈕）
     setIsParseConfirmed(true)
-  }, [itineraryText, baseTickets])  // baseTickets 變更時重新解析
+  }, [itineraryText, people])  // 行程文字或人數變更時重新解析
 
   // 車費管理函數
   const updateCarFee = (index: number, field: keyof CarFeeDay, value: any) => {

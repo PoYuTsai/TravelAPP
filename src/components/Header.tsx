@@ -5,10 +5,12 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { trackLineClick } from '@/lib/analytics'
-import { headerNavLinks, LINE_URL } from '@/lib/navigation'
+import { headerNavLinks } from '@/lib/navigation'
+import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
 
 export default function Header() {
   const pathname = usePathname()
+  const siteSettings = useSiteSettings()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -88,7 +90,7 @@ export default function Header() {
           <Link href="/" className="flex items-center">
             <Image
               src="/images/logo.png"
-              alt="清微旅行 Chiangway Travel"
+              alt={siteSettings.businessName}
               width={160}
               height={53}
               className={`w-auto transition-all duration-300 ${
@@ -114,11 +116,11 @@ export default function Header() {
               </Link>
             ))}
             <a
-              href={LINE_URL}
+              href={siteSettings.socialLinks.line}
               target="_blank"
               rel="noopener noreferrer"
               className="bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors"
-              onClick={() => trackLineClick('Header - Desktop')}
+              onClick={() => trackLineClick('Header - Desktop', siteSettings.socialLinks.line)}
             >
               LINE 諮詢
             </a>
@@ -177,11 +179,11 @@ export default function Header() {
                 </Link>
               ))}
               <a
-                href={LINE_URL}
+                href={siteSettings.socialLinks.line}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="bg-primary hover:bg-primary-dark text-black px-6 py-2 rounded-full font-medium transition-colors text-center"
-                onClick={() => trackLineClick('Header - Mobile')}
+                onClick={() => trackLineClick('Header - Mobile', siteSettings.socialLinks.line)}
               >
                 LINE 諮詢
               </a>

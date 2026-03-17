@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { trackLineClick } from '@/lib/analytics'
-import { LINE_URL } from '@/lib/navigation'
+import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
 
 // LINE icon
 function LineIcon({ className }: { className?: string }) {
@@ -19,10 +19,12 @@ interface FloatingLineButtonProps {
 }
 
 export default function FloatingLineButton({
-  lineUrl = LINE_URL
+  lineUrl,
 }: FloatingLineButtonProps) {
+  const siteSettings = useSiteSettings()
   const [isVisible, setIsVisible] = useState(false)
   const pathname = usePathname()
+  const resolvedLineUrl = lineUrl || siteSettings.socialLinks.line
 
   // 在文章頁面隱藏浮動按鈕（已有底部 CTA 和 Footer）
   const isBlogArticlePage = pathname?.startsWith('/blog/') && pathname !== '/blog/'
@@ -55,12 +57,12 @@ export default function FloatingLineButton({
   }, [isBlogArticlePage])
 
   const handleClick = () => {
-    trackLineClick('Floating LINE Button')
+    trackLineClick('Floating LINE Button', resolvedLineUrl)
   }
 
   return (
     <a
-      href={lineUrl}
+      href={resolvedLineUrl}
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}

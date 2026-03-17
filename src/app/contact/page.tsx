@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
+import { client } from '@/sanity/client'
 import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 import ContactForm from '@/components/ContactForm'
 import ContactPageSchema from '@/components/schema/ContactPageSchema'
 import { FAQSection } from '@/components/cms'
+import { mergeSiteSettings, siteSettingsQuery } from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: '聯繫我們',
@@ -25,37 +27,6 @@ export const metadata: Metadata = {
   },
 }
 
-const contactMethods = [
-  {
-    icon: '💬',
-    title: 'LINE 官方帳號',
-    description: '最快速的聯繫方式，通常 24 小時內回覆',
-    link: 'https://line.me/R/ti/p/@037nyuwk',
-    linkText: '加入好友',
-  },
-  {
-    icon: '📸',
-    title: 'Instagram',
-    description: '追蹤我們的清邁日常與旅遊分享',
-    link: 'https://www.instagram.com/chiangway_travel',
-    linkText: '@chiangway_travel',
-  },
-  {
-    icon: '📘',
-    title: 'Facebook',
-    description: '最新行程資訊與旅遊優惠',
-    link: 'https://www.facebook.com/profile.php?id=61569067776768',
-    linkText: '清微旅行',
-  },
-  {
-    icon: '🎵',
-    title: 'TikTok',
-    description: '清邁短影音，發現更多玩法',
-    link: 'https://www.tiktok.com/@chiangway_travel',
-    linkText: '@chiangway_travel',
-  },
-]
-
 const faqItems = [
   {
     question: '需要提前多久預約？',
@@ -71,7 +42,48 @@ const faqItems = [
   },
 ]
 
-export default function ContactPage() {
+async function getSiteSettings() {
+  try {
+    const settings = await client.fetch(siteSettingsQuery)
+    return mergeSiteSettings(settings)
+  } catch {
+    return mergeSiteSettings(null)
+  }
+}
+
+export default async function ContactPage() {
+  const siteSettings = await getSiteSettings()
+  const contactMethods = [
+    {
+      icon: '💬',
+      title: 'LINE 官方帳號',
+      description: '最快速的聯繫方式，通常 24 小時內回覆',
+      link: siteSettings.socialLinks.line,
+      linkText: '加入好友',
+    },
+    {
+      icon: '📸',
+      title: 'Instagram',
+      description: '追蹤我們的清邁日常與旅遊分享',
+      link: siteSettings.socialLinks.instagram,
+      linkText: '@chiangway_travel',
+    },
+    {
+      icon: '📘',
+      title: 'Facebook',
+      description: '最新行程資訊與旅遊優惠',
+      link: siteSettings.socialLinks.facebook,
+      linkText: '清微旅行',
+    },
+    {
+      icon: '🎵',
+      title: 'TikTok',
+      description: '清邁短影音，發現更多玩法',
+      link: siteSettings.socialLinks.tiktok,
+      linkText: '@chiangway_travel',
+    },
+  ]
+
   return (
     <>
       <ContactPageSchema faqItems={faqItems} />
@@ -94,7 +106,7 @@ export default function ContactPage() {
             <div>
               <h3 className="text-xl font-bold text-gray-900 mb-4">其他聯繫方式</h3>
               <div className="space-y-4">
-                {contactMethods.map((method) => (
+                {contactMethods.filter((method) => Boolean(method.link)).map((method) => (
                   <a
                     key={method.title}
                     href={method.link}
@@ -118,7 +130,7 @@ export default function ContactPage() {
               <h3 className="text-lg font-bold text-gray-900 mb-4">常見問題</h3>
               <FAQSection items={faqItems} />
               <div className="mt-4">
-                <Button href="https://line.me/R/ti/p/@037nyuwk" external size="sm" variant="secondary">
+                <Button href={siteSettings.socialLinks.line} external size="sm" variant="secondary">
                   更多問題？LINE 我們
                 </Button>
               </div>

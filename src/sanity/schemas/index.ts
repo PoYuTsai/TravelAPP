@@ -5,8 +5,10 @@ import homestay from './homestay'
 import itinerary from './itinerary'
 import tourPackage from './tourPackage'
 import dayTour from './dayTour'
+import siteSettings from './siteSettings'
 
 export const schemaTypes = [
+  siteSettings,
   post,
   landingPage,
   carCharter,

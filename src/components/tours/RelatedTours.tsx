@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { client, urlFor } from '@/sanity/client'
+import Button from '@/components/ui/Button'
 
 interface RelatedTour {
   _id: string
@@ -21,11 +22,13 @@ interface RelatedToursProps {
   currentType: 'tourPackage' | 'dayTour'
 }
 
-// Get related tours (excluding current tour)
 async function getRelatedTours(currentSlug: string, currentType: string): Promise<RelatedTour[]> {
-  // First try to get tours of the same type, then fill with other type
   const query = `{
-    "sameType": *[(_type == "tourPackage" || _type == "dayTour") && slug.current != $currentSlug && _type == $currentType][0...2] {
+    "sameType": *[
+      (_type == "tourPackage" || _type == "dayTour") &&
+      slug.current != $currentSlug &&
+      _type == $currentType
+    ][0...3] {
       _id,
       _type,
       title,
@@ -35,7 +38,11 @@ async function getRelatedTours(currentSlug: string, currentType: string): Promis
       duration,
       highlights
     },
-    "otherType": *[(_type == "tourPackage" || _type == "dayTour") && slug.current != $currentSlug && _type != $currentType][0...2] {
+    "otherType": *[
+      (_type == "tourPackage" || _type == "dayTour") &&
+      slug.current != $currentSlug &&
+      _type != $currentType
+    ][0...3] {
       _id,
       _type,
       title,
@@ -48,14 +55,12 @@ async function getRelatedTours(currentSlug: string, currentType: string): Promis
   }`
 
   try {
-    const result = await client.fetch<{ sameType: RelatedTour[]; otherType: RelatedTour[] }>(
-      query,
-      { currentSlug, currentType }
-    )
+    const result = await client.fetch<{ sameType: RelatedTour[]; otherType: RelatedTour[] }>(query, {
+      currentSlug,
+      currentType,
+    })
 
-    // Combine results, prioritizing same type
-    const combined = [...result.sameType, ...result.otherType]
-    return combined.slice(0, 3)
+    return [...result.sameType, ...result.otherType].slice(0, 3)
   } catch {
     return []
   }
@@ -69,53 +74,91 @@ export default async function RelatedTours({ currentSlug, currentType }: Related
   }
 
   return (
-    <section className="mt-12 pt-12 border-t border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">其他推薦行程</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <section className="mt-16 border-t border-stone-200 pt-12">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">
+            More Tours
+          </p>
+          <h2 className="mt-3 text-3xl font-bold text-stone-900">接著看看這些相關行程</h2>
+          <p className="mt-3 text-base leading-7 text-stone-600">
+            如果你喜歡這個路線的節奏，下面這幾個行程通常也會一起被拿來比較。
+          </p>
+        </div>
+        <Button href="/tours" variant="outline" size="sm">
+          查看全部行程
+        </Button>
+      </div>
+
+      <div className="mt-8 grid gap-6 md:grid-cols-3">
         {tours.map((tour) => (
-          <Link key={tour._id} href={`/tours/${tour.slug}`} className="group">
-            <article className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
-              <div className="relative h-40">
+          <Link key={tour._id} href={`/tours/${tour.slug}`} className="group block">
+            <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-stone-200 bg-white shadow-[0_24px_70px_-40px_rgba(0,0,0,0.35)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_34px_90px_-40px_rgba(0,0,0,0.45)]">
+              <div className="relative aspect-[4/3]">
                 {tour.coverImage ? (
                   <Image
-                    src={urlFor(tour.coverImage).width(800).height(500).quality(85).url()}
+                    src={urlFor(tour.coverImage).width(800).height(600).quality(85).url()}
                     alt={tour.coverImage.alt || tour.title}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary-light to-primary/20 flex items-center justify-center">
-                    <span className="text-4xl">
-                      {tour._type === 'tourPackage' ? '🌴' : '🌿'}
-                    </span>
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary-light to-primary/20">
+                    <span className="text-5xl">{tour._type === 'tourPackage' ? '🧳' : '🚐'}</span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-stone-950/65 via-transparent to-transparent" />
+                <div className="absolute left-4 top-4">
+                  <span className="rounded-full bg-white/92 px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-sm backdrop-blur-sm">
+                    {tour._type === 'tourPackage' ? '多日套裝' : '一日包車'}
+                  </span>
+                </div>
+                {tour.duration && (
+                  <div className="absolute bottom-4 left-4 rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm">
+                    {tour.duration}
                   </div>
                 )}
               </div>
-              <div className="p-4 flex-1 flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs bg-primary/20 text-primary-dark px-2 py-0.5 rounded-full font-medium">
-                    {tour._type === 'tourPackage' ? '套裝行程' : '一日遊'}
-                  </span>
-                  {tour.duration && (
-                    <span className="text-xs text-gray-500">{tour.duration}</span>
-                  )}
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors line-clamp-2">
+
+              <div className="flex flex-1 flex-col p-6">
+                <h3 className="text-xl font-bold text-stone-900 transition-colors group-hover:text-primary">
                   {tour.title}
                 </h3>
                 {tour.subtitle && (
-                  <p className="text-gray-600 text-sm flex-1 line-clamp-2">{tour.subtitle}</p>
+                  <p className="mt-3 flex-1 line-clamp-3 text-sm leading-7 text-stone-600">
+                    {tour.subtitle}
+                  </p>
                 )}
                 {tour.highlights && tour.highlights.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {tour.highlights.slice(0, 2).map((h) => (
-                      <span key={h} className="text-xs text-gray-500">
-                        #{h}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {tour.highlights.slice(0, 3).map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-600"
+                      >
+                        {item}
                       </span>
                     ))}
                   </div>
                 )}
+
+                <div className="mt-5 flex items-center justify-between border-t border-stone-100 pt-4">
+                  <div>
+                    <p className="text-sm font-medium text-stone-900">看這個行程的節奏</p>
+                    <p className="mt-1 text-xs text-stone-500">快速抓重點、適合旅伴與玩法</p>
+                  </div>
+                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-primary/12 text-primary transition-all duration-300 group-hover:bg-primary group-hover:text-stone-950">
+                    <svg
+                      className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
               </div>
             </article>
           </Link>

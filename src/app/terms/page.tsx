@@ -1,5 +1,11 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { client } from '@/sanity/client'
+import {
+  extractLineHandle,
+  mergeSiteSettings,
+  siteSettingsQuery,
+} from '@/lib/site-settings'
 
 export const metadata: Metadata = {
   title: '服務條款',
@@ -19,7 +25,20 @@ export const metadata: Metadata = {
   },
 }
 
-export default function TermsPage() {
+async function getSiteSettings() {
+  try {
+    const settings = await client.fetch(siteSettingsQuery)
+    return mergeSiteSettings(settings)
+  } catch {
+    return mergeSiteSettings(null)
+  }
+}
+
+export default async function TermsPage() {
+  const siteSettings = await getSiteSettings()
+  const lineUrl = siteSettings.socialLinks.line
+  const lineHandle = extractLineHandle(lineUrl)
+
   // Static schema - no user input, safe to use
   const webPageSchema = {
     '@context': 'https://schema.org',
@@ -150,12 +169,12 @@ export default function TermsPage() {
             <p className="text-gray-700">
               如有任何問題，請透過 LINE 聯繫我們：
               <a
-                href="https://line.me/R/ti/p/@037nyuwk"
+                href={lineUrl}
                 className="text-primary hover:underline ml-1"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                @037nyuwk
+                {lineHandle}
               </a>
             </p>
           </section>

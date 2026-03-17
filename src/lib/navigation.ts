@@ -2,8 +2,9 @@
  * Navigation links and social media configuration
  * Centralized to avoid duplication across Header, Footer, and other components
  */
+import { defaultSiteSettings } from '@/lib/site-settings'
 
-export const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
+export const LINE_URL = defaultSiteSettings.socialLinks.line
 
 export const headerNavLinks = [
   { href: '/', label: '首頁' },
@@ -34,15 +35,15 @@ export const socialLinks = [
     trackingLabel: 'LINE',
   },
   {
-    href: 'https://www.instagram.com/chiangway_travel',
+    href: defaultSiteSettings.socialLinks.instagram,
     label: 'Instagram',
   },
   {
-    href: 'https://www.facebook.com/profile.php?id=61569067776768',
+    href: defaultSiteSettings.socialLinks.facebook,
     label: 'Facebook',
   },
   {
-    href: 'https://www.tiktok.com/@chiangway_travel',
+    href: defaultSiteSettings.socialLinks.tiktok,
     label: 'TikTok',
   },
 ] as const

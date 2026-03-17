@@ -13,7 +13,7 @@ export default function TableOfContents() {
   const [activeId, setActiveId] = useState('')
 
   useEffect(() => {
-    const article = document.querySelector('article')
+    const article = document.getElementById('article-content') || document.querySelector('article')
     if (!article) return
 
     const elements = article.querySelectorAll('h2, h3')
@@ -26,6 +26,7 @@ export default function TableOfContents() {
         level: el.tagName === 'H2' ? 2 : 3,
       }
     })
+
     setHeadings(items)
 
     const observer = new IntersectionObserver(
@@ -36,7 +37,7 @@ export default function TableOfContents() {
           }
         })
       },
-      { rootMargin: '-80px 0px -80% 0px' }
+      { rootMargin: '-80px 0px -75% 0px' }
     )
 
     elements.forEach((el) => observer.observe(el))
@@ -46,20 +47,24 @@ export default function TableOfContents() {
   if (headings.length === 0) return null
 
   return (
-    <nav className="bg-gray-50 rounded-xl p-6 mb-8">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">文章目錄</h2>
-      <ul className="space-y-2">
+    <nav className="rounded-[28px] border border-stone-200 bg-white px-5 py-6 shadow-[0_24px_70px_-40px_rgba(0,0,0,0.2)]">
+      <p className="text-sm font-semibold uppercase tracking-[0.18em] text-stone-400">
+        On This Page
+      </p>
+      <h2 className="mt-2 text-lg font-bold text-stone-900">文章目錄</h2>
+      <p className="mt-2 text-sm leading-6 text-stone-600">
+        需要快速跳到重點時，可以直接從這裡切換。
+      </p>
+
+      <ul className="mt-5 space-y-2">
         {headings.map((heading) => (
-          <li
-            key={heading.id}
-            className={heading.level === 3 ? 'ml-4' : ''}
-          >
+          <li key={heading.id} className={heading.level === 3 ? 'ml-4' : ''}>
             <a
               href={`#${heading.id}`}
-              className={`block text-sm py-1 border-l-2 pl-3 transition-colors ${
+              className={`block rounded-2xl border px-3 py-2.5 text-sm transition-colors ${
                 activeId === heading.id
-                  ? 'border-primary text-primary font-medium'
-                  : 'border-transparent text-gray-600 hover:text-primary hover:border-gray-300'
+                  ? 'border-primary/30 bg-primary/10 font-medium text-primary-dark'
+                  : 'border-transparent text-stone-600 hover:border-stone-200 hover:bg-stone-50 hover:text-stone-900'
               }`}
             >
               {heading.text}

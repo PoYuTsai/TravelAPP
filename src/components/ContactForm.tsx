@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import { trackFormSubmit } from '@/lib/analytics'
+import { useSiteSettings } from '@/components/providers/SiteSettingsProvider'
+import {
+  buildLineOaMessageBaseUrl,
+  extractLineHandle,
+} from '@/lib/site-settings'
 
 interface FormData {
   name: string
@@ -46,11 +51,14 @@ const MAX_LENGTHS = {
 }
 
 export default function ContactForm() {
+  const siteSettings = useSiteSettings()
   const [formData, setFormData] = useState<FormData>(initialFormData)
   const [errors, setErrors] = useState<FormErrors>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const lineHandle = extractLineHandle(siteSettings.socialLinks.line)
+  const lineMessageBaseUrl = buildLineOaMessageBaseUrl(siteSettings.socialLinks.line)
 
   // 驗證單一欄位
   const validateField = (name: string, value: string): string | undefined => {
@@ -137,19 +145,18 @@ Email：${formData.email}
 ${formData.message}`
 
       // 計算 LINE URL 長度並截斷訊息（如需要）
-      const baseUrl = 'https://line.me/R/oaMessage/@037nyuwk/?'
       const encodedMessage = encodeURIComponent(message)
-      const fullUrl = baseUrl + encodedMessage
+      const fullUrl = lineMessageBaseUrl + encodedMessage
 
       if (fullUrl.length > LINE_URL_MAX_LENGTH) {
         // 估算可用字元數並截斷訊息
-        const availableLength = LINE_URL_MAX_LENGTH - baseUrl.length - 100 // 保留緩衝
+        const availableLength = LINE_URL_MAX_LENGTH - lineMessageBaseUrl.length - 100 // 保留緩衝
         const truncatedMessage = message.slice(0, Math.floor(availableLength / 3)) + '\n...(訊息過長已截斷，請在 LINE 中補充)'
         message = truncatedMessage
       }
 
       // 開啟 LINE 並帶入訊息
-      const lineUrl = `${baseUrl}${encodeURIComponent(message)}`
+      const lineUrl = `${lineMessageBaseUrl}${encodeURIComponent(message)}`
       window.open(lineUrl, '_blank')
 
       // 追蹤表單提交 (GA4)
@@ -338,7 +345,7 @@ ${formData.message}`
       {submitStatus === 'success' && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg" role="alert">
           <p className="text-green-800 text-sm">
-            已開啟 LINE 視窗！如果沒有自動開啟，請直接加入我們的 LINE：@037nyuwk
+            已開啟 LINE 視窗！如果沒有自動開啟，請直接加入我們的 LINE：{lineHandle}
           </p>
         </div>
       )}
@@ -346,7 +353,7 @@ ${formData.message}`
       {submitStatus === 'error' && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
           <p className="text-red-800 text-sm">
-            發生錯誤，請直接透過 LINE 聯繫我們：@037nyuwk
+            發生錯誤，請直接透過 LINE 聯繫我們：{lineHandle}
           </p>
         </div>
       )}

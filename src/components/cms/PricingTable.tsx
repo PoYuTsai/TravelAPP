@@ -18,9 +18,14 @@ interface VehicleType {
 interface PricingTableProps {
   vehicleTypes: VehicleType[]
   footnotes?: string[]
+  footnoteClassName?: string
 }
 
-export default function PricingTable({ vehicleTypes, footnotes }: PricingTableProps) {
+export default function PricingTable({
+  vehicleTypes,
+  footnotes,
+  footnoteClassName = 'text-gray-500',
+}: PricingTableProps) {
   if (!vehicleTypes || vehicleTypes.length === 0) return null
 
   return (
@@ -86,7 +91,7 @@ export default function PricingTable({ vehicleTypes, footnotes }: PricingTablePr
 
       {/* Footnotes */}
       {footnotes && footnotes.length > 0 && (
-        <div className="text-sm text-gray-500 space-y-1">
+        <div className={`space-y-1 text-sm ${footnoteClassName}`}>
           {footnotes.map((note, index) => (
             <p key={index}>* {note}</p>
           ))}
