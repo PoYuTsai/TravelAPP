@@ -35,10 +35,11 @@
 | Phase 6.8 | 報價計算系統 | ✅ 完成 |
 | 維護 2026-03-16 | Google CSP / Studio / Parser 穩定性 | ✅ 完成 |
 | 維護 2026-03-17 | CMS 內容營運收斂 + 前端回退原始設計 | ✅ 完成 |
-| **Phase 7** | **LINE OA AI 客服助理** | 📋 規劃中 |
-| Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 規劃中 |
-| Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 規劃中 |
-| Phase 7.3 | 語音輸入 + 週報優化 + 內部派單 | 📋 規劃中 |
+| 維護 2026-03-22 | Phase 7 規格完善 + Implementation Plan + Handoff | ✅ 完成 |
+| **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
+| Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
+| Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
+| Phase 7.3 | 語音輸入 + 週報優化 + 內部派單 | 📋 待實作 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -276,25 +277,28 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 
 - **核心目標**：初次回覆時間從 30-60 分鐘降至 5-10 分鐘
 - **設計原則**：AI 準備草稿，Eric 決定是否送出（人機協作，不是全自動）
+- **目前狀態**：規格 v2.1、implementation plan、Claude handoff 已完成；功能碼尚未開始
 - **Phase 7.1 - MVP**：
-  - LINE Webhook 接收訊息（不觸發已讀）
+  - LINE Webhook fast-ack 接收訊息（不觸發已讀）
   - Claude Haiku 需求抽取（日期、人數、景點、特殊需求）
   - Telegram Topics 通知（每客人獨立對話串，上下文隔離）
-  - 狀態追蹤（🟢新 🟡等待 🔵已回 ⚪冷掉）
+  - 冪等處理、Topic mapping、對話狀態追蹤
 - **Phase 7.2 - 完整功能**：
   - Claude Sonnet + RAG 草稿生成（參考成交對話、行程範本、話術）
   - 一鍵送出 / 編輯送出 / 自己回
   - 圖片發送（TG 發圖 → 選客人 → LINE 發送）
-  - 成交標記（保留學習資料）+ 7 天無互動自動清理
+  - 成交標記、封存、資料生命週期管理
   - 快速回饋按鈕（👍 📏 🎭 ❄️）+ 每日摘要（20:00）
 - **Phase 7.3 - 進階**：
   - 語音輸入（Whisper API）
   - 收單信號偵測（AI 建議發 QR Code 時機）
   - 週報 + Prompt 優化建議
   - 內部派單記錄（/new /assign /cost）
-- **技術架構**：LINE Messaging API + Claude API + Telegram Bot + Sanity/Vercel KV
-- **成本**：< $5/月（LINE 免費、TG 免費、AI 約 $1-2）
+- **技術架構**：LINE Messaging API + Claude API + Telegram Bot + Sanity + Vercel KV
+- **關鍵約束**：webhook fast-ack、event/action idempotency、Notion 只作舊客提示、Prompt 更新必須人工批准
 - **詳細規格**：[docs/plans/2026-03-22-phase7-line-oa-ai-assistant.md](docs/plans/2026-03-22-phase7-line-oa-ai-assistant.md)
+- **實作計畫**：[docs/plans/2026-03-22-phase7-line-oa-ai-assistant-implementation-plan.md](docs/plans/2026-03-22-phase7-line-oa-ai-assistant-implementation-plan.md)
+- **交接文件**：[CLAUDE_CODE_HANDOFF_2026-03-22_PHASE7.md](CLAUDE_CODE_HANDOFF_2026-03-22_PHASE7.md)
 
 ## 技術架構
 
@@ -348,4 +352,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-22 Phase 7 LINE OA AI 客服助理規格確認 -->
+<!-- Last build trigger: 2026-03-22 Phase 7 規格完善與 implementation plan -->
