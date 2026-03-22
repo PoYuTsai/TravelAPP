@@ -55,6 +55,7 @@ next-env.d.ts
 # Temporary files
 tmp/
 temp/
+.worktrees/
 *.tmp
 *.bak
 .env*.local
