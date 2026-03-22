@@ -7,7 +7,11 @@ import { createMemoryDraftStore, type DraftStore } from './storage/draft-store'
 import { createMemoryIdempotencyStore, type IdempotencyStore } from './storage/idempotency-store'
 import { createMemoryInboundEventStore, type InboundEventStore } from './storage/inbound-event-store'
 import { createKvLineAssistantStores } from './storage/kv-stores'
-import { createMemoryTelegramClient, type TelegramClient } from './telegram/client'
+import {
+  createMemoryTelegramClient,
+  createTelegramBotClient,
+  type TelegramClient,
+} from './telegram/client'
 import { createMemoryTopicMapper, type TopicMapper } from './telegram/topic-mapper'
 import type { LineAssistantConfig } from './types'
 
@@ -52,15 +56,22 @@ export function createLineAssistantRuntime(input: {
     input.config.storage.kvRestApiUrl &&
     input.config.storage.kvRestApiToken
   ) {
+    const telegramClient = createTelegramBotClient({
+      botToken: input.config.telegram.botToken,
+      groupId: input.config.telegram.groupId,
+      fetchImpl: input.fetchImpl,
+    })
+
     const kvStores = createKvLineAssistantStores({
       baseUrl: input.config.storage.kvRestApiUrl,
       token: input.config.storage.kvRestApiToken,
+      createTopic: (title: string) => telegramClient.createForumTopic(title),
       fetchImpl: input.fetchImpl,
     })
 
     return {
       ...kvStores,
-      telegramClient: createMemoryTelegramClient(),
+      telegramClient,
       lineSender: createLineMessageSender(),
     }
   }

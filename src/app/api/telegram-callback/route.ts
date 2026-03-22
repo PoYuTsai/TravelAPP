@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'crypto'
 import { NextResponse } from 'next/server'
 import { getLineAssistantConfig } from '@/lib/line-assistant/config'
 import { handleTelegramAction } from '@/lib/line-assistant/actions/handle-telegram-action'
+import { getLineAssistantRuntime } from '@/lib/line-assistant/runtime'
 import type { TelegramAction, TelegramActionType } from '@/lib/line-assistant/types'
 import { apiLogger } from '@/lib/logger'
 
@@ -88,6 +89,33 @@ function parseTelegramAction(payload: unknown): TelegramAction {
   }
 }
 
+function getCallbackQueryId(payload: unknown): string | null {
+  const callbackQuery =
+    payload &&
+    typeof payload === 'object' &&
+    'callback_query' in payload &&
+    payload.callback_query &&
+    typeof payload.callback_query === 'object'
+      ? (payload.callback_query as Record<string, unknown>)
+      : null
+
+  return typeof callbackQuery?.id === 'string' && callbackQuery.id.trim()
+    ? callbackQuery.id
+    : null
+}
+
+function buildAcknowledgementText(status: 'sent' | 'dismissed' | 'duplicate'): string {
+  if (status === 'dismissed') {
+    return 'Draft dismissed'
+  }
+
+  if (status === 'duplicate') {
+    return 'Already processed'
+  }
+
+  return 'LINE reply sent'
+}
+
 export async function POST(request: Request) {
   let config
 
@@ -114,6 +142,7 @@ export async function POST(request: Request) {
   }
 
   let action: TelegramAction
+  const callbackQueryId = getCallbackQueryId(payload)
   try {
     action = parseTelegramAction(payload)
   } catch (error) {
@@ -125,6 +154,21 @@ export async function POST(request: Request) {
 
   try {
     const result = await handleTelegramAction(action)
+
+    if (callbackQueryId) {
+      try {
+        await getLineAssistantRuntime().telegramClient.answerCallbackQuery(
+          callbackQueryId,
+          buildAcknowledgementText(result.status)
+        )
+      } catch (error) {
+        telegramCallbackLogger.error(
+          'Telegram callback acknowledgement failed',
+          error instanceof Error ? error : new Error(String(error))
+        )
+      }
+    }
+
     return NextResponse.json({ ok: true, result })
   } catch (error) {
     telegramCallbackLogger.error(

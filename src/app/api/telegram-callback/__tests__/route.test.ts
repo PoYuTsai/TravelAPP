@@ -5,10 +5,15 @@ import {
   resetTelegramActionRuntimeForTests,
 } from '@/lib/line-assistant/actions/handle-telegram-action'
 import { createMemoryAuditLog } from '@/lib/line-assistant/audit-log'
+import {
+  configureLineAssistantRuntimeForTests,
+  resetLineAssistantRuntimeForTests,
+} from '@/lib/line-assistant/runtime'
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
 import { createMemoryIdempotencyStore } from '@/lib/line-assistant/storage/idempotency-store'
 import { createMemoryLineMessageSender } from '@/lib/line-assistant/line/send-message'
+import { createMemoryTelegramClient } from '@/lib/line-assistant/telegram/client'
 import type { Conversation, ConversationDraft, CustomerInquiry } from '@/lib/line-assistant/types'
 
 function createInquiry(overrides: Partial<CustomerInquiry> = {}): CustomerInquiry {
@@ -80,7 +85,10 @@ function createRequest(body: unknown, secret = 'tg-secret'): Request {
 }
 
 describe('POST /api/telegram-callback', () => {
+  let telegramClient: ReturnType<typeof createMemoryTelegramClient>
+
   beforeEach(() => {
+    telegramClient = createMemoryTelegramClient()
     process.env.LINE_CHANNEL_ACCESS_TOKEN = 'line-token'
     process.env.LINE_CHANNEL_SECRET = 'line-secret'
     process.env.TELEGRAM_BOT_TOKEN = 'tg-token'
@@ -93,6 +101,10 @@ describe('POST /api/telegram-callback', () => {
       idempotencyStore: createMemoryIdempotencyStore(),
       lineSender: createMemoryLineMessageSender(),
       auditLog: createMemoryAuditLog(),
+    })
+
+    configureLineAssistantRuntimeForTests({
+      telegramClient,
     })
   })
 
@@ -119,6 +131,9 @@ describe('POST /api/telegram-callback', () => {
     expect(response.status).toBe(200)
     expect(payload.ok).toBe(true)
     expect(payload.result.status).toBe('sent')
+    expect(telegramClient.getAnsweredCallbackQueries()).toEqual([
+      { callbackQueryId: 'callback-1', text: 'LINE reply sent' },
+    ])
   })
 
   it('rejects a callback with an invalid secret token', async () => {
@@ -142,5 +157,6 @@ describe('POST /api/telegram-callback', () => {
 
   afterEach(() => {
     resetTelegramActionRuntimeForTests()
+    resetLineAssistantRuntimeForTests()
   })
 })

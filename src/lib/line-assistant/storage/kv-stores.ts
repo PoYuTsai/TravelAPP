@@ -15,6 +15,7 @@ const PREFIXES = {
   inbound: 'la:inbound:',
   audit: 'la:audit:',
   topic: 'la:topic:',
+  topicLock: 'la:topic-lock:',
 } as const
 
 function buildKey(prefix: string, id: string): string {
@@ -24,6 +25,7 @@ function buildKey(prefix: string, id: string): string {
 export function createKvLineAssistantStores(input: {
   baseUrl: string
   token: string
+  createTopic?: (title: string) => Promise<string>
   fetchImpl?: FetchLike
 }): {
   conversationStore: ConversationStore
@@ -114,16 +116,35 @@ export function createKvLineAssistantStores(input: {
   }
 
   const topicMapper: TopicMapper = {
-    async ensureTopicForLineUser(lineUserId) {
+    async ensureTopicForLineUser(lineUserId, title) {
       const key = buildKey(PREFIXES.topic, lineUserId)
       const existing = await client.getText(key)
       if (existing) {
         return existing
       }
 
-      const topicId = `topic:${lineUserId}`
-      await client.setText(key, topicId)
-      return topicId
+      const lockKey = buildKey(PREFIXES.topicLock, lineUserId)
+      const claimed = await client.claim(lockKey, 30)
+
+      if (!claimed) {
+        const pending = await client.getText(key)
+        if (pending) {
+          return pending
+        }
+
+        throw new Error(`Telegram topic creation already in progress for ${lineUserId}`)
+      }
+
+      try {
+        const topicId = input.createTopic
+          ? await input.createTopic(title)
+          : `topic:${lineUserId}`
+
+        await client.setText(key, topicId)
+        return topicId
+      } finally {
+        await client.delete(lockKey)
+      }
     },
     async getTopicIdForLineUser(lineUserId) {
       return client.getText(buildKey(PREFIXES.topic, lineUserId))

@@ -126,9 +126,39 @@ function createRecord(overrides: Partial<InboundLineEventRecord> = {}): InboundL
 
 function createMockKvFetch() {
   const store = new Map<string, string>()
+  const telegramCalls: Array<{ url: string; body: Record<string, unknown> | null }> = []
 
-  return async function mockFetch(input: string | URL, init?: RequestInit) {
+  const mockFetch = async (input: string | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? new URL(input) : new URL(input.toString())
+
+    if (url.hostname === 'api.telegram.org') {
+      const body =
+        typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null
+      telegramCalls.push({ url: url.toString(), body })
+
+      if (url.pathname.endsWith('/createForumTopic')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            result: {
+              message_thread_id: 3001,
+            },
+          }),
+        } as Response
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          result: true,
+        }),
+      } as Response
+    }
+
     const path = url.pathname.replace(/^\/+/, '')
     const segments = path.split('/').map((segment) => decodeURIComponent(segment))
     const command = segments[0]?.toUpperCase()
@@ -176,13 +206,21 @@ function createMockKvFetch() {
 
     throw new Error(`Unsupported KV command: ${path}`)
   }
+
+  return {
+    fetchImpl: mockFetch,
+    getTelegramCalls() {
+      return telegramCalls
+    },
+  }
 }
 
 describe('createLineAssistantRuntime (kv)', () => {
   it('persists assistant state through the kv-backed stores', async () => {
+    const mock = createMockKvFetch()
     const runtime = createLineAssistantRuntime({
       config: createConfig(),
-      fetchImpl: createMockKvFetch(),
+      fetchImpl: mock.fetchImpl,
     })
 
     expect(await runtime.idempotencyStore.claim('idempotency:test', 60)).toBe(true)
@@ -208,5 +246,21 @@ describe('createLineAssistantRuntime (kv)', () => {
     })
 
     expect(await runtime.auditLog.list()).toHaveLength(1)
+  })
+
+  it('creates and reuses a durable telegram topic for the same line user', async () => {
+    const mock = createMockKvFetch()
+    const runtime = createLineAssistantRuntime({
+      config: createConfig(),
+      fetchImpl: mock.fetchImpl,
+    })
+
+    const first = await runtime.topicMapper.ensureTopicForLineUser('line-user-1', 'Wang Family')
+    const second = await runtime.topicMapper.ensureTopicForLineUser('line-user-1', 'Wang Family')
+
+    expect(first).toBe('3001')
+    expect(second).toBe('3001')
+    expect(mock.getTelegramCalls()).toHaveLength(1)
+    expect(mock.getTelegramCalls()[0]?.url).toContain('/bottg-token/createForumTopic')
   })
 })
