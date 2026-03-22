@@ -55,4 +55,4 @@ This slice upgrades the Phase 7 assistant from synthetic Telegram placeholders t
 ## Commit
 
 - Feature commit: `8ced3d2` `feat: integrate telegram bot api topics and callback ack`
-- Docs commit: pending
+- Docs commit: `6d2d430` `docs: record telegram bot api integration progress`

@@ -78,6 +78,7 @@
 - Feature commit: `ebbef76` `feat: add phase 7 shared runtime and kv processing`
 - Docs commit: `f0b63b3` `docs: record phase 7 runtime and kv progress`
 - Telegram integration feature commit: `8ced3d2` `feat: integrate telegram bot api topics and callback ack`
+- Telegram integration docs commit: `6d2d430` `docs: record telegram bot api integration progress`
 
 Notes:
 
