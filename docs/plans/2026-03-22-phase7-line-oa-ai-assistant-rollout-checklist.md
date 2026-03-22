@@ -1,0 +1,43 @@
+# 2026-03-22 Phase 7 LINE OA AI Assistant Rollout Checklist
+
+## Goal
+
+Use this checklist before enabling the LINE OA assistant in production. The Phase 7 code path is intentionally staged, so rollout should happen behind configuration and operator verification.
+
+## Environment
+
+- [ ] `LINE_CHANNEL_ACCESS_TOKEN` is set in the deployment environment.
+- [ ] `LINE_CHANNEL_SECRET` is set in the deployment environment.
+- [ ] `TELEGRAM_BOT_TOKEN` is set in the deployment environment.
+- [ ] `TELEGRAM_GROUP_ID` is set in the deployment environment.
+- [ ] `TELEGRAM_WEBHOOK_SECRET` is set and matches Telegram webhook configuration.
+- [ ] `LINE_ASSISTANT_CRON_SECRET` is set for protected cron routes.
+- [ ] `NOTION_TOKEN` and `NOTION_CUSTOMER_DATABASE_IDS_JSON` are set before enabling returning-customer hints.
+- [ ] `ANTHROPIC_API_KEY` is set before replacing the current draft stub with model-backed generation.
+
+## External Setup
+
+- [ ] LINE Messaging API webhook URL points to `/api/line-webhook`.
+- [ ] Telegram bot webhook points to `/api/telegram-callback`.
+- [ ] Telegram webhook includes the same secret token configured in `TELEGRAM_WEBHOOK_SECRET`.
+- [ ] Telegram group has Topics enabled and the bot can post to the target group.
+- [ ] LINE OA push quota and fallback process have been reviewed before enabling real sends.
+
+## Verification
+
+- [ ] `npm run lint`
+- [ ] `npm run test:run`
+- [ ] `npm run build`
+- [ ] Send one test LINE message and confirm a Telegram topic summary appears exactly once.
+- [ ] Trigger the same Telegram callback twice and confirm LINE send happens only once.
+- [ ] Verify a failed LINE send is logged and does not silently disappear.
+- [ ] Run the housekeeping cron route with a valid secret in staging.
+- [ ] Review one generated weekly report and confirm recommendations are understandable.
+
+## Operational Readiness
+
+- [ ] Eric confirms the reply tone matches the Chiangway Travel brand voice.
+- [ ] PII retention and deletion rules are documented for operators.
+- [ ] Audit log access is limited to internal operators only.
+- [ ] A manual fallback path exists if LINE push or Telegram callback fails during rollout.
+- [ ] Claude handoff and README status are updated after the rollout branch merges.
