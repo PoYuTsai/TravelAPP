@@ -53,6 +53,7 @@ This delivery moves Phase 7 from isolated in-memory prototypes to a shared runti
 ## Commit
 
 - Feature commit: `ebbef76` `feat: add phase 7 shared runtime and kv processing`
+- Docs commit: `f0b63b3` `docs: record phase 7 runtime and kv progress`
 
 ## Remaining Gaps
 

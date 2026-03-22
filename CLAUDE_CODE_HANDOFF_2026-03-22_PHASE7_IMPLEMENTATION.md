@@ -76,7 +76,7 @@
 ## Commit Tracking
 
 - Feature commit: `ebbef76` `feat: add phase 7 shared runtime and kv processing`
-- Docs commit: pending
+- Docs commit: `f0b63b3` `docs: record phase 7 runtime and kv progress`
 
 Notes:
 
