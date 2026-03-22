@@ -20,7 +20,8 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 - [ ] LINE Messaging API webhook URL points to `/api/line-webhook`.
 - [ ] Telegram bot webhook points to `/api/telegram-callback`.
 - [ ] Telegram webhook includes the same secret token configured in `TELEGRAM_WEBHOOK_SECRET`.
-- [ ] Telegram group has Topics enabled and the bot can post to the target group.
+- [ ] Telegram group is a topics-enabled supergroup.
+- [ ] Telegram bot is in the target group and has permission to create / manage topics and post messages.
 - [ ] LINE OA push quota and fallback process have been reviewed before enabling real sends.
 
 ## Verification
@@ -29,7 +30,9 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 - [ ] `npm run test:run`
 - [ ] `npm run build`
 - [ ] Send one test LINE message and confirm a Telegram topic summary appears exactly once.
+- [ ] Confirm the first test LINE message creates a real Telegram forum topic and later messages from the same LINE user reuse that topic.
 - [ ] Trigger the same Telegram callback twice and confirm LINE send happens only once.
+- [ ] Confirm the Telegram inline button stops spinning after callback acknowledgement is returned.
 - [ ] Verify a failed LINE send is logged and does not silently disappear.
 - [ ] Run the housekeeping cron route with a valid secret in staging.
 - [ ] Review one generated weekly report and confirm recommendations are understandable.

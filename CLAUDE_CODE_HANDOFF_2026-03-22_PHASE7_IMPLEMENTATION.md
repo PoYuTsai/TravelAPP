@@ -69,7 +69,7 @@
 
 ## Verification Run
 
-- `npm run test:run` -> passed, `88/88`
+- `npm run test:run` -> passed, `92/92`
 - `npm run lint` -> passed
 - `npm run build` -> passed
 
@@ -77,40 +77,62 @@
 
 - Feature commit: `ebbef76` `feat: add phase 7 shared runtime and kv processing`
 - Docs commit: `f0b63b3` `docs: record phase 7 runtime and kv progress`
+- Telegram integration feature commit: `8ced3d2` `feat: integrate telegram bot api topics and callback ack`
 
 Notes:
 
 - Build still logs existing Notion warnings when `NOTION_TOKEN` is absent, but the build succeeds because the frontend has fallbacks.
 - Route and job logic were verified through unit and route tests, not live external webhooks.
 
+## Post-Task Follow-up: Real Telegram Bot API Integration
+
+- Replaced the placeholder Telegram client with a real Bot API client in `src/lib/line-assistant/telegram/client.ts`
+- Added support for:
+  - `createForumTopic`
+  - `sendMessage` with `message_thread_id`
+  - `answerCallbackQuery`
+- Updated KV runtime wiring in `src/lib/line-assistant/runtime.ts` so durable topic mapping now stores the real Telegram `message_thread_id`
+- Updated `src/lib/line-assistant/storage/kv-stores.ts` to persist real topic ids instead of synthetic `topic:${lineUserId}` values
+- Updated `src/app/api/telegram-callback/route.ts` so successful button actions answer the Telegram callback query
+- Added / updated tests for:
+  - real Telegram Bot API client behavior
+  - KV-backed durable topic reuse
+  - callback acknowledgement behavior
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `92/92`
+- `npm run lint` -> passed
+- `npm run build` -> passed
+
 ## Code Review Findings From This Implementation Pass
 
 These are the main remaining blockers before calling the Phase 7 assistant production-ready:
 
-1. Telegram production integration is still not real yet.
-   - `telegramClient` still defaults to the in-memory client.
-   - `topicMapper` is now durable under KV, but it still generates synthetic topic ids instead of calling Telegram `createForumTopic`.
-   - This means the LINE side is closer to production than the Telegram ops side.
-
-2. LINE webhook ingestion is now durable, but it still needs an actual trigger strategy.
+1. LINE webhook ingestion is now durable, but it still needs an actual trigger strategy.
    - `POST /api/line-webhook` stores accepted events.
    - `POST /api/line-webhook/process` processes them safely.
    - What is still missing is the production trigger: cron, queue, or a best-effort internal kickoff after webhook ack.
 
-3. Draft generation is still deterministic stub text.
+2. Draft generation is still deterministic stub text.
    - The architecture is ready for Anthropic integration, but real model-backed reply generation is not yet wired in.
 
-4. KV adapter is implemented against the documented REST command pattern, but it has only been verified via mocked tests so far.
+3. KV adapter is implemented against the documented REST command pattern, but it has only been verified via mocked tests so far.
    - Before production rollout, it should be smoke-tested against a real Vercel KV / Upstash environment.
+
+4. Telegram topic creation now uses the real Bot API, but real operator setup still needs to be verified.
+   - The target Telegram group must be a topics-enabled supergroup.
+   - The bot must be allowed to create or manage topics and post messages in that group.
+   - A real staging smoke test should confirm callback acknowledgements and topic reuse work with the live bot.
 
 ## Recommended Next Step
 
 Implement the next slice in this order:
 
-1. Replace the in-memory Telegram client with a real Bot API client.
-2. Replace synthetic topic ids with real `createForumTopic` integration and persist the resulting `message_thread_id`.
-3. Decide and implement the production trigger path for `/api/line-webhook/process`.
-4. Replace draft stub generation with Anthropic-backed generation behind a provider wrapper.
+1. Decide and implement the production trigger path for `/api/line-webhook/process`.
+2. Replace draft stub generation with Anthropic-backed generation behind a provider wrapper.
+3. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement.
+4. Start the Phase 7.2 image / media workflow slice.
 
 ## Operator Setup Still Needed From Eric
 
