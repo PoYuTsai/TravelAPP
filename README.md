@@ -35,6 +35,10 @@
 | Phase 6.8 | 報價計算系統 | ✅ 完成 |
 | 維護 2026-03-16 | Google CSP / Studio / Parser 穩定性 | ✅ 完成 |
 | 維護 2026-03-17 | CMS 內容營運收斂 + 前端回退原始設計 | ✅ 完成 |
+| **Phase 7** | **LINE OA AI 客服助理** | 📋 規劃中 |
+| Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 規劃中 |
+| Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 規劃中 |
+| Phase 7.3 | 語音輸入 + 週報優化 + 內部派單 | 📋 規劃中 |
 
 ### Phase 1：官網
 - 響應式 Landing Page
@@ -267,6 +271,31 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - **保留後端修正**：Google CSP、Studio session、`/api/sign-url`、parser fallback 等後端與安全修正不回退
 - **驗證結果**：`npm run lint`、`npm run build` 通過
 
+### Phase 7：LINE OA AI 客服助理系統
+將 LINE OA 客服從「純手動回覆」升級為「AI 輔助 + 人工決策」模式：
+
+- **核心目標**：初次回覆時間從 30-60 分鐘降至 5-10 分鐘
+- **設計原則**：AI 準備草稿，Eric 決定是否送出（人機協作，不是全自動）
+- **Phase 7.1 - MVP**：
+  - LINE Webhook 接收訊息（不觸發已讀）
+  - Claude Haiku 需求抽取（日期、人數、景點、特殊需求）
+  - Telegram Topics 通知（每客人獨立對話串，上下文隔離）
+  - 狀態追蹤（🟢新 🟡等待 🔵已回 ⚪冷掉）
+- **Phase 7.2 - 完整功能**：
+  - Claude Sonnet + RAG 草稿生成（參考成交對話、行程範本、話術）
+  - 一鍵送出 / 編輯送出 / 自己回
+  - 圖片發送（TG 發圖 → 選客人 → LINE 發送）
+  - 成交標記（保留學習資料）+ 7 天無互動自動清理
+  - 快速回饋按鈕（👍 📏 🎭 ❄️）+ 每日摘要（20:00）
+- **Phase 7.3 - 進階**：
+  - 語音輸入（Whisper API）
+  - 收單信號偵測（AI 建議發 QR Code 時機）
+  - 週報 + Prompt 優化建議
+  - 內部派單記錄（/new /assign /cost）
+- **技術架構**：LINE Messaging API + Claude API + Telegram Bot + Sanity/Vercel KV
+- **成本**：< $5/月（LINE 免費、TG 免費、AI 約 $1-2）
+- **詳細規格**：[docs/plans/2026-03-22-phase7-line-oa-ai-assistant.md](docs/plans/2026-03-22-phase7-line-oa-ai-assistant.md)
+
 ## 技術架構
 
 ```
@@ -319,4 +348,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-17 維護：CMS 內容營運收斂 + 前端回退原始設計 -->
+<!-- Last build trigger: 2026-03-22 Phase 7 LINE OA AI 客服助理規格確認 -->
