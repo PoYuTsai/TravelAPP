@@ -112,6 +112,21 @@ export interface TelegramActionContext {
   sentAt: string
 }
 
+export type TelegramActionType = 'send' | 'edit_then_send' | 'dismiss'
+
+export interface TelegramAction {
+  actionId: string
+  type: TelegramActionType
+  conversationId: string
+  draftId: string
+  lineUserId: string
+  receivedAt: string
+  editedText?: string
+  telegramUserId?: string
+  telegramMessageId?: string
+  tgTopicId?: string
+}
+
 export interface LineAssistantConfig {
   siteUrl: string | null
   line: {

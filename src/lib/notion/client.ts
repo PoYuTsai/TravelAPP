@@ -366,3 +366,8 @@ export async function fetchNotionOrders(): Promise<NotionOrder[]> {
   const currentYear = new Date().getFullYear()
   return fetchNotionOrdersByYear(currentYear)
 }
+
+export async function fetchAllNotionOrdersFlat(): Promise<NotionOrder[]> {
+  const allYearData = await fetchAllOrders()
+  return allYearData.flatMap(({ orders }) => orders)
+}

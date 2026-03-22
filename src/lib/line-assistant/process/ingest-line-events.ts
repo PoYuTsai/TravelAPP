@@ -1,25 +1,23 @@
-import {
-  buildIdempotencyKey,
-  createMemoryIdempotencyStore,
-} from '../storage/idempotency-store'
+import { buildIdempotencyKey } from '../storage/idempotency-store'
+import { getLineAssistantRuntime, resetLineAssistantRuntimeForTests } from '../runtime'
 import type { InboundLineEventRecord } from '../types'
 import { normalizeLineMessageEvents } from '../line/normalize-event'
 
-let idempotencyStore = createMemoryIdempotencyStore()
-const ingestedRecords = new Map<string, InboundLineEventRecord>()
+let ingestedRecordsSnapshot: InboundLineEventRecord[] = []
 
 export async function ingestLineEvents(rawBody: string): Promise<{
   acceptedCount: number
   ignoredCount: number
   records: InboundLineEventRecord[]
 }> {
+  const runtime = getLineAssistantRuntime()
   const payload = JSON.parse(rawBody) as unknown
   const normalizedEvents = normalizeLineMessageEvents(payload)
   const records: InboundLineEventRecord[] = []
 
   for (const event of normalizedEvents) {
     const idempotencyKey = buildIdempotencyKey('line-event', event.lineEventId)
-    const claimed = await idempotencyStore.claim(idempotencyKey, 3600)
+    const claimed = await runtime.idempotencyStore.claim(idempotencyKey, 3600)
 
     if (!claimed) {
       continue
@@ -35,9 +33,11 @@ export async function ingestLineEvents(rawBody: string): Promise<{
       payload: event.rawEvent,
     }
 
-    ingestedRecords.set(record.lineEventId, record)
+    await runtime.inboundEventStore.upsert(record)
     records.push(record)
   }
+
+  ingestedRecordsSnapshot = records
 
   return {
     acceptedCount: records.length,
@@ -47,10 +47,14 @@ export async function ingestLineEvents(rawBody: string): Promise<{
 }
 
 export function getIngestedLineEventRecords(): InboundLineEventRecord[] {
-  return Array.from(ingestedRecords.values())
+  return [...ingestedRecordsSnapshot]
+}
+
+export async function getIngestedLineEventRecordsAsync(): Promise<InboundLineEventRecord[]> {
+  return getLineAssistantRuntime().inboundEventStore.list()
 }
 
 export function resetIngestedLineEvents(): void {
-  idempotencyStore = createMemoryIdempotencyStore()
-  ingestedRecords.clear()
+  ingestedRecordsSnapshot = []
+  resetLineAssistantRuntimeForTests()
 }

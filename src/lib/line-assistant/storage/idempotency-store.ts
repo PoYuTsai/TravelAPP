@@ -13,7 +13,7 @@ export function createMemoryIdempotencyStore(): IdempotencyStore {
 
   const cleanup = () => {
     const now = Date.now()
-    for (const [key, expiresAt] of store.entries()) {
+    for (const [key, expiresAt] of Array.from(store.entries())) {
       if (expiresAt <= now) {
         store.delete(key)
       }

@@ -1,0 +1,136 @@
+import { timingSafeEqual } from 'crypto'
+import { NextResponse } from 'next/server'
+import { getLineAssistantConfig } from '@/lib/line-assistant/config'
+import { handleTelegramAction } from '@/lib/line-assistant/actions/handle-telegram-action'
+import type { TelegramAction, TelegramActionType } from '@/lib/line-assistant/types'
+import { apiLogger } from '@/lib/logger'
+
+const telegramCallbackLogger = apiLogger.child('telegram-callback')
+
+function isValidSecret(provided: string | null, expected: string | null): boolean {
+  if (!provided || !expected || provided.length !== expected.length) {
+    return false
+  }
+
+  try {
+    return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+  } catch {
+    return false
+  }
+}
+
+function parseTelegramAction(payload: unknown): TelegramAction {
+  const callbackQuery =
+    payload &&
+    typeof payload === 'object' &&
+    'callback_query' in payload &&
+    payload.callback_query &&
+    typeof payload.callback_query === 'object'
+      ? (payload.callback_query as Record<string, unknown>)
+      : null
+
+  if (!callbackQuery) {
+    throw new Error('Missing callback_query')
+  }
+
+  const rawData = callbackQuery.data
+  if (typeof rawData !== 'string' || !rawData.trim()) {
+    throw new Error('Missing callback_query.data')
+  }
+
+  let parsedData: Record<string, unknown>
+  try {
+    parsedData = JSON.parse(rawData) as Record<string, unknown>
+  } catch {
+    throw new Error('Invalid callback_query.data JSON')
+  }
+
+  const type = parsedData.type
+  const actionId = parsedData.actionId
+  const conversationId = parsedData.conversationId
+  const draftId = parsedData.draftId
+  const lineUserId = parsedData.lineUserId
+  const editedText = parsedData.editedText
+  const message =
+    callbackQuery.message && typeof callbackQuery.message === 'object'
+      ? (callbackQuery.message as Record<string, unknown>)
+      : null
+  const from =
+    callbackQuery.from && typeof callbackQuery.from === 'object'
+      ? (callbackQuery.from as Record<string, unknown>)
+      : null
+
+  if (
+    (type !== 'send' && type !== 'edit_then_send' && type !== 'dismiss') ||
+    typeof actionId !== 'string' ||
+    typeof conversationId !== 'string' ||
+    typeof draftId !== 'string' ||
+    typeof lineUserId !== 'string'
+  ) {
+    throw new Error('Invalid telegram action payload')
+  }
+
+  return {
+    actionId,
+    type: type as TelegramActionType,
+    conversationId,
+    draftId,
+    lineUserId,
+    receivedAt: new Date().toISOString(),
+    editedText: typeof editedText === 'string' ? editedText : undefined,
+    telegramUserId: typeof from?.id === 'number' ? String(from.id) : undefined,
+    telegramMessageId:
+      typeof message?.message_id === 'number' ? String(message.message_id) : undefined,
+    tgTopicId:
+      typeof message?.message_thread_id === 'number'
+        ? String(message.message_thread_id)
+        : undefined,
+  }
+}
+
+export async function POST(request: Request) {
+  let config
+
+  try {
+    config = getLineAssistantConfig(process.env)
+  } catch (error) {
+    telegramCallbackLogger.error(
+      'Telegram callback is not configured',
+      error instanceof Error ? error : new Error(String(error))
+    )
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  }
+
+  const providedSecret = request.headers.get('x-telegram-bot-api-secret-token')
+  if (!isValidSecret(providedSecret, config.telegram.webhookSecret)) {
+    return NextResponse.json({ error: 'Invalid secret token' }, { status: 401 })
+  }
+
+  let payload: unknown
+  try {
+    payload = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+  }
+
+  let action: TelegramAction
+  try {
+    action = parseTelegramAction(payload)
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Invalid callback payload' },
+      { status: 400 }
+    )
+  }
+
+  try {
+    const result = await handleTelegramAction(action)
+    return NextResponse.json({ ok: true, result })
+  } catch (error) {
+    telegramCallbackLogger.error(
+      'Telegram callback action failed',
+      error instanceof Error ? error : new Error(String(error))
+    )
+    return NextResponse.json({ error: 'Callback action failed' }, { status: 500 })
+  }
+}

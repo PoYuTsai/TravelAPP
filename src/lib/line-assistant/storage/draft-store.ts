@@ -2,6 +2,7 @@ import type { ConversationDraft } from '../types'
 
 export interface DraftStore {
   getById(id: string): Promise<ConversationDraft | null>
+  list(): Promise<ConversationDraft[]>
   listByConversationId(conversationId: string): Promise<ConversationDraft[]>
   getPendingByConversationId(conversationId: string): Promise<ConversationDraft | null>
   upsert(draft: ConversationDraft): Promise<void>
@@ -13,6 +14,9 @@ export function createMemoryDraftStore(initialDrafts: ConversationDraft[] = []):
   return {
     async getById(id) {
       return store.get(id) ?? null
+    },
+    async list() {
+      return Array.from(store.values())
     },
     async listByConversationId(conversationId) {
       return Array.from(store.values()).filter((draft) => draft.conversationId === conversationId)
