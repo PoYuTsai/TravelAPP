@@ -79,6 +79,7 @@
 - Docs commit: `f0b63b3` `docs: record phase 7 runtime and kv progress`
 - Telegram integration feature commit: `8ced3d2` `feat: integrate telegram bot api topics and callback ack`
 - Telegram integration docs commit: `6d2d430` `docs: record telegram bot api integration progress`
+- Webhook kickoff feature commit: `542fd58` `feat: kick off line webhook processing after ingest`
 
 Notes:
 
@@ -106,14 +107,29 @@ Additional verification for this slice:
 - `npm run lint` -> passed
 - `npm run build` -> passed
 
+## Post-Task Follow-up: Webhook Processor Kickoff
+
+- Added `src/lib/line-assistant/process/kickoff-processor.ts`
+- Updated `src/app/api/line-webhook/route.ts` so accepted LINE events now trigger a best-effort internal POST to `/api/line-webhook/process`
+- The webhook still returns success even if kickoff fails, because the accepted inbound events remain durable in storage
+- Added / updated tests for:
+  - kickoff helper behavior
+  - webhook success when kickoff fails
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `96/96`
+- `npm run lint` -> passed
+- `npm run build` -> passed
+
 ## Code Review Findings From This Implementation Pass
 
 These are the main remaining blockers before calling the Phase 7 assistant production-ready:
 
-1. LINE webhook ingestion is now durable, but it still needs an actual trigger strategy.
+1. LINE webhook ingestion is now durable and now has a best-effort internal kickoff, but it still needs deployment-level fallback scheduling.
    - `POST /api/line-webhook` stores accepted events.
-   - `POST /api/line-webhook/process` processes them safely.
-   - What is still missing is the production trigger: cron, queue, or a best-effort internal kickoff after webhook ack.
+   - `POST /api/line-webhook` now also attempts a best-effort internal kickoff to `POST /api/line-webhook/process`.
+   - What is still missing is the deployment config for a periodic sweeper, such as Vercel Cron hitting `/api/line-webhook/process`.
 
 2. Draft generation is still deterministic stub text.
    - The architecture is ready for Anthropic integration, but real model-backed reply generation is not yet wired in.
@@ -130,8 +146,8 @@ These are the main remaining blockers before calling the Phase 7 assistant produ
 
 Implement the next slice in this order:
 
-1. Decide and implement the production trigger path for `/api/line-webhook/process`.
-2. Replace draft stub generation with Anthropic-backed generation behind a provider wrapper.
+1. Replace draft stub generation with Anthropic-backed generation behind a provider wrapper.
+2. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
 3. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement.
 4. Start the Phase 7.2 image / media workflow slice.
 

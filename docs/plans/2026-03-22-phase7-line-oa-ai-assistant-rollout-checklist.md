@@ -18,6 +18,7 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 ## External Setup
 
 - [ ] LINE Messaging API webhook URL points to `/api/line-webhook`.
+- [ ] A periodic cron or equivalent deployment job hits `/api/line-webhook/process`.
 - [ ] Telegram bot webhook points to `/api/telegram-callback`.
 - [ ] Telegram webhook includes the same secret token configured in `TELEGRAM_WEBHOOK_SECRET`.
 - [ ] Telegram group is a topics-enabled supergroup.
