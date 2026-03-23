@@ -11,21 +11,36 @@ interface SessionState {
 }
 
 const REFRESH_BUFFER_MS = 5 * 60 * 1000
-const SANITY_TOKEN_STORAGE_KEY = `__studio_auth_token_${projectId}`
+const SANITY_TOKEN_STORAGE_KEYS = [`__studio_auth_token_${projectId}`, '__sanity_auth_token']
 
-function getStoredSanityToken(): string | null {
+export function extractSanityTokenFromAuthState(authState: unknown): string | null {
+  if (!authState || typeof authState !== 'object' || !('token' in authState)) {
+    return null
+  }
+
+  const token = typeof authState.token === 'string' ? authState.token.trim() : ''
+  return token || null
+}
+
+export function getStoredSanityToken(): string | null {
   if (typeof window === 'undefined') {
     return null
   }
 
   try {
-    const raw = window.localStorage.getItem(SANITY_TOKEN_STORAGE_KEY)
-    if (!raw) {
-      return null
+    for (const storageKey of SANITY_TOKEN_STORAGE_KEYS) {
+      const raw = window.localStorage.getItem(storageKey)
+      if (!raw) {
+        continue
+      }
+
+      const parsed = JSON.parse(raw)
+      if (typeof parsed?.token === 'string') {
+        return parsed.token
+      }
     }
 
-    const parsed = JSON.parse(raw)
-    return typeof parsed?.token === 'string' ? parsed.token : null
+    return null
   } catch {
     return null
   }
@@ -118,15 +133,15 @@ export function useSessionToken() {
   }, [])
 
   useEffect(() => {
-    const token$ = workspace.auth.token
-    if (!token$) {
+    const authState$ = workspace.auth?.state
+    if (!authState$?.subscribe) {
       setSanityToken(getStoredSanityToken())
       return
     }
 
-    const subscription = token$.subscribe((token) => {
+    const subscription = authState$.subscribe((authState) => {
       if (!isMountedRef.current) return
-      setSanityToken(token || getStoredSanityToken())
+      setSanityToken(extractSanityTokenFromAuthState(authState) || getStoredSanityToken())
     })
 
     return () => {
