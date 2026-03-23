@@ -80,6 +80,7 @@
 - Telegram integration feature commit: `8ced3d2` `feat: integrate telegram bot api topics and callback ack`
 - Telegram integration docs commit: `6d2d430` `docs: record telegram bot api integration progress`
 - Webhook kickoff feature commit: `542fd58` `feat: kick off line webhook processing after ingest`
+- Webhook kickoff docs commit: `2d65351` `docs: record webhook processor kickoff progress`
 
 Notes:
 

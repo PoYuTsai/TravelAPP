@@ -41,4 +41,4 @@ This slice adds a production-oriented trigger path between the fast-ack LINE web
 ## Commit
 
 - Feature commit: `542fd58` `feat: kick off line webhook processing after ingest`
-- Docs commit: pending
+- Docs commit: `2d65351` `docs: record webhook processor kickoff progress`
