@@ -13,7 +13,7 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 - [ ] `TELEGRAM_WEBHOOK_SECRET` is set and matches Telegram webhook configuration.
 - [ ] `LINE_ASSISTANT_CRON_SECRET` is set for protected cron routes.
 - [ ] `NOTION_TOKEN` and `NOTION_CUSTOMER_DATABASE_IDS_JSON` are set before enabling returning-customer hints.
-- [ ] `ANTHROPIC_API_KEY` is set before replacing the current draft stub with model-backed generation.
+- [ ] `ANTHROPIC_API_KEY` is set before enabling model-backed draft generation in production.
 
 ## External Setup
 
@@ -32,6 +32,7 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 - [ ] `npm run build`
 - [ ] Send one test LINE message and confirm a Telegram topic summary appears exactly once.
 - [ ] Confirm the first test LINE message creates a real Telegram forum topic and later messages from the same LINE user reuse that topic.
+- [ ] If `ANTHROPIC_API_KEY` is enabled, confirm a test inbound message creates an Anthropic-backed draft instead of the local fallback template.
 - [ ] Trigger the same Telegram callback twice and confirm LINE send happens only once.
 - [ ] Confirm the Telegram inline button stops spinning after callback acknowledgement is returned.
 - [ ] Verify a failed LINE send is logged and does not silently disappear.

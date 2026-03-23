@@ -132,8 +132,9 @@ These are the main remaining blockers before calling the Phase 7 assistant produ
    - `POST /api/line-webhook` now also attempts a best-effort internal kickoff to `POST /api/line-webhook/process`.
    - What is still missing is the deployment config for a periodic sweeper, such as Vercel Cron hitting `/api/line-webhook/process`.
 
-2. Draft generation is still deterministic stub text.
-   - The architecture is ready for Anthropic integration, but real model-backed reply generation is not yet wired in.
+2. Anthropic-backed draft generation is now wired, but still needs live staging validation.
+   - The runtime now creates a real Anthropic draft generator when `ANTHROPIC_API_KEY` is configured.
+   - A staging smoke test should confirm real responses, latency, and failure handling before production rollout.
 
 3. KV adapter is implemented against the documented REST command pattern, but it has only been verified via mocked tests so far.
    - Before production rollout, it should be smoke-tested against a real Vercel KV / Upstash environment.
@@ -147,10 +148,9 @@ These are the main remaining blockers before calling the Phase 7 assistant produ
 
 Implement the next slice in this order:
 
-1. Replace draft stub generation with Anthropic-backed generation behind a provider wrapper.
-2. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
-3. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement.
-4. Start the Phase 7.2 image / media workflow slice.
+1. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
+2. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement + Anthropic draft generation.
+3. Start the Phase 7.2 image / media workflow slice.
 
 ## Operator Setup Still Needed From Eric
 
@@ -184,3 +184,30 @@ Additional verification for this slice:
 - `npm run test:run` -> passed, `98/98`
 - `npm run lint` -> passed
 - `npm run build` -> passed
+
+## Post-Task Follow-up: Anthropic Draft Generation and Studio Auth Sync
+
+- Added `src/lib/line-assistant/ai/anthropic.ts`
+- Runtime now wires `draftTextGenerator` when `ANTHROPIC_API_KEY` is configured
+- Updated:
+  - `src/lib/line-assistant/ai/generate-draft.ts`
+  - `src/lib/line-assistant/process/process-inbound-event.ts`
+  - `src/lib/line-assistant/process/process-pending-events.ts`
+  - `src/lib/line-assistant/runtime.ts`
+- Added / updated tests:
+  - `src/lib/line-assistant/__tests__/anthropic-draft-generator.test.ts`
+  - `src/lib/ai/__tests__/draft-generation.test.ts`
+  - `src/lib/line-assistant/__tests__/process-inbound-event.test.ts`
+  - `src/lib/line-assistant/__tests__/process-pending-events.test.ts`
+  - `src/lib/line-assistant/__tests__/kv-runtime.test.ts`
+- Synced the latest protected-Studio auth fixes from `main` into this branch:
+  - `sanity.config.ts` now uses `auth.loginMethod = 'token'`
+  - `src/sanity/hooks/useSessionToken.ts` now checks multiple token paths, including nested auth state and `workspace.auth.token`
+  - `src/sanity/hooks/__tests__/useSessionToken.test.ts` was updated accordingly
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `106/106`
+- `npm run lint` -> passed
+- `npm run build` -> passed
+- Feature commit: `a051127` (`feat: add anthropic-backed phase 7 draft generation`)

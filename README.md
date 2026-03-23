@@ -40,9 +40,10 @@
 | 維護 2026-03-22 | Phase 7 Telegram Bot API / forum topic / callback ack | ✅ 完成 |
 | 維護 2026-03-23 | Phase 7 webhook processor kickoff | ✅ 完成 |
 | 維護 2026-03-23 | Footer credit cleanup + dashboard allowlist fix | ✅ 完成 |
+| 維護 2026-03-23 | Phase 7 Anthropic draft generation + Studio auth sync | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | 🚧 Phase 7.1 實作中 |
-| Phase 7.1 | Webhook + 需求抽取 + TG Topics | 🚧 TG 真實整合 + webhook kickoff 完成，AI draft 待補 |
-| Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
+| Phase 7.1 | Webhook + 需求抽取 + TG Topics | 🚧 TG 真實整合 + webhook kickoff + Anthropic AI draft 完成 |
+| Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 🚧 圖片 / image-media 流程待補 |
 | Phase 7.3 | 語音輸入 + 週報優化 + 內部派單 | 📋 待實作 |
 
 ### Phase 1：官網
@@ -291,12 +292,13 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 
 - **核心目標**：初次回覆時間從 30-60 分鐘降至 5-10 分鐘
 - **設計原則**：AI 準備草稿，Eric 決定是否送出（人機協作，不是全自動）
-- **目前狀態**：規格 v2.1、implementation plan、Claude handoff、shared runtime / KV / processor、真實 Telegram Bot API topic + callback ack、webhook best-effort processor kickoff 都已完成；AI draft 與 cron rollout 設定仍待補
+- **目前狀態**：規格 v2.1、implementation plan、Claude handoff、shared runtime / KV / processor、真實 Telegram Bot API topic + callback ack、webhook best-effort processor kickoff、Anthropic AI draft 都已完成；cron rollout 設定與 live staging 驗證仍待補
 - **Phase 7.1 - MVP**：
   - LINE Webhook fast-ack 接收訊息（不觸發已讀）
   - Claude Haiku 需求抽取（日期、人數、景點、特殊需求）
   - Telegram Topics 通知（每客人獨立對話串，上下文隔離）
   - 冪等處理、Topic mapping、對話狀態追蹤
+  - Anthropic AI draft generation，保留 safe fallback，未設 API key 時仍走 local template
 - **Phase 7.2 - 完整功能**：
   - Claude Sonnet + RAG 草稿生成（參考成交對話、行程範本、話術）
   - 一鍵送出 / 編輯送出 / 自己回
@@ -315,6 +317,7 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - **本輪進度**：[docs/plans/2026-03-22-phase7-shared-runtime-and-kv-implementation.md](docs/plans/2026-03-22-phase7-shared-runtime-and-kv-implementation.md)
 - **Telegram 整合進度**：[docs/plans/2026-03-22-phase7-telegram-bot-api-integration.md](docs/plans/2026-03-22-phase7-telegram-bot-api-integration.md)
 - **Webhook Kickoff 進度**：[docs/plans/2026-03-23-phase7-webhook-processor-kickoff.md](docs/plans/2026-03-23-phase7-webhook-processor-kickoff.md)
+- **Anthropic Draft + Studio Auth 進度**：[docs/plans/2026-03-23-phase7-anthropic-draft-generation-and-studio-auth-sync.md](docs/plans/2026-03-23-phase7-anthropic-draft-generation-and-studio-auth-sync.md)
 - **交接文件**：[CLAUDE_CODE_HANDOFF_2026-03-22_PHASE7.md](CLAUDE_CODE_HANDOFF_2026-03-22_PHASE7.md)
 
 ## 技術架構
@@ -369,4 +372,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-23 footer and dashboard allowlist fix -->
+<!-- Last build trigger: 2026-03-23 phase 7 anthropic draft generation and studio auth sync -->
