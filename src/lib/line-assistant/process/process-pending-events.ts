@@ -28,6 +28,7 @@ export async function processPendingInboundEvents(
     | 'idempotencyStore'
     | 'topicMapper'
     | 'telegramClient'
+    | 'draftTextGenerator'
     | 'resolveProfile'
   > & { limit?: number }
 ): Promise<ProcessPendingInboundEventsResult> {
@@ -54,6 +55,7 @@ export async function processPendingInboundEvents(
         draftStore: runtime.draftStore,
         topicMapper: runtime.topicMapper,
         telegramClient: runtime.telegramClient,
+        draftTextGenerator: runtime.draftTextGenerator,
         resolveProfile: runtime.resolveProfile,
       })
 

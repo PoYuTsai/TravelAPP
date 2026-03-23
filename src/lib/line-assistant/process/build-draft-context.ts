@@ -1,4 +1,4 @@
-import type { Conversation } from '../types'
+import type { Conversation, DraftGenerationContext } from '../types'
 
 function buildPeopleSummary(conversation: Conversation): string {
   const adults = conversation.latestInquiry.adults
@@ -10,7 +10,7 @@ function buildPeopleSummary(conversation: Conversation): string {
   return [adults, children].filter(Boolean).join('') || '人數待確認'
 }
 
-export function buildDraftContext(conversation: Conversation) {
+export function buildDraftContext(conversation: Conversation): DraftGenerationContext {
   return {
     customerName: conversation.customerName,
     travelDates: conversation.latestInquiry.travelDates,

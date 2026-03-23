@@ -14,11 +14,28 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000
 const SANITY_TOKEN_STORAGE_KEYS = [`__studio_auth_token_${projectId}`, '__sanity_auth_token']
 
 export function extractSanityTokenFromAuthState(authState: unknown): string | null {
-  if (!authState || typeof authState !== 'object' || !('token' in authState)) {
+  if (!authState || typeof authState !== 'object') {
     return null
   }
 
-  const token = typeof authState.token === 'string' ? authState.token.trim() : ''
+  const rootToken = 'token' in authState && typeof authState.token === 'string'
+    ? authState.token.trim()
+    : ''
+
+  if (rootToken) {
+    return rootToken
+  }
+
+  const nestedAuthState =
+    'authState' in authState && authState.authState && typeof authState.authState === 'object'
+      ? authState.authState
+      : null
+
+  const token =
+    nestedAuthState && 'token' in nestedAuthState && typeof nestedAuthState.token === 'string'
+      ? nestedAuthState.token.trim()
+      : ''
+
   return token || null
 }
 
@@ -133,19 +150,36 @@ export function useSessionToken() {
   }, [])
 
   useEffect(() => {
+    setSanityToken(getStoredSanityToken())
+
     const authState$ = workspace.auth?.state
-    if (!authState$?.subscribe) {
-      setSanityToken(getStoredSanityToken())
+    const token$ = workspace.auth?.token
+    const subscriptions: Array<{ unsubscribe: () => void }> = []
+
+    if (authState$?.subscribe) {
+      subscriptions.push(
+        authState$.subscribe((authState) => {
+          if (!isMountedRef.current) return
+          setSanityToken(extractSanityTokenFromAuthState(authState) || getStoredSanityToken())
+        })
+      )
+    }
+
+    if (token$?.subscribe) {
+      subscriptions.push(
+        token$.subscribe((token) => {
+          if (!isMountedRef.current) return
+          setSanityToken(typeof token === 'string' && token.trim() ? token.trim() : getStoredSanityToken())
+        })
+      )
+    }
+
+    if (subscriptions.length === 0) {
       return
     }
 
-    const subscription = authState$.subscribe((authState) => {
-      if (!isMountedRef.current) return
-      setSanityToken(extractSanityTokenFromAuthState(authState) || getStoredSanityToken())
-    })
-
     return () => {
-      subscription.unsubscribe()
+      subscriptions.forEach((subscription) => subscription.unsubscribe())
     }
   }, [workspace])
 

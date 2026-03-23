@@ -8,7 +8,7 @@ import type {
   CustomerInquiry,
 } from '@/lib/line-assistant/types'
 
-function createConfig(): LineAssistantConfig {
+function createConfig(overrides: Partial<LineAssistantConfig> = {}): LineAssistantConfig {
   return {
     siteUrl: 'https://chiangway-travel.com',
     line: {
@@ -22,22 +22,28 @@ function createConfig(): LineAssistantConfig {
     },
     anthropic: {
       apiKey: null,
+      ...overrides.anthropic,
     },
     openai: {
       apiKey: null,
+      ...overrides.openai,
     },
     notion: {
       token: null,
       customerDatabaseIds: {},
+      ...overrides.notion,
     },
     storage: {
       mode: 'kv',
       kvRestApiUrl: 'https://kv.example.test',
       kvRestApiToken: 'kv-token',
+      ...overrides.storage,
     },
     cron: {
       secret: 'cron-secret',
+      ...overrides.cron,
     },
+    ...overrides,
   }
 }
 
@@ -130,6 +136,21 @@ function createMockKvFetch() {
 
   const mockFetch = async (input: string | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? new URL(input) : new URL(input.toString())
+
+    if (url.hostname === 'api.anthropic.com') {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          content: [
+            {
+              type: 'text',
+              text: 'Anthropic generated draft',
+            },
+          ],
+        }),
+      } as Response
+    }
 
     if (url.hostname === 'api.telegram.org') {
       const body =
@@ -262,5 +283,34 @@ describe('createLineAssistantRuntime (kv)', () => {
     expect(second).toBe('3001')
     expect(mock.getTelegramCalls()).toHaveLength(1)
     expect(mock.getTelegramCalls()[0]?.url).toContain('/bottg-token/createForumTopic')
+  })
+
+  it('wires an Anthropic draft generator when an api key is configured', async () => {
+    const mock = createMockKvFetch()
+    const runtime = createLineAssistantRuntime({
+      config: createConfig({
+        anthropic: {
+          apiKey: 'anthropic-key',
+        },
+      }),
+      fetchImpl: mock.fetchImpl,
+    })
+
+    const result = await runtime.draftTextGenerator?.({
+      customerName: 'Wang Family',
+      travelDates: '2026-04-12 to 2026-04-16',
+      peopleSummary: '2 adults, 1 child',
+      attractionsSummary: 'Old city',
+      specialNeedsSummary: 'child seat',
+      recentMessages: [
+        {
+          role: 'customer',
+          content: 'Need a family charter in Chiang Mai.',
+          timestamp: '2026-03-22T00:00:00.000Z',
+        },
+      ],
+    })
+
+    expect(result).toBe('Anthropic generated draft')
   })
 })

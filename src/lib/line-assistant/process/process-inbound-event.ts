@@ -1,6 +1,7 @@
 import type {
   Conversation,
   ConversationContentType,
+  DraftTextGenerator,
   ConversationMessage,
   InboundLineEventRecord,
 } from '../types'
@@ -23,6 +24,7 @@ export interface ProcessInboundEventDependencies {
   draftStore?: DraftStore
   topicMapper?: TopicMapper
   telegramClient?: TelegramClient
+  draftTextGenerator?: DraftTextGenerator
   resolveProfile?: (lineUserId: string) => Promise<LineProfileResolverResult | null>
 }
 
@@ -62,6 +64,7 @@ export async function processInboundEvent(
   const draftStore = dependencies.draftStore ?? defaultDraftStore
   const topicMapper = dependencies.topicMapper ?? defaultTopicMapper
   const telegramClient = dependencies.telegramClient ?? defaultTelegramClient
+  const draftTextGenerator = dependencies.draftTextGenerator
   const resolveProfile =
     dependencies.resolveProfile ??
     (async (lineUserId: string) => ({
@@ -110,6 +113,7 @@ export async function processInboundEvent(
 
   const draft = await generateDraftForConversation(nextConversation, {
     draftStore,
+    draftTextGenerator,
   })
   nextConversation.pendingDraftId = draft.id
   await conversationStore.upsert(nextConversation)

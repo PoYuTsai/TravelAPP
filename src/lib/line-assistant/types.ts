@@ -95,6 +95,25 @@ export interface ConversationDraft {
   feedbackTags?: Array<'ok' | 'too_long' | 'too_formal' | 'too_cold'>
 }
 
+export interface DraftGenerationMessageContext {
+  role: ConversationMessage['role']
+  content: string
+  timestamp: string
+}
+
+export interface DraftGenerationContext {
+  customerName: string
+  travelDates: string | null
+  peopleSummary: string
+  attractionsSummary: string
+  specialNeedsSummary: string
+  recentMessages: DraftGenerationMessageContext[]
+}
+
+export type DraftTextGenerator = (
+  context: DraftGenerationContext
+) => Promise<string>
+
 export interface InboundLineEventRecord {
   id: string
   lineEventId: string

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { processInboundEvent } from '@/lib/line-assistant/process/process-inbound-event'
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
@@ -25,7 +25,7 @@ function createRecord(): InboundLineEventRecord {
       message: {
         id: 'msg-1',
         type: 'text',
-        text: '你好，我們 4/12-16 2大2小想去大象營',
+        text: 'Need a 5 day family charter in Chiang Mai with a child seat.',
       },
     },
   }
@@ -45,7 +45,7 @@ describe('processInboundEvent', () => {
       telegramClient,
       resolveProfile: async () => ({
         userId: 'line-user-1',
-        displayName: '王先生',
+        displayName: 'Wang Family',
       }),
     })
 
@@ -55,13 +55,38 @@ describe('processInboundEvent', () => {
 
     expect(result.topicId).toBeTruthy()
     expect(result.draftId).toBeTruthy()
-    expect(savedConversation?.customerName).toBe('王先生')
+    expect(savedConversation?.customerName).toBe('Wang Family')
     expect(savedConversation?.status).toBe('waiting_eric')
     expect(savedConversation?.pendingDraftId).toBe(result.draftId)
     expect(savedConversation?.messages).toHaveLength(1)
     expect(savedDraft?.status).toBe('pending')
     expect(sentSummaries).toHaveLength(1)
     expect(sentSummaries[0]?.topicId).toBe(result.topicId)
-    expect(sentSummaries[0]?.text).toContain('王先生')
+    expect(sentSummaries[0]?.text).toContain('Wang Family')
+  })
+
+  it('uses the injected draft text generator for the saved pending draft', async () => {
+    const conversationStore = createMemoryConversationStore()
+    const draftStore = createMemoryDraftStore()
+    const topicMapper = createMemoryTopicMapper()
+    const telegramClient = createMemoryTelegramClient()
+    const draftTextGenerator = vi.fn().mockResolvedValue('Anthropic generated draft')
+
+    const result = await processInboundEvent(createRecord(), {
+      conversationStore,
+      draftStore,
+      topicMapper,
+      telegramClient,
+      draftTextGenerator,
+      resolveProfile: async () => ({
+        userId: 'line-user-1',
+        displayName: 'Wang Family',
+      }),
+    })
+
+    const savedDraft = await draftStore.getById(result.draftId)
+
+    expect(savedDraft?.originalDraft).toBe('Anthropic generated draft')
+    expect(draftTextGenerator).toHaveBeenCalledTimes(1)
   })
 })

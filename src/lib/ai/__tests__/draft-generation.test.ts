@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { generateDraftForConversation } from '@/lib/line-assistant/ai/generate-draft'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
 import type { Conversation, CustomerInquiry, ConversationDraft } from '@/lib/line-assistant/types'
@@ -84,5 +84,26 @@ describe('generateDraftForConversation', () => {
     expect(result.originalDraft).toContain('王先生')
     expect(oldDraft?.status).toBe('superseded')
     expect(latestDraft?.status).toBe('pending')
+  })
+
+  it('uses the injected draft text generator when available', async () => {
+    const draftStore = createMemoryDraftStore()
+    const draftTextGenerator = vi.fn().mockResolvedValue('Anthropic generated draft')
+
+    const result = await generateDraftForConversation(createConversation(), {
+      draftStore,
+      draftTextGenerator,
+      now: '2026-03-22T01:00:00.000Z',
+      draftIdFactory: () => 'draft-anthropic',
+    })
+
+    expect(result.originalDraft).toBe('Anthropic generated draft')
+    expect(draftTextGenerator).toHaveBeenCalledTimes(1)
+    expect(draftTextGenerator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customerName: expect.any(String),
+        recentMessages: expect.any(Array),
+      })
+    )
   })
 })

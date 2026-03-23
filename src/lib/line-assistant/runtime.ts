@@ -1,4 +1,5 @@
 import { createMemoryAuditLog, type AuditLog } from './audit-log'
+import { createAnthropicDraftTextGenerator } from './ai/anthropic'
 import { getLineAssistantConfig } from './config'
 import { createLineMessageSender, type LineMessageSender } from './line/send-message'
 import { type LineProfileResolverResult } from './process/process-inbound-event'
@@ -13,7 +14,7 @@ import {
   type TelegramClient,
 } from './telegram/client'
 import { createMemoryTopicMapper, type TopicMapper } from './telegram/topic-mapper'
-import type { LineAssistantConfig } from './types'
+import type { DraftTextGenerator, LineAssistantConfig } from './types'
 
 export interface LineAssistantRuntime {
   conversationStore: ConversationStore
@@ -24,6 +25,7 @@ export interface LineAssistantRuntime {
   telegramClient: TelegramClient
   auditLog: AuditLog
   lineSender: LineMessageSender
+  draftTextGenerator?: DraftTextGenerator
   resolveProfile?: (lineUserId: string) => Promise<LineProfileResolverResult | null>
 }
 
@@ -51,6 +53,13 @@ export function createLineAssistantRuntime(input: {
   config: LineAssistantConfig
   fetchImpl?: typeof fetch
 }): LineAssistantRuntime {
+  const draftTextGenerator = input.config.anthropic.apiKey
+    ? createAnthropicDraftTextGenerator({
+        apiKey: input.config.anthropic.apiKey,
+        fetchImpl: input.fetchImpl,
+      })
+    : undefined
+
   if (
     input.config.storage.mode === 'kv' &&
     input.config.storage.kvRestApiUrl &&
@@ -73,10 +82,14 @@ export function createLineAssistantRuntime(input: {
       ...kvStores,
       telegramClient,
       lineSender: createLineMessageSender(),
+      draftTextGenerator,
     }
   }
 
-  return createDefaultMemoryRuntime()
+  return {
+    ...createDefaultMemoryRuntime(),
+    draftTextGenerator,
+  }
 }
 
 function buildRuntimeKey(config: LineAssistantConfig): string {

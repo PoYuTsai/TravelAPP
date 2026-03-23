@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { processPendingInboundEvents } from '@/lib/line-assistant/process/process-pending-events'
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
@@ -84,5 +84,35 @@ describe('processPendingInboundEvents', () => {
     expect(second.processedCount).toBe(0)
     expect(second.failedCount).toBe(0)
     expect(telegramClient.getSentSummaries()).toHaveLength(1)
+  })
+
+  it('passes the runtime draft text generator through to draft creation', async () => {
+    const inboundEventStore = createMemoryInboundEventStore([createRecord()])
+    const conversationStore = createMemoryConversationStore()
+    const draftStore = createMemoryDraftStore()
+    const idempotencyStore = createMemoryIdempotencyStore()
+    const topicMapper = createMemoryTopicMapper()
+    const telegramClient = createMemoryTelegramClient()
+    const draftTextGenerator = vi.fn().mockResolvedValue('Anthropic generated draft')
+
+    const result = await processPendingInboundEvents({
+      inboundEventStore,
+      conversationStore,
+      draftStore,
+      idempotencyStore,
+      topicMapper,
+      telegramClient,
+      draftTextGenerator,
+      resolveProfile: async () => ({
+        userId: 'line-user-1',
+        displayName: 'Wang Family',
+      }),
+    })
+
+    const drafts = await draftStore.list()
+
+    expect(result.processedCount).toBe(1)
+    expect(drafts[0]?.originalDraft).toBe('Anthropic generated draft')
+    expect(draftTextGenerator).toHaveBeenCalledTimes(1)
   })
 })
