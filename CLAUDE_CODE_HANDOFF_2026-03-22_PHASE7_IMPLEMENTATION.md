@@ -169,3 +169,18 @@ Implement the next slice in this order:
 - Review whether callback idempotency should distinguish `claimed` versus `completed` states once durable storage is introduced.
 - Review whether audit logs should also persist send request ids from LINE.
 - Review whether a dead-letter path is needed for failed processor events before production rollout.
+
+## Post-Task Follow-up: Footer and Dashboard Allowlist Fix
+
+- Removed the public `由 Eric 與 Claude Code 協作開發` footer credit from `src/components/Footer.tsx`
+- Added a built-in dashboard allowlist fallback for `eric19921204@gmail.com` in `src/lib/api-auth.ts`
+- This ensures Eric can access the protected dashboard / accounting flow even if `DASHBOARD_ALLOWED_EMAILS` is empty or misconfigured
+- Added / updated tests:
+  - `src/lib/__tests__/api-auth.test.ts`
+  - `src/components/__tests__/Footer.test.tsx`
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `98/98`
+- `npm run lint` -> passed
+- `npm run build` -> passed
