@@ -14,10 +14,15 @@ export function normalizeEmail(email: string | null | undefined): string {
   return email?.trim().toLowerCase() || ''
 }
 
-export const DASHBOARD_ALLOWED_EMAILS = (process.env.DASHBOARD_ALLOWED_EMAILS || '')
-  .split(',')
-  .map((email) => normalizeEmail(email))
-  .filter(Boolean)
+const DEFAULT_DASHBOARD_ALLOWED_EMAILS = ['eric19921204@gmail.com']
+
+export const DASHBOARD_ALLOWED_EMAILS = Array.from(
+  new Set(
+    [...DEFAULT_DASHBOARD_ALLOWED_EMAILS, ...(process.env.DASHBOARD_ALLOWED_EMAILS || '').split(',')]
+      .map((email) => normalizeEmail(email))
+      .filter(Boolean)
+  )
+)
 
 export function isDashboardEmailAllowed(email: string): boolean {
   return DASHBOARD_ALLOWED_EMAILS.includes(normalizeEmail(email))
