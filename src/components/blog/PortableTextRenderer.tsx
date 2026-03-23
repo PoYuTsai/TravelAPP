@@ -6,8 +6,14 @@ import type { SanityImageSource } from '@sanity/image-url'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { urlFor } from '@/sanity/client'
 import Button from '@/components/ui/Button'
+import {
+  BLOG_ARTICLE_BODY_IMAGE_SIZES,
+  BLOG_ARTICLE_BODY_IMAGE_WIDTH,
+  BLOG_ARTICLE_PORTRAIT_IMAGE_SIZES,
+  getBlogArticleBodyImageUrl,
+  getBlogArticleLightboxImageUrl,
+} from '@/lib/blog-image'
 
 // 圖片燈箱元件（完整無障礙支援）
 const ImageLightbox = ({
@@ -193,18 +199,8 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: st
 
   if (!value?.asset) return null
 
-  const thumbnailUrl = urlFor(value)
-    .width(800)
-    .fit('max')
-    .auto('format')
-    .url()
-
-  const fullSizeUrl = urlFor(value)
-    .width(1920)
-    .fit('max')
-    .auto('format')
-    .quality(90)
-    .url()
+  const thumbnailUrl = getBlogArticleBodyImageUrl(value)
+  const fullSizeUrl = getBlogArticleLightboxImageUrl(value)
 
   const altText = value.alt || '文章圖片'
 
@@ -230,10 +226,10 @@ const ImageBlock = ({ value }: { value: { asset: SanityImageSource & { _ref?: st
             <Image
               src={thumbnailUrl}
               alt={altText}
-              width={800}
+              width={BLOG_ARTICLE_BODY_IMAGE_WIDTH}
               height={1200}
               className="w-full h-auto"
-              sizes={detectedPortrait ? '(max-width: 768px) 50vw, 320px' : '(max-width: 768px) 100vw, 800px'}
+              sizes={detectedPortrait ? BLOG_ARTICLE_PORTRAIT_IMAGE_SIZES : BLOG_ARTICLE_BODY_IMAGE_SIZES}
               onLoad={(e) => {
                 // 備用：圖片載入後檢測比例
                 const img = e.target as HTMLImageElement

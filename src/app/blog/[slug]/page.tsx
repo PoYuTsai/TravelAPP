@@ -14,6 +14,11 @@ import PortableTextRenderer from '@/components/blog/PortableTextRenderer'
 import RelatedPosts from '@/components/blog/RelatedPosts'
 import Button from '@/components/ui/Button'
 import LineCTAButton from '@/components/ui/LineCTAButton'
+import {
+  BLOG_ARTICLE_HERO_IMAGE_SIZES,
+  BLOG_ARTICLE_HERO_IMAGE_WIDTH,
+  getBlogArticleHeroImageUrl,
+} from '@/lib/blog-image'
 import { getCategoryName } from '@/lib/constants'
 
 // Sanity 查詢 - 取得單篇文章
@@ -173,16 +178,12 @@ export default async function BlogPostPage({ params }: { params: { slug: string 
           {post.mainImage && (
             <div className="mb-8 rounded-2xl overflow-hidden">
               <Image
-                src={urlFor(post.mainImage)
-                  .width(1200)
-                  .fit('max')
-                  .auto('format')
-                  .url()}
+                src={getBlogArticleHeroImageUrl(post.mainImage)}
                 alt={post.mainImage.alt || post.title}
-                width={1200}
+                width={BLOG_ARTICLE_HERO_IMAGE_WIDTH}
                 height={800}
                 className="w-full h-auto"
-                sizes="(max-width: 768px) 100vw, 896px"
+                sizes={BLOG_ARTICLE_HERO_IMAGE_SIZES}
                 priority
               />
             </div>
