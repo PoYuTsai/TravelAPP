@@ -81,6 +81,36 @@ describe('createTelegramBotClient', () => {
     })
   })
 
+  it('sends topic action prompts with inline keyboard callback tokens', async () => {
+    const mock = createMockTelegramFetch()
+    const client = createTelegramBotClient({
+      botToken: 'tg-token',
+      groupId: '-1001234567890',
+      fetchImpl: mock.fetchImpl,
+    })
+
+    await client.sendTopicActionPrompt('4321', 'Draft ready to review', [
+      { text: 'Send', callbackData: 'la:token-send' },
+      { text: 'Dismiss', callbackData: 'la:token-dismiss' },
+    ])
+
+    expect(mock.getCalls()).toHaveLength(1)
+    expect(mock.getCalls()[0]?.url).toContain('/bottg-token/sendMessage')
+    expect(mock.getCalls()[0]?.body).toMatchObject({
+      chat_id: '-1001234567890',
+      message_thread_id: 4321,
+      text: 'Draft ready to review',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: 'Send', callback_data: 'la:token-send' },
+            { text: 'Dismiss', callback_data: 'la:token-dismiss' },
+          ],
+        ],
+      },
+    })
+  })
+
   it('answers telegram callback queries after a button action is processed', async () => {
     const mock = createMockTelegramFetch()
     const client = createTelegramBotClient({

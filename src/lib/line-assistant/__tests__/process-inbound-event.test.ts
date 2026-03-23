@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { processInboundEvent } from '@/lib/line-assistant/process/process-inbound-event'
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
+import { createMemoryTelegramActionStore } from '@/lib/line-assistant/storage/telegram-action-store'
 import { createMemoryTopicMapper } from '@/lib/line-assistant/telegram/topic-mapper'
 import { createMemoryTelegramClient } from '@/lib/line-assistant/telegram/client'
 import type { InboundLineEventRecord } from '@/lib/line-assistant/types'
@@ -35,12 +36,14 @@ describe('processInboundEvent', () => {
   it('creates a topic, stores the conversation, and posts a telegram summary', async () => {
     const conversationStore = createMemoryConversationStore()
     const draftStore = createMemoryDraftStore()
+    const telegramActionStore = createMemoryTelegramActionStore()
     const topicMapper = createMemoryTopicMapper()
     const telegramClient = createMemoryTelegramClient()
 
     const result = await processInboundEvent(createRecord(), {
       conversationStore,
       draftStore,
+      telegramActionStore,
       topicMapper,
       telegramClient,
       resolveProfile: async () => ({
@@ -63,6 +66,10 @@ describe('processInboundEvent', () => {
     expect(sentSummaries).toHaveLength(1)
     expect(sentSummaries[0]?.topicId).toBe(result.topicId)
     expect(sentSummaries[0]?.text).toContain('Wang Family')
+    expect(telegramClient.getActionPrompts()).toHaveLength(1)
+    expect(telegramClient.getActionPrompts()[0]?.buttons).toHaveLength(2)
+    expect(telegramClient.getActionPrompts()[0]?.buttons[0]?.callbackData).toMatch(/^la:/)
+    expect(await telegramActionStore.list()).toHaveLength(2)
   })
 
   it('uses the injected draft text generator for the saved pending draft', async () => {

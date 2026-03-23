@@ -7,6 +7,10 @@ import { createMemoryConversationStore, type ConversationStore } from './storage
 import { createMemoryDraftStore, type DraftStore } from './storage/draft-store'
 import { createMemoryIdempotencyStore, type IdempotencyStore } from './storage/idempotency-store'
 import { createMemoryInboundEventStore, type InboundEventStore } from './storage/inbound-event-store'
+import {
+  createMemoryTelegramActionStore,
+  type TelegramActionStore,
+} from './storage/telegram-action-store'
 import { createKvLineAssistantStores } from './storage/kv-stores'
 import {
   createMemoryTelegramClient,
@@ -22,6 +26,7 @@ export interface LineAssistantRuntime {
   inboundEventStore: InboundEventStore
   idempotencyStore: IdempotencyStore
   topicMapper: TopicMapper
+  telegramActionStore: TelegramActionStore
   telegramClient: TelegramClient
   auditLog: AuditLog
   lineSender: LineMessageSender
@@ -43,6 +48,7 @@ function createDefaultMemoryRuntime(): LineAssistantRuntime {
     inboundEventStore: createMemoryInboundEventStore(),
     idempotencyStore: createMemoryIdempotencyStore(),
     topicMapper: createMemoryTopicMapper(),
+    telegramActionStore: createMemoryTelegramActionStore(),
     telegramClient: createMemoryTelegramClient(),
     auditLog: createMemoryAuditLog(),
     lineSender: createLineMessageSender(),

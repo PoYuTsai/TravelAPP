@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import type {
   Conversation,
   ConversationContentType,
@@ -7,6 +8,10 @@ import type {
 } from '../types'
 import { createMemoryConversationStore, type ConversationStore } from '../storage/conversation-store'
 import { createMemoryDraftStore, type DraftStore } from '../storage/draft-store'
+import {
+  createMemoryTelegramActionStore,
+  type TelegramActionStore,
+} from '../storage/telegram-action-store'
 import { createMemoryTopicMapper, type TopicMapper } from '../telegram/topic-mapper'
 import { createMemoryTelegramClient, type TelegramClient } from '../telegram/client'
 import { formatTelegramInquirySummary } from '../telegram/format-summary'
@@ -22,6 +27,7 @@ export interface LineProfileResolverResult {
 export interface ProcessInboundEventDependencies {
   conversationStore?: ConversationStore
   draftStore?: DraftStore
+  telegramActionStore?: TelegramActionStore
   topicMapper?: TopicMapper
   telegramClient?: TelegramClient
   draftTextGenerator?: DraftTextGenerator
@@ -30,6 +36,7 @@ export interface ProcessInboundEventDependencies {
 
 const defaultConversationStore = createMemoryConversationStore()
 const defaultDraftStore = createMemoryDraftStore()
+const defaultTelegramActionStore = createMemoryTelegramActionStore()
 const defaultTopicMapper = createMemoryTopicMapper()
 const defaultTelegramClient = createMemoryTelegramClient()
 
@@ -56,12 +63,23 @@ function buildCustomerMessage(record: InboundLineEventRecord): ConversationMessa
   }
 }
 
+function buildDraftActionToken(): string {
+  return randomUUID().replace(/-/g, '').slice(0, 24)
+}
+
+function buildDraftActionPromptText(draftText: string): string {
+  const trimmedDraft = draftText.trim()
+  const preview = trimmedDraft.length > 500 ? `${trimmedDraft.slice(0, 500)}...` : trimmedDraft
+  return ['📝 AI 草稿已準備好', preview].filter(Boolean).join('\n\n')
+}
+
 export async function processInboundEvent(
   record: InboundLineEventRecord,
   dependencies: ProcessInboundEventDependencies = {}
 ): Promise<{ conversationId: string; topicId: string; draftId: string }> {
   const conversationStore = dependencies.conversationStore ?? defaultConversationStore
   const draftStore = dependencies.draftStore ?? defaultDraftStore
+  const telegramActionStore = dependencies.telegramActionStore ?? defaultTelegramActionStore
   const topicMapper = dependencies.topicMapper ?? defaultTopicMapper
   const telegramClient = dependencies.telegramClient ?? defaultTelegramClient
   const draftTextGenerator = dependencies.draftTextGenerator
@@ -125,6 +143,40 @@ export async function processInboundEvent(
       rawMessage,
     })
   )
+  const sendToken = buildDraftActionToken()
+  const dismissToken = buildDraftActionToken()
+
+  await telegramActionStore.upsert({
+    token: sendToken,
+    action: {
+      actionId: `${draft.id}:send`,
+      type: 'send',
+      conversationId: nextConversation.id,
+      draftId: draft.id,
+      lineUserId: nextConversation.lineUserId,
+      receivedAt: record.receivedAt,
+      tgTopicId: topicId,
+    },
+    createdAt: record.receivedAt,
+  })
+  await telegramActionStore.upsert({
+    token: dismissToken,
+    action: {
+      actionId: `${draft.id}:dismiss`,
+      type: 'dismiss',
+      conversationId: nextConversation.id,
+      draftId: draft.id,
+      lineUserId: nextConversation.lineUserId,
+      receivedAt: record.receivedAt,
+      tgTopicId: topicId,
+    },
+    createdAt: record.receivedAt,
+  })
+
+  await telegramClient.sendTopicActionPrompt(topicId, buildDraftActionPromptText(draft.originalDraft), [
+    { text: '✅ 送出', callbackData: `la:${sendToken}` },
+    { text: '🗑️ 略過', callbackData: `la:${dismissToken}` },
+  ])
 
   return {
     conversationId: nextConversation.id,

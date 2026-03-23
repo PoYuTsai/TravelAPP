@@ -12,6 +12,7 @@ import {
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
 import { createMemoryIdempotencyStore } from '@/lib/line-assistant/storage/idempotency-store'
+import { createMemoryTelegramActionStore } from '@/lib/line-assistant/storage/telegram-action-store'
 import { createMemoryLineMessageSender } from '@/lib/line-assistant/line/send-message'
 import { createMemoryTelegramClient } from '@/lib/line-assistant/telegram/client'
 import type { Conversation, ConversationDraft, CustomerInquiry } from '@/lib/line-assistant/types'
@@ -109,19 +110,33 @@ describe('POST /api/telegram-callback', () => {
   })
 
   it('accepts a valid callback and sends the draft', async () => {
+    const telegramActionStore = createMemoryTelegramActionStore([
+      {
+        token: 'token-send',
+        action: {
+          actionId: 'action-1',
+          type: 'send',
+          conversationId: 'conv-1',
+          draftId: 'draft-1',
+          lineUserId: 'line-user-1',
+          receivedAt: '2026-03-22T00:05:00.000Z',
+        },
+        createdAt: '2026-03-22T00:05:00.000Z',
+      },
+    ])
+
+    configureLineAssistantRuntimeForTests({
+      telegramClient,
+      telegramActionStore,
+    })
+
     const response = await POST(
       createRequest({
         callback_query: {
           id: 'callback-1',
           from: { id: 999, username: 'eric' },
           message: { message_id: 1001, message_thread_id: 2002 },
-          data: JSON.stringify({
-            actionId: 'action-1',
-            type: 'send',
-            conversationId: 'conv-1',
-            draftId: 'draft-1',
-            lineUserId: 'line-user-1',
-          }),
+          data: 'la:token-send',
         },
       })
     )

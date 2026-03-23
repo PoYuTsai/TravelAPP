@@ -20,7 +20,7 @@ function isValidSecret(provided: string | null, expected: string | null): boolea
   }
 }
 
-function parseTelegramAction(payload: unknown): TelegramAction {
+async function parseTelegramAction(payload: unknown): Promise<TelegramAction> {
   const callbackQuery =
     payload &&
     typeof payload === 'object' &&
@@ -37,6 +37,41 @@ function parseTelegramAction(payload: unknown): TelegramAction {
   const rawData = callbackQuery.data
   if (typeof rawData !== 'string' || !rawData.trim()) {
     throw new Error('Missing callback_query.data')
+  }
+
+  if (rawData.startsWith('la:')) {
+    const token = rawData.slice(3)
+    if (!token) {
+      throw new Error('Missing callback token')
+    }
+
+    const storedAction = await getLineAssistantRuntime().telegramActionStore.get(token)
+    if (!storedAction) {
+      throw new Error('Unknown callback token')
+    }
+
+    const message =
+      callbackQuery.message && typeof callbackQuery.message === 'object'
+        ? (callbackQuery.message as Record<string, unknown>)
+        : null
+    const from =
+      callbackQuery.from && typeof callbackQuery.from === 'object'
+        ? (callbackQuery.from as Record<string, unknown>)
+        : null
+
+    return {
+      ...storedAction.action,
+      telegramUserId: typeof from?.id === 'number' ? String(from.id) : storedAction.action.telegramUserId,
+      telegramMessageId:
+        typeof message?.message_id === 'number'
+          ? String(message.message_id)
+          : storedAction.action.telegramMessageId,
+      tgTopicId:
+        typeof message?.message_thread_id === 'number'
+          ? String(message.message_thread_id)
+          : storedAction.action.tgTopicId,
+      receivedAt: new Date().toISOString(),
+    }
   }
 
   let parsedData: Record<string, unknown>
@@ -144,7 +179,7 @@ export async function POST(request: Request) {
   let action: TelegramAction
   const callbackQueryId = getCallbackQueryId(payload)
   try {
-    action = parseTelegramAction(payload)
+    action = await parseTelegramAction(payload)
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Invalid callback payload' },

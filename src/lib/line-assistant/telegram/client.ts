@@ -13,6 +13,17 @@ export interface TelegramSummaryMessage {
   text: string
 }
 
+export interface TelegramInlineButton {
+  text: string
+  callbackData: string
+}
+
+export interface TelegramActionPrompt {
+  topicId: string
+  text: string
+  buttons: TelegramInlineButton[]
+}
+
 export interface CreatedTelegramTopic {
   topicId: string
   title: string
@@ -26,6 +37,11 @@ export interface AnsweredTelegramCallbackQuery {
 export interface TelegramClient {
   createForumTopic(title: string): Promise<string>
   sendTopicSummary(topicId: string, text: string): Promise<void>
+  sendTopicActionPrompt(
+    topicId: string,
+    text: string,
+    buttons: TelegramInlineButton[]
+  ): Promise<void>
   answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void>
 }
 
@@ -88,6 +104,19 @@ export function createTelegramBotClient(input: {
         text,
       })
     },
+    async sendTopicActionPrompt(topicId, text, buttons) {
+      await callTelegramMethod('sendMessage', {
+        chat_id: input.groupId,
+        message_thread_id: parseMessageThreadId(topicId),
+        text,
+        reply_markup: {
+          inline_keyboard: [buttons.map((button) => ({
+            text: button.text,
+            callback_data: button.callbackData,
+          }))],
+        },
+      })
+    },
     async answerCallbackQuery(callbackQueryId, text) {
       await callTelegramMethod('answerCallbackQuery', {
         callback_query_id: callbackQueryId,
@@ -99,10 +128,12 @@ export function createTelegramBotClient(input: {
 
 export function createMemoryTelegramClient(): TelegramClient & {
   getSentSummaries(): TelegramSummaryMessage[]
+  getActionPrompts(): TelegramActionPrompt[]
   getCreatedTopics(): CreatedTelegramTopic[]
   getAnsweredCallbackQueries(): AnsweredTelegramCallbackQuery[]
 } {
   const sentSummaries: TelegramSummaryMessage[] = []
+  const actionPrompts: TelegramActionPrompt[] = []
   const createdTopics: CreatedTelegramTopic[] = []
   const answeredCallbackQueries: AnsweredTelegramCallbackQuery[] = []
   let topicCounter = 1
@@ -119,11 +150,17 @@ export function createMemoryTelegramClient(): TelegramClient & {
     async sendTopicSummary(topicId, text) {
       sentSummaries.push({ topicId, text })
     },
+    async sendTopicActionPrompt(topicId, text, buttons) {
+      actionPrompts.push({ topicId, text, buttons })
+    },
     async answerCallbackQuery(callbackQueryId, text) {
       answeredCallbackQueries.push({ callbackQueryId, text })
     },
     getSentSummaries() {
       return [...sentSummaries]
+    },
+    getActionPrompts() {
+      return [...actionPrompts]
     },
     getCreatedTopics() {
       return [...createdTopics]
