@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getLineAssistantConfig } from '@/lib/line-assistant/config'
 import { verifyLineSignature } from '@/lib/line-assistant/line/signature'
 import { ingestLineEvents } from '@/lib/line-assistant/process/ingest-line-events'
+import { kickoffLineWebhookProcessor } from '@/lib/line-assistant/process/kickoff-processor'
 import { apiLogger } from '@/lib/logger'
 
 const lineWebhookLogger = apiLogger.child('line-webhook')
@@ -35,6 +36,19 @@ export async function POST(request: Request) {
 
   try {
     const result = await ingestLineEvents(rawBody)
+
+    void kickoffLineWebhookProcessor({
+      acceptedCount: result.acceptedCount,
+      requestUrl: request.url,
+      siteUrl: config.siteUrl,
+      cronSecret: config.cron.secret,
+    }).catch((error) => {
+      lineWebhookLogger.warn(
+        'LINE webhook processor kickoff failed',
+        error instanceof Error ? { error: error.message } : { error: String(error) }
+      )
+    })
+
     return NextResponse.json({
       ok: true,
       acceptedCount: result.acceptedCount,
