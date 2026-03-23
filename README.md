@@ -39,6 +39,7 @@
 | 維護 2026-03-23 | Footer credit cleanup + dashboard allowlist fix | ✅ 完成 |
 | 維護 2026-03-23 | Studio session token fallback recovery | ✅ 完成 |
 | 維護 2026-03-23 | Studio auth token recovery hardening | ✅ 完成 |
+| 維護 2026-03-23 | Force Studio token auth mode | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -307,6 +308,13 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - 更新測試：`src/sanity/hooks/__tests__/useSessionToken.test.ts`
 - 驗證：`npx vitest run --exclude ".worktrees/**" src/sanity/hooks/__tests__/useSessionToken.test.ts`、`npm run lint`、`npm run build` 全部通過
 
+### 維護：Force Studio token auth mode (2026-03-23)
+
+- `sanity.config.ts` 將 `auth.loginMethod` 從 `dual` 改成 `token`
+- 避免 Studio 優先走 cookie path，導致 Dashboard / Accounting 拿不到可驗證的 Sanity bearer token
+- 這次部署後需要重新登入 Studio 一次，讓新的 token-only auth flow 生效
+- 驗證：`npm run lint`、`npm run build` 全部通過
+
 ### Phase 7：LINE OA AI 客服助理系統
 將 LINE OA 客服從「純手動回覆」升級為「AI 輔助 + 人工決策」模式：
 
@@ -387,4 +395,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-23 studio auth token recovery hardening -->
+<!-- Last build trigger: 2026-03-23 force studio token auth mode -->
