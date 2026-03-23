@@ -395,4 +395,16 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-23 force studio token auth mode -->
+### 維護：Blog image clarity fix (2026-03-24)
+
+- 修正 blog 文章首圖與內文圖在桌機上顯示模糊的問題
+- 新增 `src/lib/blog-image.ts` 統一管理 hero / body / lightbox 圖片尺寸
+- `src/app/blog/[slug]/page.tsx` 改為使用較高解析 hero 圖
+- `src/components/blog/PortableTextRenderer.tsx` 改為使用較高解析內文圖與 lightbox 圖
+- 新增 `src/lib/__tests__/blog-image.test.ts` 防止圖片尺寸回退
+- 驗證通過：
+  - `npx vitest run --exclude ".worktrees/**" src/lib/__tests__/blog-image.test.ts src/lib/__tests__/api-auth.test.ts src/components/__tests__/Footer.test.tsx src/sanity/hooks/__tests__/useSessionToken.test.ts src/lib/__tests__/pdf-template.test.ts src/lib/__tests__/itinerary-parser.test.ts`
+  - `npm run lint`
+  - `npm run build`
+
+<!-- Last build trigger: 2026-03-24 blog image clarity fix -->
