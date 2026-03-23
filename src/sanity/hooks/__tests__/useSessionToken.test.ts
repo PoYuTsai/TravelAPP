@@ -9,6 +9,13 @@ describe('useSessionToken helpers', () => {
 
   it('extracts the token from auth state when present', () => {
     expect(extractSanityTokenFromAuthState({ token: 'studio-token' })).toBe('studio-token')
+    expect(
+      extractSanityTokenFromAuthState({
+        authState: {
+          token: 'nested-studio-token',
+        },
+      })
+    ).toBe('nested-studio-token')
     expect(extractSanityTokenFromAuthState({ token: '   ' })).toBeNull()
     expect(extractSanityTokenFromAuthState(null)).toBeNull()
   })

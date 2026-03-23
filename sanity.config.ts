@@ -17,6 +17,9 @@ export default defineConfig({
   projectId,
   dataset,
   basePath: '/studio',
+  auth: {
+    loginMethod: 'dual',
+  },
   plugins: [structureTool({ structure }), dashboardTool(), accountingTool(), pricingTool()],
   schema: { types: schemaTypes },
   document: {
