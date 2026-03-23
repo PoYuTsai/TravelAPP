@@ -36,6 +36,7 @@
 | 維護 2026-03-16 | Google CSP / Studio / Parser 穩定性 | ✅ 完成 |
 | 維護 2026-03-17 | CMS 內容營運收斂 + 前端回退原始設計 | ✅ 完成 |
 | 維護 2026-03-22 | Phase 7 規格完善 + Implementation Plan + Handoff | ✅ 完成 |
+| 維護 2026-03-23 | Footer credit cleanup + dashboard allowlist fix | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -272,6 +273,16 @@ Google Ads 轉換追蹤與內部匯出 API 安全加固：
 - **保留後端修正**：Google CSP、Studio session、`/api/sign-url`、parser fallback 等後端與安全修正不回退
 - **驗證結果**：`npm run lint`、`npm run build` 通過
 
+### 維護：Footer credit cleanup + dashboard allowlist fix (2026-03-23)
+
+- Public footer 移除 `由 Eric 與 Claude Code 協作開發` 額外署名，只保留標準版權行
+- `src/lib/api-auth.ts` 內建白名單 fallback：`eric19921204@gmail.com`
+- Dashboard / Accounting / Sign URL 相關保護路由沿用同一套 allowlist 判斷
+- 新增測試：
+  - `src/lib/__tests__/api-auth.test.ts`
+  - `src/components/__tests__/Footer.test.tsx`
+- 驗證：`npx vitest run --exclude ".worktrees/**" src/lib/__tests__/api-auth.test.ts src/components/__tests__/Footer.test.tsx`、`npm run lint`、`npm run build` 全部通過
+
 ### Phase 7：LINE OA AI 客服助理系統
 將 LINE OA 客服從「純手動回覆」升級為「AI 輔助 + 人工決策」模式：
 
@@ -352,4 +363,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-03-22 Phase 7 規格完善與 implementation plan -->
+<!-- Last build trigger: 2026-03-23 footer and dashboard allowlist fix -->
