@@ -11,6 +11,10 @@ import {
   createMemoryTelegramActionStore,
   type TelegramActionStore,
 } from './storage/telegram-action-store'
+import {
+  createMemoryTelegramMediaStore,
+  type TelegramMediaStore,
+} from './storage/telegram-media-store'
 import { createKvLineAssistantStores } from './storage/kv-stores'
 import {
   createMemoryTelegramClient,
@@ -27,6 +31,7 @@ export interface LineAssistantRuntime {
   idempotencyStore: IdempotencyStore
   topicMapper: TopicMapper
   telegramActionStore: TelegramActionStore
+  telegramMediaStore: TelegramMediaStore
   telegramClient: TelegramClient
   auditLog: AuditLog
   lineSender: LineMessageSender
@@ -49,6 +54,7 @@ function createDefaultMemoryRuntime(): LineAssistantRuntime {
     idempotencyStore: createMemoryIdempotencyStore(),
     topicMapper: createMemoryTopicMapper(),
     telegramActionStore: createMemoryTelegramActionStore(),
+    telegramMediaStore: createMemoryTelegramMediaStore(),
     telegramClient: createMemoryTelegramClient(),
     auditLog: createMemoryAuditLog(),
     lineSender: createLineMessageSender(),

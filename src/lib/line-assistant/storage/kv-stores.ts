@@ -5,6 +5,7 @@ import type { DraftStore } from './draft-store'
 import type { IdempotencyStore } from './idempotency-store'
 import type { InboundEventStore } from './inbound-event-store'
 import type { TelegramActionStore, StoredTelegramAction } from './telegram-action-store'
+import type { TelegramMediaStore, StoredTelegramMedia } from './telegram-media-store'
 import type { Conversation, ConversationDraft, InboundLineEventRecord } from '../types'
 import { createUpstashRestClient } from './upstash-rest'
 
@@ -18,6 +19,7 @@ const PREFIXES = {
   topic: 'la:topic:',
   topicLock: 'la:topic-lock:',
   telegramAction: 'la:telegram-action:',
+  telegramMedia: 'la:telegram-media:',
 } as const
 
 function buildKey(prefix: string, id: string): string {
@@ -37,6 +39,7 @@ export function createKvLineAssistantStores(input: {
   auditLog: AuditLog
   topicMapper: TopicMapper
   telegramActionStore: TelegramActionStore
+  telegramMediaStore: TelegramMediaStore
 } {
   const client = createUpstashRestClient(input)
 
@@ -170,6 +173,22 @@ export function createKvLineAssistantStores(input: {
     },
   }
 
+  const telegramMediaStore: TelegramMediaStore = {
+    async get(token) {
+      return client.getJson<StoredTelegramMedia>(buildKey(PREFIXES.telegramMedia, token))
+    },
+    async upsert(record) {
+      await client.setJson(buildKey(PREFIXES.telegramMedia, record.token), record)
+    },
+    async delete(token) {
+      await client.delete(buildKey(PREFIXES.telegramMedia, token))
+    },
+    async list() {
+      const keys = await client.scanKeys(PREFIXES.telegramMedia)
+      return client.mgetJson<StoredTelegramMedia>(keys)
+    },
+  }
+
   return {
     conversationStore,
     draftStore,
@@ -178,5 +197,6 @@ export function createKvLineAssistantStores(input: {
     auditLog,
     topicMapper,
     telegramActionStore,
+    telegramMediaStore,
   }
 }

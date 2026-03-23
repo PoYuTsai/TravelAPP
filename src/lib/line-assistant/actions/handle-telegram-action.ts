@@ -8,12 +8,17 @@ import {
   createMemoryIdempotencyStore,
   type IdempotencyStore,
 } from '../storage/idempotency-store'
+import {
+  createMemoryTelegramMediaStore,
+  type TelegramMediaStore,
+} from '../storage/telegram-media-store'
 import { createLineMessageSender, type LineMessageSender } from '../line/send-message'
 import type { Conversation, ConversationDraft, TelegramAction } from '../types'
 
 export interface HandleTelegramActionDependencies {
   conversationStore?: ConversationStore
   draftStore?: DraftStore
+  mediaStore?: TelegramMediaStore
   idempotencyStore?: IdempotencyStore
   lineSender?: LineMessageSender
   auditLog?: AuditLog
@@ -22,6 +27,7 @@ export interface HandleTelegramActionDependencies {
 
 const defaultConversationStore = createMemoryConversationStore()
 const defaultDraftStore = createMemoryDraftStore()
+const defaultMediaStore = createMemoryTelegramMediaStore()
 const defaultIdempotencyStore = createMemoryIdempotencyStore()
 const defaultAuditLog = createMemoryAuditLog()
 
@@ -48,6 +54,11 @@ function getDependencies(
       runtimeOverrides.draftStore ??
       runtime.draftStore ??
       defaultDraftStore,
+    mediaStore:
+      overrides.mediaStore ??
+      runtimeOverrides.mediaStore ??
+      runtime.telegramMediaStore ??
+      defaultMediaStore,
     idempotencyStore:
       overrides.idempotencyStore ??
       runtimeOverrides.idempotencyStore ??
@@ -112,6 +123,18 @@ function buildSentConversationMessage(
   }
 }
 
+function buildSentImageConversationMessage(action: TelegramAction, content: string, sentAt: string) {
+  return {
+    id: `${action.actionId}:line-image-send`,
+    source: 'telegram' as const,
+    role: 'eric' as const,
+    content,
+    contentType: 'image' as const,
+    timestamp: sentAt,
+    telegramMessageId: action.telegramMessageId,
+  }
+}
+
 function resolveDraftText(action: TelegramAction, draft: ConversationDraft): string {
   if (action.type === 'edit_then_send') {
     return action.editedText?.trim() || draft.editedDraft || draft.originalDraft
@@ -132,11 +155,18 @@ async function loadConversationOrThrow(
 }
 
 async function loadDraftOrThrow(draftStore: DraftStore, action: TelegramAction): Promise<ConversationDraft> {
+  if (!action.draftId) {
+    throw new Error(`Draft id is required for ${action.type}`)
+  }
   const draft = await draftStore.getById(action.draftId)
   if (!draft || draft.conversationId !== action.conversationId) {
     throw new Error(`Draft not found for ${action.draftId}`)
   }
   return draft
+}
+
+function buildLineMediaUrl(siteUrl: string, mediaToken: string): string {
+  return `${siteUrl}/api/line-media/${encodeURIComponent(mediaToken)}`
 }
 
 export async function handleTelegramAction(
@@ -154,6 +184,60 @@ export async function handleTelegramAction(
   }
 
   const conversation = await loadConversationOrThrow(deps.conversationStore, action)
+
+  if (action.type === 'send_image') {
+    if (!action.mediaToken) {
+      throw new Error('Media token is required for send_image')
+    }
+
+    const media = await deps.mediaStore.get(action.mediaToken)
+    if (!media) {
+      throw new Error(`Telegram media not found for ${action.mediaToken}`)
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()?.replace(/\/+$/, '') || null
+    if (!siteUrl) {
+      throw new Error('NEXT_PUBLIC_SITE_URL is required for LINE media delivery')
+    }
+
+    const mediaUrl = buildLineMediaUrl(siteUrl, action.mediaToken)
+
+    try {
+      await deps.lineSender.sendImageMessage({
+        lineUserId: action.lineUserId,
+        originalContentUrl: mediaUrl,
+        previewImageUrl: mediaUrl,
+      })
+    } catch (error) {
+      await appendAuditLog(
+        deps.auditLog,
+        action,
+        'failed',
+        createdAt,
+        error instanceof Error ? error.message : String(error)
+      )
+      throw error
+    }
+
+    const nextConversation: Conversation = {
+      ...conversation,
+      status: 'waiting_customer',
+      lastActivityAt: createdAt,
+      messages: [
+        ...conversation.messages,
+        buildSentImageConversationMessage(
+          action,
+          media.caption?.trim() || 'Image sent via Telegram',
+          createdAt
+        ),
+      ],
+    }
+
+    await deps.conversationStore.upsert(nextConversation)
+    await appendAuditLog(deps.auditLog, action, 'sent', createdAt, 'image')
+    return { status: 'sent' }
+  }
+
   const draft = await loadDraftOrThrow(deps.draftStore, action)
 
   if (action.type === 'dismiss') {

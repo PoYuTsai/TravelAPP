@@ -3,8 +3,8 @@ export type LineAssistantAuditOutcome = 'sent' | 'dismissed' | 'duplicate' | 'fa
 export interface LineAssistantAuditEntry {
   id: string
   actionId: string
-  conversationId: string
-  draftId: string
+  conversationId?: string
+  draftId?: string
   lineUserId: string
   outcome: LineAssistantAuditOutcome
   createdAt: string

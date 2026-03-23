@@ -13,6 +13,7 @@ import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conv
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
 import { createMemoryIdempotencyStore } from '@/lib/line-assistant/storage/idempotency-store'
 import { createMemoryTelegramActionStore } from '@/lib/line-assistant/storage/telegram-action-store'
+import { createMemoryTelegramMediaStore } from '@/lib/line-assistant/storage/telegram-media-store'
 import { createMemoryLineMessageSender } from '@/lib/line-assistant/line/send-message'
 import { createMemoryTelegramClient } from '@/lib/line-assistant/telegram/client'
 import type { Conversation, ConversationDraft, CustomerInquiry } from '@/lib/line-assistant/types'
@@ -106,6 +107,8 @@ describe('POST /api/telegram-callback', () => {
 
     configureLineAssistantRuntimeForTests({
       telegramClient,
+      telegramActionStore: createMemoryTelegramActionStore(),
+      telegramMediaStore: createMemoryTelegramMediaStore(),
     })
   })
 
@@ -168,6 +171,76 @@ describe('POST /api/telegram-callback', () => {
     )
 
     expect(response.status).toBe(400)
+  })
+
+  it('accepts a telegram photo message and prompts for a recipient selection', async () => {
+    const conversationStore = createMemoryConversationStore([
+      createConversation({
+        id: 'conv-1',
+        lineUserId: 'line-user-1',
+        customerName: 'Wang Family',
+        pendingDraftId: null,
+        lastActivityAt: '2026-03-23T00:00:00.000Z',
+      }),
+      createConversation({
+        id: 'conv-2',
+        lineUserId: 'line-user-2',
+        customerName: 'Lin Family',
+        pendingDraftId: null,
+        lastActivityAt: '2026-03-22T00:00:00.000Z',
+      }),
+    ])
+    const telegramActionStore = createMemoryTelegramActionStore()
+    const telegramMediaStore = createMemoryTelegramMediaStore()
+
+    configureLineAssistantRuntimeForTests({
+      conversationStore,
+      telegramClient,
+      telegramActionStore,
+      telegramMediaStore,
+      idempotencyStore: createMemoryIdempotencyStore(),
+    })
+
+    const response = await POST(
+      createRequest({
+        message: {
+          message_id: 2001,
+          message_thread_id: 2002,
+          date: 1711065600,
+          chat: { id: -1001234567890, type: 'supergroup' },
+          from: { id: 999, username: 'eric' },
+          caption: 'car photo',
+          photo: [
+            {
+              file_id: 'photo-small',
+              file_unique_id: 'unique-small',
+              file_size: 1024,
+              width: 320,
+              height: 240,
+            },
+            {
+              file_id: 'photo-large',
+              file_unique_id: 'unique-large',
+              file_size: 204800,
+              width: 1280,
+              height: 960,
+            },
+          ],
+        },
+      })
+    )
+
+    const payload = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(payload.ok).toBe(true)
+    expect(payload.result.status).toBe('photo_prompted')
+    expect(telegramClient.getActionPrompts()).toHaveLength(1)
+    expect(telegramClient.getActionPrompts()[0]?.text).toContain('收到照片')
+    expect(telegramClient.getActionPrompts()[0]?.buttons).toHaveLength(2)
+    expect(telegramClient.getActionPrompts()[0]?.buttons[0]?.callbackData).toMatch(/^la:/)
+    expect(await telegramMediaStore.list()).toHaveLength(1)
+    expect(await telegramActionStore.list()).toHaveLength(2)
   })
 
   afterEach(() => {

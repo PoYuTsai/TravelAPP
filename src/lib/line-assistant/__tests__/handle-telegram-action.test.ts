@@ -4,6 +4,7 @@ import { createMemoryAuditLog } from '@/lib/line-assistant/audit-log'
 import { createMemoryConversationStore } from '@/lib/line-assistant/storage/conversation-store'
 import { createMemoryDraftStore } from '@/lib/line-assistant/storage/draft-store'
 import { createMemoryIdempotencyStore } from '@/lib/line-assistant/storage/idempotency-store'
+import { createMemoryTelegramMediaStore } from '@/lib/line-assistant/storage/telegram-media-store'
 import { createMemoryLineMessageSender } from '@/lib/line-assistant/line/send-message'
 import type { Conversation, ConversationDraft, CustomerInquiry, TelegramAction } from '@/lib/line-assistant/types'
 
@@ -148,5 +149,65 @@ describe('handleTelegramAction', () => {
     expect(savedConversation?.pendingDraftId).toBeNull()
     expect(auditLog.listSync()).toHaveLength(1)
     expect(auditLog.listSync()[0]?.outcome).toBe('dismissed')
+  })
+
+  it('sends an image message for a stored telegram photo selection', async () => {
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://chiangway-travel.com'
+
+    const conversationStore = createMemoryConversationStore([
+      createConversation({
+        pendingDraftId: null,
+        status: 'waiting_eric',
+      }),
+    ])
+    const draftStore = createMemoryDraftStore()
+    const mediaStore = createMemoryTelegramMediaStore([
+      {
+        token: 'media-1',
+        telegramFileId: 'tg-file-1',
+        telegramFileUniqueId: 'tg-unique-1',
+        contentType: 'image/jpeg',
+        fileSize: 512000,
+        caption: 'car photo',
+        createdAt: '2026-03-23T00:00:00.000Z',
+      },
+    ])
+    const idempotencyStore = createMemoryIdempotencyStore()
+    const lineSender = createMemoryLineMessageSender()
+    const auditLog = createMemoryAuditLog()
+
+    const result = await handleTelegramAction(
+      createAction({
+        actionId: 'action-image-1',
+        type: 'send_image',
+        draftId: undefined,
+        mediaToken: 'media-1',
+      }),
+      {
+        conversationStore,
+        draftStore,
+        mediaStore,
+        idempotencyStore,
+        lineSender,
+        auditLog,
+      }
+    )
+
+    const savedConversation = await conversationStore.getByLineUserId('line-user-1')
+
+    expect(result.status).toBe('sent')
+    expect(lineSender.getSentMessages()).toHaveLength(0)
+    expect(lineSender.getSentImageMessages()).toHaveLength(1)
+    expect(lineSender.getSentImageMessages()[0]).toMatchObject({
+      lineUserId: 'line-user-1',
+      originalContentUrl: 'https://chiangway-travel.com/api/line-media/media-1',
+      previewImageUrl: 'https://chiangway-travel.com/api/line-media/media-1',
+    })
+    expect(savedConversation?.status).toBe('waiting_customer')
+    expect(savedConversation?.messages.at(-1)).toMatchObject({
+      contentType: 'image',
+      source: 'telegram',
+      role: 'eric',
+    })
   })
 })

@@ -131,15 +131,16 @@ export interface TelegramActionContext {
   sentAt: string
 }
 
-export type TelegramActionType = 'send' | 'edit_then_send' | 'dismiss'
+export type TelegramActionType = 'send' | 'edit_then_send' | 'dismiss' | 'send_image'
 
 export interface TelegramAction {
   actionId: string
   type: TelegramActionType
   conversationId: string
-  draftId: string
   lineUserId: string
   receivedAt: string
+  draftId?: string
+  mediaToken?: string
   editedText?: string
   telegramUserId?: string
   telegramMessageId?: string
