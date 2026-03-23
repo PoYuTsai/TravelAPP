@@ -148,9 +148,9 @@ These are the main remaining blockers before calling the Phase 7 assistant produ
 
 Implement the next slice in this order:
 
-1. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
-2. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement + Anthropic draft generation.
-3. Start the Phase 7.2 image / media workflow slice.
+1. Start the Phase 7.2 image / media workflow slice on top of the new callback-token mechanism.
+2. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
+3. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement + Anthropic draft generation.
 
 ## Operator Setup Still Needed From Eric
 
@@ -211,3 +211,26 @@ Additional verification for this slice:
 - `npm run lint` -> passed
 - `npm run build` -> passed
 - Feature commit: `a051127` (`feat: add anthropic-backed phase 7 draft generation`)
+
+## Post-Task Follow-up: Telegram Action Prompts and Callback Tokens
+
+- Added `src/lib/line-assistant/storage/telegram-action-store.ts`
+- Runtime now exposes a shared `telegramActionStore` in both memory and KV modes
+- Updated `src/lib/line-assistant/telegram/client.ts` so Telegram prompts can include inline keyboard buttons
+- Updated `src/lib/line-assistant/process/process-inbound-event.ts` so each new pending draft:
+  - stores compact `send` and `dismiss` callback tokens
+  - sends a real Telegram action prompt for operators
+- Updated `src/app/api/telegram-callback/route.ts` to resolve compact callback payloads like `la:<token>` server-side
+
+Added / updated tests:
+
+- `src/lib/line-assistant/__tests__/telegram-client.test.ts`
+- `src/lib/line-assistant/__tests__/process-inbound-event.test.ts`
+- `src/app/api/telegram-callback/__tests__/route.test.ts`
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `107/107`
+- `npm run lint` -> passed
+- `npm run build` -> passed
+- Feature commit: `cdc75df` (`feat: add telegram action prompts and callback tokens`)
