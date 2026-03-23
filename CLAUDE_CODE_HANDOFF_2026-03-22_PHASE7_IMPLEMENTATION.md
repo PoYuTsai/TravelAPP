@@ -148,7 +148,7 @@ These are the main remaining blockers before calling the Phase 7 assistant produ
 
 Implement the next slice in this order:
 
-1. Start the Phase 7.2 image / media workflow slice on top of the new callback-token mechanism.
+1. Configure Telegram + LINE deployment settings and run the first live staging smoke test for image delivery.
 2. Configure and smoke-test the periodic `/api/line-webhook/process` fallback trigger in the deployment environment.
 3. Add real staging smoke tests for KV + Telegram topic creation + callback acknowledgement + Anthropic draft generation.
 
@@ -234,3 +234,42 @@ Additional verification for this slice:
 - `npm run lint` -> passed
 - `npm run build` -> passed
 - Feature commit: `cdc75df` (`feat: add telegram action prompts and callback tokens`)
+
+## Post-Task Follow-up: Phase 7 Image Delivery Flow
+
+- Added `src/lib/line-assistant/storage/telegram-media-store.ts`
+- Updated `src/app/api/telegram-callback/route.ts` so Telegram can now accept `message.photo` payloads
+- Updated `src/lib/line-assistant/line/send-message.ts` to support LINE image push
+- Updated `src/lib/line-assistant/actions/handle-telegram-action.ts` with `send_image`
+- Added `src/app/api/line-media/[token]/route.ts` as a public proxy route for LINE image fetches
+
+Added / updated tests:
+
+- `src/app/api/line-media/[token]/__tests__/route.test.ts`
+- `src/lib/line-assistant/__tests__/handle-telegram-action.test.ts`
+- `src/app/api/telegram-callback/__tests__/route.test.ts`
+
+Additional verification for this slice:
+
+- `npm run test:run` -> passed, `110/110`
+- `npm run lint` -> passed
+- `npm run build` -> passed
+- Feature commit: `e3de295` (`feat: add phase 7 image delivery flow`)
+
+## Setup Stage Now Needed From Eric
+
+The next stage needs real environment setup and live smoke testing. Required inputs:
+
+- LINE channel access token
+- LINE channel secret
+- Telegram bot token
+- Telegram webhook secret
+- Telegram group id
+- Deployed `NEXT_PUBLIC_SITE_URL`
+
+The first guided smoke test should verify:
+
+1. Telegram webhook receives a real photo message.
+2. Telegram shows the recipient-selection prompt.
+3. Clicking a recipient sends the image to LINE successfully.
+4. LINE can fetch `/api/line-media/[token]` from the deployed site.

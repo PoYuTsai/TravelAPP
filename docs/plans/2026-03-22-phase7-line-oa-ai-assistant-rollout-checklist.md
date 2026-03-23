@@ -33,6 +33,8 @@ Use this checklist before enabling the LINE OA assistant in production. The Phas
 - [ ] Send one test LINE message and confirm a Telegram topic summary appears exactly once.
 - [ ] Confirm the first test LINE message creates a real Telegram forum topic and later messages from the same LINE user reuse that topic.
 - [ ] Confirm each new pending draft appears in Telegram with compact inline action buttons and callback token resolution works.
+- [ ] Send one real Telegram photo and confirm recipient-selection buttons appear exactly once.
+- [ ] Select one recipient from Telegram and confirm LINE receives the image through `/api/line-media/[token]`.
 - [ ] If `ANTHROPIC_API_KEY` is enabled, confirm a test inbound message creates an Anthropic-backed draft instead of the local fallback template.
 - [ ] Trigger the same Telegram callback twice and confirm LINE send happens only once.
 - [ ] Confirm the Telegram inline button stops spinning after callback acknowledgement is returned.
