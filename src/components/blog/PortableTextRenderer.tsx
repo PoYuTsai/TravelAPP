@@ -123,7 +123,7 @@ const ToursBlock = ({ value }: { value: { title?: string; tours?: Array<{ title:
         {value.tours.map((tour) => (
           <Link
             key={tour.slug?.current}
-            href={`/tours#${tour.slug?.current}`}
+            href={tour.slug?.current ? `/tours/${tour.slug.current}` : '/tours'}
             className="block p-4 bg-white rounded-lg hover:shadow-md transition-shadow"
           >
             <h4 className="font-medium text-gray-900">{tour.title}</h4>

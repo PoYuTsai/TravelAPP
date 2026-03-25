@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default function AuthorCard() {
   return (
@@ -11,9 +12,13 @@ export default function AuthorCard() {
         className="w-16 h-16 rounded-full object-cover"
       />
       <div>
-        <p className="font-medium text-gray-900">Eric & Min</p>
+        <p className="font-medium text-gray-900">
+          <Link href="/" className="hover:underline">
+            Eric & Min｜清微旅行
+          </Link>
+        </p>
         <p className="text-sm text-gray-600">
-          清微旅行創辦人，住在清邁的台泰夫妻，專營親子包車旅遊服務
+          清微旅行 Chiangway Travel 創辦人，住在清邁的台泰夫妻，專做清邁親子包車與親子旅遊規劃。
         </p>
       </div>
     </div>

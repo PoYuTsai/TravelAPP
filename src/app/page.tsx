@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
+import { HOMEPAGE_ENTITY_SENTENCE, ensureEntitySentence } from '@/lib/brand-entity'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 
 // ISR: Revalidate every 60 seconds
@@ -33,6 +34,22 @@ export const metadata: Metadata = {
   alternates: {
     canonical: 'https://chiangway-travel.com/',
   },
+}
+
+const homepageMetadataDescription = ensureEntitySentence(
+  typeof metadata.description === 'string' ? metadata.description : '',
+  HOMEPAGE_ENTITY_SENTENCE,
+  ['清微旅行', '清邁親子包車']
+)
+
+metadata.description = homepageMetadataDescription
+
+if (metadata.openGraph) {
+  metadata.openGraph.description = homepageMetadataDescription
+}
+
+if (metadata.twitter) {
+  metadata.twitter.description = homepageMetadataDescription
 }
 
 import Hero from '@/components/sections/Hero'
@@ -82,6 +99,11 @@ export default async function Home() {
     getLandingPageData(),
     fetchTotalFamilyCount(),
   ])
+  const heroDescription = ensureEntitySentence(
+    data?.heroDescription,
+    HOMEPAGE_ENTITY_SENTENCE,
+    ['清微旅行', '清邁親子包車']
+  )
 
   return (
     <>
@@ -89,7 +111,7 @@ export default async function Home() {
         backgroundImage={data?.heroBackgroundImage}
         title={data?.heroTitle || '清邁親子包車，交給 Eric & Min'}
         subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
-        description={data?.heroDescription}
+        description={heroDescription}
         primaryCta={data?.heroPrimaryCta}
         secondaryCta={data?.heroSecondaryCta}
       />

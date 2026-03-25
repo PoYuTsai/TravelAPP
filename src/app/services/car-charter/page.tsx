@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
+import { CAR_CHARTER_ENTITY_SENTENCE, ensureEntitySentence } from '@/lib/brand-entity'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, PricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
@@ -25,6 +26,22 @@ export const metadata: Metadata = {
     description: '清邁親子包車首選！司機+導遊專業分工、兒童安全座椅、全程中文。清邁一日 NT$3,200 起。',
     images: ['/images/og-image.png'],
   },
+}
+
+const carCharterMetadataDescription = ensureEntitySentence(
+  typeof metadata.description === 'string' ? metadata.description : '',
+  CAR_CHARTER_ENTITY_SENTENCE,
+  ['清微旅行', '清邁親子包車']
+)
+
+metadata.description = carCharterMetadataDescription
+
+if (metadata.openGraph) {
+  metadata.openGraph.description = carCharterMetadataDescription
+}
+
+if (metadata.twitter) {
+  metadata.twitter.description = carCharterMetadataDescription
 }
 
 // Default data - Brand: 強調司機導遊分工差異化
@@ -124,7 +141,11 @@ export default async function CarCharterPage() {
   const data = await getCarCharterData()
 
   const heroTitle = data?.heroTitle || defaultData.heroTitle
-  const heroSubtitle = data?.heroSubtitle || defaultData.heroSubtitle
+  const heroSubtitle = ensureEntitySentence(
+    data?.heroSubtitle || defaultData.heroSubtitle,
+    CAR_CHARTER_ENTITY_SENTENCE,
+    ['清微旅行', '清邁親子包車']
+  )
   const heroCtaText = data?.heroCtaText || defaultData.heroCtaText
   const heroCtaLink = data?.heroCtaLink || defaultData.heroCtaLink
   const features = data?.features?.length > 0 ? data.features : defaultData.features
