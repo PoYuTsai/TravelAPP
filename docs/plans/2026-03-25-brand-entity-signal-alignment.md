@@ -102,3 +102,31 @@ These supporting docs were also prepared for follow-up SEO / indexing work:
 ## Commit Reference
 
 - Code commit: `f06b27d` `feat: strengthen brand entity signals`
+
+## Follow-up: Car-charter CTA family count sync
+
+Follow-up date:
+
+- `2026-03-25`
+
+Additional change:
+
+- `/services/car-charter` CTA copy no longer hardcodes `114+`
+- the page now fetches the live total via `fetchTotalFamilyCount()`
+- display formatting is centralized in `src/lib/family-count.ts`
+
+Files:
+
+- `src/app/services/car-charter/page.tsx`
+- `src/lib/family-count.ts`
+- `src/lib/__tests__/family-count.test.ts`
+
+Verification:
+
+- `npm run test:run -- src/lib/__tests__/family-count.test.ts`
+- `npm run lint`
+- `npm run build`
+
+Follow-up code commit:
+
+- `f417671` `fix: sync car charter family count`

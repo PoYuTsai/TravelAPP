@@ -414,6 +414,7 @@ NOTION_TOKEN=
 - `src/app/page.tsx`、`src/app/services/car-charter/page.tsx` 會在 fallback 文案與 metadata description 補齊品牌 / 服務關鍵訊號
 - `src/components/blog/AuthorCard.tsx` 補上首頁回鏈與品牌定義句
 - `src/components/blog/PortableTextRenderer.tsx` 將推薦行程連結改為 canonical `/tours/[slug]`
+- follow-up：`/services/car-charter` footer CTA 已改為吃 Notion 家庭總數，不再寫死 `114+`
 - 新增策略 / handoff 文件：
   - `docs/plans/2026-03-25-brand-entity-and-indexing-plan.md`
   - `docs/plans/2026-03-25-homepage-car-charter-about-entity-brief.md`
@@ -424,4 +425,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-03-25 brand entity signal alignment -->
+<!-- Last build trigger: 2026-03-25 car charter family count sync -->
