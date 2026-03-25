@@ -407,4 +407,21 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-03-24 blog image clarity fix -->
+### 維護：Brand entity signal alignment (2026-03-25)
+
+- 僅補強首頁、`/services/car-charter` 與既有 blog 元件的品牌訊號，未改動前端版型
+- 新增 `src/lib/brand-entity.ts`，集中管理 `清微旅行` 與 `清邁親子包車` 的預設實體句
+- `src/app/page.tsx`、`src/app/services/car-charter/page.tsx` 會在 fallback 文案與 metadata description 補齊品牌 / 服務關鍵訊號
+- `src/components/blog/AuthorCard.tsx` 補上首頁回鏈與品牌定義句
+- `src/components/blog/PortableTextRenderer.tsx` 將推薦行程連結改為 canonical `/tours/[slug]`
+- 新增策略 / handoff 文件：
+  - `docs/plans/2026-03-25-brand-entity-and-indexing-plan.md`
+  - `docs/plans/2026-03-25-homepage-car-charter-about-entity-brief.md`
+  - `docs/plans/2026-03-25-search-console-exclusion-triage-worksheet.md`
+  - `docs/plans/2026-03-25-brand-entity-signal-alignment.md`
+- 驗證通過：
+  - `npx vitest run --exclude ".worktrees/**" src/lib/__tests__/brand-entity.test.ts src/components/__tests__/AuthorCard.test.tsx src/components/__tests__/PortableTextRenderer.test.tsx`
+  - `npm run lint`
+  - `npm run build`
+
+<!-- Last build trigger: 2026-03-25 brand entity signal alignment -->
