@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
 import { CAR_CHARTER_ENTITY_SENTENCE, ensureEntitySentence } from '@/lib/brand-entity'
+import { formatFamilyCountLabel } from '@/lib/family-count'
+import { fetchTotalFamilyCount } from '@/lib/notion'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, PricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
@@ -138,7 +140,10 @@ async function getCarCharterData() {
 }
 
 export default async function CarCharterPage() {
-  const data = await getCarCharterData()
+  const [data, familyCount] = await Promise.all([
+    getCarCharterData(),
+    fetchTotalFamilyCount(),
+  ])
 
   const heroTitle = data?.heroTitle || defaultData.heroTitle
   const heroSubtitle = ensureEntitySentence(
@@ -153,6 +158,7 @@ export default async function CarCharterPage() {
   // Video - always use default if Sanity doesn't have one
   const videoUrl = data?.videoUrl || defaultData.videoUrl
   const videoTitle = data?.videoTitle || defaultData.videoTitle
+  const familyCountLabel = formatFamilyCountLabel(familyCount)
 
   const faqSchema = generateFaqSchema(faq)
 
@@ -255,7 +261,7 @@ export default async function CarCharterPage() {
               每個家庭的清邁之旅都不一樣
             </h2>
             <p className="text-gray-600 mb-2">
-              告訴我們孩子年齡、興趣、體力，我們根據 114+ 組家庭的經驗幫你規劃
+              告訴我們孩子年齡、興趣、體力，我們根據 {familyCountLabel} 組家庭的經驗幫你規劃
             </p>
             <p className="text-sm text-gray-500 mb-6">
               平均 2 小時內回覆
