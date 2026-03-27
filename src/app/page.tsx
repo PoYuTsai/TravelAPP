@@ -8,7 +8,7 @@ export const revalidate = 60
 
 export const metadata: Metadata = {
   title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
-  description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，在地家庭提供司機導遊分工服務。兒童座椅、中文溝通、客製行程，100+ 組家庭好評推薦。清邁一日 NT$3,200 起。',
+  description: '清微旅行 - 清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，在地家庭提供司機導遊分工服務。兒童座椅、中文溝通、客製行程，100+ 組家庭好評推薦。',
   openGraph: {
     title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
     description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
@@ -109,7 +109,7 @@ export default async function Home() {
     <>
       <Hero
         backgroundImage={data?.heroBackgroundImage}
-        title={data?.heroTitle || '清邁親子包車，交給 Eric & Min'}
+        title={data?.heroTitle || '清微旅行｜清邁親子包車，交給 Eric & Min'}
         subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
         description={heroDescription}
         primaryCta={data?.heroPrimaryCta}

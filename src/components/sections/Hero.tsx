@@ -7,9 +7,9 @@ import type { SanityImageSource } from '@sanity/image-url'
 // Simple blur placeholder (light golden gradient matching brand)
 const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBQYSIRMxQWH/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8AotuXM19qN5cXEhmWOdkjQnpFXrgA/PtZpSlIr//Z'
 
-// Default values - Brand: Eric & Min 強調家庭定位
+// Default values - Brand: 清微旅行 + Eric & Min 強調品牌與家庭定位
 const defaults = {
-  title: '清邁親子包車，交給 Eric & Min',
+  title: '清微旅行｜清邁親子包車，交給 Eric & Min',
   subtitle: '台灣爸爸 × 在清邁住 30 年的泰國媽媽，住在清邁的真實家庭',
   description: '司機導遊分開服務，不趕路、不跟團，專為爸媽設計的包車旅程',
   primaryCta: { text: 'LINE 聊聊你的清邁計畫', link: 'https://line.me/R/ti/p/@037nyuwk' },
