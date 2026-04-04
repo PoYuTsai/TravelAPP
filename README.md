@@ -40,6 +40,8 @@
 | 維護 2026-03-23 | Studio session token fallback recovery | ✅ 完成 |
 | 維護 2026-03-23 | Studio auth token recovery hardening | ✅ 完成 |
 | 維護 2026-03-23 | Force Studio token auth mode | ✅ 完成 |
+| 維護 2026-04-04 | Studio 權限分流 + 報價計算正式版 | ✅ 完成 |
+| 維護 2026-04-04 | 包車價格同步（前台 / 後台 / LINE OA 文件） | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -239,6 +241,9 @@ Sanity Studio 內部報價計算工具：
 - **兒童設施**：汽座（0-2歲/2-5歲）、增高墊定價
 - **三階段付款**：住宿全額 → 餐費門票 → 車導尾款（送機前一天）
 - **超時計算**：清邁 10hr / 清萊 12hr、200 泰銖/小時
+- **雙版本報價工具**：保留測試版，新增正式版供協作者使用
+- **正式版規則**：門票原價計算，利潤分配摘要為柏裕 70% / Lulu 15% / 彥君 15%
+- **價格同步**：前台起價、FAQ、Sanity 快速報價範本與 LINE OA 文件已同步到最新包車價格
 - **報價單匯出**：
   - 內部報價：含成本利潤分析
   - 外部報價 PDF：棕色主題配色、與 UI 一致
@@ -425,4 +430,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-03-25 car charter family count sync -->
+<!-- Last build trigger: 2026-04-04 formal pricing access + car charter price sync -->

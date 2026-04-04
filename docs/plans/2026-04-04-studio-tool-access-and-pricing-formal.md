@@ -45,6 +45,17 @@ Run: `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts`
 
 Expected: PASS
 
+---
+
+## Implementation Record
+
+- **Completed:** 2026-04-04
+- **Shipped changes:** collaborator-only Studio tool filtering, renamed tools, cloned `報價計算(正式版)`, formal pricing variant with zero rebate sharing and 70/15/15 profit summary
+- **Commit:** `d09ea5e` `feat: add formal pricing studio access`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
