@@ -26,6 +26,7 @@ import {
   parsePricingExampleDocument,
   type PricingExampleDocument,
 } from './sharedExamples'
+import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
 import { clampGuideServiceDays, getChildSeatChargeDays } from './serviceDays'
 import {
   getThaiDressPhotographerCount,
@@ -1000,6 +1001,7 @@ interface SavedQuote {
     exchangeRate?: number
     includeAccommodation?: boolean
     includeMeals?: boolean
+    includeInsurance?: boolean
     includeGuide?: boolean
     guideDays?: number
     luggageCar?: boolean
@@ -1195,6 +1197,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [includeAccommodation, setIncludeAccommodation] = useState(true)
   const [includeMeals, setIncludeMeals] = useState(true)
   const [includeTickets, setIncludeTickets] = useState(true)
+  const [includeInsurance, setIncludeInsurance] = useState(true)
   const [includeGuide, setIncludeGuide] = useState(true)  // 導遊選項
   const [guideServiceDays, setGuideServiceDays] = useState(config.guideDays)
   const [collectDeposit, setCollectDeposit] = useState(false)  // 代收押金（預設不收）
@@ -1671,6 +1674,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         exchangeRate,
         includeAccommodation,
         includeMeals,
+        includeInsurance,
         includeGuide,
         guideDays: guideServiceDays,
         luggageCar,
@@ -1744,7 +1748,19 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.exchangeRate !== undefined) setExchangeRate(quote.data.exchangeRate)
     if (quote.data.includeAccommodation !== undefined) setIncludeAccommodation(quote.data.includeAccommodation)
     if (quote.data.includeMeals !== undefined) setIncludeMeals(quote.data.includeMeals)
+    const nextIncludeAccommodation = quote.data.includeAccommodation ?? true
+    const nextIncludeMeals = quote.data.includeMeals ?? true
+    const nextHasSelectedTickets = quote.data.tickets?.some((ticket) => ticket.checked) ?? false
+
     if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
+    setIncludeInsurance(
+      resolveSavedInsuranceSelection({
+        savedIncludeInsurance: quote.data.includeInsurance,
+        includeAccommodation: nextIncludeAccommodation,
+        includeMeals: nextIncludeMeals,
+        hasSelectedTickets: nextHasSelectedTickets,
+      })
+    )
     setGuideServiceDays(
       clampGuideServiceDays(
         quote.data.guideDays,
@@ -1792,6 +1808,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setExchangeRate(0.93)
     setIncludeAccommodation(true)
     setIncludeMeals(true)
+    setIncludeInsurance(true)
     setIncludeGuide(true)
     setGuideServiceDays(config.guideDays)
     setCollectDeposit(true)
@@ -2184,9 +2201,12 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       thaiDressPartnerProfit += profit / 2
     }
 
-    // Insurance（只有包套行程才含保險，純包車不含）
-    const hasPackageServices = includeAccommodation || includeMeals || (includeTickets && selectedTickets.length > 0)
-    const insuranceCost = hasPackageServices ? insurancePerPerson * people : 0
+    // Insurance（改為手動勾選，不再跟門票綁定）
+    const insuranceCost = getInsuranceCost({
+      includeInsurance,
+      people,
+      insurancePerPerson,
+    })
 
     // 門票費用（只有勾選「含門票」才計入）
     const effectiveTicketCost = includeTickets ? ticketCost : 0
@@ -2207,7 +2227,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
     return {
       people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
-      includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity,
+      includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, hotelsWithDeposit, totalRoomCapacity,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost, childSeatCost,
@@ -2218,7 +2238,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, guideServiceDays, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
   const formalProfitShares =
@@ -2788,6 +2808,10 @@ Day 5｜送機
                 <span>🎫 含門票</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={includeInsurance} onChange={e => setIncludeInsurance(e.target.checked)} style={{ width: 16, height: 16 }} />
+                <span>🛡️ 含保險</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeGuide} onChange={e => setIncludeGuide(e.target.checked)} style={{ width: 16, height: 16 }} />
                 <span>🧑‍💼 含導遊</span>
               </label>
@@ -2842,12 +2866,13 @@ Day 5｜送機
                 </span>
               </div>
             )}
-            {(!includeAccommodation || !includeMeals || noActivitiesSelected || !includeGuide) && (
+            {(!includeAccommodation || !includeMeals || noActivitiesSelected || !includeInsurance || !includeGuide) && (
               <div style={{ marginTop: 10, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
                 💡 {[
                   !includeAccommodation && '住宿',
                   !includeMeals && '餐費',
                   noActivitiesSelected && '門票/活動',
+                  !includeInsurance && '保險',
                   !includeGuide && '導遊'
                 ].filter(Boolean).join('、')}由客人自理
               </div>
@@ -3978,8 +4003,12 @@ Day 5｜送機
           {/* 保險 + 總計 + 利潤分配 */}
           <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
             <tbody>
-              <SectionRow title="🛡️ 保險" />
-              <DataRow name={`旅遊保險 (${people}人)`} cost={calculation.insuranceCost} price={calculation.insuranceCost} profit={0} />
+              {calculation.insuranceCost > 0 && (
+                <>
+                  <SectionRow title="🛡️ 保險" />
+                  <DataRow name={`旅遊保險 (${people}人)`} cost={calculation.insuranceCost} price={calculation.insuranceCost} profit={0} />
+                </>
+              )}
 
               <SectionRow title="💰 總計" />
               <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>

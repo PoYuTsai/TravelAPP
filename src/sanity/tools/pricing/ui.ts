@@ -7,7 +7,7 @@ export function getPricingResponsiveLayout(viewportWidth: number) {
     : '50px 60px minmax(180px, 1fr) 80px 80px 30px'
   const serviceToggleGridColumns = isCompact
     ? 'repeat(2, minmax(0, 1fr))'
-    : 'repeat(4, max-content)'
+    : 'repeat(5, max-content)'
   const savedQuoteCardDirection = isCompact ? 'column' : 'row'
 
   return {
