@@ -30,10 +30,9 @@ import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
   buildQuoteItinerary,
+  getExternalQuoteHeaderCopy,
   EXTERNAL_QUOTE_LAYOUT,
   EXTERNAL_QUOTE_THEME,
-  QUOTE_HERO_IMAGE_SRC,
-  resolveQuotePdfRenderScale,
   TWD_TRANSFER_ACCOUNT,
 } from './quoteDetails'
 import { sanitizeQuoteHtml } from './quoteHtml'
@@ -945,10 +944,7 @@ function downloadSimpleExternalQuote(
           ...day,
           hotel: includeAccommodation ? day.hotel ?? null : null,
         }))
-  const heroImageUrl =
-    typeof window !== 'undefined'
-      ? new URL(QUOTE_HERO_IMAGE_SRC, window.location.origin).toString()
-      : QUOTE_HERO_IMAGE_SRC
+  const headerCopy = getExternalQuoteHeaderCopy(tripDays, tripNights)
 
   const html = `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -981,22 +977,18 @@ function downloadSimpleExternalQuote(
       box-shadow: 0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow};
     }
     .header {
-      background: linear-gradient(180deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 100%);
+      background:
+        radial-gradient(circle at top right, rgba(216, 155, 71, 0.22), transparent 34%),
+        radial-gradient(circle at bottom left, rgba(244, 228, 197, 0.85), transparent 42%),
+        linear-gradient(135deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 60%, ${EXTERNAL_QUOTE_THEME.surfaceWarm} 100%);
       border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
       border-radius: 18px;
-      overflow: hidden;
       margin-bottom: 20px;
       box-shadow: 0 12px 28px ${EXTERNAL_QUOTE_THEME.shadow};
-    }
-    .hero-image {
-      display: block;
-      width: 100%;
-      height: ${EXTERNAL_QUOTE_LAYOUT.heroHeightDesktop}px;
-      object-fit: cover;
-      object-position: center top;
+      padding: ${EXTERNAL_QUOTE_LAYOUT.headerPaddingDesktop}px;
     }
     .header-copy {
-      padding: 18px 18px 20px;
+      padding: 0;
     }
     .eyebrow {
       margin: 0;
@@ -1016,6 +1008,23 @@ function downloadSimpleExternalQuote(
       border-radius: 999px;
       margin: 16px 0 14px;
       background: linear-gradient(90deg, ${EXTERNAL_QUOTE_THEME.accentSoft} 0%, ${EXTERNAL_QUOTE_THEME.accent} 100%);
+    }
+    .header-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .header-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(216, 155, 71, 0.35);
+      background: rgba(255, 250, 242, 0.85);
+      color: ${EXTERNAL_QUOTE_THEME.textSoft};
+      font-size: 11px;
+      font-weight: 600;
     }
     .header .trip {
       font-size: 24px;
@@ -1151,8 +1160,7 @@ function downloadSimpleExternalQuote(
     @media (max-width: 560px) {
       .pdf-container { padding: 18px 14px 22px; }
       .quote-shell { padding: 16px; border-radius: 18px; }
-      .hero-image { height: ${EXTERNAL_QUOTE_LAYOUT.heroHeightMobile}px; }
-      .header-copy { padding: 14px 14px 16px; }
+      .header { padding: ${EXTERNAL_QUOTE_LAYOUT.headerPaddingMobile}px; }
       .header .trip { font-size: 20px; }
       .grid { grid-template-columns: 1fr; }
     }
@@ -1162,12 +1170,14 @@ function downloadSimpleExternalQuote(
   <div class="pdf-container">
     <div class="quote-shell">
     <div class="header">
-      <img class="hero-image" src="${heroImageUrl}" alt="清微旅行 Chiangway Travel" />
       <div class="header-copy">
-        <div class="eyebrow">清微旅行 Chiangway Travel</div>
-        <p>在地清邁包車與客製旅遊報價</p>
+        <div class="header-badges">
+          ${headerCopy.badges.map((badge) => `<span class="header-badge">${badge}</span>`).join('')}
+        </div>
+        <div class="eyebrow">${headerCopy.brandName}</div>
+        <p>${headerCopy.subtitle}</p>
         <div class="header-divider"></div>
-        <div class="trip">清邁 ${tripDays} 天 ${tripNights} 夜 行程報價</div>
+        <div class="trip">${headerCopy.title}</div>
       </div>
     </div>
 
@@ -1312,45 +1322,27 @@ function downloadSimpleExternalQuote(
     return
   }
 
-  const waitForImage = (img: HTMLImageElement) =>
-    img.complete
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => {
-          const finish = () => resolve()
-          img.addEventListener('load', finish, { once: true })
-          img.addEventListener('error', finish, { once: true })
-        })
-
-  Promise.all(Array.from(container.querySelectorAll('img')).map((img) => waitForImage(img as HTMLImageElement)))
-    .then(() => {
-      const heroImage = container.querySelector('.hero-image') as HTMLImageElement | null
-      const renderWidth = heroImage?.getBoundingClientRect().width || EXTERNAL_QUOTE_LAYOUT.maxWidth
-      const renderScale = resolveQuotePdfRenderScale({
-        imageNaturalWidth: heroImage?.naturalWidth,
-        renderWidth,
-      })
-
-      return loadHtml2Pdf().then((html2pdf) =>
-        html2pdf().set({
-          margin: [10, 10, 10, 10] as [number, number, number, number],
-          filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
-          image: { type: 'png' as const, quality: 1 },
-          html2canvas: {
-            scale: renderScale,
-            useCORS: true,
-            logging: false,
-            backgroundColor: EXTERNAL_QUOTE_THEME.pageBackground,
-            letterRendering: true,
-          },
-          jsPDF: {
-            unit: 'mm' as const,
-            format: 'a4' as const,
-            orientation: 'portrait' as const,
-          },
-          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-        }).from(element).save()
-      )
-    })
+  loadHtml2Pdf()
+    .then((html2pdf) =>
+      html2pdf().set({
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
+        image: { type: 'png' as const, quality: 1 },
+        html2canvas: {
+          scale: 3,
+          useCORS: true,
+          logging: false,
+          backgroundColor: EXTERNAL_QUOTE_THEME.pageBackground,
+          letterRendering: true,
+        },
+        jsPDF: {
+          unit: 'mm' as const,
+          format: 'a4' as const,
+          orientation: 'portrait' as const,
+        },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+      }).from(element).save()
+    )
     .then(() => {
       document.body.removeChild(container)
     })
@@ -5331,6 +5323,7 @@ function ExternalQuoteTab({
     includeAccommodation,
     hotels,
   })
+  const headerCopy = getExternalQuoteHeaderCopy(tripDays, tripNights)
 
   const cardShadow = `0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow}`
   const surfaceShadow = `0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow}`
@@ -5364,41 +5357,49 @@ function ExternalQuoteTab({
     >
       <div
         style={{
-          background: `linear-gradient(180deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 100%)`,
+          background: `radial-gradient(circle at top right, rgba(216, 155, 71, 0.22), transparent 34%), radial-gradient(circle at bottom left, rgba(244, 228, 197, 0.85), transparent 42%), linear-gradient(135deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 60%, ${EXTERNAL_QUOTE_THEME.surfaceWarm} 100%)`,
           border: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
           borderRadius: 18,
-          overflow: 'hidden',
           marginBottom: 20,
           boxShadow: surfaceShadow,
+          padding: responsive.isCompact
+            ? EXTERNAL_QUOTE_LAYOUT.headerPaddingMobile
+            : EXTERNAL_QUOTE_LAYOUT.headerPaddingDesktop,
         }}
       >
-        <div
-          style={{
-            width: '100%',
-            height: responsive.isCompact
-              ? EXTERNAL_QUOTE_LAYOUT.heroHeightMobile
-              : EXTERNAL_QUOTE_LAYOUT.heroHeightDesktop,
-            overflow: 'hidden',
-          }}
-        >
-          <img
-            src={QUOTE_HERO_IMAGE_SRC}
-            alt="清微旅行 Chiangway Travel"
+        <div style={{ padding: 0 }}>
+          <div
             style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center top',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              marginBottom: 12,
             }}
-          />
-        </div>
-        <div style={{ padding: responsive.isCompact ? 16 : 20 }}>
+          >
+            {headerCopy.badges.map((badge) => (
+              <div
+                key={badge}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 10px',
+                  borderRadius: 999,
+                  border: '1px solid rgba(216, 155, 71, 0.35)',
+                  background: 'rgba(255, 250, 242, 0.85)',
+                  color: EXTERNAL_QUOTE_THEME.textSoft,
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                {badge}
+              </div>
+            ))}
+          </div>
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', color: EXTERNAL_QUOTE_THEME.text }}>
-            清微旅行 Chiangway Travel
+            {headerCopy.brandName}
           </div>
           <p style={{ margin: '8px 0 0 0', color: EXTERNAL_QUOTE_THEME.textSoft, fontSize: 14 }}>
-            在地清邁包車與客製旅遊報價
+            {headerCopy.subtitle}
           </p>
           <div
             style={{
@@ -5410,7 +5411,7 @@ function ExternalQuoteTab({
             }}
           />
           <div style={{ fontSize: responsive.isCompact ? 22 : 26, fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>
-            清邁 {tripDays} 天 {tripNights} 夜 行程報價
+            {headerCopy.title}
           </div>
         </div>
       </div>

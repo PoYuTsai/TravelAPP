@@ -5,12 +5,16 @@ export const TWD_TRANSFER_ACCOUNT = {
   accountNumber: '51619501772100',
 } as const
 
-export const QUOTE_HERO_IMAGE_SRC = '/images/quote-hero-eric-min-2x.png'
+export const EXTERNAL_QUOTE_BRAND = {
+  brandName: '清微旅行 Chiangway Travel',
+  subtitle: '在地清邁包車與客製旅遊報價',
+  badges: ['台灣爸爸 × 泰國媽媽', '清邁在地親子旅遊'],
+} as const
 
 export const EXTERNAL_QUOTE_LAYOUT = {
   maxWidth: 640,
-  heroHeightDesktop: 210,
-  heroHeightMobile: 154,
+  headerPaddingDesktop: 20,
+  headerPaddingMobile: 16,
 } as const
 
 export const EXTERNAL_QUOTE_THEME = {
@@ -28,19 +32,11 @@ export const EXTERNAL_QUOTE_THEME = {
   shadow: 'rgba(110, 77, 49, 0.08)',
 } as const
 
-export function resolveQuotePdfRenderScale(params: {
-  imageNaturalWidth?: number
-  renderWidth?: number
-  fallbackScale?: number
-}): number {
-  const { imageNaturalWidth, renderWidth, fallbackScale = 3 } = params
-
-  if (!imageNaturalWidth || !renderWidth || renderWidth <= 0) {
-    return fallbackScale
+export function getExternalQuoteHeaderCopy(tripDays: number, tripNights: number) {
+  return {
+    ...EXTERNAL_QUOTE_BRAND,
+    title: `清邁 ${tripDays} 天 ${tripNights} 夜 行程報價`,
   }
-
-  const idealScale = imageNaturalWidth / renderWidth
-  return Math.max(1, Math.min(fallbackScale, Number(idealScale.toFixed(2))))
 }
 
 export interface QuoteDetailDay {

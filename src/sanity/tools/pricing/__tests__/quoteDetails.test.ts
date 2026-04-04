@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   EXTERNAL_QUOTE_LAYOUT,
+  getExternalQuoteHeaderCopy,
   buildQuoteItinerary,
-  resolveQuotePdfRenderScale,
   TWD_TRANSFER_ACCOUNT,
 } from '@/sanity/tools/pricing/quoteDetails'
 
@@ -58,14 +58,17 @@ describe('pricing quote details', () => {
   it('keeps external quote layout dimensions shared between page and pdf', () => {
     expect(EXTERNAL_QUOTE_LAYOUT).toEqual({
       maxWidth: 640,
-      heroHeightDesktop: 210,
-      heroHeightMobile: 154,
+      headerPaddingDesktop: 20,
+      headerPaddingMobile: 16,
     })
   })
 
-  it('limits pdf render scale to the image natural resolution', () => {
-    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 1256, renderWidth: 640 })).toBe(1.96)
-    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 2400, renderWidth: 640 })).toBe(3)
-    expect(resolveQuotePdfRenderScale({ renderWidth: 640 })).toBe(3)
+  it('returns shared brand header copy for page and pdf', () => {
+    expect(getExternalQuoteHeaderCopy(5, 4)).toEqual({
+      brandName: '清微旅行 Chiangway Travel',
+      subtitle: '在地清邁包車與客製旅遊報價',
+      title: '清邁 5 天 4 夜 行程報價',
+      badges: ['台灣爸爸 × 泰國媽媽', '清邁在地親子旅遊'],
+    })
   })
 })
