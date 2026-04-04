@@ -33,6 +33,7 @@ import {
   getThaiDressPhotographerLabel,
   shouldOfferExtraPhotographer,
 } from './thaiDress'
+import { buildExternalQuoteBreakdown, type ExternalQuoteBreakdown } from './externalQuote'
 import { getPricingResponsiveLayout } from './ui'
 
 async function loadHtml2Pdf() {
@@ -921,6 +922,381 @@ function downloadExternalQuote(
 }
 
 // 行程資料（跟 HTML v3 一樣）
+function downloadSimpleExternalQuote(
+  c: any,
+  _people: number,
+  exchangeRate: number,
+  hotels: Hotel[],
+  _mealLevel: number,
+  _thaiDressCloth: boolean,
+  _thaiDressPhoto: boolean,
+  _makeupCount: number,
+  _config: any,
+  includeAccommodation: boolean,
+  includeMeals: boolean,
+  includeGuide: boolean,
+  totalNights: number,
+  _babySeatCount: number,
+  _childSeatCount: number,
+  collectDeposit: boolean,
+  tripDays: number,
+  customItinerary?: { day: string; title: string; items: string[]; hotel: string | null }[]
+) {
+  const tripNights = tripDays - 1
+  const fmt = (n: number) => n.toLocaleString()
+  const externalQuote = buildExternalQuoteBreakdown({
+    includeAccommodation,
+    includeMeals,
+    includeGuide,
+    includeInsurance: c.includeInsurance,
+    accommodationCost: c.accommodationCost,
+    mealCost: c.mealCost,
+    carPriceTotal: c.carPriceTotal,
+    guidePrice: c.guidePrice,
+    luggageCost: c.luggageCost,
+    childSeatCost: c.childSeatCost,
+    ticketPrice: c.ticketPrice,
+    thaiDressPrice: c.thaiDressPrice,
+    insuranceCost: c.insuranceCost,
+    totalPrice: c.totalPrice,
+    exchangeRate,
+    totalNights,
+    mealDays: c.mealDays,
+    guideDays: c.guideDays,
+    carServiceDays: c.carServiceDays,
+    carCount: c.carCount,
+    selectedTicketCount: c.selectedTickets.length,
+    hasThaiDress: c.thaiDressPrice > 0,
+  })
+
+  const itineraryToShow =
+    customItinerary && customItinerary.length > 0 ? customItinerary.slice(0, tripDays) : ITINERARY.slice(0, tripDays)
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>清微旅行報價單</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      color: #2c2c2c;
+      background: #fff;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .pdf-container {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      background: #fff;
+    }
+    .header {
+      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
+      color: #fff;
+      padding: 24px 20px;
+      border-radius: 10px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .header h1 { margin: 0; font-size: 24px; }
+    .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 13px; }
+    .header .trip {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255,255,255,0.25);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .section { margin-bottom: 18px; }
+    .section-title {
+      margin: 0 0 12px 0;
+      color: #5c4a2a;
+      font-size: 15px;
+      font-weight: 700;
+      border-bottom: 2px solid #5c4a2a;
+      padding-bottom: 8px;
+    }
+    .itinerary-day {
+      background: #fafafa;
+      border-left: 4px solid #5c4a2a;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .itinerary-day .title { font-weight: 700; color: #5c4a2a; margin-bottom: 6px; }
+    .itinerary-day .items { font-size: 12px; color: #555; }
+    .itinerary-day .hotel { margin-top: 6px; font-size: 11px; color: #888; }
+    .meta { font-size: 14px; color: #555; margin-bottom: 12px; }
+    .breakdown { background: #fafafa; border-radius: 8px; padding: 16px; }
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px dashed #ddd;
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-row .label { font-weight: 700; color: #5c4a2a; }
+    .breakdown-row .desc { font-size: 12px; color: #666; margin-top: 4px; }
+    .breakdown-row .amount { text-align: right; font-weight: 700; }
+    .breakdown-row .amount small { display: block; font-size: 12px; color: #666; font-weight: 400; }
+    .total {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      padding-top: 12px;
+      border-top: 2px solid #5c4a2a;
+      font-weight: 700;
+      color: #5c4a2a;
+    }
+    .total-box {
+      margin-bottom: 18px;
+      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
+      color: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .total-box .label { font-size: 14px; opacity: 0.9; }
+    .total-box .amount { font-size: 34px; font-weight: 700; margin: 8px 0; }
+    .total-box .sub { font-size: 12px; opacity: 0.85; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .box { border-radius: 8px; padding: 12px; }
+    .box.yes { background: #f9f8f6; }
+    .box.no { background: #fff3e0; }
+    .box h4 { margin: 0 0 8px 0; font-size: 14px; color: #5c4a2a; }
+    .box.no h4 { color: #9a6b2a; }
+    .box ul { margin: 0; padding-left: 18px; color: #333; }
+    .box li { margin-bottom: 4px; }
+    .note-box, .deposit-box, .bank-box {
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+    .note-box { background: #f8f6f2; border: 1px solid #e8e4dc; }
+    .deposit-box { background: #fff8e1; border: 1px solid #ffcc02; }
+    .bank-box { background: #f9f8f6; border: 1px solid #b89b4d; }
+    .summary-box {
+      margin-top: 18px;
+      background: #5c4a2a;
+      color: #fff;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .summary-box h4 { margin: 0 0 10px 0; font-size: 14px; }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+    .summary-total {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      font-weight: 700;
+    }
+    .footer {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 2px solid #eee;
+      text-align: center;
+      font-size: 12px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-container">
+    <div class="header">
+      <div style="font-size: 32px; margin-bottom: 8px;">📄</div>
+      <h1>清微旅行 Chiangway Travel</h1>
+      <p>在地清邁包車與客製旅遊報價</p>
+      <div class="trip">清邁 ${tripDays}天${tripNights}夜 行程報價</div>
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">行程安排</h3>
+      ${itineraryToShow
+        .map(
+          (day) => `
+        <div class="itinerary-day">
+          <div class="title">${day.day}｜${day.title}</div>
+          ${day.items.length > 0 ? `<div class="items">${day.items.join('、')}</div>` : ''}
+          ${day.hotel ? `<div class="hotel">住宿：${day.hotel}</div>` : ''}
+        </div>`
+        )
+        .join('')}
+    </div>
+
+    <div class="section">
+      <h3 class="section-title">價格明細</h3>
+      <div class="meta">👥 <strong>${c.adults} 位成人${c.children > 0 ? ` + ${c.children} 位小孩` : ''}</strong>，共 ${tripDays}天${tripNights}夜</div>
+      <div class="breakdown">
+        ${externalQuote.items
+          .map(
+            (item) => `
+          <div class="breakdown-row">
+            <div>
+              <div class="label">${item.label}</div>
+              ${item.description ? `<div class="desc">${item.description}</div>` : ''}
+            </div>
+            <div class="amount">
+              ${fmt(item.amountTHB)} 泰銖
+              <small>約 NT$ ${fmt(item.amountTWD)}</small>
+            </div>
+          </div>`
+          )
+          .join('')}
+        <div class="total">
+          <span>總計</span>
+          <span>${fmt(externalQuote.totalTHB)} 泰銖</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="total-box">
+      <div class="label">團費總計</div>
+      <div class="amount">NT$ ${fmt(externalQuote.totalTWD)}</div>
+      <div class="sub">約 ${fmt(externalQuote.totalTHB)} 泰銖${c.children > 0 ? '<br>小孩費用已併入全團總價' : ''}</div>
+    </div>
+
+    <div class="grid">
+      <div class="box yes">
+        <h4>✅ 報價包含</h4>
+        <ul>${externalQuote.included.map((item) => `<li>${item}</li>`).join('')}</ul>
+      </div>
+      <div class="box no">
+        <h4>❌ 報價不含</h4>
+        <ul>${externalQuote.excluded.map((item) => `<li>${item}</li>`).join('')}</ul>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">💳 付款方式與時程</div>
+      ${externalQuote.paymentNotes.map((note) => `<div>• ${note}</div>`).join('')}
+      <div style="margin-top: 10px;">• 每日包車服務最多 10 小時，如需超時另計 12 小時。</div>
+      <div>• 加班費為 <strong>200 泰銖/小時 × ${c.carCount} 台車</strong>。</div>
+    </div>
+
+    <div class="bank-box">
+      <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">🏦 匯款帳號資訊</div>
+      <div>戶名：<strong>柏裕</strong></div>
+      <div>銀行：ไทยเครดิต แบงก์ 009</div>
+      <div>帳號：<strong>51619501772100</strong></div>
+    </div>
+
+    ${
+      c.hotelsWithDeposit.length > 0 && collectDeposit
+        ? `<div class="deposit-box">
+            <div style="font-weight: 700; color: #9a6b2a; margin-bottom: 8px;">🏨 住宿押金提醒</div>
+            ${c.hotelsWithDeposit
+              .map(
+                (hotel: Hotel) =>
+                  `<div>• ${hotel.name}：${fmt(c.getHotelDeposit(hotel))} 泰銖（${c.getHotelRoomCount(hotel)} 間）</div>`
+              )
+              .join('')}
+            <div style="margin-top: 8px; padding: 10px; background: #b89b4d; color: white; border-radius: 4px; font-weight: 700;">
+              住宿押金總計：${fmt(c.totalDeposit)} 泰銖，約 NT$ ${fmt(Math.round(c.totalDeposit / exchangeRate))}
+            </div>
+          </div>`
+        : includeAccommodation && !collectDeposit
+          ? `<div class="note-box">
+              <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">📌 住宿押金備註</div>
+              <div>若本次住宿需另付押金或保留金，會依實際飯店規則與房型安排另行說明。</div>
+            </div>`
+          : ''
+    }
+
+    <div class="summary-box">
+      <h4>🧾 報價摘要</h4>
+      ${externalQuote.items
+        .map(
+          (item) => `
+        <div class="summary-row">
+          <span>${item.label}</span>
+          <span>NT$ ${fmt(item.amountTWD)}</span>
+        </div>`
+        )
+        .join('')}
+      <div class="summary-total">
+        <span>團費總計</span>
+        <span>NT$ ${fmt(externalQuote.totalTWD)}</span>
+      </div>
+      ${
+        c.totalDeposit > 0 && collectDeposit
+          ? `<div class="summary-row" style="color:#ffcc00; margin-top:4px;">
+              <span>+ 住宿押金</span>
+              <span>NT$ ${fmt(Math.round(c.totalDeposit / exchangeRate))}</span>
+            </div>`
+          : ''
+      }
+    </div>
+
+    <div class="footer">
+      <div style="margin-bottom: 8px;">💬 LINE：<strong>@037nyuwk</strong></div>
+      <div>chiangway-travel.com</div>
+    </div>
+  </div>
+</body>
+</html>`
+
+  const container = document.createElement('div')
+  container.innerHTML = sanitizeQuoteHtml(html)
+  document.body.appendChild(container)
+
+  const element = container.querySelector('.pdf-container') as HTMLElement
+  if (!element) {
+    document.body.removeChild(container)
+    alert('PDF 產生失敗')
+    return
+  }
+
+  const opt = {
+    margin: [10, 10, 10, 10] as [number, number, number, number],
+    filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
+    image: { type: 'png' as const, quality: 1 },
+    html2canvas: {
+      scale: 3,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      letterRendering: true,
+    },
+    jsPDF: {
+      unit: 'mm' as const,
+      format: 'a4' as const,
+      orientation: 'portrait' as const,
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+  }
+
+  loadHtml2Pdf()
+    .then((html2pdf) => html2pdf().set(opt).from(element).save())
+    .then(() => {
+      document.body.removeChild(container)
+    })
+    .catch((err: Error) => {
+      document.body.removeChild(container)
+      console.error('PDF export failed:', err)
+      alert('PDF 匯出失敗，請稍後再試')
+    })
+}
+
 const PACKAGE_IMAGE_PATH = '/images/packages/6d5n-classic'
 const ITINERARY = [
   { day: 'DAY 1', title: '抵達清邁・放鬆展開旅程', items: ['🛬 機場接機', '💱 巫宗雄換匯', '🍽️ 午餐：脆皮豬', '👘 泰服體驗＋攝影', '🥭 阿嬤芒果糯米飯', '🍽️ 晚餐：EKACHAN'], hotel: '香格里拉酒店', image: 'd1.png' },
@@ -2245,6 +2621,34 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     variant === 'formal'
       ? calculateFormalProfitShares(calculation.yourTotalProfit + calculation.partnerTotalProfit)
       : []
+  const externalQuote = useMemo(
+    () =>
+      buildExternalQuoteBreakdown({
+        includeAccommodation,
+        includeMeals,
+        includeGuide,
+        includeInsurance,
+        accommodationCost: calculation.accommodationCost,
+        mealCost: calculation.mealCost,
+        carPriceTotal: calculation.carPriceTotal,
+        guidePrice: calculation.guidePrice,
+        luggageCost: calculation.luggageCost,
+        childSeatCost: calculation.childSeatCost,
+        ticketPrice: calculation.ticketPrice,
+        thaiDressPrice: calculation.thaiDressPrice,
+        insuranceCost: calculation.insuranceCost,
+        totalPrice: calculation.totalPrice,
+        exchangeRate,
+        totalNights,
+        mealDays: calculation.mealDays,
+        guideDays: calculation.guideDays,
+        carServiceDays: calculation.carServiceDays,
+        carCount: calculation.carCount,
+        selectedTicketCount: calculation.selectedTickets.length,
+        hasThaiDress: calculation.thaiDressPrice > 0,
+      }),
+    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, totalNights]
+  )
 
   const toggleTicket = (id: string) => {
     setTickets(prev => {
@@ -2436,7 +2840,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                 items: [],
                 hotel: hotels[0]?.name || null
               }))
-          downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
+                          downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
         }} style={tabButtonStyle(false, '#b89b4d')}>📥 下載報價</button>
       </div>
 
@@ -4088,6 +4492,24 @@ Day 5｜送機
 
       {/* External Tab */}
       {activeTab === 'external' && (
+        <ExternalQuoteTab
+          responsive={responsive}
+          tripDays={tripDays}
+          tripNights={tripNights}
+          parsedItinerary={parsedItinerary}
+          carFees={carFees}
+          includeAccommodation={includeAccommodation}
+          hotels={hotels}
+          adults={adults}
+          childCount={children}
+          externalQuote={externalQuote}
+          calculation={calculation}
+          collectDeposit={collectDeposit}
+          exchangeRate={exchangeRate}
+          fmt={fmt}
+        />
+      )}
+      {false && activeTab === 'external' && (
         <div style={{ background: 'white', border: '2px solid #5c4a2a', borderRadius: 12, padding: responsive.isCompact ? 16 : 24, maxWidth: 600, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           {/* Header */}
           <div style={{ background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)', color: 'white', borderRadius: '12px 12px 0 0', margin: responsive.isCompact ? '-16px -16px 20px -16px' : '-24px -24px 20px -24px', padding: responsive.isCompact ? 18 : 24, textAlign: 'center' }}>
@@ -4561,6 +4983,326 @@ Day 5｜送機
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+type ExternalItineraryDay = {
+  day: string
+  title: string
+  items: string[]
+  hotel: string | null
+}
+
+type ExternalQuoteTabProps = {
+  responsive: ReturnType<typeof getPricingResponsiveLayout>
+  tripDays: number
+  tripNights: number
+  parsedItinerary: ExternalItineraryDay[]
+  carFees: CarFeeDay[]
+  includeAccommodation: boolean
+  hotels: Hotel[]
+  adults: number
+  childCount: number
+  externalQuote: ExternalQuoteBreakdown
+  calculation: {
+    carCount: number
+    totalDeposit: number
+    hotelsWithDeposit: Hotel[]
+    getHotelDeposit: (hotel: Hotel) => number
+    getHotelRoomCount: (hotel: Hotel) => number
+  }
+  collectDeposit: boolean
+  exchangeRate: number
+  fmt: (value: number) => string
+}
+
+function ExternalQuoteTab({
+  responsive,
+  tripDays,
+  tripNights,
+  parsedItinerary,
+  carFees,
+  includeAccommodation,
+  hotels,
+  adults,
+  childCount,
+  externalQuote,
+  calculation,
+  collectDeposit,
+  exchangeRate,
+  fmt,
+}: ExternalQuoteTabProps) {
+  const itineraryToShow =
+    parsedItinerary.length > 0
+      ? parsedItinerary.slice(0, tripDays)
+      : carFees.map((carFee, index) => ({
+          day: `DAY ${index + 1}${carFee.date ? ` (${carFee.date})` : ''}`,
+          title: carFee.name || `第 ${index + 1} 天`,
+          items: [],
+          hotel: includeAccommodation ? hotels[0]?.name ?? null : null,
+        }))
+
+  return (
+    <div
+      style={{
+        background: 'white',
+        border: '2px solid #5c4a2a',
+        borderRadius: 12,
+        padding: responsive.isCompact ? 16 : 24,
+        maxWidth: 600,
+        margin: '0 auto',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)',
+          color: 'white',
+          borderRadius: '12px 12px 0 0',
+          margin: responsive.isCompact ? '-16px -16px 20px -16px' : '-24px -24px 20px -24px',
+          padding: responsive.isCompact ? 18 : 24,
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+        <h2 style={{ margin: 0, fontSize: 24 }}>清微旅行 Chiangway Travel</h2>
+        <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: 14 }}>在地清邁包車與客製旅遊報價</p>
+        <div
+          style={{
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: '1px solid rgba(255,255,255,0.3)',
+            fontSize: 18,
+            fontWeight: 'bold',
+          }}
+        >
+          清邁 {tripDays}天{tripNights}夜 行程報價
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <h3
+          style={{
+            margin: '0 0 12px 0',
+            color: '#5c4a2a',
+            fontSize: 16,
+            borderBottom: '2px solid #5c4a2a',
+            paddingBottom: 8,
+          }}
+        >
+          行程安排
+        </h3>
+        {itineraryToShow.map((day, index) => (
+          <div
+            key={`${day.day}-${index}`}
+            style={{
+              background: '#fafafa',
+              borderRadius: 8,
+              padding: 12,
+              marginBottom: 8,
+              borderLeft: '4px solid #5c4a2a',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 6 }}>
+              {day.day}｜{day.title}
+            </div>
+            {day.items.length > 0 && (
+              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('、')}</div>
+            )}
+            {day.hotel && <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>住宿：{day.hotel}</div>}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <h3
+          style={{
+            margin: '0 0 12px 0',
+            color: '#5c4a2a',
+            fontSize: 16,
+            borderBottom: '2px solid #5c4a2a',
+            paddingBottom: 8,
+          }}
+        >
+          價格明細
+        </h3>
+
+        <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
+          👥 <strong>{adults} 位成人{childCount > 0 ? ` + ${childCount} 位小孩` : ''}</strong>，共 {tripDays}天{tripNights}夜
+        </div>
+
+        <div style={{ background: '#fafafa', borderRadius: 8, padding: 16 }}>
+          {externalQuote.items.map((item, index) => (
+            <div
+              key={item.label}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 0',
+                borderBottom: index === externalQuote.items.length - 1 ? 'none' : '1px dashed #ddd',
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{item.label}</div>
+                {item.description && (
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{item.description}</div>
+                )}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontWeight: 'bold' }}>{fmt(item.amountTHB)} 泰銖</div>
+                <div style={{ fontSize: 12, color: '#666' }}>約 NT$ {fmt(item.amountTWD)}</div>
+              </div>
+            </div>
+          ))}
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: '12px 0 4px 0',
+              marginTop: 8,
+              borderTop: '2px solid #5c4a2a',
+            }}
+          >
+            <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>總計</span>
+            <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{fmt(externalQuote.totalTHB)} 泰銖</span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)',
+          color: 'white',
+          padding: 20,
+          borderRadius: 12,
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ fontSize: 14, opacity: 0.9 }}>團費總計</div>
+        <div style={{ fontSize: 36, fontWeight: 'bold', margin: '8px 0' }}>NT$ {fmt(externalQuote.totalTWD)}</div>
+        <div style={{ fontSize: 12, opacity: 0.8 }}>
+          約 {fmt(externalQuote.totalTHB)} 泰銖
+          {childCount > 0 && <span style={{ display: 'block', marginTop: 4 }}>小孩費用已併入全團總價</span>}
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 20,
+          display: 'grid',
+          gridTemplateColumns: responsive.isCompact ? '1fr' : '1fr 1fr',
+          gap: 12,
+        }}
+      >
+        <div style={{ background: '#f9f8f6', padding: 12, borderRadius: 8 }}>
+          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>✅ 報價包含</div>
+          <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+            {externalQuote.included.map((item) => (
+              <div key={item}>• {item}</div>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: '#fff3e0', padding: 12, borderRadius: 8 }}>
+          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 8 }}>❌ 報價不含</div>
+          <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+            {externalQuote.excluded.map((item) => (
+              <div key={item}>• {item}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8, padding: 16 }}>
+        <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 12, fontSize: 14 }}>💳 付款方式與時程</div>
+        <div style={{ fontSize: 13, color: '#555', lineHeight: 1.8 }}>
+          {externalQuote.paymentNotes.map((note) => (
+            <div key={note}>• {note}</div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 12, padding: 10, background: '#fff3e0', borderRadius: 6, fontSize: 12, border: '1px solid #ffcc02' }}>
+          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 4 }}>⏰ 加班費提醒</div>
+          <div style={{ color: '#555' }}>
+            • 每日包車服務最多 10 小時，如需超時另計 12 小時<br />
+            • 加班費為<strong>200 泰銖/小時 × {calculation.carCount} 台車</strong>
+          </div>
+        </div>
+
+        <div style={{ marginTop: 12, padding: 12, background: '#f9f8f6', border: '1px solid #b89b4d', borderRadius: 6, fontSize: 12 }}>
+          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>🏦 匯款帳號資訊</div>
+          <div style={{ color: '#333', lineHeight: 1.8 }}>
+            戶名：<strong>柏裕</strong><br />
+            銀行：ไทยเครดิต แบงก์ 009<br />
+            帳號：<strong>51619501772100</strong>
+          </div>
+        </div>
+      </div>
+
+      {calculation.hotelsWithDeposit.length > 0 && collectDeposit && (
+        <div style={{ marginTop: 16, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
+          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 8, fontSize: 14 }}>🏨 住宿押金提醒</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+            {calculation.hotelsWithDeposit.map((hotel) => (
+              <div key={hotel.id}>
+                • {hotel.name}：{fmt(calculation.getHotelDeposit(hotel))} 泰銖（{calculation.getHotelRoomCount(hotel)} 間）
+              </div>
+            ))}
+            <div style={{ marginTop: 8, padding: 10, background: '#b89b4d', color: 'white', borderRadius: 4, fontWeight: 'bold' }}>
+              住宿押金總計：{fmt(calculation.totalDeposit)} 泰銖，約 NT$ {fmt(Math.round(calculation.totalDeposit / exchangeRate))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {includeAccommodation && !collectDeposit && (
+        <div style={{ marginTop: 16, padding: 12, background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8 }}>
+          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8, fontSize: 14 }}>📌 住宿押金備註</div>
+          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+            若本次住宿需另付押金或保留金，會依實際飯店規則與房型安排另行說明。
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 20, background: '#5c4a2a', color: 'white', padding: 16, borderRadius: 8 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 12, fontSize: 14 }}>🧾 報價摘要</div>
+        <div style={{ fontSize: 13, lineHeight: 2 }}>
+          {externalQuote.items.map((item) => (
+            <div key={`summary-${item.label}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span>{item.label}</span>
+              <span>NT$ {fmt(item.amountTWD)}</span>
+            </div>
+          ))}
+          <div
+            style={{
+              borderTop: '1px solid rgba(255,255,255,0.3)',
+              marginTop: 8,
+              paddingTop: 8,
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontWeight: 'bold',
+              fontSize: 15,
+            }}
+          >
+            <span>團費總計</span>
+            <span>NT$ {fmt(externalQuote.totalTWD)}</span>
+          </div>
+          {calculation.totalDeposit > 0 && collectDeposit && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ffcc00', marginTop: 4 }}>
+              <span>+ 住宿押金</span>
+              <span>NT$ {fmt(Math.round(calculation.totalDeposit / exchangeRate))}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '2px solid #eee', textAlign: 'center', fontSize: 13, color: '#666' }}>
+        <div style={{ marginBottom: 8 }}>💬 LINE：<strong>@037nyuwk</strong></div>
+        <div>chiangway-travel.com</div>
+      </div>
     </div>
   )
 }
