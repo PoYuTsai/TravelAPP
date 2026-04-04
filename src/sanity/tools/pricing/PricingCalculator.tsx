@@ -10,6 +10,14 @@ import {
   type ActivityRecord,
   type ActivityMatchResult,
 } from '@/lib/itinerary'
+import {
+  calculateFormalProfitShares,
+  getPricingStorageKeys,
+  getPricingVariantUi,
+  normalizePricingConfigForVariant,
+  normalizeTicketsForVariant,
+  type PricingCalculatorVariant,
+} from './variants'
 
 // 互斥群組定義 - 同群組只能選一個
 const EXCLUSIVE_GROUPS: Record<string, string[]> = {
@@ -28,12 +36,12 @@ const DEFAULT_CONFIG = {
   insurancePerPerson: 100,
   roomPrices: { double: 2500, triple: 3500, family: 4500 },
   dailyCarFees: [
-    { day: 'D1', name: '市區(接機+行程)', cost: 2700, price: 3200, type: 'city' },
-    { day: 'D2', name: '郊區(大象/射擊)', cost: 3300, price: 3800, type: 'suburban' },
-    { day: 'D3', name: '清萊一日遊', cost: 4000, price: 4500, type: 'chiangrai' },
-    { day: 'D4', name: '郊區(水上/動物園)', cost: 3300, price: 3800, type: 'suburban' },
-    { day: 'D5', name: '郊區(叢林/蛇園)', cost: 3300, price: 3800, type: 'suburban' },
-    { day: 'D6', name: '送機', cost: 500, price: 600, type: 'airport' },
+    { day: 'D1', name: '市區(接機+行程)', cost: 2700, price: 3700, type: 'city' },
+    { day: 'D2', name: '郊區(大象/射擊)', cost: 3300, price: 4300, type: 'suburban' },
+    { day: 'D3', name: '清萊一日遊', cost: 4000, price: 5300, type: 'chiangrai' },
+    { day: 'D4', name: '郊區(水上/動物園)', cost: 3300, price: 4300, type: 'suburban' },
+    { day: 'D5', name: '郊區(叢林/蛇園)', cost: 3300, price: 4300, type: 'suburban' },
+    { day: 'D6', name: '送機', cost: 500, price: 700, type: 'airport' },
   ],
   guidePerDay: { cost: 1500, price: 2500 },
   luggagePerTrip: 600,
@@ -151,19 +159,20 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   { id: 'dantewada', name: '天使瀑布', price: 80, rebate: 0, split: false, checked: false, source: 'default' },
 ]
 
-// 門票 localStorage 儲存機制
-const TICKETS_STORAGE_KEY = 'chiangway-pricing-tickets-v1'
-
 interface TicketConfig {
   version: 1
   lastUpdated: string
   tickets: DynamicTicket[]
 }
 
+function cloneTickets(tickets: DynamicTicket[]): DynamicTicket[] {
+  return tickets.map((ticket) => ({ ...ticket }))
+}
+
 // 從 localStorage 載入自訂門票
-function loadTicketsFromStorage(): DynamicTicket[] | null {
+function loadTicketsFromStorage(storageKey: string): DynamicTicket[] | null {
   try {
-    const stored = localStorage.getItem(TICKETS_STORAGE_KEY)
+    const stored = localStorage.getItem(storageKey)
     if (!stored) return null
     const config: TicketConfig = JSON.parse(stored)
     if (config.version !== 1) return null
@@ -174,26 +183,26 @@ function loadTicketsFromStorage(): DynamicTicket[] | null {
 }
 
 // 儲存自訂門票到 localStorage
-function saveTicketsToStorage(tickets: DynamicTicket[]) {
+function saveTicketsToStorage(storageKey: string, tickets: DynamicTicket[]) {
   const config: TicketConfig = {
     version: 1,
     lastUpdated: new Date().toISOString(),
     tickets: tickets.map(t => ({ ...t, checked: false })), // 儲存時不保存 checked 狀態
   }
-  localStorage.setItem(TICKETS_STORAGE_KEY, JSON.stringify(config))
+  localStorage.setItem(storageKey, JSON.stringify(config))
 }
 
 // 重置門票為預設值
-function resetTicketsToDefault() {
-  localStorage.removeItem(TICKETS_STORAGE_KEY)
-  return DEFAULT_TICKETS.map(t => ({ ...t }))
+function resetTicketsToDefault(storageKey: string, defaultTickets: DynamicTicket[]) {
+  localStorage.removeItem(storageKey)
+  return cloneTickets(defaultTickets)
 }
 
 // 將門票轉換為 ActivityRecord 格式（供匹配器使用）
 // 優先使用 localStorage 的自訂門票，否則用 DEFAULT_TICKETS
-function getActivitiesForMatching(): ActivityRecord[] {
-  const storedTickets = loadTicketsFromStorage()
-  const tickets = storedTickets || DEFAULT_TICKETS
+function getActivitiesForMatching(storageKey: string, defaultTickets: DynamicTicket[]): ActivityRecord[] {
+  const storedTickets = loadTicketsFromStorage(storageKey)
+  const tickets = storedTickets || defaultTickets
   return tickets.map(ticket => ({
     _id: ticket.id,
     name: ticket.name,
@@ -931,7 +940,22 @@ interface SavedQuote {
   }
 }
 
-export function PricingCalculator() {
+interface PricingCalculatorProps {
+  variant?: PricingCalculatorVariant
+}
+
+export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps) {
+  const variantUi = getPricingVariantUi(variant)
+  const { ticketStorageKey, quoteStorageKey } = getPricingStorageKeys(variant)
+  const defaultTickets = useMemo(
+    () => normalizeTicketsForVariant(DEFAULT_TICKETS, variant),
+    [variant]
+  )
+  const config = useMemo(
+    () => normalizePricingConfigForVariant(DEFAULT_CONFIG, variant),
+    [variant]
+  )
+
   // 智能解析器狀態
   const [showParser, setShowParser] = useState(false)
   const [itineraryText, setItineraryText] = useState('')
@@ -1047,12 +1071,12 @@ export function PricingCalculator() {
   const [mealLevel, setMealLevel] = useState(900)
   // 門票狀態 - 優先從 localStorage 載入
   const [tickets, setTickets] = useState<DynamicTicket[]>(() => {
-    const stored = loadTicketsFromStorage()
-    return stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    const stored = loadTicketsFromStorage(ticketStorageKey)
+    return stored || cloneTickets(defaultTickets)
   })
   const [baseTickets, setBaseTickets] = useState<DynamicTicket[]>(() => {
-    const stored = loadTicketsFromStorage()
-    return stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    const stored = loadTicketsFromStorage(ticketStorageKey)
+    return stored || cloneTickets(defaultTickets)
   })  // 基礎門票列表（用於管理面板編輯）
   const [showTicketManager, setShowTicketManager] = useState(false)  // 門票管理面板開關
   const [useDefaultTickets, setUseDefaultTickets] = useState(true)  // 是否使用預設門票（vs 解析後動態門票）
@@ -1085,15 +1109,13 @@ export function PricingCalculator() {
     if (key in expandedCategories) return expandedCategories[key]
     return hasRooms  // 預設：有房間才展開
   }
-  const config = DEFAULT_CONFIG
-
   // 智能解析行程 - 直接使用本地門票資料庫（不再依賴 Sanity）
   const handleParseItinerary = useCallback(() => {
     if (!itineraryText.trim()) return
 
     const parsed = parseItineraryText(itineraryText)
     // 使用本地門票資料庫（localStorage 或 DEFAULT_TICKETS）
-    const activitiesToMatch = getActivitiesForMatching()
+    const activitiesToMatch = getActivitiesForMatching(ticketStorageKey, defaultTickets)
     const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
 
     // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
@@ -1174,24 +1196,24 @@ export function PricingCalculator() {
 
         // 智能判斷路線類型
         let type = 'suburban'
-        let defaultPrice = 3800
+        let defaultPrice = 4300
         let defaultCost = 3300
 
         if (isFirstDay && day.title?.includes('抵達')) {
           type = 'city'
-          defaultPrice = 3200
+          defaultPrice = 3700
           defaultCost = 2700
         } else if (isLastDay && (day.title?.includes('送機') || day.rawText?.includes('送機'))) {
           type = 'airport'
-          defaultPrice = 600
+          defaultPrice = 700
           defaultCost = 500
         } else if (day.title?.includes('清萊') || day.rawText?.includes('清萊')) {
           type = 'chiangrai'
-          defaultPrice = 4500
+          defaultPrice = 5300
           defaultCost = 4000
         } else if (day.title?.includes('市區') || day.title?.includes('市集')) {
           type = 'city'
-          defaultPrice = 3500
+          defaultPrice = 4000
           defaultCost = 3000
         }
 
@@ -1215,7 +1237,7 @@ export function PricingCalculator() {
 
       for (const matched of result.matched) {
         // 找對應的 DEFAULT_TICKET 範本
-        const template = DEFAULT_TICKETS.find(t =>
+        const template = defaultTickets.find(t =>
           matched.activityName.includes(t.name) ||
           t.name.includes(matched.activityName) ||
           // 也嘗試用 id 匹配
@@ -1233,7 +1255,7 @@ export function PricingCalculator() {
             addedGroups.add(template.exclusiveGroup)
 
             // 加入整個互斥群組的所有選項
-            const groupTickets = DEFAULT_TICKETS.filter(t => t.exclusiveGroup === template.exclusiveGroup)
+            const groupTickets = defaultTickets.filter(t => t.exclusiveGroup === template.exclusiveGroup)
             groupTickets.forEach(gt => {
               dynamicTickets.push({
                 ...gt,
@@ -1360,7 +1382,7 @@ export function PricingCalculator() {
 
     // 解析完成直接生效（不需要確認按鈕）
     setIsParseConfirmed(true)
-  }, [itineraryText, people])  // 行程文字或人數變更時重新解析
+  }, [defaultTickets, itineraryText, people, ticketStorageKey])  // 行程文字或人數變更時重新解析
 
   // 車費管理函數
   const updateCarFee = (index: number, field: keyof CarFeeDay, value: any) => {
@@ -1408,27 +1430,25 @@ export function PricingCalculator() {
       date: '',
     })))
     // 重置為本地儲存的門票（或預設）
-    const stored = loadTicketsFromStorage()
-    const baseList = stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    const stored = loadTicketsFromStorage(ticketStorageKey)
+    const baseList = stored || cloneTickets(defaultTickets)
     setTickets(baseList.map(t => ({ ...t, checked: false })))
     setBaseTickets(baseList)
     setUseDefaultTickets(true)
-  }, [])
+  }, [defaultTickets, ticketStorageKey])
 
   // 報價儲存/載入/複製功能
-  const STORAGE_KEY = 'chiangway-pricing-quotes'
-
   // 從 localStorage 載入已儲存的報價
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
+      const saved = localStorage.getItem(quoteStorageKey)
       if (saved) {
         setSavedQuotes(JSON.parse(saved))
       }
     } catch (e) {
       console.error('Failed to load saved quotes:', e)
     }
-  }, [])
+  }, [quoteStorageKey])
 
   // 儲存當前報價
   const saveCurrentQuote = () => {
@@ -1463,7 +1483,7 @@ export function PricingCalculator() {
     }
     const updated = [...savedQuotes, newQuote]
     setSavedQuotes(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    localStorage.setItem(quoteStorageKey, JSON.stringify(updated))
     setCurrentQuoteName('')
     alert(`✅ 已儲存「${name}」`)
   }
@@ -1481,7 +1501,9 @@ export function PricingCalculator() {
       setChildren(0)
     }
     if (quote.data.carFees) setCarFees(quote.data.carFees)
-    if (quote.data.tickets) setTickets(quote.data.tickets)
+    if (quote.data.tickets) {
+      setTickets(normalizeTicketsForVariant(quote.data.tickets, variant))
+    }
     if (quote.data.useDefaultTickets !== undefined) setUseDefaultTickets(quote.data.useDefaultTickets)
     // 載入新增欄位
     if (quote.data.hotels) setHotels(quote.data.hotels)
@@ -1597,8 +1619,8 @@ export function PricingCalculator() {
     ])
     setNextHotelId(3)
     // 重置門票（使用本地儲存的門票或預設）
-    const stored = loadTicketsFromStorage()
-    const baseList = stored || DEFAULT_TICKETS.map(t => ({ ...t }))
+    const stored = loadTicketsFromStorage(ticketStorageKey)
+    const baseList = stored || cloneTickets(defaultTickets)
     setTickets(baseList.map(t => ({ ...t, checked: false })))
     setBaseTickets(baseList)
     setUseDefaultTickets(true)
@@ -1618,14 +1640,14 @@ export function PricingCalculator() {
     if (!confirm('確定要刪除這個報價嗎？')) return
     const updated = savedQuotes.filter(q => q.id !== id)
     setSavedQuotes(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    localStorage.setItem(quoteStorageKey, JSON.stringify(updated))
   }
 
   // 清空所有報價
   const clearAllQuotes = () => {
     if (!confirm('確定要清空所有儲存的報價嗎？此操作無法復原。')) return
     setSavedQuotes([])
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(quoteStorageKey)
   }
 
   // 飯店管理函數
@@ -1908,6 +1930,10 @@ export function PricingCalculator() {
   }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
+  const formalProfitShares =
+    variant === 'formal'
+      ? calculateFormalProfitShares(calculation.yourTotalProfit + calculation.partnerTotalProfit)
+      : []
 
   const toggleTicket = (id: string) => {
     setTickets(prev => {
@@ -2869,7 +2895,9 @@ Day 5｜送機
           <Section title={`🎫 門票活動${!useDefaultTickets ? '（解析自行程）' : ''}${!includeTickets ? '（客人自理）' : ''}`} style={!includeTickets ? { opacity: 0.5 } : {}}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <p style={{ ...noteStyle, margin: 0 }}>★ = 退款對分</p>
+                {variantUi.showTicketRefundSplitNote && (
+                  <p style={{ ...noteStyle, margin: 0 }}>★ = 退款對分</p>
+                )}
                 {/* 門票管理按鈕 */}
                 <button
                   onClick={() => setShowTicketManager(!showTicketManager)}
@@ -2881,8 +2909,8 @@ Day 5｜送機
                 {!useDefaultTickets && (
                   <button
                     onClick={() => {
-                      const stored = loadTicketsFromStorage()
-                      setTickets((stored || DEFAULT_TICKETS).map(t => ({ ...t, checked: false })))
+                      const stored = loadTicketsFromStorage(ticketStorageKey)
+                      setTickets((stored || cloneTickets(defaultTickets)).map(t => ({ ...t, checked: false })))
                       setUseDefaultTickets(true)
                     }}
                     style={{ padding: '4px 8px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
@@ -2949,7 +2977,7 @@ Day 5｜送機
                         const updated = [...baseTickets, newTicket]
                         setBaseTickets(updated)
                         setTickets(updated.map(t => ({ ...t, checked: tickets.find(x => x.id === t.id)?.checked || false })))
-                        saveTicketsToStorage(updated)
+                        saveTicketsToStorage(ticketStorageKey, updated)
                       }}
                       style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
                     >
@@ -2958,7 +2986,7 @@ Day 5｜送機
                     <button
                       onClick={() => {
                         if (confirm('確定要重置為預設門票嗎？所有自訂的門票都會被清除。')) {
-                          const defaults = resetTicketsToDefault()
+                          const defaults = resetTicketsToDefault(ticketStorageKey, defaultTickets)
                           setBaseTickets(defaults)
                           setTickets(defaults.map(t => ({ ...t, checked: false })))
                         }
@@ -2976,8 +3004,12 @@ Day 5｜送機
                         <th style={{ padding: 8, textAlign: 'left', borderBottom: '1px solid #ccc' }}>名稱</th>
                         <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 80 }}>成人價</th>
                         <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 80 }}>兒童價</th>
-                        <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 70 }}>退佣</th>
-                        <th style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #ccc', width: 50 }}>對分</th>
+                        {variantUi.showTicketRebateInput && (
+                          <th style={{ padding: 8, textAlign: 'right', borderBottom: '1px solid #ccc', width: 70 }}>退佣</th>
+                        )}
+                        {variantUi.showTicketSplitInput && (
+                          <th style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #ccc', width: 50 }}>對分</th>
+                        )}
                         <th style={{ padding: 8, textAlign: 'center', borderBottom: '1px solid #ccc', width: 60 }}>操作</th>
                       </tr>
                     </thead>
@@ -2992,7 +3024,7 @@ Day 5｜送機
                                 const updated = baseTickets.map(x => x.id === t.id ? { ...x, name: e.target.value } : x)
                                 setBaseTickets(updated)
                                 setTickets(tickets.map(x => x.id === t.id ? { ...x, name: e.target.value } : x))
-                                saveTicketsToStorage(updated)
+                                saveTicketsToStorage(ticketStorageKey, updated)
                               }}
                               style={{ width: '100%', padding: 4, border: '1px solid #ddd', borderRadius: 3 }}
                             />
@@ -3006,7 +3038,7 @@ Day 5｜送機
                                 const updated = baseTickets.map(x => x.id === t.id ? { ...x, price: val } : x)
                                 setBaseTickets(updated)
                                 setTickets(tickets.map(x => x.id === t.id ? { ...x, price: val } : x))
-                                saveTicketsToStorage(updated)
+                                saveTicketsToStorage(ticketStorageKey, updated)
                               }}
                               style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
                             />
@@ -3021,37 +3053,41 @@ Day 5｜送機
                                 const updated = baseTickets.map(x => x.id === t.id ? { ...x, childPrice: val } : x)
                                 setBaseTickets(updated)
                                 setTickets(tickets.map(x => x.id === t.id ? { ...x, childPrice: val } : x))
-                                saveTicketsToStorage(updated)
+                                saveTicketsToStorage(ticketStorageKey, updated)
                               }}
                               style={{ width: 60, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
                             />
                           </td>
-                          <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
-                            <input
-                              type="number"
-                              value={t.rebate}
-                              onChange={e => {
-                                const val = Number(e.target.value) || 0
-                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, rebate: val } : x)
-                                setBaseTickets(updated)
-                                setTickets(tickets.map(x => x.id === t.id ? { ...x, rebate: val } : x))
-                                saveTicketsToStorage(updated)
-                              }}
-                              style={{ width: 50, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
-                            />
-                          </td>
-                          <td style={{ padding: 6, borderBottom: '1px solid #eee', textAlign: 'center' }}>
-                            <input
-                              type="checkbox"
-                              checked={t.split}
-                              onChange={e => {
-                                const updated = baseTickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x)
-                                setBaseTickets(updated)
-                                setTickets(tickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x))
-                                saveTicketsToStorage(updated)
-                              }}
-                            />
-                          </td>
+                          {variantUi.showTicketRebateInput && (
+                            <td style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+                              <input
+                                type="number"
+                                value={t.rebate}
+                                onChange={e => {
+                                  const val = Number(e.target.value) || 0
+                                  const updated = baseTickets.map(x => x.id === t.id ? { ...x, rebate: val } : x)
+                                  setBaseTickets(updated)
+                                  setTickets(tickets.map(x => x.id === t.id ? { ...x, rebate: val } : x))
+                                  saveTicketsToStorage(ticketStorageKey, updated)
+                                }}
+                                style={{ width: 50, padding: 4, border: '1px solid #ddd', borderRadius: 3, textAlign: 'right' }}
+                              />
+                            </td>
+                          )}
+                          {variantUi.showTicketSplitInput && (
+                            <td style={{ padding: 6, borderBottom: '1px solid #eee', textAlign: 'center' }}>
+                              <input
+                                type="checkbox"
+                                checked={t.split}
+                                onChange={e => {
+                                  const updated = baseTickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x)
+                                  setBaseTickets(updated)
+                                  setTickets(tickets.map(x => x.id === t.id ? { ...x, split: e.target.checked } : x))
+                                  saveTicketsToStorage(ticketStorageKey, updated)
+                                }}
+                              />
+                            </td>
+                          )}
                           <td style={{ padding: 6, borderBottom: '1px solid #eee', textAlign: 'center' }}>
                             <button
                               onClick={() => {
@@ -3059,7 +3095,7 @@ Day 5｜送機
                                   const updated = baseTickets.filter(x => x.id !== t.id)
                                   setBaseTickets(updated)
                                   setTickets(tickets.filter(x => x.id !== t.id))
-                                  saveTicketsToStorage(updated)
+                                  saveTicketsToStorage(ticketStorageKey, updated)
                                 }
                               }}
                               style={{ padding: '2px 6px', background: '#f44336', color: 'white', border: 'none', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}
@@ -3281,7 +3317,7 @@ Day 5｜送機
             )}
             <p style={{ ...noteStyle, marginTop: 12 }}>
               {/* 計數包含泰服（如有勾選） */}
-              已選 {calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}/{tickets.length + 1} 項｜門票成本/人：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0) + calculation.thaiDressCost / people)} 泰銖
+              已選 {calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}/{tickets.length + 1} 項｜{variantUi.ticketCostSummaryLabel}：{fmt(calculation.selectedTickets.reduce((sum, t) => sum + (t.price - t.rebate), 0) + calculation.thaiDressCost / people)} 泰銖
             </p>
 
             {/* 泰服體驗（僅在預設門票模式時顯示，有日期分組時在 Day 1 內顯示） */}
@@ -3293,17 +3329,17 @@ Day 5｜送機
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <input type="checkbox" checked={thaiDressCloth} onChange={e => setThaiDressCloth(e.target.checked)} />
                   <label>泰服衣服</label>
-                  <span style={noteStyle}>售價 500 / 成本 200 /人（全員）</span>
+                  <span style={noteStyle}>{variantUi.showThaiDressCostCopy ? '售價 500 / 成本 200 /人（全員）' : '500 /人（全員）'}</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
                   <label>攝影師</label>
-                  <span style={noteStyle}>售價 2,500 / 成本 500 /位（1位可拍10人）</span>
+                  <span style={noteStyle}>{variantUi.showThaiDressCostCopy ? '售價 2,500 / 成本 500 /位（1位可拍10人）' : '2,500 /位（1位可拍10人）'}</span>
                 </div>
                 <Row style={{ marginTop: 8 }}>
                   <label>化妝人數</label>
                   <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
-                  <span style={noteStyle}>售價 1,000 / 成本 500 /人</span>
+                  <span style={noteStyle}>{variantUi.showThaiDressCostCopy ? '售價 1,000 / 成本 500 /人' : '1,000 /人'}</span>
                 </Row>
                 <p style={{ ...noteStyle, marginTop: 8 }}>泰服小計：{fmt(calculation.thaiDressPrice)} 泰銖</p>
               </div>
@@ -3413,29 +3449,53 @@ Day 5｜送機
               ))}
               {/* 泰服體驗（整合進門票區塊，無標題行） */}
               {thaiDressCloth && (
-                <DataRow name={`泰服衣服 ★ (${people}人)`} cost={(config.thaiDress.cloth.price - config.thaiDress.cloth.rebate) * people} price={config.thaiDress.cloth.price * people} profit={config.thaiDress.cloth.rebate * people} className="day-row" />
+                <DataRow
+                  name={`泰服衣服${variantUi.showTicketRefundSplitNote ? ' ★' : ''} (${people}人)`}
+                  cost={(config.thaiDress.cloth.price - config.thaiDress.cloth.rebate) * people}
+                  price={config.thaiDress.cloth.price * people}
+                  profit={config.thaiDress.cloth.rebate * people}
+                  className="day-row"
+                />
               )}
               {makeupCount > 0 && (
-                <DataRow name={`化妝 ★ (${makeupCount}人)`} cost={(config.thaiDress.makeup.price - config.thaiDress.makeup.rebate) * makeupCount} price={config.thaiDress.makeup.price * makeupCount} profit={config.thaiDress.makeup.rebate * makeupCount} className="day-row" />
+                <DataRow
+                  name={`化妝${variantUi.showTicketRefundSplitNote ? ' ★' : ''} (${makeupCount}人)`}
+                  cost={(config.thaiDress.makeup.price - config.thaiDress.makeup.rebate) * makeupCount}
+                  price={config.thaiDress.makeup.price * makeupCount}
+                  profit={config.thaiDress.makeup.rebate * makeupCount}
+                  className="day-row"
+                />
               )}
               {thaiDressPhoto && (() => {
                 const photographerCount = people <= 10 ? 1 : 2
-                return <DataRow name={`攝影師 ★ (${photographerCount}位)`} cost={(config.thaiDress.photo.price - config.thaiDress.photo.rebate) * photographerCount} price={config.thaiDress.photo.price * photographerCount} profit={config.thaiDress.photo.rebate * photographerCount} className="day-row" />
+                return (
+                  <DataRow
+                    name={`攝影師${variantUi.showTicketRefundSplitNote ? ' ★' : ''} (${photographerCount}位)`}
+                    cost={(config.thaiDress.photo.price - config.thaiDress.photo.rebate) * photographerCount}
+                    price={config.thaiDress.photo.price * photographerCount}
+                    profit={config.thaiDress.photo.rebate * photographerCount}
+                    className="day-row"
+                  />
+                )
               })()}
               <SubtotalRow name="門票+泰服總計" cost={calculation.ticketCost + calculation.thaiDressCost} price={calculation.ticketPrice + calculation.thaiDressPrice} profit={calculation.ticketYourProfit + calculation.ticketPartnerProfit + calculation.thaiDressYourProfit + calculation.thaiDressPartnerProfit} />
-              <tr style={{ background: '#c8e6c9' }}>
-                <td style={{ ...tdStyle, textAlign: 'left' }}>　→ 你的利潤（退款½）</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}></td>
-                <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.ticketYourProfit + calculation.thaiDressYourProfit)}</td>
-              </tr>
-              <tr style={{ background: '#fff3cd' }}>
-                <td style={{ ...tdStyle, textAlign: 'left' }}>　→ 郭姐利潤（退款½）</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}></td>
-                <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.ticketPartnerProfit + calculation.thaiDressPartnerProfit)}</td>
-              </tr>
-              <InfoRow text="★ 標記項目有退款（佣金）需對分｜無標記為原價或免費" />
+              {variantUi.showLegacyPartnerProfitRows && (
+                <>
+                  <tr style={{ background: '#c8e6c9' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>　→ 你的利潤（退款½）</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                    <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.ticketYourProfit + calculation.thaiDressYourProfit)}</td>
+                  </tr>
+                  <tr style={{ background: '#fff3cd' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>　→ 郭姐利潤（退款½）</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                    <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.ticketPartnerProfit + calculation.thaiDressPartnerProfit)}</td>
+                  </tr>
+                  <InfoRow text="★ 標記項目有退款（佣金）需對分｜無標記為原價或免費" />
+                </>
+              )}
             </tbody>
           </table>
 
@@ -3454,24 +3514,39 @@ Day 5｜送機
               </tr>
 
               <SectionRow title="📈 利潤分配" />
-              <tr style={{ background: '#c8e6c9' }}>
-                <td style={{ ...tdStyle, textAlign: 'left' }}>✅ 你的利潤（車導差價 + 門票½）</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}></td>
-                <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.yourTotalProfit)}</td>
-              </tr>
-              <tr style={{ background: '#fff3cd' }}>
-                <td style={{ ...tdStyle, textAlign: 'left' }}>🤝 郭姐利潤（門票½）</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}></td>
-                <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.partnerTotalProfit)}</td>
-              </tr>
-              <tr style={{ background: '#fff3cd' }}>
-                <td style={{ ...tdStyle, textAlign: 'left' }}>💵 付給郭姐（成本）</td>
-                <td style={{ ...tdStyle, fontWeight: 'bold' }}>{fmt(calculation.transportCost + calculation.ticketCost + calculation.mealCost + calculation.thaiDressCost)}</td>
-                <td style={tdStyle}></td>
-                <td style={tdStyle}></td>
-              </tr>
+              {variant === 'formal' ? (
+                <>
+                  {formalProfitShares.map((share, index) => (
+                    <tr key={share.label} style={{ background: index === 0 ? '#c8e6c9' : '#fff3cd' }}>
+                      <td style={{ ...tdStyle, textAlign: 'left' }}>{share.label}</td>
+                      <td style={tdStyle}></td>
+                      <td style={tdStyle}></td>
+                      <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(share.amount)}</td>
+                    </tr>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <tr style={{ background: '#c8e6c9' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>✅ 你的利潤（車導差價 + 門票½）</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                    <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.yourTotalProfit)}</td>
+                  </tr>
+                  <tr style={{ background: '#fff3cd' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>🤝 郭姐利潤（門票½）</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                    <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>{fmt(calculation.partnerTotalProfit)}</td>
+                  </tr>
+                  <tr style={{ background: '#fff3cd' }}>
+                    <td style={{ ...tdStyle, textAlign: 'left' }}>💵 付給郭姐（成本）</td>
+                    <td style={{ ...tdStyle, fontWeight: 'bold' }}>{fmt(calculation.transportCost + calculation.ticketCost + calculation.mealCost + calculation.thaiDressCost)}</td>
+                    <td style={tdStyle}></td>
+                    <td style={tdStyle}></td>
+                  </tr>
+                </>
+              )}
 
               <SectionRow title="🏷️ 每人報價" />
               <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>
@@ -3982,6 +4057,10 @@ Day 5｜送機
       )}
     </div>
   )
+}
+
+export function FormalPricingCalculator() {
+  return <PricingCalculator variant="formal" />
 }
 
 // Styles

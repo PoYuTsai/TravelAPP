@@ -7,9 +7,10 @@ import { exportPdfAction } from './src/sanity/actions/exportPdfAction'
 import { exportExcelAction } from './src/sanity/actions/exportExcelAction'
 import { exportTextAction } from './src/sanity/actions/exportTextAction'
 import { syncFromTextAction } from './src/sanity/actions/syncFromTextAction'
+import { customizeStudioTools } from './src/sanity/studio-access'
 import { dashboardTool } from './src/sanity/tools/dashboard'
 import { accountingTool } from './src/sanity/tools/accounting'
-import { pricingTool } from './src/sanity/tools/pricing'
+import { formalPricingTool, pricingTool } from './src/sanity/tools/pricing'
 
 export default defineConfig({
   name: 'chiangway-travel',
@@ -20,7 +21,8 @@ export default defineConfig({
   auth: {
     loginMethod: 'token',
   },
-  plugins: [structureTool({ structure }), dashboardTool(), accountingTool(), pricingTool()],
+  plugins: [structureTool({ structure }), dashboardTool(), accountingTool(), pricingTool(), formalPricingTool()],
+  tools: (prev, { currentUser }) => customizeStudioTools(prev, currentUser?.email),
   schema: { types: schemaTypes },
   document: {
     actions: (prev, context) => {

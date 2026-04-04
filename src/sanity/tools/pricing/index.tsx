@@ -1,17 +1,40 @@
 // src/sanity/tools/pricing/index.tsx
 
-import { definePlugin } from 'sanity'
 import { DocumentsIcon } from '@sanity/icons'
-import { PricingCalculator } from './PricingCalculator'
+import { definePlugin } from 'sanity'
+import type { ComponentType } from 'react'
 
-export const pricingTool = definePlugin({
-  name: 'pricing-tool',
-  tools: [
-    {
-      name: 'pricing',
-      title: '報價計算',
-      icon: DocumentsIcon,
-      component: PricingCalculator,
-    },
-  ],
-})
+import { FormalPricingCalculator, PricingCalculator } from './PricingCalculator'
+
+function createPricingTool(
+  pluginName: string,
+  toolName: string,
+  title: string,
+  component: ComponentType<any>
+) {
+  return definePlugin({
+    name: pluginName,
+    tools: [
+      {
+        name: toolName,
+        title,
+        icon: DocumentsIcon,
+        component,
+      },
+    ],
+  })
+}
+
+export const pricingTool = createPricingTool(
+  'pricing-tool',
+  'pricing',
+  '報價計算測試v1',
+  PricingCalculator
+)
+
+export const formalPricingTool = createPricingTool(
+  'pricing-formal-tool',
+  'pricing-formal',
+  '報價計算(正式版)',
+  FormalPricingCalculator
+)
