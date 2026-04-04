@@ -120,6 +120,21 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/thaiDress.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
   - `npm.cmd run build`
 
+## Manual Insurance Toggle Record
+
+- **Completed:** 2026-04-04
+- **Goal:** decouple travel insurance from the ticket toggle so users can manually decide whether to include it.
+- **Changes:**
+  - added a dedicated `含保險` checkbox in the base settings area
+  - changed insurance pricing to follow the manual toggle only, regardless of whether tickets are included
+  - preserved the insurance selection in saved/shared pricing examples and added a legacy fallback for older saved cases
+  - updated phone layout spacing to accommodate the extra service toggle column
+- **Code commit:** `3938d53` `feat: add manual pricing insurance toggle`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/insurance.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/insurance.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/thaiDress.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
