@@ -44,6 +44,7 @@
 | 維護 2026-04-04 | 包車價格同步（前台 / 後台 / LINE OA 文件） | ✅ 完成 |
 | 維護 2026-04-04 | Studio pricing 工具 SSR hotfix | ✅ 完成 |
 | 維護 2026-04-04 | Studio 夥伴登入 email 更新 | ✅ 完成 |
+| 維護 2026-04-04 | 報價共享案例同步 + 手機版體驗優化 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -245,6 +246,11 @@ Sanity Studio 內部報價計算工具：
 - **超時計算**：清邁 10hr / 清萊 12hr、200 泰銖/小時
 - **雙版本報價工具**：保留測試版，新增正式版供協作者使用
 - **正式版規則**：門票原價計算，利潤分配摘要為柏裕 70% / Lulu 15% / 彥君 15%
+- **共享案例同步**：已儲存案例改存 Sanity，所有登入夥伴都能看到、載入，返回頁面會自動同步
+- **手機版優化**：
+  - 頂部提供 `Structure` / 當前工具快速切換
+  - 共享案例清單與操作按鈕改為手機友善排版
+  - 內部明細表格可橫向滑動，算車費欄位手機版改成雙欄
 - **價格同步**：前台起價、FAQ、Sanity 快速報價範本與 LINE OA 文件已同步到最新包車價格
 - **報價單匯出**：
   - 內部報價：含成本利潤分析
@@ -432,4 +438,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-04-04 studio collaborator email update -->
+<!-- Last build trigger: 2026-04-04 shared pricing examples sync -->

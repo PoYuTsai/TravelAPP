@@ -74,6 +74,22 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
   - `npm.cmd run build`
 
+## Shared Pricing Examples And Mobile UX Record
+
+- **Completed:** 2026-04-04
+- **Goal:** make saved pricing examples shared across all logged-in collaborators and improve the calculator's phone layout.
+- **Changes:**
+  - added `pricingExample` documents in Sanity so saved examples live in the project dataset instead of only localStorage
+  - merged remote and local examples on load, added auto-refresh on focus/visibility, and exposed a manual `同步案例` action
+  - added variant-specific draft storage keys so legacy and formal drafts do not overwrite each other
+  - added mobile-responsive layout helpers for tabs, car-fee rows, internal table overflow, and the external quote card
+  - added top quick links to `Structure` and the active pricing tool so collaborators can jump tools more easily on mobile
+- **Code commit:** `d48d229` `feat: sync shared pricing examples`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
