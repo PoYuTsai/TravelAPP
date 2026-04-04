@@ -90,6 +90,21 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts`
   - `npm.cmd run build`
 
+## Guide Days And Mobile Polish Record
+
+- **Completed:** 2026-04-04
+- **Goal:** let pricing quotes include guide service for only part of the itinerary and make the phone layout feel steadier during editing.
+- **Changes:**
+  - added a guide-day selector under `含導遊` so users can charge guide service for fewer days than the full car itinerary
+  - saved guide days inside shared pricing examples so reloading a case preserves the custom guide count
+  - separated child-seat billing days from guide days, keeping seat charges tied to car days
+  - refined the phone layout for saved-case controls, option toggles, and horizontal scroll containers
+- **Code commit:** `3d70755` `feat: add configurable guide days`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
