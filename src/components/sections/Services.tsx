@@ -24,7 +24,7 @@ const defaultServices: ServiceItem[] = [
       '行程彈性不趕路',
       '接機 / 送機服務',
     ],
-    price: '每日 NT$ 3,200 起',
+    price: '每日 NT$ 3,700 起',
     ctaText: '了解包車服務',
     ctaLink: '/services/car-charter',
   },

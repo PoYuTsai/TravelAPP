@@ -211,7 +211,7 @@ export const defaultSiteSettings: SiteSettings = {
     },
     {
       question: '清邁一日親子包車的費用是多少？如何預訂？',
-      answer: '一日包車方案從 NT$3,200 起，含油費，12 小時服務。可透過官網 LINE 按鈕免費諮詢，與 Eric 或 Min 討論行程後確認預訂。',
+      answer: '一日包車方案從 NT$3,700 起，含油費，10 小時服務。可透過官網 LINE 按鈕免費諮詢，與 Eric 或 Min 討論行程後確認預訂。',
     },
     {
       question: '清微旅行有提供兒童汽車座椅嗎？',

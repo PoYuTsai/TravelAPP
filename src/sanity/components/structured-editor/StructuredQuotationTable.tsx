@@ -46,14 +46,14 @@ export function StructuredQuotationTable({
       const isFirst = index === 0
       const isLast = index === dates.length - 1
       let description = ''
-      let price = 3500
+      let price = 4000
 
       if (isFirst) {
         description = '接機+市區'
-        price = 3200
+        price = 3700
       } else if (isLast) {
         description = '送機'
-        price = 600
+        price = 700
       }
 
       return {
