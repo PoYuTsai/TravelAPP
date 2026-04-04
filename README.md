@@ -43,6 +43,7 @@
 | 維護 2026-04-04 | Studio 權限分流 + 報價計算正式版 | ✅ 完成 |
 | 維護 2026-04-04 | 包車價格同步（前台 / 後台 / LINE OA 文件） | ✅ 完成 |
 | 維護 2026-04-04 | Studio pricing 工具 SSR hotfix | ✅ 完成 |
+| 維護 2026-04-04 | Studio 夥伴登入 email 更新 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -431,4 +432,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-04-04 studio pricing SSR hotfix -->
+<!-- Last build trigger: 2026-04-04 studio collaborator email update -->

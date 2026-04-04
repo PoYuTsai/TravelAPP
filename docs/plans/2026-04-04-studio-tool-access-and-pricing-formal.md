@@ -20,7 +20,7 @@
 
 Add tests that assert:
 - `lyc32580@gmail.com` only sees `structure` and `pricing-formal`
-- `moon12sun20@gmail.com` only sees `structure` and `pricing-formal`
+- `moon12sun20@yahoo.com.tw` only sees `structure` and `pricing-formal`
 - unrestricted users keep `structure`, `dashboard`, `accounting`, `pricing`, and `pricing-formal`
 - renamed tool titles match the requested labels
 
@@ -64,6 +64,14 @@ Expected: PASS
 - **Code commit:** `d7eb5cf` `fix: restore studio pricing route SSR`
 - **Verification:**
   - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/server-import.test.ts src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
+  - `npm.cmd run build`
+
+## Collaborator Email Update Record
+
+- **Completed:** 2026-04-04
+- **Change:** replaced Lulu's restricted Studio login email from `moon12sun20@gmail.com` to `moon12sun20@yahoo.com.tw`.
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
   - `npm.cmd run build`
 
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
