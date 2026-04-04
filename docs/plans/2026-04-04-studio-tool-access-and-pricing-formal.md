@@ -56,6 +56,16 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
   - `npm.cmd run build`
 
+## Studio SSR Hotfix Record
+
+- **Completed:** 2026-04-04
+- **Root cause:** `src/sanity/tools/pricing/PricingCalculator.tsx` imported `html2pdf.js` at module scope, so the embedded Next.js Studio route evaluated a browser-only package during production SSR and crashed with `ReferenceError: self is not defined`.
+- **Fix:** moved `html2pdf.js` to a lazy runtime import inside the PDF download flow and added `src/sanity/tools/pricing/__tests__/server-import.test.ts` to lock the server import behavior.
+- **Code commit:** `d7eb5cf` `fix: restore studio pricing route SSR`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/server-import.test.ts src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
