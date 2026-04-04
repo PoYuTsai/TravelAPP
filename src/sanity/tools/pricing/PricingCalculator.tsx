@@ -26,6 +26,7 @@ import {
   parsePricingExampleDocument,
   type PricingExampleDocument,
 } from './sharedExamples'
+import { clampGuideServiceDays, getChildSeatChargeDays } from './serviceDays'
 import { getPricingResponsiveLayout } from './ui'
 
 async function loadHtml2Pdf() {
@@ -665,7 +666,7 @@ function downloadExternalQuote(
         <div class="price-detail">• 包車 ${tripDays} 天 × ${c.carCount}台</div>
         <div class="price-detail">• 中文導遊 ${c.guideDays} 天</div>
         ${c.needLuggageCar ? `<div class="price-detail">• 行李車（接機＋送機）</div>` : ''}
-        ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.guideDays}天</div>` : ''}
+        ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.childSeatDays}天</div>` : ''}
 
         ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `
         <div class="price-row category">
@@ -995,6 +996,7 @@ interface SavedQuote {
     includeAccommodation?: boolean
     includeMeals?: boolean
     includeGuide?: boolean
+    guideDays?: number
     luggageCar?: boolean
     childSeatCount?: number
     babySeatCount?: number  // 嬰兒座椅
@@ -1187,6 +1189,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [includeMeals, setIncludeMeals] = useState(true)
   const [includeTickets, setIncludeTickets] = useState(true)
   const [includeGuide, setIncludeGuide] = useState(true)  // 導遊選項
+  const [guideServiceDays, setGuideServiceDays] = useState(config.guideDays)
   const [collectDeposit, setCollectDeposit] = useState(false)  // 代收押金（預設不收）
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})  // 房型分類展開狀態
   const [activeTab, setActiveTab] = useState<'input' | 'internal' | 'external'>('input')
@@ -1662,6 +1665,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         includeAccommodation,
         includeMeals,
         includeGuide,
+        guideDays: guideServiceDays,
         luggageCar,
         childSeatCount,
         babySeatCount,
@@ -1733,6 +1737,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.includeAccommodation !== undefined) setIncludeAccommodation(quote.data.includeAccommodation)
     if (quote.data.includeMeals !== undefined) setIncludeMeals(quote.data.includeMeals)
     if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
+    setGuideServiceDays(
+      clampGuideServiceDays(
+        quote.data.guideDays,
+        quote.data.carFees?.length ?? tripDays,
+        config.guideDays
+      )
+    )
     if (quote.data.luggageCar !== undefined) setLuggageCar(quote.data.luggageCar)
     if (quote.data.childSeatCount !== undefined) setChildSeatCount(quote.data.childSeatCount)
     if (quote.data.babySeatCount !== undefined) setBabySeatCount(quote.data.babySeatCount)
@@ -1773,6 +1784,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setIncludeAccommodation(true)
     setIncludeMeals(true)
     setIncludeGuide(true)
+    setGuideServiceDays(config.guideDays)
     setCollectDeposit(true)
     // 重置車費
     setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({ ...d, date: '' })))
@@ -1956,6 +1968,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const tripDays = carFees.length
   const tripNights = tripDays - 1 // 天數 - 1 = 晚數
 
+  useEffect(() => {
+    setGuideServiceDays((prev) => clampGuideServiceDays(prev, tripDays, config.guideDays))
+  }, [config.guideDays, tripDays])
+
   // Auto-adjust luggage car based on max passengers per car
   // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
   useEffect(() => {
@@ -1968,9 +1984,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
   // Calculations
   const calculation = useMemo(() => {
-    const { mealDays, guideDays, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    const { mealDays, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
     // 使用動態車費（carFees state）而非 config.dailyCarFees
     const dailyCarFees = carFees
+    const carServiceDays = dailyCarFees.length
+    const childSeatDays = getChildSeatChargeDays(carServiceDays)
+    const guideDays = includeGuide
+      ? clampGuideServiceDays(guideServiceDays, carServiceDays, config.guideDays)
+      : 0
     // 使用多飯店的總晚數
     const nights = totalNights
 
@@ -2065,7 +2086,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const luggageCost = needLuggageCar ? luggagePerTrip * 2 : 0
 
     // Child Seats (0-2歲嬰兒座椅, 3-5歲兒童座椅)
-    const childSeatCost = (babySeatCount + childSeatCount) * config.childSeatPerDay * guideDays
+    const childSeatCost =
+      (babySeatCount + childSeatCount) * config.childSeatPerDay * childSeatDays
 
     const transportCost = carCostTotal + guideCost
     const transportPrice = carPriceTotal + guidePrice + luggageCost + childSeatCost
@@ -2164,7 +2186,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, mealLevel,
+      people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
       includeAccommodation, includeMeals, includeTickets, hotels, hotelsWithDeposit, totalRoomCapacity,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
@@ -2175,7 +2197,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, guideServiceDays, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
   const formalProfitShares =
@@ -2381,24 +2403,24 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             <p style={{ fontSize: 12, color: '#666', margin: '0 0 12px 0' }}>
               儲存完整報價設定，下次可快速載入或複製修改
             </p>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: responsive.isCompact ? 'stretch' : 'center', flexDirection: responsive.isCompact ? 'column' : 'row', flexWrap: 'wrap', marginBottom: 12 }}>
               <input
                 type="text"
                 value={currentQuoteName}
                 onChange={e => setCurrentQuoteName(e.target.value)}
                 placeholder="輸入名稱（例：王先生 6天5夜 2/12-17）"
-                style={{ flex: 1, minWidth: 200, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
+                style={{ flex: 1, width: responsive.isCompact ? '100%' : 'auto', minWidth: responsive.isCompact ? '100%' : 200, padding: 8, border: '1px solid #ccc', borderRadius: 4, fontSize: 13, boxSizing: 'border-box' }}
               />
               <button
                 onClick={saveCurrentQuote}
                 disabled={isSavingQuote}
-                style={{ padding: '8px 16px', background: isSavingQuote ? '#c7a9cf' : '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: isSavingQuote ? 'wait' : 'pointer', fontSize: 13 }}
+                style={{ padding: '8px 16px', width: responsive.isCompact ? '100%' : 'auto', background: isSavingQuote ? '#c7a9cf' : '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: isSavingQuote ? 'wait' : 'pointer', fontSize: 13 }}
               >
                 💾 儲存
               </button>
               <button
                 onClick={resetAllFields}
-                style={{ padding: '8px 16px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
+                style={{ padding: '8px 16px', width: responsive.isCompact ? '100%' : 'auto', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
               >
                 ✨ 新建
               </button>
@@ -2438,7 +2460,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                       key={q.id}
                       style={{
                         display: 'flex',
-                        alignItems: 'center',
+                        alignItems: responsive.isCompact ? 'stretch' : 'center',
+                        flexDirection: responsive.savedQuoteCardDirection,
                         gap: 8,
                         padding: 8,
                         background: '#fff',
@@ -2457,25 +2480,34 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                             : ''}
                         </div>
                       </div>
-                      <button
-                        onClick={() => loadQuote(q)}
-                        style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                      <div
+                        style={{
+                          display: responsive.isCompact ? 'grid' : 'flex',
+                          gridTemplateColumns: responsive.isCompact ? 'repeat(3, minmax(0, 1fr))' : undefined,
+                          gap: 8,
+                          width: responsive.isCompact ? '100%' : 'auto',
+                        }}
                       >
-                        📥 載入
-                      </button>
-                      <button
-                        onClick={() => forkQuote(q)}
-                        style={{ padding: '4px 8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                      >
-                        📋 複製
-                      </button>
-                      <button
-                        onClick={() => deleteQuote(q.id)}
-                        disabled={isRestrictedUser}
-                        style={{ padding: '4px 8px', background: isRestrictedUser ? '#ef9a9a' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: isRestrictedUser ? 'not-allowed' : 'pointer', fontSize: 11 }}
-                      >
-                        🗑️
-                      </button>
+                        <button
+                          onClick={() => loadQuote(q)}
+                          style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                        >
+                          📥 載入
+                        </button>
+                        <button
+                          onClick={() => forkQuote(q)}
+                          style={{ padding: '4px 8px', background: '#ff9800', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                        >
+                          📋 複製
+                        </button>
+                        <button
+                          onClick={() => deleteQuote(q.id)}
+                          disabled={isRestrictedUser}
+                          style={{ padding: '4px 8px', background: isRestrictedUser ? '#ef9a9a' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: isRestrictedUser ? 'not-allowed' : 'pointer', fontSize: 11 }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2710,7 +2742,14 @@ Day 5｜送機
               {people < 4 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 4 人（目前 {people} 人）</span>}
               <span style={{ ...noteStyle, fontWeight: 'bold', color: '#5c4a2a' }}>共 {people} 人</span>
             </div>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'grid',
+                gap: 12,
+                gridTemplateColumns: responsive.serviceToggleGridColumns,
+                alignItems: 'center',
+              }}
+            >
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeAccommodation} onChange={e => setIncludeAccommodation(e.target.checked)} style={{ width: 16, height: 16 }} />
                 <span>🏨 含住宿</span>
@@ -2734,6 +2773,50 @@ Day 5｜送機
                 </label>
               )}
             </div>
+            {includeGuide && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 10,
+                  background: '#f9f8f6',
+                  borderRadius: 8,
+                  display: 'flex',
+                  flexDirection: responsive.isCompact ? 'column' : 'row',
+                  alignItems: responsive.isCompact ? 'stretch' : 'center',
+                  gap: 10,
+                }}
+              >
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                  <span>🗓️ 導遊天數</span>
+                  <select
+                    value={guideServiceDays}
+                    onChange={e =>
+                      setGuideServiceDays(
+                        clampGuideServiceDays(
+                          Number(e.target.value),
+                          tripDays,
+                          config.guideDays
+                        )
+                      )
+                    }
+                    style={{
+                      ...inputStyle,
+                      width: responsive.isCompact ? '100%' : 90,
+                      maxWidth: responsive.isCompact ? '100%' : 90,
+                    }}
+                  >
+                    {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
+                      <option key={day} value={day}>
+                        {day} 天
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <span style={{ ...noteStyle, color: '#666' }}>
+                  包車仍按 {tripDays} 天計算，導遊只按實際聘請的 {calculation.guideDays} 天計
+                </span>
+              </div>
+            )}
             {(!includeAccommodation || !includeMeals || noActivitiesSelected || !includeGuide) && (
               <div style={{ marginTop: 10, padding: 8, background: '#fff3e0', borderRadius: 6, fontSize: 13 }}>
                 💡 {[
@@ -3153,7 +3236,7 @@ Day 5｜送機
               </div>
               {(babySeatCount > 0 || childSeatCount > 0) && (
                 <div style={{ marginTop: 10, padding: 8, background: '#f9f8f6', borderRadius: 4, fontSize: 12 }}>
-                  🪑 座椅費用：({babySeatCount} + {childSeatCount}) × 500 × {calculation.guideDays}天 = <strong>{fmt(calculation.childSeatCost)} 泰銖</strong>
+                  🪑 座椅費用：({babySeatCount} + {childSeatCount}) × 500 × {calculation.childSeatDays}天 = <strong>{fmt(calculation.childSeatCost)} 泰銖</strong>
                 </div>
               )}
             </div>
@@ -3352,7 +3435,7 @@ Day 5｜送機
                     </button>
                   </div>
                 </div>
-                <div style={{ overflowX: 'auto' }}>
+                <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain', touchAction: 'pan-x pan-y', paddingBottom: 4 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                     <thead>
                       <tr style={{ background: '#e0e0e0' }}>
@@ -3723,7 +3806,7 @@ Day 5｜送機
       {/* Internal Tab */}
       {activeTab === 'internal' && (
         <Section title="📊 成本/售價/利潤明細（內部用）">
-          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehaviorX: 'contain', touchAction: 'pan-x pan-y', paddingBottom: 4 }}>
           <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f5f5f5' }}>
@@ -3770,7 +3853,7 @@ Day 5｜送機
               <SectionRow title="👤 導遊" />
               <DataRow name={`導遊 (${calculation.guideDays}天)`} cost={calculation.guideCost} price={calculation.guidePrice} profit={calculation.guidePrice - calculation.guideCost} />
               {calculation.needLuggageCar && <DataRow name="行李車 (2趟)" cost={0} price={calculation.luggageCost} profit={calculation.luggageCost} />}
-              {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${babySeatCount + childSeatCount}張 × ${calculation.guideDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
+              {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${babySeatCount + childSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
               <SubtotalRow name="車導總計" cost={calculation.transportCost} price={calculation.transportPrice} profit={calculation.transportProfit} />
               <InfoRow text="※ 接送機已含在 D1/D6 車費" />
 
@@ -4016,10 +4099,10 @@ Day 5｜送機
                 <span style={{ fontWeight: 'bold' }}>{fmt(calculation.transportPrice)} 泰銖</span>
               </div>
               <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
-                • 包車 6 天 × {calculation.carCount}台<br />
+                • 包車 {calculation.carServiceDays} 天 × {calculation.carCount}台<br />
                 • 中文導遊 {calculation.guideDays} 天
                 {calculation.needLuggageCar && <><br />• 行李車（接機＋送機）</>}
-                {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {babySeatCount + childSeatCount}張 × {calculation.guideDays}天</>}
+                {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {babySeatCount + childSeatCount}張 × {calculation.childSeatDays}天</>}
               </div>
 
               {/* 門票+泰服明細（合併顯示） */}

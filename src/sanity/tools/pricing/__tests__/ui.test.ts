@@ -10,6 +10,8 @@ describe('pricing responsive layout', () => {
       sectionPadding: 14,
       carFeeGridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
       internalTableMinWidth: 560,
+      serviceToggleGridColumns: 'repeat(2, minmax(0, 1fr))',
+      savedQuoteCardDirection: 'column',
     })
   })
 
@@ -20,6 +22,8 @@ describe('pricing responsive layout', () => {
       sectionPadding: 20,
       carFeeGridTemplateColumns: '50px 60px minmax(180px, 1fr) 80px 80px 30px',
       internalTableMinWidth: 0,
+      serviceToggleGridColumns: 'repeat(4, max-content)',
+      savedQuoteCardDirection: 'row',
     })
   })
 })
