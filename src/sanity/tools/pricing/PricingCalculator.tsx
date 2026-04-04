@@ -2,7 +2,6 @@
 // 報價計算器 - 複製 HTML prototype 的 UI
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import html2pdf from 'html2pdf.js'
 import {
   parseItineraryText,
   matchActivitiesToDatabase,
@@ -18,6 +17,11 @@ import {
   normalizeTicketsForVariant,
   type PricingCalculatorVariant,
 } from './variants'
+
+async function loadHtml2Pdf() {
+  const html2pdfModule = await import('html2pdf.js')
+  return (html2pdfModule.default ?? html2pdfModule) as any
+}
 
 // 互斥群組定義 - 同群組只能選一個
 const EXCLUSIVE_GROUPS: Record<string, string[]> = {
@@ -838,13 +842,16 @@ function downloadExternalQuote(
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
   }
 
-  html2pdf().set(opt).from(element).save().then(() => {
-    document.body.removeChild(container)
-  }).catch((err: Error) => {
-    document.body.removeChild(container)
-    console.error('PDF 產生錯誤:', err)
-    alert('PDF 下載失敗，請再試一次')
-  })
+  loadHtml2Pdf()
+    .then((html2pdf) => html2pdf().set(opt).from(element).save())
+    .then(() => {
+      document.body.removeChild(container)
+    })
+    .catch((err: Error) => {
+      document.body.removeChild(container)
+      console.error('PDF 產生錯誤:', err)
+      alert('PDF 下載失敗，請再試一次')
+    })
 }
 
 // 行程資料（跟 HTML v3 一樣）
