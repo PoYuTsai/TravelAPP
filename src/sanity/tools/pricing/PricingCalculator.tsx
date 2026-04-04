@@ -27,6 +27,11 @@ import {
   type PricingExampleDocument,
 } from './sharedExamples'
 import { clampGuideServiceDays, getChildSeatChargeDays } from './serviceDays'
+import {
+  getThaiDressPhotographerCount,
+  getThaiDressPhotographerLabel,
+  shouldOfferExtraPhotographer,
+} from './thaiDress'
 import { getPricingResponsiveLayout } from './ui'
 
 async function loadHtml2Pdf() {
@@ -677,7 +682,7 @@ function downloadExternalQuote(
         ${c.selectedTickets.length > 6 ? `<div class="price-detail">• ...及其他 ${c.selectedTickets.length - 6} 項</div>` : ''}
         ${thaiDressCloth ? `<div class="price-detail">• 泰服衣服 500/人 × ${people}人</div>` : ''}
         ${makeupCount > 0 ? `<div class="price-detail">• 專業化妝 1,000/人 × ${makeupCount}人</div>` : ''}
-        ${thaiDressPhoto ? `<div class="price-detail">• 攝影師 2,500/位 × ${people <= 10 ? 1 : 2}位</div>` : ''}
+        ${thaiDressPhoto ? `<div class="price-detail">• ${getThaiDressPhotographerLabel(c.photographerCount)} × 2,500</div>` : ''}
         ` : ''}
 
         ${c.insuranceCost > 0 ? `
@@ -1002,6 +1007,7 @@ interface SavedQuote {
     babySeatCount?: number  // 嬰兒座椅
     thaiDressCloth?: boolean
     thaiDressPhoto?: boolean
+    extraPhotographer?: boolean
     makeupCount?: number
     mealLevel?: number  // 餐費等級
     collectDeposit?: boolean
@@ -1179,6 +1185,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [savedParsedTickets, setSavedParsedTickets] = useState<DynamicTicket[]>([])  // 保存解析後的門票，用於切換回去
   const [thaiDressCloth, setThaiDressCloth] = useState(true)
   const [thaiDressPhoto, setThaiDressPhoto] = useState(true)  // 攝影師預設勾選
+  const [extraPhotographer, setExtraPhotographer] = useState(false)
   const [makeupCount, setMakeupCount] = useState(0)
   const [thaiDressDay, setThaiDressDay] = useState<number | null>(null)  // 泰服在哪一天（從解析結果取得）
   const [luggageCar, setLuggageCar] = useState(true)
@@ -1671,6 +1678,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         babySeatCount,
         thaiDressCloth,
         thaiDressPhoto,
+        extraPhotographer,
         makeupCount,
         mealLevel,
         collectDeposit,
@@ -1749,6 +1757,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.babySeatCount !== undefined) setBabySeatCount(quote.data.babySeatCount)
     if (quote.data.thaiDressCloth !== undefined) setThaiDressCloth(quote.data.thaiDressCloth)
     if (quote.data.thaiDressPhoto !== undefined) setThaiDressPhoto(quote.data.thaiDressPhoto)
+    setExtraPhotographer(Boolean(quote.data.extraPhotographer))
     if (quote.data.makeupCount !== undefined) setMakeupCount(quote.data.makeupCount)
     if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
     if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
@@ -1864,6 +1873,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 重置泰服
     setThaiDressCloth(false)
     setThaiDressPhoto(false)
+    setExtraPhotographer(false)
     setMakeupCount(0)
     setThaiDressDay(null)
     // 清空報價名稱
@@ -1972,6 +1982,12 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setGuideServiceDays((prev) => clampGuideServiceDays(prev, tripDays, config.guideDays))
   }, [config.guideDays, tripDays])
 
+  useEffect(() => {
+    if (!thaiDressPhoto || !shouldOfferExtraPhotographer(people)) {
+      setExtraPhotographer(false)
+    }
+  }, [people, thaiDressPhoto])
+
   // Auto-adjust luggage car based on max passengers per car
   // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
   useEffect(() => {
@@ -1992,6 +2008,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const guideDays = includeGuide
       ? clampGuideServiceDays(guideServiceDays, carServiceDays, config.guideDays)
       : 0
+    const photographerCount = getThaiDressPhotographerCount({
+      isSelected: thaiDressPhoto,
+      people,
+      includeExtraPhotographer: extraPhotographer,
+    })
     // 使用多飯店的總晚數
     const nights = totalNights
 
@@ -2154,7 +2175,6 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       thaiDressPartnerProfit += profit / 2
     }
     if (thaiDressPhoto) {
-      const photographerCount = people <= 10 ? 1 : 2
       const photoCost = (thaiDress.photo.price - thaiDress.photo.rebate) * photographerCount
       const photoPrice = thaiDress.photo.price * photographerCount
       thaiDressCost += photoCost
@@ -2191,13 +2211,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost, childSeatCost,
+      photographerCount,
       selectedTickets, ticketCost, ticketPrice, ticketYourProfit, ticketPartnerProfit,
       thaiDressCost, thaiDressPrice, thaiDressYourProfit, thaiDressPartnerProfit,
       insuranceCost, totalCost, totalPrice, yourTotalProfit, partnerTotalProfit,
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, guideServiceDays, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeGuide, guideServiceDays, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
   const formalProfitShares =
@@ -2291,6 +2312,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const noTicketsSelected = tickets.every(t => !t.checked)
   const allActivitiesSelected = allTicketsSelected && thaiDressCloth
   const noActivitiesSelected = noTicketsSelected && !thaiDressCloth && !thaiDressPhoto && makeupCount === 0
+  const showExtraPhotographerOption = shouldOfferExtraPhotographer(people)
+  const photographerPricingNote = variantUi.showThaiDressCostCopy
+    ? '售價 2,500 / 成本 500 /位（1 小時，1 位最多服務 10 位）'
+    : '2,500 /位（1 小時，1 位最多服務 10 位）'
   const currentToolPath = variant === 'formal' ? '/studio/pricing-formal' : '/studio/pricing'
   const tabButtonStyle = (isActive: boolean, accentColor = '#5c4a2a') => ({
     padding: responsive.isCompact ? '10px 12px' : '10px 20px',
@@ -3660,9 +3685,15 @@ Day 5｜送機
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                             <span style={{ fontSize: 13, opacity: 0 }}>👘</span>
                             <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
-                            <label style={{ fontSize: 13 }}>攝影師</label>
-                            <span style={{ ...noteStyle, fontSize: 11 }}>2,500/位</span>
+                            <label style={{ fontSize: 13 }}>攝影師 1 小時</label>
+                            <span style={{ ...noteStyle, fontSize: 11 }}>{photographerPricingNote}</span>
                           </div>
+                          {thaiDressPhoto && showExtraPhotographerOption && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, paddingLeft: 21 }}>
+                              <input type="checkbox" checked={extraPhotographer} onChange={e => setExtraPhotographer(e.target.checked)} />
+                              <label style={{ fontSize: 12 }}>超過 10 位，如需再加 1 位攝影師再勾</label>
+                            </div>
+                          )}
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 13, opacity: 0 }}>👘</span>
                             <label style={{ fontSize: 13 }}>化妝</label>
@@ -3771,9 +3802,15 @@ Day 5｜送機
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <input type="checkbox" checked={thaiDressPhoto} onChange={e => setThaiDressPhoto(e.target.checked)} />
-                  <label>攝影師</label>
-                  <span style={noteStyle}>{variantUi.showThaiDressCostCopy ? '售價 2,500 / 成本 500 /位（1位可拍10人）' : '2,500 /位（1位可拍10人）'}</span>
+                  <label>攝影師 1 小時</label>
+                  <span style={noteStyle}>{photographerPricingNote}</span>
                 </div>
+                {thaiDressPhoto && showExtraPhotographerOption && (
+                  <Row style={{ marginTop: -4 }}>
+                    <input type="checkbox" checked={extraPhotographer} onChange={e => setExtraPhotographer(e.target.checked)} />
+                    <span style={{ fontSize: 13 }}>超過 10 位，如需再加 1 位攝影師再勾</span>
+                  </Row>
+                )}
                 <Row style={{ marginTop: 8 }}>
                   <label>化妝人數</label>
                   <input type="number" value={makeupCount} onChange={e => setMakeupCount(Number(e.target.value))} min={0} max={50} style={inputStyle} />
@@ -3906,10 +3943,10 @@ Day 5｜送機
                 />
               )}
               {thaiDressPhoto && (() => {
-                const photographerCount = people <= 10 ? 1 : 2
+                const photographerCount = calculation.photographerCount
                 return (
                   <DataRow
-                    name={`攝影師${variantUi.showTicketRefundSplitNote ? ' ★' : ''} (${photographerCount}位)`}
+                    name={`${getThaiDressPhotographerLabel(photographerCount)}${variantUi.showTicketRefundSplitNote ? ' ★' : ''}`}
                     cost={(config.thaiDress.photo.price - config.thaiDress.photo.rebate) * photographerCount}
                     price={config.thaiDress.photo.price * photographerCount}
                     profit={config.thaiDress.photo.rebate * photographerCount}
@@ -4119,7 +4156,7 @@ Day 5｜送機
                     {/* 泰服項目 */}
                     {thaiDressCloth && <div>• 泰服衣服 {fmt(config.thaiDress.cloth.price)}/人 × {people}人</div>}
                     {makeupCount > 0 && <div>• 專業化妝 1,000/人 × {makeupCount}人</div>}
-                    {thaiDressPhoto && <div>• 攝影師 2,500/位 × {people <= 10 ? 1 : 2}位</div>}
+                    {thaiDressPhoto && <div>• {getThaiDressPhotographerLabel(calculation.photographerCount)} × 2,500</div>}
                   </div>
                 </>
               )}
