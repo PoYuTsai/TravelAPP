@@ -8,13 +8,14 @@ export const TWD_TRANSFER_ACCOUNT = {
 export const EXTERNAL_QUOTE_BRAND = {
   brandName: '清微旅行 Chiangway Travel',
   subtitle: '在地清邁包車與客製旅遊報價',
-  badges: ['台灣爸爸 × 泰國媽媽', '清邁在地親子旅遊'],
+  supportLine: '台灣爸爸 × 泰國媽媽｜清邁在地親子旅遊',
 } as const
 
 export const EXTERNAL_QUOTE_LAYOUT = {
   maxWidth: 640,
-  headerPaddingDesktop: 20,
-  headerPaddingMobile: 16,
+  headerPaddingDesktop: 28,
+  headerPaddingMobile: 20,
+  headerContentMaxWidth: 460,
 } as const
 
 export const EXTERNAL_QUOTE_THEME = {

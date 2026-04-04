@@ -989,6 +989,9 @@ function downloadSimpleExternalQuote(
     }
     .header-copy {
       padding: 0;
+      max-width: ${EXTERNAL_QUOTE_LAYOUT.headerContentMaxWidth}px;
+      margin: 0 auto;
+      text-align: center;
     }
     .eyebrow {
       margin: 0;
@@ -998,7 +1001,7 @@ function downloadSimpleExternalQuote(
       color: ${EXTERNAL_QUOTE_THEME.text};
     }
     .header p {
-      margin: 8px 0 0 0;
+      margin: 10px 0 0 0;
       font-size: 13px;
       color: ${EXTERNAL_QUOTE_THEME.textSoft};
     }
@@ -1006,30 +1009,21 @@ function downloadSimpleExternalQuote(
       width: 72px;
       height: 2px;
       border-radius: 999px;
-      margin: 16px 0 14px;
+      margin: 18px auto 16px;
       background: linear-gradient(90deg, ${EXTERNAL_QUOTE_THEME.accentSoft} 0%, ${EXTERNAL_QUOTE_THEME.accent} 100%);
     }
-    .header-badges {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .header-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid rgba(216, 155, 71, 0.35);
-      background: rgba(255, 250, 242, 0.85);
-      color: ${EXTERNAL_QUOTE_THEME.textSoft};
-      font-size: 11px;
-      font-weight: 600;
-    }
     .header .trip {
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 700;
       color: ${EXTERNAL_QUOTE_THEME.text};
+      line-height: 1.25;
+      letter-spacing: 0.01em;
+    }
+    .header-support {
+      margin-top: 12px;
+      font-size: 12px;
+      color: ${EXTERNAL_QUOTE_THEME.textMuted};
+      letter-spacing: 0.02em;
     }
     .section { margin-bottom: 18px; }
     .section-title {
@@ -1161,7 +1155,8 @@ function downloadSimpleExternalQuote(
       .pdf-container { padding: 18px 14px 22px; }
       .quote-shell { padding: 16px; border-radius: 18px; }
       .header { padding: ${EXTERNAL_QUOTE_LAYOUT.headerPaddingMobile}px; }
-      .header .trip { font-size: 20px; }
+      .header-copy { max-width: 100%; }
+      .header .trip { font-size: 22px; }
       .grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -1171,13 +1166,11 @@ function downloadSimpleExternalQuote(
     <div class="quote-shell">
     <div class="header">
       <div class="header-copy">
-        <div class="header-badges">
-          ${headerCopy.badges.map((badge) => `<span class="header-badge">${badge}</span>`).join('')}
-        </div>
         <div class="eyebrow">${headerCopy.brandName}</div>
         <p>${headerCopy.subtitle}</p>
         <div class="header-divider"></div>
         <div class="trip">${headerCopy.title}</div>
+        <div class="header-support">${headerCopy.supportLine}</div>
       </div>
     </div>
 
@@ -5367,38 +5360,18 @@ function ExternalQuoteTab({
             : EXTERNAL_QUOTE_LAYOUT.headerPaddingDesktop,
         }}
       >
-        <div style={{ padding: 0 }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
-            {headerCopy.badges.map((badge) => (
-              <div
-                key={badge}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '6px 10px',
-                  borderRadius: 999,
-                  border: '1px solid rgba(216, 155, 71, 0.35)',
-                  background: 'rgba(255, 250, 242, 0.85)',
-                  color: EXTERNAL_QUOTE_THEME.textSoft,
-                  fontSize: 11,
-                  fontWeight: 600,
-                }}
-              >
-                {badge}
-              </div>
-            ))}
-          </div>
+        <div
+          style={{
+            padding: 0,
+            maxWidth: EXTERNAL_QUOTE_LAYOUT.headerContentMaxWidth,
+            margin: '0 auto',
+            textAlign: 'center',
+          }}
+        >
           <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', color: EXTERNAL_QUOTE_THEME.text }}>
             {headerCopy.brandName}
           </div>
-          <p style={{ margin: '8px 0 0 0', color: EXTERNAL_QUOTE_THEME.textSoft, fontSize: 14 }}>
+          <p style={{ margin: '10px 0 0 0', color: EXTERNAL_QUOTE_THEME.textSoft, fontSize: 14 }}>
             {headerCopy.subtitle}
           </p>
           <div
@@ -5406,12 +5379,30 @@ function ExternalQuoteTab({
               width: 72,
               height: 2,
               borderRadius: 999,
-              margin: '16px 0 14px',
+              margin: '18px auto 16px',
               background: `linear-gradient(90deg, ${EXTERNAL_QUOTE_THEME.accentSoft} 0%, ${EXTERNAL_QUOTE_THEME.accent} 100%)`,
             }}
           />
-          <div style={{ fontSize: responsive.isCompact ? 22 : 26, fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>
+          <div
+            style={{
+              fontSize: responsive.isCompact ? 22 : 28,
+              fontWeight: 700,
+              color: EXTERNAL_QUOTE_THEME.text,
+              lineHeight: 1.25,
+              letterSpacing: '0.01em',
+            }}
+          >
             {headerCopy.title}
+          </div>
+          <div
+            style={{
+              marginTop: 12,
+              fontSize: 12,
+              color: EXTERNAL_QUOTE_THEME.textMuted,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {headerCopy.supportLine}
           </div>
         </div>
       </div>

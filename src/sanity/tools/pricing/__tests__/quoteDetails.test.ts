@@ -58,8 +58,9 @@ describe('pricing quote details', () => {
   it('keeps external quote layout dimensions shared between page and pdf', () => {
     expect(EXTERNAL_QUOTE_LAYOUT).toEqual({
       maxWidth: 640,
-      headerPaddingDesktop: 20,
-      headerPaddingMobile: 16,
+      headerPaddingDesktop: 28,
+      headerPaddingMobile: 20,
+      headerContentMaxWidth: 460,
     })
   })
 
@@ -68,7 +69,7 @@ describe('pricing quote details', () => {
       brandName: '清微旅行 Chiangway Travel',
       subtitle: '在地清邁包車與客製旅遊報價',
       title: '清邁 5 天 4 夜 行程報價',
-      badges: ['台灣爸爸 × 泰國媽媽', '清邁在地親子旅遊'],
+      supportLine: '台灣爸爸 × 泰國媽媽｜清邁在地親子旅遊',
     })
   })
 })
