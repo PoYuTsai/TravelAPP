@@ -49,6 +49,7 @@
 | 維護 2026-04-05 | 對外報價 PDF 品牌暖色改版 + 匯款資訊修正 | ✅ 完成 |
 | 維護 2026-04-05 | 對外報價 PDF 主視覺圖片匯出 hotfix | ✅ 完成 |
 | 維護 2026-04-05 | 對外報價 PDF 主視覺清晰度與裁切同步 | ✅ 完成 |
+| 維護 2026-04-05 | 對外報價 PDF 主視覺高解析資產更新 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -452,4 +453,4 @@ NOTION_TOKEN=
 - Studio pricing calculator now supports adjustable meal days, child-seat days, per-day guide cost/price, and editable daily car cost/price in both legacy and formal tools.
 - Shared pricing examples keep the new service-day and guide-rate fields, so saved cases reload consistently across collaborators.
 
-<!-- Last build trigger: 2026-04-05 external quote pdf hero sync -->
+<!-- Last build trigger: 2026-04-05 external quote pdf hi-res hero -->

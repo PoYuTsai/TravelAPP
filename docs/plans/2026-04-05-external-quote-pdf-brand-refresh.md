@@ -10,6 +10,7 @@
 - 補上 PDF sanitizer hotfix：保留安全的 `<img>` 標籤，避免主視覺在下載檔案中被整個移除。
 - 將對外報價頁面與 PDF 的主視覺寬高抽成共用設定，避免兩邊裁切比例不一致。
 - PDF 匯出改為依主視覺圖片實際寬度計算 `html2canvas` scale，避免用 3x 硬放大造成模糊。
+- 新增 `2x PNG` 主視覺資產，讓對外報價頁面與 PDF 都改吃較高品質來源，降低 JPG 壓縮感。
 
 ## Files Changed
 
@@ -30,3 +31,4 @@
 - Feature: `9c8da9f` `feat: refresh external quote pdf branding`
 - Hotfix: `2b4c576` `fix: preserve quote hero image in pdf export`
 - Hotfix: `408b52d` `fix: align quote pdf hero rendering`
+- Hotfix: `292e10e` `fix: improve quote hero image quality`
