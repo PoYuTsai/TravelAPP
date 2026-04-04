@@ -5,7 +5,7 @@ export const TWD_TRANSFER_ACCOUNT = {
   accountNumber: '51619501772100',
 } as const
 
-export const QUOTE_HERO_IMAGE_SRC = '/images/quote-hero-eric-min.jpg'
+export const QUOTE_HERO_IMAGE_SRC = '/images/quote-hero-eric-min-2x.png'
 
 export const EXTERNAL_QUOTE_LAYOUT = {
   maxWidth: 640,
@@ -33,7 +33,7 @@ export function resolveQuotePdfRenderScale(params: {
   renderWidth?: number
   fallbackScale?: number
 }): number {
-  const { imageNaturalWidth, renderWidth, fallbackScale = 2 } = params
+  const { imageNaturalWidth, renderWidth, fallbackScale = 3 } = params
 
   if (!imageNaturalWidth || !renderWidth || renderWidth <= 0) {
     return fallbackScale

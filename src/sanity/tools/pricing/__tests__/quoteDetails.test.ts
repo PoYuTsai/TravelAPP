@@ -65,7 +65,7 @@ describe('pricing quote details', () => {
 
   it('limits pdf render scale to the image natural resolution', () => {
     expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 1256, renderWidth: 640 })).toBe(1.96)
-    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 2400, renderWidth: 640 })).toBe(2)
-    expect(resolveQuotePdfRenderScale({ renderWidth: 640 })).toBe(2)
+    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 2400, renderWidth: 640 })).toBe(3)
+    expect(resolveQuotePdfRenderScale({ renderWidth: 640 })).toBe(3)
   })
 })

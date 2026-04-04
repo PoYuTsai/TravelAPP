@@ -6,14 +6,14 @@ import { sanitizeQuoteHtml } from '@/sanity/tools/pricing/quoteHtml'
 
 describe('sanitizeQuoteHtml', () => {
   it('keeps safe image tags for quote pdf rendering', () => {
-    const html = sanitizeQuoteHtml('<div><img src="/images/quote-hero-eric-min.jpg" alt="hero" class="hero-image" /></div>')
+    const html = sanitizeQuoteHtml('<div><img src="/images/quote-hero-eric-min-2x.png" alt="hero" class="hero-image" /></div>')
 
     expect(html).toContain('<img')
-    expect(html).toContain('src="/images/quote-hero-eric-min.jpg"')
+    expect(html).toContain('src="/images/quote-hero-eric-min-2x.png"')
   })
 
   it('strips dangerous inline handlers from images', () => {
-    const html = sanitizeQuoteHtml('<img src="/images/quote-hero-eric-min.jpg" onerror="alert(1)" alt="hero" />')
+    const html = sanitizeQuoteHtml('<img src="/images/quote-hero-eric-min-2x.png" onerror="alert(1)" alt="hero" />')
 
     expect(html).toContain('<img')
     expect(html).not.toContain('onerror')
