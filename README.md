@@ -443,4 +443,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-04-04 manual insurance toggle -->
+<!-- Last build trigger: 2026-04-05 external quote simplification -->

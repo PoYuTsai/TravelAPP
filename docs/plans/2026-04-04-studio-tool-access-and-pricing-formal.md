@@ -135,6 +135,21 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/insurance.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/thaiDress.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
   - `npm.cmd run build`
 
+## External Quote Simplification Record
+
+- **Completed:** 2026-04-05
+- **Goal:** make the public-facing quote tab and PDF directly mirror the input selections, remove the auto-generated 30/70 payment split logic, and ensure the TWD total uses the real quote total instead of `per-person * people`.
+- **Changes:**
+  - added `src/sanity/tools/pricing/externalQuote.ts` to define one shared external-quote breakdown from the base calculator state
+  - replaced the external quote tab with a simpler itemized layout driven by the same input toggles and totals
+  - switched the PDF export to the same simplified breakdown so the page and downloaded quote stay aligned
+  - added `src/sanity/tools/pricing/__tests__/externalQuote.test.ts` to lock the new mapping and total behavior
+  - added payment policy reference docs for customer-facing wording, partner scripts, and the internal SOP
+- **Code commit:** `7940794` `feat: simplify external pricing quote flow`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/externalQuote.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
