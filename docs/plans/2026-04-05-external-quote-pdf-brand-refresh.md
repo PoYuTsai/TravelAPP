@@ -11,6 +11,8 @@
 - 將對外報價頁面與 PDF 的主視覺寬高抽成共用設定，避免兩邊裁切比例不一致。
 - PDF 匯出改為依主視覺圖片實際寬度計算 `html2canvas` scale，避免用 3x 硬放大造成模糊。
 - 新增 `2x PNG` 主視覺資產，讓對外報價頁面與 PDF 都改吃較高品質來源，降低 JPG 壓縮感。
+- 最終改版方向改為移除頂部主視覺圖片，統一使用暖色純文字品牌標頭，避免頁面與 PDF 視覺不一致。
+- 新增 shared header copy helper，讓 `對外報價` 頁面與 `下載 PDF` 共用同一份品牌文字與標籤。
 
 ## Files Changed
 
@@ -32,3 +34,4 @@
 - Hotfix: `2b4c576` `fix: preserve quote hero image in pdf export`
 - Hotfix: `408b52d` `fix: align quote pdf hero rendering`
 - Hotfix: `292e10e` `fix: improve quote hero image quality`
+- Final branding pass: `4366aea` `feat: simplify quote header branding`
