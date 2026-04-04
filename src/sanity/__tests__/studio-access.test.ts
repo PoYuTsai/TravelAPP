@@ -5,14 +5,15 @@ import { getStudioToolTitle, getVisibleStudioToolNames, isRestrictedStudioEmail 
 describe('studio access helper', () => {
   it('treats the two collaborator emails as restricted users', () => {
     expect(isRestrictedStudioEmail('lyc32580@gmail.com')).toBe(true)
-    expect(isRestrictedStudioEmail('moon12sun20@gmail.com')).toBe(true)
-    expect(isRestrictedStudioEmail('MOON12SUN20@GMAIL.COM')).toBe(true)
+    expect(isRestrictedStudioEmail('moon12sun20@yahoo.com.tw')).toBe(true)
+    expect(isRestrictedStudioEmail('MOON12SUN20@YAHOO.COM.TW')).toBe(true)
+    expect(isRestrictedStudioEmail('moon12sun20@gmail.com')).toBe(false)
     expect(isRestrictedStudioEmail('eric19921204@gmail.com')).toBe(false)
   })
 
   it('shows only structure and the formal pricing tool to restricted users', () => {
     expect(getVisibleStudioToolNames('lyc32580@gmail.com')).toEqual(['structure', 'pricing-formal'])
-    expect(getVisibleStudioToolNames('moon12sun20@gmail.com')).toEqual(['structure', 'pricing-formal'])
+    expect(getVisibleStudioToolNames('moon12sun20@yahoo.com.tw')).toEqual(['structure', 'pricing-formal'])
   })
 
   it('keeps the full tool list for unrestricted users', () => {

@@ -1,6 +1,6 @@
 const RESTRICTED_STUDIO_EMAILS = new Set([
   'lyc32580@gmail.com',
-  'moon12sun20@gmail.com',
+  'moon12sun20@yahoo.com.tw',
 ])
 
 const RESTRICTED_TOOL_NAMES = ['structure', 'pricing-formal'] as const
