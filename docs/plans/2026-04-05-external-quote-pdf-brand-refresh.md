@@ -15,6 +15,9 @@
 - 新增 shared header copy helper，讓 `對外報價` 頁面與 `下載 PDF` 共用同一份品牌文字與標籤。
 - 依 `ui-ux-pro-max` 的 service landing / minimal single column / trust & authority 建議，將 header 收斂成置中單欄版式。
 - 移除 badge 泡泡感，改為品牌名、服務副標、主標與品牌敘事一行，強化正式提案書感。
+- 最後一輪精修補上旅客資訊一行、移除底部重複的深色 `報價摘要`，避免頁面與 PDF 反覆重覆總價。
+- 將 `付款方式與時程` 與 `匯款帳號資訊` 改為雙卡資訊區塊，並把加時提醒抽成獨立子卡，閱讀順序更接近正式提案書。
+- 針對 PDF 卡片補上 `page-break-inside: avoid`，降低明細卡、總價卡、付款卡被匯出切頁的機率。
 
 ## Files Changed
 
@@ -28,6 +31,7 @@
 - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteHtml.test.ts`
 - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteDetails.test.ts src/sanity/tools/pricing/__tests__/quoteHtml.test.ts`
 - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteDetails.test.ts src/sanity/tools/pricing/__tests__/guideRate.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/externalQuote.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteDetails.test.ts src/sanity/tools/pricing/__tests__/quoteHtml.test.ts src/sanity/tools/pricing/__tests__/externalQuote.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
 - `npm.cmd run build`
 
 ## Commits
@@ -38,3 +42,4 @@
 - Hotfix: `292e10e` `fix: improve quote hero image quality`
 - Final branding pass: `4366aea` `feat: simplify quote header branding`
 - Refinement: `9dcb13d` `feat: refine quote layout using ui ux guidance`
+- Hierarchy polish: `c0e383f` `feat: polish external quote hierarchy`
