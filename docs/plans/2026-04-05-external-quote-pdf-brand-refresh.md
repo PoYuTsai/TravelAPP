@@ -7,6 +7,7 @@
 - 將 `對外報價` 頁面與 `下載報價 PDF` 一起改成暖奶油色系版型，套用 `Eric & Min` 主視覺圖。
 - 修正未勾選 `含住宿` 時，PDF 仍可能殘留預設飯店名稱的問題。
 - PDF 匯出前會等待主視覺圖片載入完成，降低匯出空白圖或半載入的風險。
+- 補上 PDF sanitizer hotfix：保留安全的 `<img>` 標籤，避免主視覺在下載檔案中被整個移除。
 
 ## Files Changed
 
@@ -17,9 +18,11 @@
 
 ## Verification
 
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteHtml.test.ts`
 - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/quoteDetails.test.ts src/sanity/tools/pricing/__tests__/guideRate.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/externalQuote.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts`
 - `npm.cmd run build`
 
 ## Commits
 
 - Feature: `9c8da9f` `feat: refresh external quote pdf branding`
+- Hotfix: pending current session commit
