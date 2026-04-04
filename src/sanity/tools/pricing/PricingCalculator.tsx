@@ -29,6 +29,12 @@ import {
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
+  buildQuoteItinerary,
+  EXTERNAL_QUOTE_THEME,
+  QUOTE_HERO_IMAGE_SRC,
+  TWD_TRANSFER_ACCOUNT,
+} from './quoteDetails'
+import {
   clampChildSeatServiceDays,
   clampGuideServiceDays,
   clampMealServiceDays,
@@ -821,9 +827,10 @@ function downloadExternalQuote(
       <div style="margin-top: 12px; padding: 12px; background: #f9f8f6; border: 1px solid #b89b4d; border-radius: 6px; font-size: 12px;">
         <div style="font-weight:bold;color:#5c4a2a;margin-bottom:8px;">🏦 台幣匯款資訊</div>
         <div style="color:#333; line-height: 1.8;">
-          戶名：<strong>蔡柏裕</strong><br />
-          銀行：彰化銀行（代碼 009）<br />
-          帳號：<strong>51619501772100</strong>
+          戶名：<strong>${TWD_TRANSFER_ACCOUNT.accountName}</strong><br />
+          銀行名稱：${TWD_TRANSFER_ACCOUNT.bankName}<br />
+          銀行代碼：${TWD_TRANSFER_ACCOUNT.bankCode}<br />
+          帳號：<strong>${TWD_TRANSFER_ACCOUNT.accountNumber}</strong>
         </div>
       </div>
     </div>
@@ -977,7 +984,19 @@ function downloadSimpleExternalQuote(
   })
 
   const itineraryToShow =
-    customItinerary && customItinerary.length > 0 ? customItinerary.slice(0, tripDays) : ITINERARY.slice(0, tripDays)
+    customItinerary && customItinerary.length > 0
+      ? customItinerary.slice(0, tripDays).map((day) => ({
+          ...day,
+          hotel: includeAccommodation ? day.hotel ?? null : null,
+        }))
+      : ITINERARY.slice(0, tripDays).map((day) => ({
+          ...day,
+          hotel: includeAccommodation ? day.hotel ?? null : null,
+        }))
+  const heroImageUrl =
+    typeof window !== 'undefined'
+      ? new URL(QUOTE_HERO_IMAGE_SRC, window.location.origin).toString()
+      : QUOTE_HERO_IMAGE_SRC
 
   const html = `<!DOCTYPE html>
 <html lang="zh-TW">
@@ -990,84 +1009,124 @@ function downloadSimpleExternalQuote(
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
-      color: #2c2c2c;
-      background: #fff;
+      color: ${EXTERNAL_QUOTE_THEME.text};
+      background: ${EXTERNAL_QUOTE_THEME.pageBackground};
       font-size: 13px;
-      line-height: 1.55;
+      line-height: 1.65;
     }
     .pdf-container {
       width: 100%;
-      max-width: 560px;
+      max-width: 620px;
       margin: 0 auto;
-      padding: 24px 20px;
-      background: #fff;
+      padding: 24px 18px 28px;
+      background: ${EXTERNAL_QUOTE_THEME.pageBackground};
+    }
+    .quote-shell {
+      background: ${EXTERNAL_QUOTE_THEME.surface};
+      border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow};
     }
     .header {
-      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
-      color: #fff;
-      padding: 24px 20px;
-      border-radius: 10px;
-      text-align: center;
+      background: linear-gradient(180deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 100%);
+      border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      border-radius: 18px;
+      overflow: hidden;
       margin-bottom: 20px;
+      box-shadow: 0 12px 28px ${EXTERNAL_QUOTE_THEME.shadow};
     }
-    .header h1 { margin: 0; font-size: 24px; }
-    .header p { margin: 8px 0 0 0; opacity: 0.9; font-size: 13px; }
-    .header .trip {
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid rgba(255,255,255,0.25);
-      font-size: 18px;
+    .hero-image {
+      display: block;
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      object-position: center top;
+    }
+    .header-copy {
+      padding: 18px 18px 20px;
+    }
+    .eyebrow {
+      margin: 0;
+      font-size: 12px;
       font-weight: 700;
+      letter-spacing: 0.03em;
+      color: ${EXTERNAL_QUOTE_THEME.text};
+    }
+    .header p {
+      margin: 8px 0 0 0;
+      font-size: 13px;
+      color: ${EXTERNAL_QUOTE_THEME.textSoft};
+    }
+    .header-divider {
+      width: 72px;
+      height: 2px;
+      border-radius: 999px;
+      margin: 16px 0 14px;
+      background: linear-gradient(90deg, ${EXTERNAL_QUOTE_THEME.accentSoft} 0%, ${EXTERNAL_QUOTE_THEME.accent} 100%);
+    }
+    .header .trip {
+      font-size: 24px;
+      font-weight: 700;
+      color: ${EXTERNAL_QUOTE_THEME.text};
     }
     .section { margin-bottom: 18px; }
     .section-title {
       margin: 0 0 12px 0;
-      color: #5c4a2a;
+      color: ${EXTERNAL_QUOTE_THEME.text};
       font-size: 15px;
       font-weight: 700;
-      border-bottom: 2px solid #5c4a2a;
-      padding-bottom: 8px;
+      border-bottom: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      padding-bottom: 10px;
     }
     .itinerary-day {
-      background: #fafafa;
-      border-left: 4px solid #5c4a2a;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 8px;
+      background: #fffdf9;
+      border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: 0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow};
     }
-    .itinerary-day .title { font-weight: 700; color: #5c4a2a; margin-bottom: 6px; }
-    .itinerary-day .items { font-size: 12px; color: #555; }
-    .itinerary-day .hotel { margin-top: 6px; font-size: 11px; color: #888; }
-    .meta { font-size: 14px; color: #555; margin-bottom: 12px; }
-    .breakdown { background: #fafafa; border-radius: 8px; padding: 16px; }
+    .itinerary-day .title { font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.text}; margin-bottom: 6px; }
+    .itinerary-day .items { font-size: 12px; color: ${EXTERNAL_QUOTE_THEME.textSoft}; }
+    .itinerary-day .hotel { margin-top: 6px; font-size: 11px; color: ${EXTERNAL_QUOTE_THEME.textMuted}; }
+    .meta { font-size: 13px; color: ${EXTERNAL_QUOTE_THEME.textSoft}; margin-bottom: 12px; }
+    .breakdown {
+      background: #fffdf9;
+      border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow};
+    }
     .breakdown-row {
       display: flex;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 0;
-      border-bottom: 1px dashed #ddd;
+      padding: 11px 0;
+      border-bottom: 1px dashed ${EXTERNAL_QUOTE_THEME.border};
     }
     .breakdown-row:last-child { border-bottom: none; }
-    .breakdown-row .label { font-weight: 700; color: #5c4a2a; }
-    .breakdown-row .desc { font-size: 12px; color: #666; margin-top: 4px; }
+    .breakdown-row .label { font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.text}; }
+    .breakdown-row .desc { font-size: 12px; color: ${EXTERNAL_QUOTE_THEME.textSoft}; margin-top: 4px; }
     .breakdown-row .amount { text-align: right; font-weight: 700; }
-    .breakdown-row .amount small { display: block; font-size: 12px; color: #666; font-weight: 400; }
+    .breakdown-row .amount small { display: block; font-size: 12px; color: ${EXTERNAL_QUOTE_THEME.textSoft}; font-weight: 400; }
     .total {
       display: flex;
       justify-content: space-between;
       margin-top: 8px;
       padding-top: 12px;
-      border-top: 2px solid #5c4a2a;
+      border-top: 1px solid ${EXTERNAL_QUOTE_THEME.border};
       font-weight: 700;
-      color: #5c4a2a;
+      color: ${EXTERNAL_QUOTE_THEME.text};
     }
     .total-box {
       margin-bottom: 18px;
-      background: linear-gradient(135deg, #a08060 0%, #8b7355 100%);
-      color: #fff;
-      border-radius: 12px;
-      padding: 20px;
+      background: linear-gradient(135deg, #6e4e3d 0%, #b5783f 100%);
+      color: #fffaf2;
+      border-radius: 18px;
+      padding: 22px 20px;
       text-align: center;
+      box-shadow: 0 18px 34px rgba(103, 70, 44, 0.18);
     }
     .total-box .label { font-size: 14px; opacity: 0.9; }
     .total-box .amount { font-size: 34px; font-weight: 700; margin: 8px 0; }
@@ -1075,31 +1134,38 @@ function downloadSimpleExternalQuote(
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 14px;
       margin-bottom: 18px;
     }
-    .box { border-radius: 8px; padding: 12px; }
-    .box.yes { background: #f9f8f6; }
-    .box.no { background: #fff3e0; }
-    .box h4 { margin: 0 0 8px 0; font-size: 14px; color: #5c4a2a; }
-    .box.no h4 { color: #9a6b2a; }
-    .box ul { margin: 0; padding-left: 18px; color: #333; }
+    .box {
+      border-radius: 14px;
+      padding: 14px;
+      border: 1px solid ${EXTERNAL_QUOTE_THEME.border};
+      box-shadow: 0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow};
+    }
+    .box.yes { background: #fffdf9; }
+    .box.no { background: #fbf2e6; }
+    .box h4 { margin: 0 0 8px 0; font-size: 14px; color: ${EXTERNAL_QUOTE_THEME.text}; }
+    .box.no h4 { color: ${EXTERNAL_QUOTE_THEME.accentDeep}; }
+    .box ul { margin: 0; padding-left: 18px; color: ${EXTERNAL_QUOTE_THEME.text}; }
     .box li { margin-bottom: 4px; }
     .note-box, .deposit-box, .bank-box {
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
       font-size: 12px;
+      box-shadow: 0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow};
     }
-    .note-box { background: #f8f6f2; border: 1px solid #e8e4dc; }
-    .deposit-box { background: #fff8e1; border: 1px solid #ffcc02; }
-    .bank-box { background: #f9f8f6; border: 1px solid #b89b4d; }
+    .note-box { background: #fff8ef; border: 1px solid ${EXTERNAL_QUOTE_THEME.border}; }
+    .deposit-box { background: #fcf3de; border: 1px solid ${EXTERNAL_QUOTE_THEME.accentSoft}; }
+    .bank-box { background: #f8efdf; border: 1px solid ${EXTERNAL_QUOTE_THEME.accentSoft}; }
     .summary-box {
       margin-top: 18px;
-      background: #5c4a2a;
-      color: #fff;
-      border-radius: 8px;
-      padding: 16px;
+      background: linear-gradient(180deg, #6a4a3b 0%, #5c4338 100%);
+      color: #fffaf2;
+      border-radius: 16px;
+      padding: 18px 16px;
+      box-shadow: 0 18px 34px rgba(103, 70, 44, 0.18);
     }
     .summary-box h4 { margin: 0 0 10px 0; font-size: 14px; }
     .summary-row {
@@ -1118,22 +1184,39 @@ function downloadSimpleExternalQuote(
       font-weight: 700;
     }
     .footer {
-      margin-top: 18px;
+      margin-top: 20px;
       padding-top: 14px;
-      border-top: 2px solid #eee;
+      border-top: 1px solid ${EXTERNAL_QUOTE_THEME.border};
       text-align: center;
       font-size: 12px;
-      color: #666;
+      color: ${EXTERNAL_QUOTE_THEME.textSoft};
+    }
+    .footer .brand {
+      font-weight: 700;
+      color: ${EXTERNAL_QUOTE_THEME.text};
+      margin-bottom: 6px;
+    }
+    @media (max-width: 560px) {
+      .pdf-container { padding: 18px 14px 22px; }
+      .quote-shell { padding: 16px; border-radius: 18px; }
+      .hero-image { height: 150px; }
+      .header-copy { padding: 14px 14px 16px; }
+      .header .trip { font-size: 20px; }
+      .grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="pdf-container">
+    <div class="quote-shell">
     <div class="header">
-      <div style="font-size: 32px; margin-bottom: 8px;">📄</div>
-      <h1>清微旅行 Chiangway Travel</h1>
-      <p>在地清邁包車與客製旅遊報價</p>
-      <div class="trip">清邁 ${tripDays}天${tripNights}夜 行程報價</div>
+      <img class="hero-image" src="${heroImageUrl}" alt="清微旅行 Chiangway Travel" />
+      <div class="header-copy">
+        <div class="eyebrow">清微旅行 Chiangway Travel</div>
+        <p>在地清邁包車與客製旅遊報價</p>
+        <div class="header-divider"></div>
+        <div class="trip">清邁 ${tripDays} 天 ${tripNights} 夜 行程報價</div>
+      </div>
     </div>
 
     <div class="section">
@@ -1152,7 +1235,7 @@ function downloadSimpleExternalQuote(
 
     <div class="section">
       <h3 class="section-title">價格明細</h3>
-      <div class="meta">👥 <strong>${c.adults} 位成人${c.children > 0 ? ` + ${c.children} 位小孩` : ''}</strong>，共 ${tripDays}天${tripNights}夜</div>
+      <div class="meta"><strong>${c.adults} 位成人${c.children > 0 ? ` + ${c.children} 位小孩` : ''}</strong>，共 ${tripDays} 天 ${tripNights} 夜</div>
       <div class="breakdown">
         ${externalQuote.items
           .map(
@@ -1184,53 +1267,54 @@ function downloadSimpleExternalQuote(
 
     <div class="grid">
       <div class="box yes">
-        <h4>✅ 報價包含</h4>
+        <h4>費用包含</h4>
         <ul>${externalQuote.included.map((item) => `<li>${item}</li>`).join('')}</ul>
       </div>
       <div class="box no">
-        <h4>❌ 報價不含</h4>
+        <h4>費用不含</h4>
         <ul>${externalQuote.excluded.map((item) => `<li>${item}</li>`).join('')}</ul>
       </div>
     </div>
 
     <div class="note-box">
-      <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">💳 付款方式與時程</div>
+      <div style="font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.text}; margin-bottom: 8px;">付款方式與時程</div>
       ${externalQuote.paymentNotes.map((note) => `<div>• ${note}</div>`).join('')}
       <div style="margin-top: 10px;">• 每日包車服務最多 10 小時，如需超時另計 12 小時。</div>
       <div>• 加班費為 <strong>200 泰銖/小時 × ${c.carCount} 台車</strong>。</div>
     </div>
 
     <div class="bank-box">
-      <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">🏦 匯款帳號資訊</div>
-      <div>戶名：<strong>柏裕</strong></div>
-      <div>銀行：ไทยเครดิต แบงก์ 009</div>
-      <div>帳號：<strong>51619501772100</strong></div>
+      <div style="font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.text}; margin-bottom: 8px;">匯款帳號資訊</div>
+      <div>戶名：<strong>${TWD_TRANSFER_ACCOUNT.accountName}</strong></div>
+      <div>銀行名稱：${TWD_TRANSFER_ACCOUNT.bankName}</div>
+      <div>銀行代碼：${TWD_TRANSFER_ACCOUNT.bankCode}</div>
+      <div>帳號：<strong>${TWD_TRANSFER_ACCOUNT.accountNumber}</strong></div>
     </div>
 
     ${
       c.hotelsWithDeposit.length > 0 && collectDeposit
         ? `<div class="deposit-box">
-            <div style="font-weight: 700; color: #9a6b2a; margin-bottom: 8px;">🏨 住宿押金提醒</div>
+            <div style="font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.accentDeep}; margin-bottom: 8px;">住宿押金提醒</div>
             ${c.hotelsWithDeposit
               .map(
                 (hotel: Hotel) =>
                   `<div>• ${hotel.name}：${fmt(c.getHotelDeposit(hotel))} 泰銖（${c.getHotelRoomCount(hotel)} 間）</div>`
               )
               .join('')}
-            <div style="margin-top: 8px; padding: 10px; background: #b89b4d; color: white; border-radius: 4px; font-weight: 700;">
+            <div style="margin-top: 8px; padding: 10px; background: ${EXTERNAL_QUOTE_THEME.accent}; color: white; border-radius: 10px; font-weight: 700;">
               住宿押金總計：${fmt(c.totalDeposit)} 泰銖，約 NT$ ${fmt(Math.round(c.totalDeposit / exchangeRate))}
             </div>
           </div>`
         : includeAccommodation && !collectDeposit
           ? `<div class="note-box">
-              <div style="font-weight: 700; color: #5c4a2a; margin-bottom: 8px;">📌 住宿押金備註</div>
+              <div style="font-weight: 700; color: ${EXTERNAL_QUOTE_THEME.text}; margin-bottom: 8px;">住宿押金備註</div>
               <div>若本次住宿需另付押金或保留金，會依實際飯店規則與房型安排另行說明。</div>
             </div>`
           : ''
     }
 
     <div class="summary-box">
-      <h4>🧾 報價摘要</h4>
+      <h4>報價摘要</h4>
       ${externalQuote.items
         .map(
           (item) => `
@@ -1255,8 +1339,11 @@ function downloadSimpleExternalQuote(
     </div>
 
     <div class="footer">
-      <div style="margin-bottom: 8px;">💬 LINE：<strong>@037nyuwk</strong></div>
+      <div class="brand">清微旅行 Chiangway Travel</div>
+      <div style="margin-bottom: 8px;">LINE：<strong>@037nyuwk</strong></div>
       <div>chiangway-travel.com</div>
+      <div style="margin-top: 6px;">報價日期：${new Date().toLocaleDateString('zh-TW')}</div>
+    </div>
     </div>
   </div>
 </body>
@@ -1292,7 +1379,17 @@ function downloadSimpleExternalQuote(
     pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
   }
 
-  loadHtml2Pdf()
+  const waitForImage = (img: HTMLImageElement) =>
+    img.complete
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          const finish = () => resolve()
+          img.addEventListener('load', finish, { once: true })
+          img.addEventListener('error', finish, { once: true })
+        })
+
+  Promise.all(Array.from(container.querySelectorAll('img')).map((img) => waitForImage(img as HTMLImageElement)))
+    .then(() => loadHtml2Pdf())
     .then((html2pdf) => html2pdf().set(opt).from(element).save())
     .then(() => {
       document.body.removeChild(container)
@@ -2917,14 +3014,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         <button onClick={() => setActiveTab('external')} style={tabButtonStyle(activeTab === 'external')}>📄 對外報價單</button>
         <button onClick={() => {
           // 使用與 UI 相同的行程邏輯
-          const itineraryForPdf = parsedItinerary.length > 0
-            ? parsedItinerary.slice(0, tripDays)
-            : carFees.map((cf, i) => ({
-                day: `DAY ${i + 1}${cf.date ? ` (${cf.date})` : ''}`,
-                title: cf.name || `第 ${i + 1} 天`,
-                items: [],
-                hotel: hotels[0]?.name || null
-              }))
+          const itineraryForPdf = buildQuoteItinerary({
+            parsedItinerary,
+            carFees,
+            tripDays,
+            includeAccommodation,
+            hotels,
+          })
                           downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
         }} style={tabButtonStyle(false, '#b89b4d')}>📥 下載報價</button>
       </div>
@@ -5054,9 +5150,10 @@ Day 5｜送機
                 <div style={{ marginTop: 12, padding: 12, background: '#f9f8f6', border: '1px solid #b89b4d', borderRadius: 6, fontSize: 12 }}>
                   <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>🏦 台幣匯款資訊</div>
                   <div style={{ color: '#333', lineHeight: 1.8 }}>
-                    戶名：<strong>蔡柏裕</strong><br />
-                    銀行：彰化銀行（代碼 009）<br />
-                    帳號：<strong>51619501772100</strong>
+                    戶名：<strong>{TWD_TRANSFER_ACCOUNT.accountName}</strong><br />
+                    銀行名稱：{TWD_TRANSFER_ACCOUNT.bankName}<br />
+                    銀行代碼：{TWD_TRANSFER_ACCOUNT.bankCode}<br />
+                    帳號：<strong>{TWD_TRANSFER_ACCOUNT.accountNumber}</strong>
                   </div>
                 </div>
               </div>
@@ -5267,127 +5364,153 @@ function ExternalQuoteTab({
   exchangeRate,
   fmt,
 }: ExternalQuoteTabProps) {
-  const itineraryToShow =
-    parsedItinerary.length > 0
-      ? parsedItinerary.slice(0, tripDays)
-      : carFees.map((carFee, index) => ({
-          day: `DAY ${index + 1}${carFee.date ? ` (${carFee.date})` : ''}`,
-          title: carFee.name || `第 ${index + 1} 天`,
-          items: [],
-          hotel: includeAccommodation ? hotels[0]?.name ?? null : null,
-        }))
+  const itineraryToShow = buildQuoteItinerary({
+    parsedItinerary,
+    carFees,
+    tripDays,
+    includeAccommodation,
+    hotels,
+  })
+
+  const cardShadow = `0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow}`
+  const surfaceShadow = `0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow}`
+  const sectionTitleStyle: React.CSSProperties = {
+    margin: '0 0 12px 0',
+    color: EXTERNAL_QUOTE_THEME.text,
+    fontSize: 16,
+    borderBottom: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
+    paddingBottom: 10,
+  }
+  const cardStyle: React.CSSProperties = {
+    background: '#fffdf9',
+    border: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
+    borderRadius: 14,
+    boxShadow: surfaceShadow,
+  }
 
   return (
     <div
       style={{
-        background: 'white',
-        border: '2px solid #5c4a2a',
-        borderRadius: 12,
-        padding: responsive.isCompact ? 16 : 24,
-        maxWidth: 600,
+        background: EXTERNAL_QUOTE_THEME.pageBackground,
+        border: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
+        borderRadius: 22,
+        padding: responsive.isCompact ? 14 : 20,
+        maxWidth: 640,
         margin: '0 auto',
         width: '100%',
         boxSizing: 'border-box',
+        boxShadow: cardShadow,
       }}
     >
       <div
         style={{
-          background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)',
-          color: 'white',
-          borderRadius: '12px 12px 0 0',
-          margin: responsive.isCompact ? '-16px -16px 20px -16px' : '-24px -24px 20px -24px',
-          padding: responsive.isCompact ? 18 : 24,
-          textAlign: 'center',
+          background: `linear-gradient(180deg, ${EXTERNAL_QUOTE_THEME.surface} 0%, ${EXTERNAL_QUOTE_THEME.surfaceStrong} 100%)`,
+          border: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
+          borderRadius: 18,
+          overflow: 'hidden',
+          marginBottom: 20,
+          boxShadow: surfaceShadow,
         }}
       >
-        <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-        <h2 style={{ margin: 0, fontSize: 24 }}>清微旅行 Chiangway Travel</h2>
-        <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: 14 }}>在地清邁包車與客製旅遊報價</p>
         <div
           style={{
-            marginTop: 16,
-            paddingTop: 16,
-            borderTop: '1px solid rgba(255,255,255,0.3)',
-            fontSize: 18,
-            fontWeight: 'bold',
+            width: '100%',
+            height: responsive.isCompact ? 154 : 210,
+            overflow: 'hidden',
           }}
         >
-          清邁 {tripDays}天{tripNights}夜 行程報價
+          <img
+            src={QUOTE_HERO_IMAGE_SRC}
+            alt="清微旅行 Chiangway Travel"
+            style={{
+              display: 'block',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center top',
+            }}
+          />
+        </div>
+        <div style={{ padding: responsive.isCompact ? 16 : 20 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', color: EXTERNAL_QUOTE_THEME.text }}>
+            清微旅行 Chiangway Travel
+          </div>
+          <p style={{ margin: '8px 0 0 0', color: EXTERNAL_QUOTE_THEME.textSoft, fontSize: 14 }}>
+            在地清邁包車與客製旅遊報價
+          </p>
+          <div
+            style={{
+              width: 72,
+              height: 2,
+              borderRadius: 999,
+              margin: '16px 0 14px',
+              background: `linear-gradient(90deg, ${EXTERNAL_QUOTE_THEME.accentSoft} 0%, ${EXTERNAL_QUOTE_THEME.accent} 100%)`,
+            }}
+          />
+          <div style={{ fontSize: responsive.isCompact ? 22 : 26, fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>
+            清邁 {tripDays} 天 {tripNights} 夜 行程報價
+          </div>
         </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <h3
-          style={{
-            margin: '0 0 12px 0',
-            color: '#5c4a2a',
-            fontSize: 16,
-            borderBottom: '2px solid #5c4a2a',
-            paddingBottom: 8,
-          }}
-        >
-          行程安排
-        </h3>
+        <h3 style={sectionTitleStyle}>行程安排</h3>
         {itineraryToShow.map((day, index) => (
           <div
             key={`${day.day}-${index}`}
             style={{
-              background: '#fafafa',
-              borderRadius: 8,
-              padding: 12,
-              marginBottom: 8,
-              borderLeft: '4px solid #5c4a2a',
+              ...cardStyle,
+              padding: 14,
+              marginBottom: 10,
             }}
           >
-            <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text, marginBottom: 6 }}>
               {day.day}｜{day.title}
             </div>
             {day.items.length > 0 && (
-              <div style={{ fontSize: 12, color: '#555', lineHeight: 1.6 }}>{day.items.join('、')}</div>
+              <div style={{ fontSize: 12, color: EXTERNAL_QUOTE_THEME.textSoft, lineHeight: 1.7 }}>
+                {day.items.join('、')}
+              </div>
             )}
-            {day.hotel && <div style={{ fontSize: 11, color: '#888', marginTop: 6 }}>住宿：{day.hotel}</div>}
+            {day.hotel && (
+              <div style={{ fontSize: 11, color: EXTERNAL_QUOTE_THEME.textMuted, marginTop: 6 }}>住宿：{day.hotel}</div>
+            )}
           </div>
         ))}
       </div>
 
       <div style={{ marginBottom: 20 }}>
-        <h3
-          style={{
-            margin: '0 0 12px 0',
-            color: '#5c4a2a',
-            fontSize: 16,
-            borderBottom: '2px solid #5c4a2a',
-            paddingBottom: 8,
-          }}
-        >
-          價格明細
-        </h3>
+        <h3 style={sectionTitleStyle}>價格明細</h3>
 
-        <div style={{ fontSize: 14, color: '#555', marginBottom: 12 }}>
-          👥 <strong>{adults} 位成人{childCount > 0 ? ` + ${childCount} 位小孩` : ''}</strong>，共 {tripDays}天{tripNights}夜
+        <div style={{ fontSize: 13, color: EXTERNAL_QUOTE_THEME.textSoft, marginBottom: 12 }}>
+          <strong>{adults} 位成人{childCount > 0 ? ` + ${childCount} 位小孩` : ''}</strong>，共 {tripDays} 天 {tripNights} 夜
         </div>
 
-        <div style={{ background: '#fafafa', borderRadius: 8, padding: 16 }}>
+        <div style={{ ...cardStyle, padding: 16 }}>
           {externalQuote.items.map((item, index) => (
             <div
               key={item.label}
               style={{
                 display: 'flex',
+                flexDirection: responsive.isCompact ? 'column' : 'row',
+                alignItems: responsive.isCompact ? 'flex-start' : 'stretch',
                 justifyContent: 'space-between',
                 gap: 12,
-                padding: '10px 0',
-                borderBottom: index === externalQuote.items.length - 1 ? 'none' : '1px dashed #ddd',
+                padding: '11px 0',
+                borderBottom: index === externalQuote.items.length - 1 ? 'none' : `1px dashed ${EXTERNAL_QUOTE_THEME.border}`,
               }}
             >
               <div>
-                <div style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{item.label}</div>
+                <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>{item.label}</div>
                 {item.description && (
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{item.description}</div>
+                  <div style={{ fontSize: 12, color: EXTERNAL_QUOTE_THEME.textSoft, marginTop: 4 }}>
+                    {item.description}
+                  </div>
                 )}
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: responsive.isCompact ? 'left' : 'right' }}>
                 <div style={{ fontWeight: 'bold' }}>{fmt(item.amountTHB)} 泰銖</div>
-                <div style={{ fontSize: 12, color: '#666' }}>約 NT$ {fmt(item.amountTWD)}</div>
+                <div style={{ fontSize: 12, color: EXTERNAL_QUOTE_THEME.textSoft }}>約 NT$ {fmt(item.amountTWD)}</div>
               </div>
             </div>
           ))}
@@ -5398,26 +5521,29 @@ function ExternalQuoteTab({
               justifyContent: 'space-between',
               padding: '12px 0 4px 0',
               marginTop: 8,
-              borderTop: '2px solid #5c4a2a',
+              borderTop: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
             }}
           >
-            <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>總計</span>
-            <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{fmt(externalQuote.totalTHB)} 泰銖</span>
+            <span style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>總計</span>
+            <span style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text }}>{fmt(externalQuote.totalTHB)} 泰銖</span>
           </div>
         </div>
       </div>
 
       <div
         style={{
-          background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)',
-          color: 'white',
-          padding: 20,
-          borderRadius: 12,
+          background: 'linear-gradient(135deg, #6e4e3d 0%, #b5783f 100%)',
+          color: '#fffaf2',
+          padding: responsive.isCompact ? 18 : 22,
+          borderRadius: 18,
           textAlign: 'center',
+          boxShadow: '0 18px 34px rgba(103, 70, 44, 0.18)',
         }}
       >
         <div style={{ fontSize: 14, opacity: 0.9 }}>團費總計</div>
-        <div style={{ fontSize: 36, fontWeight: 'bold', margin: '8px 0' }}>NT$ {fmt(externalQuote.totalTWD)}</div>
+        <div style={{ fontSize: responsive.isCompact ? 32 : 38, fontWeight: 700, margin: '8px 0' }}>
+          NT$ {fmt(externalQuote.totalTWD)}
+        </div>
         <div style={{ fontSize: 12, opacity: 0.8 }}>
           約 {fmt(externalQuote.totalTHB)} 泰銖
           {childCount > 0 && <span style={{ display: 'block', marginTop: 4 }}>小孩費用已併入全團總價</span>}
@@ -5429,20 +5555,20 @@ function ExternalQuoteTab({
           marginTop: 20,
           display: 'grid',
           gridTemplateColumns: responsive.isCompact ? '1fr' : '1fr 1fr',
-          gap: 12,
+          gap: 14,
         }}
       >
-        <div style={{ background: '#f9f8f6', padding: 12, borderRadius: 8 }}>
-          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>✅ 報價包含</div>
-          <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+        <div style={{ ...cardStyle, padding: 14 }}>
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text, marginBottom: 8 }}>費用包含</div>
+          <div style={{ fontSize: 13, color: EXTERNAL_QUOTE_THEME.text, lineHeight: 1.8 }}>
             {externalQuote.included.map((item) => (
               <div key={item}>• {item}</div>
             ))}
           </div>
         </div>
-        <div style={{ background: '#fff3e0', padding: 12, borderRadius: 8 }}>
-          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 8 }}>❌ 報價不含</div>
-          <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
+        <div style={{ ...cardStyle, background: '#fbf2e6', padding: 14 }}>
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.accentDeep, marginBottom: 8 }}>費用不含</div>
+          <div style={{ fontSize: 13, color: EXTERNAL_QUOTE_THEME.text, lineHeight: 1.8 }}>
             {externalQuote.excluded.map((item) => (
               <div key={item}>• {item}</div>
             ))}
@@ -5450,42 +5576,89 @@ function ExternalQuoteTab({
         </div>
       </div>
 
-      <div style={{ marginTop: 20, background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8, padding: 16 }}>
-        <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 12, fontSize: 14 }}>💳 付款方式與時程</div>
-        <div style={{ fontSize: 13, color: '#555', lineHeight: 1.8 }}>
+      <div
+        style={{
+          ...cardStyle,
+          marginTop: 20,
+          background: '#fff8ef',
+          padding: responsive.isCompact ? 14 : 16,
+        }}
+      >
+        <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text, marginBottom: 12, fontSize: 14 }}>
+          付款方式與時程
+        </div>
+        <div style={{ fontSize: 13, color: EXTERNAL_QUOTE_THEME.textSoft, lineHeight: 1.8 }}>
           {externalQuote.paymentNotes.map((note) => (
             <div key={note}>• {note}</div>
           ))}
         </div>
 
-        <div style={{ marginTop: 12, padding: 10, background: '#fff3e0', borderRadius: 6, fontSize: 12, border: '1px solid #ffcc02' }}>
-          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 4 }}>⏰ 加班費提醒</div>
-          <div style={{ color: '#555' }}>
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            background: '#fcf3de',
+            borderRadius: 12,
+            fontSize: 12,
+            border: `1px solid ${EXTERNAL_QUOTE_THEME.accentSoft}`,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.accentDeep, marginBottom: 4 }}>加班費提醒</div>
+          <div style={{ color: EXTERNAL_QUOTE_THEME.textSoft }}>
             • 每日包車服務最多 10 小時，如需超時另計 12 小時<br />
-            • 加班費為<strong>200 泰銖/小時 × {calculation.carCount} 台車</strong>
+            • 加班費為 <strong>200 泰銖/小時 × {calculation.carCount} 台車</strong>
           </div>
         </div>
 
-        <div style={{ marginTop: 12, padding: 12, background: '#f9f8f6', border: '1px solid #b89b4d', borderRadius: 6, fontSize: 12 }}>
-          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>🏦 匯款帳號資訊</div>
-          <div style={{ color: '#333', lineHeight: 1.8 }}>
-            戶名：<strong>柏裕</strong><br />
-            銀行：ไทยเครดิต แบงก์ 009<br />
-            帳號：<strong>51619501772100</strong>
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            background: '#f8efdf',
+            border: `1px solid ${EXTERNAL_QUOTE_THEME.accentSoft}`,
+            borderRadius: 12,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text, marginBottom: 8 }}>匯款帳號資訊</div>
+          <div style={{ color: EXTERNAL_QUOTE_THEME.text, lineHeight: 1.8 }}>
+            戶名：<strong>{TWD_TRANSFER_ACCOUNT.accountName}</strong><br />
+            銀行名稱：{TWD_TRANSFER_ACCOUNT.bankName}<br />
+            銀行代碼：{TWD_TRANSFER_ACCOUNT.bankCode}<br />
+            帳號：<strong>{TWD_TRANSFER_ACCOUNT.accountNumber}</strong>
           </div>
         </div>
       </div>
 
       {calculation.hotelsWithDeposit.length > 0 && collectDeposit && (
-        <div style={{ marginTop: 16, padding: 12, background: '#fff8e1', border: '1px solid #ffcc02', borderRadius: 8 }}>
-          <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 8, fontSize: 14 }}>🏨 住宿押金提醒</div>
-          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+        <div
+          style={{
+            ...cardStyle,
+            marginTop: 16,
+            background: '#fcf3de',
+            border: `1px solid ${EXTERNAL_QUOTE_THEME.accentSoft}`,
+            padding: 14,
+          }}
+        >
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.accentDeep, marginBottom: 8, fontSize: 14 }}>
+            住宿押金提醒
+          </div>
+          <div style={{ fontSize: 12, color: EXTERNAL_QUOTE_THEME.textSoft, lineHeight: 1.8 }}>
             {calculation.hotelsWithDeposit.map((hotel) => (
               <div key={hotel.id}>
                 • {hotel.name}：{fmt(calculation.getHotelDeposit(hotel))} 泰銖（{calculation.getHotelRoomCount(hotel)} 間）
               </div>
             ))}
-            <div style={{ marginTop: 8, padding: 10, background: '#b89b4d', color: 'white', borderRadius: 4, fontWeight: 'bold' }}>
+            <div
+              style={{
+                marginTop: 8,
+                padding: 10,
+                background: EXTERNAL_QUOTE_THEME.accent,
+                color: 'white',
+                borderRadius: 10,
+                fontWeight: 700,
+              }}
+            >
               住宿押金總計：{fmt(calculation.totalDeposit)} 泰銖，約 NT$ {fmt(Math.round(calculation.totalDeposit / exchangeRate))}
             </div>
           </div>
@@ -5493,16 +5666,27 @@ function ExternalQuoteTab({
       )}
 
       {includeAccommodation && !collectDeposit && (
-        <div style={{ marginTop: 16, padding: 12, background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8 }}>
-          <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8, fontSize: 14 }}>📌 住宿押金備註</div>
-          <div style={{ fontSize: 12, color: '#555', lineHeight: 1.8 }}>
+        <div style={{ ...cardStyle, marginTop: 16, background: '#fff8ef', padding: 14 }}>
+          <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.text, marginBottom: 8, fontSize: 14 }}>
+            住宿押金備註
+          </div>
+          <div style={{ fontSize: 12, color: EXTERNAL_QUOTE_THEME.textSoft, lineHeight: 1.8 }}>
             若本次住宿需另付押金或保留金，會依實際飯店規則與房型安排另行說明。
           </div>
         </div>
       )}
 
-      <div style={{ marginTop: 20, background: '#5c4a2a', color: 'white', padding: 16, borderRadius: 8 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 12, fontSize: 14 }}>🧾 報價摘要</div>
+      <div
+        style={{
+          marginTop: 20,
+          background: 'linear-gradient(180deg, #6a4a3b 0%, #5c4338 100%)',
+          color: '#fffaf2',
+          padding: 18,
+          borderRadius: 16,
+          boxShadow: '0 18px 34px rgba(103, 70, 44, 0.18)',
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 14 }}>報價摘要</div>
         <div style={{ fontSize: 13, lineHeight: 2 }}>
           {externalQuote.items.map((item) => (
             <div key={`summary-${item.label}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
@@ -5533,8 +5717,20 @@ function ExternalQuoteTab({
         </div>
       </div>
 
-      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '2px solid #eee', textAlign: 'center', fontSize: 13, color: '#666' }}>
-        <div style={{ marginBottom: 8 }}>💬 LINE：<strong>@037nyuwk</strong></div>
+      <div
+        style={{
+          marginTop: 20,
+          paddingTop: 16,
+          borderTop: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
+          textAlign: 'center',
+          fontSize: 13,
+          color: EXTERNAL_QUOTE_THEME.textSoft,
+        }}
+      >
+        <div style={{ marginBottom: 8, color: EXTERNAL_QUOTE_THEME.text, fontWeight: 700 }}>
+          清微旅行 Chiangway Travel
+        </div>
+        <div style={{ marginBottom: 4 }}>LINE：<strong>@037nyuwk</strong></div>
         <div>chiangway-travel.com</div>
       </div>
     </div>
