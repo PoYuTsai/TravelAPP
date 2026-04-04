@@ -5,6 +5,7 @@ import homestay from './homestay'
 import itinerary from './itinerary'
 import tourPackage from './tourPackage'
 import dayTour from './dayTour'
+import pricingExample from './pricingExample'
 import siteSettings from './siteSettings'
 
 export const schemaTypes = [
@@ -16,4 +17,5 @@ export const schemaTypes = [
   itinerary,
   tourPackage,
   dayTour,
+  pricingExample,
 ]

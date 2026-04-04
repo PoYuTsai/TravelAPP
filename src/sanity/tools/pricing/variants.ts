@@ -6,12 +6,14 @@ export const PRICING_TOOL_CONFIG = {
     toolTitle: '報價計算測試v1',
     ticketStorageKey: 'chiangway-pricing-tickets-v1',
     quoteStorageKey: 'chiangway-pricing-quotes',
+    draftStorageKey: 'chiangway-pricing-draft-v1',
   },
   formal: {
     toolName: 'pricing-formal',
     toolTitle: '報價計算(正式版)',
     ticketStorageKey: 'chiangway-pricing-tickets-formal-v1',
     quoteStorageKey: 'chiangway-pricing-quotes-formal',
+    draftStorageKey: 'chiangway-pricing-draft-formal-v1',
   },
 } as const
 
@@ -97,5 +99,6 @@ export function getPricingStorageKeys(variant: PricingCalculatorVariant) {
   return {
     ticketStorageKey: PRICING_TOOL_CONFIG[variant].ticketStorageKey,
     quoteStorageKey: PRICING_TOOL_CONFIG[variant].quoteStorageKey,
+    draftStorageKey: PRICING_TOOL_CONFIG[variant].draftStorageKey,
   }
 }

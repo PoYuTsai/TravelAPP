@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   calculateFormalProfitShares,
+  getPricingStorageKeys,
   getPricingVariantUi,
   normalizePricingConfigForVariant,
   normalizeTicketsForVariant,
@@ -68,6 +69,20 @@ describe('pricing variants', () => {
       showTicketSplitInput: false,
       showTicketRefundSplitNote: false,
       showLegacyPartnerProfitRows: false,
+    })
+  })
+
+  it('uses variant-specific storage keys for quotes, tickets, and drafts', () => {
+    expect(getPricingStorageKeys('legacy')).toEqual({
+      ticketStorageKey: 'chiangway-pricing-tickets-v1',
+      quoteStorageKey: 'chiangway-pricing-quotes',
+      draftStorageKey: 'chiangway-pricing-draft-v1',
+    })
+
+    expect(getPricingStorageKeys('formal')).toEqual({
+      ticketStorageKey: 'chiangway-pricing-tickets-formal-v1',
+      quoteStorageKey: 'chiangway-pricing-quotes-formal',
+      draftStorageKey: 'chiangway-pricing-draft-formal-v1',
     })
   })
 })

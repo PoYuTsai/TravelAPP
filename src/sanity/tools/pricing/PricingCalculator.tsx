@@ -1,7 +1,8 @@
 // src/sanity/tools/pricing/PricingCalculator.tsx
 // 報價計算器 - 複製 HTML prototype 的 UI
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useClient, useCurrentUser } from 'sanity'
 import {
   parseItineraryText,
   matchActivitiesToDatabase,
@@ -9,6 +10,8 @@ import {
   type ActivityRecord,
   type ActivityMatchResult,
 } from '@/lib/itinerary'
+import { apiVersion } from '@/sanity/config'
+import { isRestrictedStudioEmail } from '@/sanity/studio-access'
 import {
   calculateFormalProfitShares,
   getPricingStorageKeys,
@@ -17,6 +20,13 @@ import {
   normalizeTicketsForVariant,
   type PricingCalculatorVariant,
 } from './variants'
+import {
+  buildPricingExampleDocument,
+  mergeSavedQuoteRecords,
+  parsePricingExampleDocument,
+  type PricingExampleDocument,
+} from './sharedExamples'
+import { getPricingResponsiveLayout } from './ui'
 
 async function loadHtml2Pdf() {
   const html2pdfModule = await import('html2pdf.js')
@@ -200,6 +210,55 @@ function saveTicketsToStorage(storageKey: string, tickets: DynamicTicket[]) {
 function resetTicketsToDefault(storageKey: string, defaultTickets: DynamicTicket[]) {
   localStorage.removeItem(storageKey)
   return cloneTickets(defaultTickets)
+}
+
+const SHARED_QUOTES_QUERY = `*[_type == "pricingExample" && variant == $variant] | order(updatedAt desc, _updatedAt desc) {
+  _id,
+  _type,
+  name,
+  variant,
+  createdAt,
+  updatedAt,
+  createdByName,
+  createdByEmail,
+  itineraryPreview,
+  payload,
+  _createdAt,
+  _updatedAt
+}`
+
+function loadSavedQuotesFromStorage(storageKey: string): SavedQuote[] {
+  try {
+    const stored = localStorage.getItem(storageKey)
+    if (!stored) return []
+    return JSON.parse(stored) as SavedQuote[]
+  } catch {
+    return []
+  }
+}
+
+function saveSavedQuotesToStorage(storageKey: string, quotes: SavedQuote[]) {
+  localStorage.setItem(storageKey, JSON.stringify(quotes))
+}
+
+function loadDraftFromStorage(storageKey: string): PricingDraft | null {
+  try {
+    const stored = localStorage.getItem(storageKey)
+    if (!stored) return null
+
+    const draft = JSON.parse(stored) as PricingDraft
+    return draft.version === 1 ? draft : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraftToStorage(storageKey: string, draft: PricingDraft) {
+  localStorage.setItem(storageKey, JSON.stringify(draft))
+}
+
+function clearDraftFromStorage(storageKey: string) {
+  localStorage.removeItem(storageKey)
 }
 
 // 將門票轉換為 ActivityRecord 格式（供匹配器使用）
@@ -947,13 +1006,28 @@ interface SavedQuote {
   }
 }
 
+interface SavedQuote {
+  updatedAt?: string
+  createdByName?: string
+  createdByEmail?: string
+}
+
+interface PricingDraft {
+  version: 1
+  itineraryText: string
+  currentQuoteName: string
+  showParser: boolean
+}
+
 interface PricingCalculatorProps {
   variant?: PricingCalculatorVariant
 }
 
 export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps) {
   const variantUi = getPricingVariantUi(variant)
-  const { ticketStorageKey, quoteStorageKey } = getPricingStorageKeys(variant)
+  const { ticketStorageKey, quoteStorageKey, draftStorageKey } = getPricingStorageKeys(variant)
+  const client = useClient({ apiVersion })
+  const currentUser = useCurrentUser()
   const defaultTickets = useMemo(
     () => normalizeTicketsForVariant(DEFAULT_TICKETS, variant),
     [variant]
@@ -962,6 +1036,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     () => normalizePricingConfigForVariant(DEFAULT_CONFIG, variant),
     [variant]
   )
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window === 'undefined' ? 1024 : window.innerWidth
+  )
+  const responsive = useMemo(
+    () => getPricingResponsiveLayout(viewportWidth),
+    [viewportWidth]
+  )
+  const isRestrictedUser = isRestrictedStudioEmail(currentUser?.email)
+  const draftReadyRef = useRef(false)
 
   // 智能解析器狀態
   const [showParser, setShowParser] = useState(false)
@@ -987,6 +1070,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   // 儲存的報價設定
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
   const [currentQuoteName, setCurrentQuoteName] = useState('')
+  const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
+  const [isQuotesLoading, setIsQuotesLoading] = useState(false)
+  const [isSavingQuote, setIsSavingQuote] = useState(false)
+  const [lastQuotesSyncAt, setLastQuotesSyncAt] = useState<string | null>(null)
 
   // Form states - 成人/小孩分開計算
   const [adults, setAdults] = useState(8)
@@ -1447,23 +1534,120 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   // 報價儲存/載入/複製功能
   // 從 localStorage 載入已儲存的報價
   useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleResize = () => setViewportWidth(window.innerWidth)
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    draftReadyRef.current = false
+
+    const savedDraft = loadDraftFromStorage(draftStorageKey)
+    if (savedDraft) {
+      setItineraryText(savedDraft.itineraryText)
+      setCurrentQuoteName(savedDraft.currentQuoteName)
+      setShowParser(savedDraft.showParser || savedDraft.itineraryText.trim().length > 0)
+    }
+
+    draftReadyRef.current = true
+  }, [draftStorageKey])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !draftReadyRef.current) return
+
+    saveDraftToStorage(draftStorageKey, {
+      version: 1,
+      itineraryText,
+      currentQuoteName,
+      showParser,
+    })
+  }, [currentQuoteName, draftStorageKey, itineraryText, showParser])
+
+  const refreshSavedQuotes = useCallback(async () => {
+    setIsQuotesLoading(true)
+
     try {
-      const saved = localStorage.getItem(quoteStorageKey)
-      if (saved) {
-        setSavedQuotes(JSON.parse(saved))
+      const localQuotes = loadSavedQuotesFromStorage(quoteStorageKey)
+      const sharedDocs = await client.fetch<PricingExampleDocument<SavedQuote['data']>[]>(
+        SHARED_QUOTES_QUERY,
+        { variant }
+      )
+      const sharedQuotes = sharedDocs
+        .map((doc) => parsePricingExampleDocument<SavedQuote['data']>(doc))
+        .filter((quote): quote is SavedQuote => quote !== null)
+      const mergedQuotes = mergeSavedQuoteRecords(sharedQuotes, localQuotes)
+
+      setSavedQuotes(mergedQuotes)
+      saveSavedQuotesToStorage(quoteStorageKey, mergedQuotes)
+      setLastQuotesSyncAt(new Date().toISOString())
+
+      const sharedIds = new Set(sharedQuotes.map((quote) => quote.id))
+      const localOnlyQuotes = localQuotes.filter((quote) => !sharedIds.has(quote.id))
+
+      if (localOnlyQuotes.length > 0) {
+        await Promise.all(
+          localOnlyQuotes.map((quote) =>
+            client.createOrReplace(
+              buildPricingExampleDocument(variant, quote, {
+                name: currentUser?.name,
+                email: currentUser?.email,
+              })
+            )
+          )
+        )
       }
     } catch (e) {
-      console.error('Failed to load saved quotes:', e)
+      console.error('Failed to sync shared quotes:', e)
+      setSavedQuotes(loadSavedQuotesFromStorage(quoteStorageKey))
+    } finally {
+      setIsQuotesLoading(false)
     }
-  }, [quoteStorageKey])
+  }, [client, currentUser?.email, currentUser?.name, quoteStorageKey, variant])
+
+  useEffect(() => {
+    void refreshSavedQuotes()
+  }, [refreshSavedQuotes])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const syncQuotes = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshSavedQuotes()
+      }
+    }
+
+    const intervalId = window.setInterval(syncQuotes, 30000)
+    window.addEventListener('focus', syncQuotes)
+    document.addEventListener('visibilitychange', syncQuotes)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', syncQuotes)
+      document.removeEventListener('visibilitychange', syncQuotes)
+    }
+  }, [refreshSavedQuotes])
 
   // 儲存當前報價
-  const saveCurrentQuote = () => {
-    const name = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
+  const saveCurrentQuote = async () => {
+    const normalizedName = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
+    const now = new Date().toISOString()
+    const existingQuote = editingQuoteId
+      ? savedQuotes.find((quote) => quote.id === editingQuoteId)
+      : null
     const newQuote: SavedQuote = {
-      id: Date.now().toString(),
-      name,
-      createdAt: new Date().toISOString(),
+      id: editingQuoteId ?? Date.now().toString(),
+      name: normalizedName,
+      createdAt: existingQuote?.createdAt ?? now,
+      updatedAt: now,
+      createdByName: existingQuote?.createdByName ?? currentUser?.name ?? undefined,
+      createdByEmail:
+        existingQuote?.createdByEmail ?? currentUser?.email?.trim().toLowerCase() ?? undefined,
       data: {
         itineraryText,
         people,  // 保留舊欄位向後相容
@@ -1488,11 +1672,42 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         collectDeposit,
       },
     }
-    const updated = [...savedQuotes, newQuote]
-    setSavedQuotes(updated)
-    localStorage.setItem(quoteStorageKey, JSON.stringify(updated))
-    setCurrentQuoteName('')
-    alert(`✅ 已儲存「${name}」`)
+    setIsSavingQuote(true)
+    try {
+      await client.createOrReplace(
+        buildPricingExampleDocument(variant, newQuote, {
+          name: newQuote.createdByName,
+          email: newQuote.createdByEmail,
+        })
+      )
+
+      const updatedQuotes = mergeSavedQuoteRecords(
+        [newQuote],
+        savedQuotes.filter((quote) => quote.id !== newQuote.id)
+      )
+
+      setSavedQuotes(updatedQuotes)
+      saveSavedQuotesToStorage(quoteStorageKey, updatedQuotes)
+      setCurrentQuoteName(normalizedName)
+      setEditingQuoteId(newQuote.id)
+      setLastQuotesSyncAt(now)
+      alert(`✅ 已同步共享案例「${normalizedName}」`)
+    } catch (e) {
+      console.error('Failed to save shared quote:', e)
+
+      const fallbackQuotes = mergeSavedQuoteRecords(
+        [newQuote],
+        savedQuotes.filter((quote) => quote.id !== newQuote.id)
+      )
+
+      setSavedQuotes(fallbackQuotes)
+      saveSavedQuotesToStorage(quoteStorageKey, fallbackQuotes)
+      setCurrentQuoteName(normalizedName)
+      setEditingQuoteId(newQuote.id)
+      alert(`⚠️ 共享同步失敗，已先保留在這台裝置：「${normalizedName}」`)
+    } finally {
+      setIsSavingQuote(false)
+    }
   }
 
   // 載入報價
@@ -1527,6 +1742,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
     if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
     setCurrentQuoteName(quote.name)
+    setEditingQuoteId(quote.id)
     // 如果有行程文字，自動打開解析器
     if (quote.data.itineraryText) {
       setShowParser(true)
@@ -1537,6 +1753,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   // 複製報價（Fork）
   const forkQuote = (quote: SavedQuote) => {
     loadQuote(quote)
+    setEditingQuoteId(null)
     setCurrentQuoteName(`${quote.name} (複製)`)
   }
 
@@ -1639,22 +1856,46 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setThaiDressDay(null)
     // 清空報價名稱
     setCurrentQuoteName('')
+    setEditingQuoteId(null)
+    setShowParser(false)
+    clearDraftFromStorage(draftStorageKey)
     alert('✅ 已清空所有欄位，可以開始新報價')
   }
 
   // 刪除報價
-  const deleteQuote = (id: string) => {
-    if (!confirm('確定要刪除這個報價嗎？')) return
-    const updated = savedQuotes.filter(q => q.id !== id)
-    setSavedQuotes(updated)
-    localStorage.setItem(quoteStorageKey, JSON.stringify(updated))
+  const deleteQuote = async (id: string) => {
+    if (!confirm('確定要刪除這個共享案例嗎？')) return
+    try {
+      await client.delete(`pricingExample.${variant}.${id}`)
+    } catch (e) {
+      console.error('Failed to delete shared quote:', e)
+    }
+
+    const updatedQuotes = savedQuotes.filter((quote) => quote.id !== id)
+    setSavedQuotes(updatedQuotes)
+    saveSavedQuotesToStorage(quoteStorageKey, updatedQuotes)
+
+    if (editingQuoteId === id) {
+      setEditingQuoteId(null)
+      setCurrentQuoteName('')
+    }
   }
 
-  // 清空所有報價
-  const clearAllQuotes = () => {
-    if (!confirm('確定要清空所有儲存的報價嗎？此操作無法復原。')) return
+  const clearAllQuotes = async () => {
+    if (!confirm('確定要清空所有共享案例嗎？此操作無法復原。')) return
+
+    try {
+      await Promise.all(
+        savedQuotes.map((quote) => client.delete(`pricingExample.${variant}.${quote.id}`))
+      )
+    } catch (e) {
+      console.error('Failed to clear shared quotes:', e)
+    }
+
     setSavedQuotes([])
     localStorage.removeItem(quoteStorageKey)
+    setEditingQuoteId(null)
+    setCurrentQuoteName('')
   }
 
   // 飯店管理函數
@@ -1993,7 +2234,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 生成唯一 ID
     const id = `manual-${Date.now()}-${Math.random().toString(36).substring(7)}`
     // 提取活動名稱（移除前綴符號）
-    const name = unmatchedText.replace(/^[・\-•·]\s*/, '').split(/[（(]/)[0].trim()
+    const trimmedText = unmatchedText.trimStart()
+    const nameSource = ['・', '-', '•', '·'].includes(trimmedText.charAt(0))
+      ? trimmedText.slice(1).trimStart()
+      : trimmedText
+    const name = nameSource.split(/[（(]/)[0].trim()
 
     const newTicket: DynamicTicket = {
       id,
@@ -2024,17 +2269,96 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const noTicketsSelected = tickets.every(t => !t.checked)
   const allActivitiesSelected = allTicketsSelected && thaiDressCloth
   const noActivitiesSelected = noTicketsSelected && !thaiDressCloth && !thaiDressPhoto && makeupCount === 0
+  const currentToolPath = variant === 'formal' ? '/studio/pricing-formal' : '/studio/pricing'
+  const tabButtonStyle = (isActive: boolean, accentColor = '#5c4a2a') => ({
+    padding: responsive.isCompact ? '10px 12px' : '10px 20px',
+    background: isActive ? accentColor : '#ddd',
+    color: isActive ? 'white' : 'black',
+    border: 'none',
+    borderRadius: '8px 8px 0 0',
+    cursor: 'pointer',
+    width: responsive.isCompact ? 'calc(50% - 4px)' : 'auto',
+  })
+  const lastSyncedLabel = lastQuotesSyncAt
+    ? new Date(lastQuotesSyncAt).toLocaleString('zh-TW', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null
 
   return (
-    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', maxWidth: 1100, margin: '0 auto', padding: 20, background: '#f5f5f5', minHeight: '100vh' }}>
+    <div
+      style={{
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        maxWidth: 1100,
+        margin: '0 auto',
+        padding: responsive.containerPadding,
+        background: '#f5f5f5',
+        minHeight: '100vh',
+        ['--pricing-section-padding' as string]: `${responsive.sectionPadding}px`,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: responsive.isCompact ? 'stretch' : 'center',
+          flexDirection: responsive.isCompact ? 'column' : 'row',
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a
+            href="/studio/structure"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px 12px',
+              background: '#fff',
+              color: '#5c4a2a',
+              border: '1px solid #d7cfbf',
+              borderRadius: 999,
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Structure
+          </a>
+          <a
+            href={currentToolPath}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px 12px',
+              background: '#5c4a2a',
+              color: 'white',
+              borderRadius: 999,
+              textDecoration: 'none',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {variant === 'formal' ? '報價計算(正式版)' : '報價計算測試v1'}
+          </a>
+        </div>
+        <div style={{ fontSize: 12, color: '#666' }}>
+          共享案例會同步到所有登入夥伴
+        </div>
+      </div>
       <h1 style={{ color: '#5c4a2a', marginBottom: 5 }}>🚐 清邁 {tripDays}天{tripNights}夜 報價計算器</h1>
       <p style={{ color: '#666', marginBottom: 20 }}>內部工具 v4 — 智能解析 + 車導明細</p>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button onClick={() => setActiveTab('input')} style={{ padding: '10px 20px', background: activeTab === 'input' ? '#5c4a2a' : '#ddd', color: activeTab === 'input' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📝 輸入</button>
-        <button onClick={() => setActiveTab('internal')} style={{ padding: '10px 20px', background: activeTab === 'internal' ? '#5c4a2a' : '#ddd', color: activeTab === 'internal' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📊 內部明細</button>
-        <button onClick={() => setActiveTab('external')} style={{ padding: '10px 20px', background: activeTab === 'external' ? '#5c4a2a' : '#ddd', color: activeTab === 'external' ? 'white' : 'black', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📄 對外報價單</button>
+        <button onClick={() => setActiveTab('input')} style={tabButtonStyle(activeTab === 'input')}>📝 輸入</button>
+        <button onClick={() => setActiveTab('internal')} style={tabButtonStyle(activeTab === 'internal')}>📊 內部明細</button>
+        <button onClick={() => setActiveTab('external')} style={tabButtonStyle(activeTab === 'external')}>📄 對外報價單</button>
         <button onClick={() => {
           // 使用與 UI 相同的行程邏輯
           const itineraryForPdf = parsedItinerary.length > 0
@@ -2046,7 +2370,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                 hotel: hotels[0]?.name || null
               }))
           downloadExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
-        }} style={{ padding: '10px 20px', background: '#b89b4d', color: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer' }}>📥 下載報價</button>
+        }} style={tabButtonStyle(false, '#b89b4d')}>📥 下載報價</button>
       </div>
 
       {/* Input Tab */}
@@ -2067,7 +2391,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
               />
               <button
                 onClick={saveCurrentQuote}
-                style={{ padding: '8px 16px', background: '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
+                disabled={isSavingQuote}
+                style={{ padding: '8px 16px', background: isSavingQuote ? '#c7a9cf' : '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: isSavingQuote ? 'wait' : 'pointer', fontSize: 13 }}
               >
                 💾 儲存
               </button>
@@ -2078,17 +2403,34 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                 ✨ 新建
               </button>
             </div>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
+              {isQuotesLoading
+                ? '共享案例同步中...'
+                : lastSyncedLabel
+                  ? `已改為共享案例，所有登入夥伴都能看到並載入。上次同步：${lastSyncedLabel}`
+                  : '已改為共享案例，所有登入夥伴都能看到並載入。'}
+            </div>
 
             {savedQuotes.length > 0 && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
                   <strong style={{ fontSize: 13 }}>📂 已儲存（{savedQuotes.length}）</strong>
-                  <button
-                    onClick={clearAllQuotes}
-                    style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
-                  >
-                    🗑️ 清空全部
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => void refreshSavedQuotes()}
+                      disabled={isQuotesLoading}
+                      style={{ padding: '4px 8px', background: isQuotesLoading ? '#90caf9' : '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: isQuotesLoading ? 'wait' : 'pointer', fontSize: 11 }}
+                    >
+                      🔄 同步案例
+                    </button>
+                    <button
+                      onClick={clearAllQuotes}
+                      disabled={isRestrictedUser}
+                      style={{ padding: '4px 8px', background: isRestrictedUser ? '#ef9a9a' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: isRestrictedUser ? 'not-allowed' : 'pointer', fontSize: 11 }}
+                    >
+                      🗑️ 清空全部
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
                   {savedQuotes.map(q => (
@@ -2104,12 +2446,17 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                         borderRadius: 6,
                       }}
                     >
-                      <span style={{ flex: 1, fontSize: 13 }}>
-                        📄 {q.name}
-                        <span style={{ fontSize: 11, color: '#999', marginLeft: 8 }}>
-                          {new Date(q.createdAt).toLocaleDateString('zh-TW')}
-                        </span>
-                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflowWrap: 'anywhere' }}>
+                          📄 {q.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                          {new Date(q.updatedAt ?? q.createdAt).toLocaleDateString('zh-TW')}
+                          {q.createdByName || q.createdByEmail
+                            ? ` · ${q.createdByName || q.createdByEmail}`
+                            : ''}
+                        </div>
+                      </div>
                       <button
                         onClick={() => loadQuote(q)}
                         style={{ padding: '4px 8px', background: '#2196f3', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
@@ -2124,7 +2471,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                       </button>
                       <button
                         onClick={() => deleteQuote(q.id)}
-                        style={{ padding: '4px 8px', background: '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
+                        disabled={isRestrictedUser}
+                        style={{ padding: '4px 8px', background: isRestrictedUser ? '#ef9a9a' : '#f44336', color: 'white', border: 'none', borderRadius: 4, cursor: isRestrictedUser ? 'not-allowed' : 'pointer', fontSize: 11 }}
                       >
                         🗑️
                       </button>
@@ -2827,7 +3175,7 @@ Day 5｜送機
                     key={index}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '50px 60px 1fr 80px 80px 30px',
+                      gridTemplateColumns: responsive.carFeeGridTemplateColumns,
                       gap: 8,
                       alignItems: 'center',
                       padding: 8,
@@ -3375,7 +3723,8 @@ Day 5｜送機
       {/* Internal Tab */}
       {activeTab === 'internal' && (
         <Section title="📊 成本/售價/利潤明細（內部用）">
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: '#f5f5f5' }}>
                 <th style={thStyle}>項目</th>
@@ -3433,7 +3782,7 @@ Day 5｜送機
           </table>
 
           {/* 門票活動 - 統一格式 */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
+          <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
             <thead>
               <tr style={{ background: '#f5f5f5' }}>
                 <th style={thStyle}>項目</th>
@@ -3507,7 +3856,7 @@ Day 5｜送機
           </table>
 
           {/* 保險 + 總計 + 利潤分配 */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
+          <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
             <tbody>
               <SectionRow title="🛡️ 保險" />
               <DataRow name={`旅遊保險 (${people}人)`} cost={calculation.insuranceCost} price={calculation.insuranceCost} profit={0} />
@@ -3584,14 +3933,15 @@ Day 5｜送機
               )}
             </tbody>
           </table>
+          </div>
         </Section>
       )}
 
       {/* External Tab */}
       {activeTab === 'external' && (
-        <div style={{ background: 'white', border: '2px solid #5c4a2a', borderRadius: 12, padding: 24, maxWidth: 600, margin: '0 auto' }}>
+        <div style={{ background: 'white', border: '2px solid #5c4a2a', borderRadius: 12, padding: responsive.isCompact ? 16 : 24, maxWidth: 600, margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           {/* Header */}
-          <div style={{ background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)', color: 'white', borderRadius: '12px 12px 0 0', margin: '-24px -24px 20px -24px', padding: 24, textAlign: 'center' }}>
+          <div style={{ background: 'linear-gradient(135deg, #a08060 0%, #8b7355 100%)', color: 'white', borderRadius: '12px 12px 0 0', margin: responsive.isCompact ? '-16px -16px 20px -16px' : '-24px -24px 20px -24px', padding: responsive.isCompact ? 18 : 24, textAlign: 'center' }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>🚐</div>
             <h2 style={{ margin: 0, fontSize: 24 }}>清微旅行 Chiangway Travel</h2>
             <p style={{ margin: '8px 0 0 0', opacity: 0.9, fontSize: 14 }}>台灣爸爸 × 泰國媽媽｜清邁在地親子包車</p>
@@ -3718,7 +4068,7 @@ Day 5｜送機
           </div>
 
           {/* Includes/Excludes */}
-          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: responsive.isCompact ? '1fr' : '1fr 1fr', gap: 12 }}>
             <div style={{ background: '#f9f8f6', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>✅ 費用包含</div>
               <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
@@ -4080,7 +4430,7 @@ const tdStyle: React.CSSProperties = { border: '1px solid #ddd', padding: 8, tex
 // Components
 function Section({ title, children, style }: { title: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
-    <div style={{ background: 'white', borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: '0 2px 4px rgba(0,0,0,0.1)', ...style }}>
+    <div style={{ background: 'white', borderRadius: 12, padding: 'var(--pricing-section-padding, 20px)', marginBottom: 16, boxShadow: '0 2px 4px rgba(0,0,0,0.1)', ...style }}>
       <h2 style={{ margin: '0 0 16px 0', fontSize: 16, color: '#333', borderBottom: '2px solid #5c4a2a', paddingBottom: 8 }}>{title}</h2>
       {children}
     </div>
