@@ -34,6 +34,7 @@ import {
   QUOTE_HERO_IMAGE_SRC,
   TWD_TRANSFER_ACCOUNT,
 } from './quoteDetails'
+import { sanitizeQuoteHtml } from './quoteHtml'
 import {
   clampChildSeatServiceDays,
   clampGuideServiceDays,
@@ -297,57 +298,6 @@ function getActivitiesForMatching(storageKey: string, defaultTickets: DynamicTic
     exclusiveGroup: ticket.exclusiveGroup,
     isActive: true,
   }))
-}
-
-function sanitizeQuoteHtml(html: string): string {
-  const container = document.createElement('div')
-  container.innerHTML = html
-
-  container.querySelectorAll([
-    'script',
-    'iframe',
-    'object',
-    'embed',
-    'svg',
-    'math',
-    'form',
-    'input',
-    'textarea',
-    'button',
-    'select',
-    'option',
-    'img',
-    'audio',
-    'video',
-    'source',
-    'track',
-    'base',
-    'link',
-  ].join(',')).forEach((element) => element.remove())
-
-  const styleTags = Array.from(container.querySelectorAll('style'))
-  styleTags.slice(1).forEach((element) => element.remove())
-
-  container.querySelectorAll('*').forEach((element) => {
-    for (const attr of Array.from(element.attributes)) {
-      const name = attr.name.toLowerCase()
-      const value = attr.value.trim().toLowerCase()
-
-      if (name.startsWith('on')) {
-        element.removeAttribute(attr.name)
-        continue
-      }
-
-      if (
-        ['href', 'src', 'xlink:href', 'formaction'].includes(name) &&
-        (value.startsWith('javascript:') || value.startsWith('data:'))
-      ) {
-        element.removeAttribute(attr.name)
-      }
-    }
-  })
-
-  return container.innerHTML
 }
 
 // 下載對外報價單
