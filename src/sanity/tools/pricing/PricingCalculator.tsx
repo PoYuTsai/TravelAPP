@@ -30,8 +30,10 @@ import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
   buildQuoteItinerary,
+  EXTERNAL_QUOTE_LAYOUT,
   EXTERNAL_QUOTE_THEME,
   QUOTE_HERO_IMAGE_SRC,
+  resolveQuotePdfRenderScale,
   TWD_TRANSFER_ACCOUNT,
 } from './quoteDetails'
 import { sanitizeQuoteHtml } from './quoteHtml'
@@ -966,7 +968,7 @@ function downloadSimpleExternalQuote(
     }
     .pdf-container {
       width: 100%;
-      max-width: 620px;
+      max-width: ${EXTERNAL_QUOTE_LAYOUT.maxWidth}px;
       margin: 0 auto;
       padding: 24px 18px 28px;
       background: ${EXTERNAL_QUOTE_THEME.pageBackground};
@@ -989,7 +991,7 @@ function downloadSimpleExternalQuote(
     .hero-image {
       display: block;
       width: 100%;
-      height: 190px;
+      height: ${EXTERNAL_QUOTE_LAYOUT.heroHeightDesktop}px;
       object-fit: cover;
       object-position: center top;
     }
@@ -1149,7 +1151,7 @@ function downloadSimpleExternalQuote(
     @media (max-width: 560px) {
       .pdf-container { padding: 18px 14px 22px; }
       .quote-shell { padding: 16px; border-radius: 18px; }
-      .hero-image { height: 150px; }
+      .hero-image { height: ${EXTERNAL_QUOTE_LAYOUT.heroHeightMobile}px; }
       .header-copy { padding: 14px 14px 16px; }
       .header .trip { font-size: 20px; }
       .grid { grid-template-columns: 1fr; }
@@ -1310,25 +1312,6 @@ function downloadSimpleExternalQuote(
     return
   }
 
-  const opt = {
-    margin: [10, 10, 10, 10] as [number, number, number, number],
-    filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
-    image: { type: 'png' as const, quality: 1 },
-    html2canvas: {
-      scale: 3,
-      useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff',
-      letterRendering: true,
-    },
-    jsPDF: {
-      unit: 'mm' as const,
-      format: 'a4' as const,
-      orientation: 'portrait' as const,
-    },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-  }
-
   const waitForImage = (img: HTMLImageElement) =>
     img.complete
       ? Promise.resolve()
@@ -1339,8 +1322,35 @@ function downloadSimpleExternalQuote(
         })
 
   Promise.all(Array.from(container.querySelectorAll('img')).map((img) => waitForImage(img as HTMLImageElement)))
-    .then(() => loadHtml2Pdf())
-    .then((html2pdf) => html2pdf().set(opt).from(element).save())
+    .then(() => {
+      const heroImage = container.querySelector('.hero-image') as HTMLImageElement | null
+      const renderWidth = heroImage?.getBoundingClientRect().width || EXTERNAL_QUOTE_LAYOUT.maxWidth
+      const renderScale = resolveQuotePdfRenderScale({
+        imageNaturalWidth: heroImage?.naturalWidth,
+        renderWidth,
+      })
+
+      return loadHtml2Pdf().then((html2pdf) =>
+        html2pdf().set({
+          margin: [10, 10, 10, 10] as [number, number, number, number],
+          filename: `清微旅行報價單_${new Date().toISOString().slice(0, 10)}.pdf`,
+          image: { type: 'png' as const, quality: 1 },
+          html2canvas: {
+            scale: renderScale,
+            useCORS: true,
+            logging: false,
+            backgroundColor: EXTERNAL_QUOTE_THEME.pageBackground,
+            letterRendering: true,
+          },
+          jsPDF: {
+            unit: 'mm' as const,
+            format: 'a4' as const,
+            orientation: 'portrait' as const,
+          },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        }).from(element).save()
+      )
+    })
     .then(() => {
       document.body.removeChild(container)
     })
@@ -5345,7 +5355,7 @@ function ExternalQuoteTab({
         border: `1px solid ${EXTERNAL_QUOTE_THEME.border}`,
         borderRadius: 22,
         padding: responsive.isCompact ? 14 : 20,
-        maxWidth: 640,
+        maxWidth: EXTERNAL_QUOTE_LAYOUT.maxWidth,
         margin: '0 auto',
         width: '100%',
         boxSizing: 'border-box',
@@ -5365,7 +5375,9 @@ function ExternalQuoteTab({
         <div
           style={{
             width: '100%',
-            height: responsive.isCompact ? 154 : 210,
+            height: responsive.isCompact
+              ? EXTERNAL_QUOTE_LAYOUT.heroHeightMobile
+              : EXTERNAL_QUOTE_LAYOUT.heroHeightDesktop,
             overflow: 'hidden',
           }}
         >

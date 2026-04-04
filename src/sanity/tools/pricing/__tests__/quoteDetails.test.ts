@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  EXTERNAL_QUOTE_LAYOUT,
   buildQuoteItinerary,
+  resolveQuotePdfRenderScale,
   TWD_TRANSFER_ACCOUNT,
 } from '@/sanity/tools/pricing/quoteDetails'
 
@@ -51,5 +53,19 @@ describe('pricing quote details', () => {
         hotel: '香格里拉酒店',
       },
     ])
+  })
+
+  it('keeps external quote layout dimensions shared between page and pdf', () => {
+    expect(EXTERNAL_QUOTE_LAYOUT).toEqual({
+      maxWidth: 640,
+      heroHeightDesktop: 210,
+      heroHeightMobile: 154,
+    })
+  })
+
+  it('limits pdf render scale to the image natural resolution', () => {
+    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 1256, renderWidth: 640 })).toBe(1.96)
+    expect(resolveQuotePdfRenderScale({ imageNaturalWidth: 2400, renderWidth: 640 })).toBe(2)
+    expect(resolveQuotePdfRenderScale({ renderWidth: 640 })).toBe(2)
   })
 })

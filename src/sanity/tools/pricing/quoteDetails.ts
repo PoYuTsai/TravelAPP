@@ -7,6 +7,12 @@ export const TWD_TRANSFER_ACCOUNT = {
 
 export const QUOTE_HERO_IMAGE_SRC = '/images/quote-hero-eric-min.jpg'
 
+export const EXTERNAL_QUOTE_LAYOUT = {
+  maxWidth: 640,
+  heroHeightDesktop: 210,
+  heroHeightMobile: 154,
+} as const
+
 export const EXTERNAL_QUOTE_THEME = {
   pageBackground: '#f7f1e6',
   surface: '#fffaf2',
@@ -21,6 +27,21 @@ export const EXTERNAL_QUOTE_THEME = {
   textMuted: '#9a826f',
   shadow: 'rgba(110, 77, 49, 0.08)',
 } as const
+
+export function resolveQuotePdfRenderScale(params: {
+  imageNaturalWidth?: number
+  renderWidth?: number
+  fallbackScale?: number
+}): number {
+  const { imageNaturalWidth, renderWidth, fallbackScale = 2 } = params
+
+  if (!imageNaturalWidth || !renderWidth || renderWidth <= 0) {
+    return fallbackScale
+  }
+
+  const idealScale = imageNaturalWidth / renderWidth
+  return Math.max(1, Math.min(fallbackScale, Number(idealScale.toFixed(2))))
+}
 
 export interface QuoteDetailDay {
   day: string
