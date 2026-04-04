@@ -248,6 +248,7 @@ Sanity Studio 內部報價計算工具：
 - **正式版規則**：門票原價計算，利潤分配摘要為柏裕 70% / Lulu 15% / 彥君 15%
 - **共享案例同步**：已儲存案例改存 Sanity，所有登入夥伴都能看到、載入，返回頁面會自動同步
 - **導遊天數可調**：`含導遊` 打開後可直接指定幾天，車費仍照整段行程計，適合不是每天都請導遊的情境
+- **泰服攝影師規則**：改成 `攝影師 1 小時`，1 位最多服務 10 位；超過 10 位時由你手動勾選是否再加 1 位，不再自動多算
 - **手機版優化**：
   - 頂部提供 `Structure` / 當前工具快速切換
   - 共享案例清單與操作按鈕改為手機友善排版
@@ -441,4 +442,4 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-04-04 guide day controls and mobile polish -->
+<!-- Last build trigger: 2026-04-04 thai dress photographer pricing -->

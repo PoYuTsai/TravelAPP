@@ -105,6 +105,21 @@ Expected: PASS
   - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
   - `npm.cmd run build`
 
+## Thai Dress Photographer Pricing Record
+
+- **Completed:** 2026-04-04
+- **Goal:** clarify the photographer wording and stop auto-charging a second photographer for groups above ten unless explicitly selected.
+- **Changes:**
+  - changed the UI copy from ambiguous `2,500/位` wording to `攝影師 1 小時` with a per-photographer capacity note
+  - added an extra photographer checkbox that only appears when the group is over 10 people
+  - updated pricing, internal details, external quote copy, and exported quote HTML to use the explicit photographer count
+  - preserved the extra photographer choice in saved/shared pricing examples
+- **Code commit:** `a66aa98` `feat: refine thai dress photographer pricing`
+- **Verification:**
+  - `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/thaiDress.test.ts`
+  - `npm.cmd run test:run -- src/sanity/__tests__/studio-access.test.ts src/sanity/tools/pricing/__tests__/serviceDays.test.ts src/sanity/tools/pricing/__tests__/thaiDress.test.ts src/sanity/tools/pricing/__tests__/ui.test.ts src/sanity/tools/pricing/__tests__/variants.test.ts src/sanity/tools/pricing/__tests__/sharedExamples.test.ts src/sanity/tools/pricing/__tests__/server-import.test.ts`
+  - `npm.cmd run build`
+
 ### Task 2: Lock The Formal Pricing Variant Rules In Tests
 
 **Files:**
