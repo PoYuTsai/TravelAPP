@@ -20,7 +20,7 @@ describe('pricing responsive layout', () => {
       isCompact: false,
       containerPadding: 20,
       sectionPadding: 20,
-      carFeeGridTemplateColumns: '50px 60px minmax(180px, 1fr) 80px 80px 30px',
+      carFeeGridTemplateColumns: '50px 60px minmax(180px, 1fr) 90px 90px 80px 30px',
       internalTableMinWidth: 0,
       serviceToggleGridColumns: 'repeat(5, max-content)',
       savedQuoteCardDirection: 'row',

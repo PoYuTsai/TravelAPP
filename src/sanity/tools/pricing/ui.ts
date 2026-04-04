@@ -4,7 +4,7 @@ export function getPricingResponsiveLayout(viewportWidth: number) {
   const isCompact = viewportWidth <= PRICING_MOBILE_BREAKPOINT
   const carFeeGridTemplateColumns = isCompact
     ? 'repeat(2, minmax(0, 1fr))'
-    : '50px 60px minmax(180px, 1fr) 80px 80px 30px'
+    : '50px 60px minmax(180px, 1fr) 90px 90px 80px 30px'
   const serviceToggleGridColumns = isCompact
     ? 'repeat(2, minmax(0, 1fr))'
     : 'repeat(5, max-content)'

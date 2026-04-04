@@ -19,6 +19,8 @@ export interface ExternalQuoteBreakdownInput {
   guideDays: number
   carServiceDays: number
   carCount: number
+  childSeatDays: number
+  totalChildSeatCount: number
   selectedTicketCount: number
   hasThaiDress: boolean
 }
@@ -97,6 +99,7 @@ export function buildExternalQuoteBreakdown(
       label: '兒童安全座椅',
       amountTHB: input.childSeatCost,
       amountTWD: toTwd(input.childSeatCost, input.exchangeRate),
+      description: `${input.totalChildSeatCount} 張 / ${input.childSeatDays} 天`,
     })
   }
 
@@ -114,7 +117,7 @@ export function buildExternalQuoteBreakdown(
       label: '餐食',
       amountTHB: input.mealCost,
       amountTWD: toTwd(input.mealCost, input.exchangeRate),
-      description: `${input.mealDays} 天`,
+      description: `${input.mealDays} 天（每日預設午餐＋晚餐）`,
     })
   }
 

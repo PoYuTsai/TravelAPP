@@ -3,7 +3,7 @@ function toWholeNumber(value: number | undefined) {
   return Math.floor(value)
 }
 
-export function clampGuideServiceDays(
+function clampSelectableServiceDays(
   requestedDays: number | undefined,
   tripDays: number,
   fallbackDays: number
@@ -11,19 +11,40 @@ export function clampGuideServiceDays(
   const maxDays = Math.max(0, toWholeNumber(tripDays) ?? 0)
   if (maxDays === 0) return 0
 
-  const fallback = Math.min(
-    Math.max(toWholeNumber(fallbackDays) ?? 1, 1),
-    maxDays
-  )
+  const fallbackValue = toWholeNumber(fallbackDays)
+  const fallback =
+    fallbackValue === null || fallbackValue < 1
+      ? maxDays
+      : Math.min(fallbackValue, maxDays)
   const requested = toWholeNumber(requestedDays)
 
-  if (requested === null) {
+  if (requested === null || requested < 1) {
     return fallback
   }
 
-  return Math.min(Math.max(requested, 1), maxDays)
+  return Math.min(requested, maxDays)
 }
 
-export function getChildSeatChargeDays(tripDays: number) {
-  return Math.max(0, toWholeNumber(tripDays) ?? 0)
+export function clampGuideServiceDays(
+  requestedDays: number | undefined,
+  tripDays: number,
+  fallbackDays: number
+) {
+  return clampSelectableServiceDays(requestedDays, tripDays, fallbackDays)
+}
+
+export function clampMealServiceDays(
+  requestedDays: number | undefined,
+  tripDays: number,
+  fallbackDays: number
+) {
+  return clampSelectableServiceDays(requestedDays, tripDays, fallbackDays)
+}
+
+export function clampChildSeatServiceDays(
+  requestedDays: number | undefined,
+  tripDays: number,
+  fallbackDays: number
+) {
+  return clampSelectableServiceDays(requestedDays, tripDays, fallbackDays)
 }

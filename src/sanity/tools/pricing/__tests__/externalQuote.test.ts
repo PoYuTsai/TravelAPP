@@ -25,6 +25,8 @@ describe('pricing external quote breakdown', () => {
       guideDays: 2,
       carServiceDays: 5,
       carCount: 1,
+      childSeatDays: 2,
+      totalChildSeatCount: 1,
       selectedTicketCount: 2,
       hasThaiDress: true,
     })
@@ -38,9 +40,12 @@ describe('pricing external quote breakdown', () => {
       '門票活動',
       '旅遊保險',
     ])
-    expect(breakdown.items.find((item) => item.label === '門票活動')?.description).toBe(
-      '2 項門票活動 + 泰服體驗'
-    )
+    expect(
+      breakdown.items.find((item) => item.label === '門票活動')?.description
+    ).toBe('2 項門票活動 + 泰服體驗')
+    expect(
+      breakdown.items.find((item) => item.label === '兒童安全座椅')?.description
+    ).toBe('1 張 / 2 天')
     expect(breakdown.included).toContain('中文導遊')
     expect(breakdown.excluded).toContain('餐食')
     expect(breakdown.excluded).not.toContain('旅遊保險')
@@ -68,6 +73,8 @@ describe('pricing external quote breakdown', () => {
       guideDays: 0,
       carServiceDays: 3,
       carCount: 1,
+      childSeatDays: 0,
+      totalChildSeatCount: 0,
       selectedTicketCount: 0,
       hasThaiDress: false,
     })

@@ -27,7 +27,12 @@ import {
   type PricingExampleDocument,
 } from './sharedExamples'
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
-import { clampGuideServiceDays, getChildSeatChargeDays } from './serviceDays'
+import { normalizeGuidePerDayRate } from './guideRate'
+import {
+  clampChildSeatServiceDays,
+  clampGuideServiceDays,
+  clampMealServiceDays,
+} from './serviceDays'
 import {
   getThaiDressPhotographerCount,
   getThaiDressPhotographerLabel,
@@ -660,7 +665,7 @@ function downloadExternalQuote(
 
         ${includeMeals ? `
         <div class="price-row category">
-          <span>🍜 餐費（${c.mealDays}天午晚餐）</span>
+          <span>🍜 餐費（${c.mealDays}天，預設午餐＋晚餐）</span>
           <span>${fmt(c.mealCost)} 泰銖</span>
         </div>
         <div class="price-detail">• ${mealLabels[mealLevel]}餐廳 ${fmt(mealLevel)}/人/天 × ${people}人</div>
@@ -671,7 +676,7 @@ function downloadExternalQuote(
           <span>${fmt(c.transportPrice)} 泰銖</span>
         </div>
         <div class="price-detail">• 包車 ${tripDays} 天 × ${c.carCount}台</div>
-        <div class="price-detail">• 中文導遊 ${c.guideDays} 天</div>
+        <div class="price-detail">• 中文導遊 ${c.guideDays} 天（${fmt(c.guidePricePerDay)}/天）</div>
         ${c.needLuggageCar ? `<div class="price-detail">• 行李車（接機＋送機）</div>` : ''}
         ${c.childSeatCost > 0 ? `<div class="price-detail">• 兒童座椅 ${babySeatCount + childSeatCount}張 × ${c.childSeatDays}天</div>` : ''}
 
@@ -712,7 +717,7 @@ function downloadExternalQuote(
         <h4>✅ 費用包含</h4>
         <ul>
           ${includeAccommodation ? `<li>• ${totalNights}晚住宿</li>` : ''}
-          ${includeMeals ? `<li>• ${c.mealDays}天午晚餐</li>` : ''}
+          ${includeMeals ? `<li>• ${c.mealDays}天餐食（每日預設午餐＋晚餐）</li>` : ''}
           <li>• 全程包車（${c.carCount}台）</li>
           ${includeGuide ? `<li>• 專業中文導遊</li>` : ''}
           ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `<li>• ${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項門票活動</li>` : ''}
@@ -965,6 +970,8 @@ function downloadSimpleExternalQuote(
     guideDays: c.guideDays,
     carServiceDays: c.carServiceDays,
     carCount: c.carCount,
+    childSeatDays: c.childSeatDays,
+    totalChildSeatCount: _babySeatCount + _childSeatCount,
     selectedTicketCount: c.selectedTickets.length,
     hasThaiDress: c.thaiDressPrice > 0,
   })
@@ -1377,12 +1384,16 @@ interface SavedQuote {
     exchangeRate?: number
     includeAccommodation?: boolean
     includeMeals?: boolean
+    mealDays?: number
     includeInsurance?: boolean
     includeGuide?: boolean
     guideDays?: number
+    guideCostPerDay?: number
+    guidePricePerDay?: number
     luggageCar?: boolean
     childSeatCount?: number
     babySeatCount?: number  // 嬰兒座椅
+    childSeatDays?: number
     thaiDressCloth?: boolean
     thaiDressPhoto?: boolean
     extraPhotographer?: boolean
@@ -1572,10 +1583,16 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [childSeatCount, setChildSeatCount] = useState(0)  // 3-5歲兒童座椅
   const [includeAccommodation, setIncludeAccommodation] = useState(true)
   const [includeMeals, setIncludeMeals] = useState(true)
+  const [mealServiceDays, setMealServiceDays] = useState(config.mealDays)
   const [includeTickets, setIncludeTickets] = useState(true)
   const [includeInsurance, setIncludeInsurance] = useState(true)
   const [includeGuide, setIncludeGuide] = useState(true)  // 導遊選項
   const [guideServiceDays, setGuideServiceDays] = useState(config.guideDays)
+  const [guideCostPerDay, setGuideCostPerDay] = useState(config.guidePerDay.cost)
+  const [guidePricePerDay, setGuidePricePerDay] = useState(config.guidePerDay.price)
+  const [childSeatServiceDays, setChildSeatServiceDays] = useState(
+    config.dailyCarFees.length
+  )
   const [collectDeposit, setCollectDeposit] = useState(false)  // 代收押金（預設不收）
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})  // 房型分類展開狀態
   const [activeTab, setActiveTab] = useState<'input' | 'internal' | 'external'>('input')
@@ -1879,7 +1896,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       date: '',
       name: `第 ${newDay} 天`,
       cost: 3300,
-      price: 3800,
+      price: 4300,
       type: 'suburban',
     }])
   }
@@ -2050,12 +2067,16 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         exchangeRate,
         includeAccommodation,
         includeMeals,
+        mealDays: mealServiceDays,
         includeInsurance,
         includeGuide,
         guideDays: guideServiceDays,
+        guideCostPerDay,
+        guidePricePerDay,
         luggageCar,
         childSeatCount,
         babySeatCount,
+        childSeatDays: childSeatServiceDays,
         thaiDressCloth,
         thaiDressPhoto,
         extraPhotographer,
@@ -2127,6 +2148,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const nextIncludeAccommodation = quote.data.includeAccommodation ?? true
     const nextIncludeMeals = quote.data.includeMeals ?? true
     const nextHasSelectedTickets = quote.data.tickets?.some((ticket) => ticket.checked) ?? false
+    const savedTripDays = quote.data.carFees?.length ?? tripDays
+    const nextGuideRate = normalizeGuidePerDayRate(
+      {
+        cost: quote.data.guideCostPerDay,
+        price: quote.data.guidePricePerDay,
+      },
+      config.guidePerDay
+    )
 
     if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
     setIncludeInsurance(
@@ -2140,13 +2169,29 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setGuideServiceDays(
       clampGuideServiceDays(
         quote.data.guideDays,
-        quote.data.carFees?.length ?? tripDays,
+        savedTripDays,
         config.guideDays
+      )
+    )
+    setGuideCostPerDay(nextGuideRate.cost)
+    setGuidePricePerDay(nextGuideRate.price)
+    setMealServiceDays(
+      clampMealServiceDays(
+        quote.data.mealDays,
+        savedTripDays,
+        config.mealDays
       )
     )
     if (quote.data.luggageCar !== undefined) setLuggageCar(quote.data.luggageCar)
     if (quote.data.childSeatCount !== undefined) setChildSeatCount(quote.data.childSeatCount)
     if (quote.data.babySeatCount !== undefined) setBabySeatCount(quote.data.babySeatCount)
+    setChildSeatServiceDays(
+      clampChildSeatServiceDays(
+        quote.data.childSeatDays,
+        savedTripDays,
+        savedTripDays
+      )
+    )
     if (quote.data.thaiDressCloth !== undefined) setThaiDressCloth(quote.data.thaiDressCloth)
     if (quote.data.thaiDressPhoto !== undefined) setThaiDressPhoto(quote.data.thaiDressPhoto)
     setExtraPhotographer(Boolean(quote.data.extraPhotographer))
@@ -2184,14 +2229,19 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setExchangeRate(0.93)
     setIncludeAccommodation(true)
     setIncludeMeals(true)
+    setMealServiceDays(config.mealDays)
     setIncludeInsurance(true)
     setIncludeGuide(true)
     setGuideServiceDays(config.guideDays)
+    setGuideCostPerDay(config.guidePerDay.cost)
+    setGuidePricePerDay(config.guidePerDay.price)
     setCollectDeposit(true)
     // 重置車費
     setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({ ...d, date: '' })))
     setLuggageCar(true)
+    setBabySeatCount(0)
     setChildSeatCount(0)
+    setChildSeatServiceDays(config.dailyCarFees.length)
     // 重置飯店（預設香格里拉3晚 + 美平2晚，10人=5間大床房）
     setHotels([
       {
@@ -2370,10 +2420,27 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   // 行程天數（優先使用解析後的車費天數）
   const tripDays = carFees.length
   const tripNights = tripDays - 1 // 天數 - 1 = 晚數
+  const totalChildSeatCount = babySeatCount + childSeatCount
 
   useEffect(() => {
     setGuideServiceDays((prev) => clampGuideServiceDays(prev, tripDays, config.guideDays))
   }, [config.guideDays, tripDays])
+
+  useEffect(() => {
+    setMealServiceDays((prev) => clampMealServiceDays(prev, tripDays, config.mealDays))
+  }, [config.mealDays, tripDays])
+
+  useEffect(() => {
+    setChildSeatServiceDays((prev) =>
+      clampChildSeatServiceDays(prev, tripDays, tripDays)
+    )
+  }, [tripDays])
+
+  useEffect(() => {
+    if (totalChildSeatCount === 0) {
+      setChildSeatServiceDays(tripDays)
+    }
+  }, [totalChildSeatCount, tripDays])
 
   useEffect(() => {
     if (!thaiDressPhoto || !shouldOfferExtraPhotographer(people)) {
@@ -2393,11 +2460,27 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
   // Calculations
   const calculation = useMemo(() => {
-    const { mealDays, guidePerDay, luggagePerTrip, insurancePerPerson, thaiDress } = config
+    const {
+      mealDays: defaultMealDays,
+      guidePerDay,
+      luggagePerTrip,
+      insurancePerPerson,
+      thaiDress,
+    } = config
+    const guideRate = normalizeGuidePerDayRate(
+      {
+        cost: guideCostPerDay,
+        price: guidePricePerDay,
+      },
+      guidePerDay
+    )
     // 使用動態車費（carFees state）而非 config.dailyCarFees
     const dailyCarFees = carFees
     const carServiceDays = dailyCarFees.length
-    const childSeatDays = getChildSeatChargeDays(carServiceDays)
+    const mealDays = clampMealServiceDays(mealServiceDays, carServiceDays, defaultMealDays)
+    const childSeatDays = totalChildSeatCount > 0
+      ? clampChildSeatServiceDays(childSeatServiceDays, carServiceDays, carServiceDays)
+      : 0
     const guideDays = includeGuide
       ? clampGuideServiceDays(guideServiceDays, carServiceDays, config.guideDays)
       : 0
@@ -2493,15 +2576,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     })
 
     // Guide (respect includeGuide toggle)
-    const guideCost = includeGuide ? guidePerDay.cost * guideDays : 0
-    const guidePrice = includeGuide ? guidePerDay.price * guideDays : 0
+    const guideCost = includeGuide ? guideRate.cost * guideDays : 0
+    const guidePrice = includeGuide ? guideRate.price * guideDays : 0
 
     // Luggage
     const luggageCost = needLuggageCar ? luggagePerTrip * 2 : 0
 
     // Child Seats (0-2歲嬰兒座椅, 3-5歲兒童座椅)
     const childSeatCost =
-      (babySeatCount + childSeatCount) * config.childSeatPerDay * childSeatDays
+      totalChildSeatCount * config.childSeatPerDay * childSeatDays
 
     const transportCost = carCostTotal + guideCost
     const transportPrice = carPriceTotal + guidePrice + luggageCost + childSeatCost
@@ -2602,7 +2685,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
+      people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel, guideCostPerDay: guideRate.cost, guidePricePerDay: guideRate.price,
       includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, hotelsWithDeposit, totalRoomCapacity,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
@@ -2614,7 +2697,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, babySeatCount, childSeatCount, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, guideCostPerDay, guidePricePerDay, carFees])
 
   const fmt = (n: number) => n.toLocaleString()
   const formalProfitShares =
@@ -2644,10 +2727,12 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         guideDays: calculation.guideDays,
         carServiceDays: calculation.carServiceDays,
         carCount: calculation.carCount,
+        childSeatDays: calculation.childSeatDays,
+        totalChildSeatCount,
         selectedTicketCount: calculation.selectedTickets.length,
         hasThaiDress: calculation.thaiDressPrice > 0,
       }),
-    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, totalNights]
+    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, totalChildSeatCount, totalNights]
   )
 
   const toggleTicket = (id: string) => {
@@ -3226,7 +3311,7 @@ Day 5｜送機
                 </label>
               )}
             </div>
-            {includeGuide && (
+            {(includeMeals || includeGuide) && (
               <div
                 style={{
                   marginTop: 12,
@@ -3235,39 +3320,126 @@ Day 5｜送機
                   borderRadius: 8,
                   display: 'flex',
                   flexDirection: responsive.isCompact ? 'column' : 'row',
-                  alignItems: responsive.isCompact ? 'stretch' : 'center',
+                  alignItems: responsive.isCompact ? 'stretch' : 'flex-start',
                   gap: 10,
                 }}
               >
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
-                  <span>🗓️ 導遊天數</span>
-                  <select
-                    value={guideServiceDays}
-                    onChange={e =>
-                      setGuideServiceDays(
-                        clampGuideServiceDays(
-                          Number(e.target.value),
-                          tripDays,
-                          config.guideDays
-                        )
-                      )
-                    }
-                    style={{
-                      ...inputStyle,
-                      width: responsive.isCompact ? '100%' : 90,
-                      maxWidth: responsive.isCompact ? '100%' : 90,
-                    }}
-                  >
-                    {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
-                      <option key={day} value={day}>
-                        {day} 天
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span style={{ ...noteStyle, color: '#666' }}>
-                  包車仍按 {tripDays} 天計算，導遊只按實際聘請的 {calculation.guideDays} 天計
-                </span>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                    flex: responsive.isCompact ? 'unset' : 1,
+                  }}
+                >
+                  {includeMeals && (
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                      <span>🍜 餐費天數</span>
+                      <select
+                        value={mealServiceDays}
+                        onChange={e =>
+                          setMealServiceDays(
+                            clampMealServiceDays(
+                              Number(e.target.value),
+                              tripDays,
+                              config.mealDays
+                            )
+                          )
+                        }
+                        style={{
+                          ...inputStyle,
+                          width: responsive.isCompact ? '100%' : 90,
+                          maxWidth: responsive.isCompact ? '100%' : 90,
+                        }}
+                      >
+                        {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
+                          <option key={`meal-${day}`} value={day}>
+                            {day} 天
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {includeGuide && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                        <span>🗓️ 導遊天數</span>
+                        <select
+                          value={guideServiceDays}
+                          onChange={e =>
+                            setGuideServiceDays(
+                              clampGuideServiceDays(
+                                Number(e.target.value),
+                                tripDays,
+                                config.guideDays
+                              )
+                            )
+                          }
+                          style={{
+                            ...inputStyle,
+                            width: responsive.isCompact ? '100%' : 90,
+                            maxWidth: responsive.isCompact ? '100%' : 90,
+                          }}
+                        >
+                          {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
+                            <option key={`guide-${day}`} value={day}>
+                              {day} 天
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                        <span>💸 導遊成本/天</span>
+                        <input
+                          type="number"
+                          value={guideCostPerDay}
+                          onChange={e => setGuideCostPerDay(Math.max(0, Number(e.target.value) || 0))}
+                          min={0}
+                          step={100}
+                          style={{
+                            ...inputStyle,
+                            width: responsive.isCompact ? '100%' : 110,
+                            maxWidth: responsive.isCompact ? '100%' : 110,
+                          }}
+                        />
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                        <span>💰 導遊售價/天</span>
+                        <input
+                          type="number"
+                          value={guidePricePerDay}
+                          onChange={e => setGuidePricePerDay(Math.max(0, Number(e.target.value) || 0))}
+                          min={0}
+                          step={100}
+                          style={{
+                            ...inputStyle,
+                            width: responsive.isCompact ? '100%' : 110,
+                            maxWidth: responsive.isCompact ? '100%' : 110,
+                          }}
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {includeMeals && (
+                    <span style={{ ...noteStyle, color: '#666' }}>
+                      1 天預設午餐＋晚餐（2 餐），可依實際供餐天數調整
+                    </span>
+                  )}
+                  {includeGuide && (
+                    <span style={{ ...noteStyle, color: '#666' }}>
+                      包車仍按 {tripDays} 天計算，導遊只按實際聘請的 {calculation.guideDays} 天與每日日價計
+                    </span>
+                  )}
+                </div>
               </div>
             )}
             {(!includeAccommodation || !includeMeals || noActivitiesSelected || !includeInsurance || !includeGuide) && (
@@ -3592,7 +3764,7 @@ Day 5｜送機
           </Section>
 
           {/* 餐費 */}
-          <Section title={`🍜 餐費（${calculation.mealDays}天午晚餐）`} style={!includeMeals ? { opacity: 0.5 } : {}}>
+          <Section title={`🍜 餐費（${calculation.mealDays}天，預設午餐＋晚餐）`} style={!includeMeals ? { opacity: 0.5 } : {}}>
             {!includeMeals ? (
               <div style={{ padding: 16, background: '#f5f5f5', borderRadius: 8, textAlign: 'center', color: '#666' }}>
                 客人自理餐費
@@ -3608,7 +3780,11 @@ Day 5｜送機
                     <option value={1500}>高級 - 1,500/人/天</option>
                   </select>
                 </Row>
-                <p style={noteStyle}>餐費小計：{fmt(calculation.mealCost)} 泰銖</p>
+                <p style={noteStyle}>
+                  餐費小計：{fmt(calculation.mealCost)} 泰銖
+                  {' · '}
+                  1 天預設午餐＋晚餐（2 餐）
+                </p>
               </>
             )}
           </Section>
@@ -3688,9 +3864,54 @@ Day 5｜送機
                   </div>
                 </div>
               </div>
-              {(babySeatCount > 0 || childSeatCount > 0) && (
+              {totalChildSeatCount > 0 && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    padding: 10,
+                    background: '#fff',
+                    border: '1px solid #e8e4dc',
+                    borderRadius: 6,
+                    display: 'flex',
+                    flexDirection: responsive.isCompact ? 'column' : 'row',
+                    alignItems: responsive.isCompact ? 'stretch' : 'center',
+                    gap: 8,
+                  }}
+                >
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
+                    <span>🗓️ 座椅天數</span>
+                    <select
+                      value={childSeatServiceDays}
+                      onChange={e =>
+                        setChildSeatServiceDays(
+                          clampChildSeatServiceDays(
+                            Number(e.target.value),
+                            tripDays,
+                            tripDays
+                          )
+                        )
+                      }
+                      style={{
+                        ...inputStyle,
+                        width: responsive.isCompact ? '100%' : 90,
+                        maxWidth: responsive.isCompact ? '100%' : 90,
+                      }}
+                    >
+                      {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
+                        <option key={`seat-${day}`} value={day}>
+                          {day} 天
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span style={{ ...noteStyle, color: '#666' }}>
+                    座椅依實際使用的 {calculation.childSeatDays} 天計算
+                  </span>
+                </div>
+              )}
+              {totalChildSeatCount > 0 && (
                 <div style={{ marginTop: 10, padding: 8, background: '#f9f8f6', borderRadius: 4, fontSize: 12 }}>
-                  🪑 座椅費用：({babySeatCount} + {childSeatCount}) × 500 × {calculation.childSeatDays}天 = <strong>{fmt(calculation.childSeatCost)} 泰銖</strong>
+                  🪑 座椅費用：{totalChildSeatCount} 張 × 500 × {calculation.childSeatDays} 天 = <strong>{fmt(calculation.childSeatCost)} 泰銖</strong>
                 </div>
               )}
             </div>
@@ -3736,13 +3957,26 @@ Day 5｜送機
                       placeholder="行程名稱"
                       style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
                     />
-                    <input
-                      type="number"
-                      value={cf.price}
-                      onChange={e => updateCarFee(index, 'price', Number(e.target.value))}
-                      placeholder="報價"
-                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
-                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 10, color: '#888' }}>成本</span>
+                      <input
+                        type="number"
+                        value={cf.cost}
+                        onChange={e => updateCarFee(index, 'cost', Number(e.target.value))}
+                        placeholder="成本"
+                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span style={{ fontSize: 10, color: '#888' }}>售價</span>
+                      <input
+                        type="number"
+                        value={cf.price}
+                        onChange={e => updateCarFee(index, 'price', Number(e.target.value))}
+                        placeholder="售價"
+                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
+                      />
+                    </div>
                     <span style={{ fontSize: 11, color: '#666' }}>
                       ×{calculation.carCount}台
                     </span>
@@ -3765,7 +3999,7 @@ Day 5｜送機
                 ))}
               </div>
               <p style={{ marginTop: 8, fontSize: 11, color: '#666' }}>
-                💡 解析行程後會自動產生每日車費，你可以手動調整報價
+                💡 解析行程後會自動產生每日車費，你可以手動調整每天的成本與售價
               </p>
             </div>
 
@@ -4307,8 +4541,8 @@ Day 5｜送機
                 </>
               )}
 
-              <SectionRow title={`🍜 餐費 (${calculation.mealDays}天午晚餐)`} />
-              <DataRow name={`餐費 (${mealLevel}/人/天)`} cost={calculation.mealCost} price={calculation.mealCost} profit={0} />
+              <SectionRow title={`🍜 餐費 (${calculation.mealDays}天，預設午餐＋晚餐)`} />
+              <DataRow name={`餐費 (${mealLevel}/人/天 × ${calculation.mealDays}天)`} cost={calculation.mealCost} price={calculation.mealCost} profit={0} />
 
               <SectionRow title={`🚗 車費明細 (${calculation.carCount}台)`} />
               {calculation.dailyCarFees.map((d: any, i: number) => (
@@ -4317,9 +4551,9 @@ Day 5｜送機
               <SubtotalRow name="車費小計" cost={calculation.carCostTotal} price={calculation.carPriceTotal} profit={calculation.carPriceTotal - calculation.carCostTotal} />
 
               <SectionRow title="👤 導遊" />
-              <DataRow name={`導遊 (${calculation.guideDays}天)`} cost={calculation.guideCost} price={calculation.guidePrice} profit={calculation.guidePrice - calculation.guideCost} />
+              <DataRow name={`導遊 (${calculation.guideDays}天 × ${fmt(calculation.guidePricePerDay)}/天)`} cost={calculation.guideCost} price={calculation.guidePrice} profit={calculation.guidePrice - calculation.guideCost} />
               {calculation.needLuggageCar && <DataRow name="行李車 (2趟)" cost={0} price={calculation.luggageCost} profit={calculation.luggageCost} />}
-              {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${babySeatCount + childSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
+              {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${totalChildSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
               <SubtotalRow name="車導總計" cost={calculation.transportCost} price={calculation.transportPrice} profit={calculation.transportProfit} />
               <InfoRow text="※ 接送機已含在 D1/D6 車費" />
 
@@ -4572,11 +4806,11 @@ Day 5｜送機
               {includeMeals && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8, marginTop: includeAccommodation ? 12 : 0 }}>
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🍜 餐費（{calculation.mealDays}天午晚餐）</span>
+                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🍜 餐費（{calculation.mealDays}天，預設午餐＋晚餐）</span>
                     <span style={{ fontWeight: 'bold' }}>{fmt(calculation.mealCost)} 泰銖</span>
                   </div>
                   <div style={{ paddingLeft: 16, fontSize: 12, color: '#555' }}>
-                    • {mealLevel === 600 ? '簡餐' : mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}餐廳 {fmt(mealLevel)}/人/天 × {people}人 × {calculation.mealDays}天
+                    • {mealLevel === 600 ? '簡餐' : mealLevel === 900 ? '平價' : mealLevel === 1200 ? '精選' : '高級'}餐廳 {fmt(mealLevel)}/人/天 × {people}人 × {calculation.mealDays}天（每日預設午餐＋晚餐）
                   </div>
                 </>
               )}
@@ -4588,9 +4822,9 @@ Day 5｜送機
               </div>
               <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
                 • 包車 {calculation.carServiceDays} 天 × {calculation.carCount}台<br />
-                • 中文導遊 {calculation.guideDays} 天
+                • 中文導遊 {calculation.guideDays} 天（{fmt(calculation.guidePricePerDay)}/天）
                 {calculation.needLuggageCar && <><br />• 行李車（接機＋送機）</>}
-                {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {babySeatCount + childSeatCount}張 × {calculation.childSeatDays}天</>}
+                {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {totalChildSeatCount}張 × {calculation.childSeatDays}天</>}
               </div>
 
               {/* 門票+泰服明細（合併顯示） */}
@@ -4644,7 +4878,7 @@ Day 5｜送機
               <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>✅ 費用包含</div>
               <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
                 {includeAccommodation && <>• {totalNights}晚住宿<br /></>}
-                {includeMeals && <>• {calculation.mealDays}天午晚餐<br /></>}
+                {includeMeals && <>• {calculation.mealDays}天餐食（每日預設午餐＋晚餐）<br /></>}
                 • 全程包車（{calculation.carCount}台）<br />
                 {includeGuide && <>• 專業中文導遊<br /></>}
                 {includeTickets && calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
