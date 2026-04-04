@@ -13,6 +13,8 @@
 - 新增 `2x PNG` 主視覺資產，讓對外報價頁面與 PDF 都改吃較高品質來源，降低 JPG 壓縮感。
 - 最終改版方向改為移除頂部主視覺圖片，統一使用暖色純文字品牌標頭，避免頁面與 PDF 視覺不一致。
 - 新增 shared header copy helper，讓 `對外報價` 頁面與 `下載 PDF` 共用同一份品牌文字與標籤。
+- 依 `ui-ux-pro-max` 的 service landing / minimal single column / trust & authority 建議，將 header 收斂成置中單欄版式。
+- 移除 badge 泡泡感，改為品牌名、服務副標、主標與品牌敘事一行，強化正式提案書感。
 
 ## Files Changed
 
@@ -35,3 +37,4 @@
 - Hotfix: `408b52d` `fix: align quote pdf hero rendering`
 - Hotfix: `292e10e` `fix: improve quote hero image quality`
 - Final branding pass: `4366aea` `feat: simplify quote header branding`
+- Refinement: `9dcb13d` `feat: refine quote layout using ui ux guidance`
