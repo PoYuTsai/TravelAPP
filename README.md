@@ -45,6 +45,7 @@
 | 維護 2026-04-04 | Studio pricing 工具 SSR hotfix | ✅ 完成 |
 | 維護 2026-04-04 | Studio 夥伴登入 email 更新 | ✅ 完成 |
 | 維護 2026-04-04 | 報價共享案例同步 + 手機版體驗優化 | ✅ 完成 |
+| 維護 2026-04-05 | 報價工具服務天數 + 車導成本售價控制 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -443,4 +444,9 @@ NOTION_TOKEN=
   - `npm run lint`
   - `npm run build`
 
-<!-- Last build trigger: 2026-04-05 external quote simplification -->
+### 維護：pricing service controls (2026-04-05)
+
+- Studio pricing calculator now supports adjustable meal days, child-seat days, per-day guide cost/price, and editable daily car cost/price in both legacy and formal tools.
+- Shared pricing examples keep the new service-day and guide-rate fields, so saved cases reload consistently across collaborators.
+
+<!-- Last build trigger: 2026-04-05 pricing service controls -->
