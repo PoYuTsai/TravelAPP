@@ -1,7 +1,47 @@
+import type { ParsedDay } from '@/lib/itinerary'
+
 type ThaiDressPhotographerOptions = {
   isSelected: boolean
   people: number
   includeExtraPhotographer: boolean
+}
+
+const THAI_DRESS_KEYWORDS = [
+  '泰服',
+  'thai dress',
+  '泰服體驗',
+  '專業攝影師拍攝',
+  '攝影師拍攝',
+]
+
+export function isThaiDressText(text: string) {
+  const normalized = text.toLowerCase()
+
+  return THAI_DRESS_KEYWORDS.some((keyword) =>
+    normalized.includes(keyword.toLowerCase())
+  )
+}
+
+export function detectThaiDressDay(days: ParsedDay[]) {
+  for (const day of days) {
+    const texts = [
+      day.title,
+      day.morning,
+      day.afternoon,
+      day.evening,
+      day.lunch,
+      day.dinner,
+      day.accommodation,
+      day.rawText,
+      ...day.activities.map((activity) => activity.content),
+    ].filter((value): value is string => Boolean(value?.trim()))
+
+    if (texts.some((text) => isThaiDressText(text))) {
+      return day.dayNumber
+    }
+  }
+
+  return null
 }
 
 export function shouldOfferExtraPhotographer(people: number) {

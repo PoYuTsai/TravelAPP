@@ -48,8 +48,10 @@ import {
   type SavedParsedItineraryDay,
 } from './savedQuoteState'
 import {
+  detectThaiDressDay,
   getThaiDressPhotographerCount,
   getThaiDressPhotographerLabel,
+  isThaiDressText,
   shouldOfferExtraPhotographer,
 } from './thaiDress'
 import { buildExternalQuoteBreakdown, type ExternalQuoteBreakdown } from './externalQuote'
@@ -1689,21 +1691,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const activitiesToMatch = getActivitiesForMatching(ticketStorageKey, defaultTickets)
     const result = matchActivitiesToDatabase(parsed, activitiesToMatch)
 
-    // 泰服關鍵字（特殊處理：不在 DEFAULT_TICKETS，但有獨立 UI）
-    const thaiDressKeywords = ['泰服', 'thai dress', '泰服體驗', '攝影師拍攝']
-
-    // 找出泰服在哪一天（從 unmatched 活動中取得 dayNumber）
-    const thaiDressActivity = result.unmatched.find(u =>
-      thaiDressKeywords.some(kw => u.text.toLowerCase().includes(kw.toLowerCase()))
-    )
-    const detectedThaiDressDay = thaiDressActivity?.dayNumber || null
+    const detectedThaiDressDay = detectThaiDressDay(parsed.days)
 
     // 檢查是否有泰服相關活動
     const hasThaiDress = detectedThaiDressDay !== null || itineraryText.toLowerCase().includes('泰服')
 
     // 過濾掉泰服相關的未匹配項目（因為有獨立 UI 處理）
     const filteredUnmatched = result.unmatched.filter(u =>
-      !thaiDressKeywords.some(kw => u.text.toLowerCase().includes(kw.toLowerCase()))
+      !isThaiDressText(u.text)
     )
 
     // 建立新的結果物件（避免修改原物件）
@@ -1869,11 +1864,17 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       setTickets(dynamicTickets)
       setSavedParsedTickets(dynamicTickets)  // 保存解析結果，用於切換回去
       setUseDefaultTickets(false)
+    } else if (hasThaiDress) {
+      console.log('僅偵測到泰服，切換為按天顯示模式')
+      setTickets([])
+      setSavedParsedTickets([])
+      setUseDefaultTickets(false)
     } else {
       // 沒有匹配到任何活動，保持現有門票但全部取消勾選
       console.log('無匹配活動，重置所有門票為未勾選')
       setTickets(prev => prev.map(t => ({ ...t, checked: false })))
       setSavedParsedTickets([])
+      setUseDefaultTickets(true)
     }
 
     // 3. 根據解析的住宿更新飯店（如果有的話）
@@ -4369,11 +4370,11 @@ Day 5｜送機
             </div>
 
             {/* 按日期分組顯示（當有解析結果時） */}
-            {!useDefaultTickets && tickets.some(t => t.dayNumber) ? (
+            {!useDefaultTickets && (tickets.some(t => t.dayNumber) || thaiDressDay !== null) ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {/* 按 dayNumber 分組 */}
                 {/* 取得所有天數（包含泰服天數） */}
-                {Array.from(new Set([...tickets.map(t => t.dayNumber), thaiDressDay].filter(Boolean))).sort((a, b) => (a || 0) - (b || 0)).map(dayNum => {
+                {Array.from(new Set([...tickets.map(t => t.dayNumber), thaiDressDay].filter((dayNum): dayNum is number => typeof dayNum === 'number' && dayNum > 0))).sort((a, b) => a - b).map(dayNum => {
                   const dayTickets = tickets.filter(t => t.dayNumber === dayNum)
                   const isThaiDressDay = thaiDressDay === dayNum
                   // 如果這天沒有門票也沒有泰服，跳過
@@ -4574,7 +4575,7 @@ Day 5｜送機
             </p>
 
             {/* 泰服體驗（僅在預設門票模式時顯示，有日期分組時在 Day 1 內顯示） */}
-            {(useDefaultTickets || !tickets.some(t => t.dayNumber)) && (
+            {(useDefaultTickets || (!tickets.some(t => t.dayNumber) && thaiDressDay === null)) && (
               <div style={{ marginTop: 16, padding: 12, background: '#fff9e6', borderRadius: 8, border: '1px solid #f0d000' }}>
                 <div style={{ fontWeight: 'bold', marginBottom: 10, color: '#5c4a2a', fontSize: 13 }}>
                   👘 泰服體驗
