@@ -42,6 +42,12 @@ import {
   clampMealServiceDays,
 } from './serviceDays'
 import {
+  getNextHotelIdFromSavedHotels,
+  resolveSavedParseState,
+  type SavedParseWarning,
+  type SavedParsedItineraryDay,
+} from './savedQuoteState'
+import {
   getThaiDressPhotographerCount,
   getThaiDressPhotographerLabel,
   shouldOfferExtraPhotographer,
@@ -1459,6 +1465,12 @@ interface SavedQuote {
     makeupCount?: number
     mealLevel?: number  // 餐費等級
     collectDeposit?: boolean
+    parsedItinerary?: SavedParsedItineraryDay[]
+    parseResult?: ActivityMatchResult | null
+    parseWarnings?: SavedParseWarning[]
+    isParseConfirmed?: boolean
+    savedParsedTickets?: DynamicTicket[]
+    thaiDressDay?: number | null
   }
 }
 
@@ -2142,6 +2154,26 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         makeupCount,
         mealLevel,
         collectDeposit,
+        parsedItinerary: parsedItinerary.map((day) => ({
+          ...day,
+          items: [...day.items],
+          hotel: day.hotel ?? null,
+        })),
+        parseResult: parseResult
+          ? {
+              matched: parseResult.matched.map((item) => ({ ...item })),
+              unmatched: parseResult.unmatched.map((item) => ({
+                ...item,
+                suggestedKeywords: [...item.suggestedKeywords],
+              })),
+              dates: parseResult.dates.map((item) => ({ ...item })),
+              hotels: parseResult.hotels.map((item) => ({ ...item })),
+            }
+          : null,
+        parseWarnings: parseWarnings.map((warning) => ({ ...warning })),
+        isParseConfirmed,
+        savedParsedTickets: savedParsedTickets.map((ticket) => ({ ...ticket })),
+        thaiDressDay,
       },
     }
     setIsSavingQuote(true)
@@ -2185,6 +2217,23 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   // 載入報價
   const loadQuote = (quote: SavedQuote) => {
     setItineraryText(quote.data.itineraryText || '')
+    const normalizedSavedTickets = quote.data.tickets
+      ? normalizeTicketsForVariant(quote.data.tickets, variant)
+      : undefined
+    const normalizedSavedParsedTickets = quote.data.savedParsedTickets
+      ? normalizeTicketsForVariant(quote.data.savedParsedTickets, variant)
+      : undefined
+    const restoredParseState = resolveSavedParseState({
+      itineraryText: quote.data.itineraryText,
+      parsedItinerary: quote.data.parsedItinerary,
+      parseResult: quote.data.parseResult,
+      parseWarnings: quote.data.parseWarnings,
+      isParseConfirmed: quote.data.isParseConfirmed,
+      thaiDressDay: quote.data.thaiDressDay,
+      useDefaultTickets: quote.data.useDefaultTickets,
+      tickets: normalizedSavedTickets,
+      savedParsedTickets: normalizedSavedParsedTickets,
+    })
     // 向後相容：新格式用 adults/children，舊格式用 people
     if (quote.data.adults !== undefined) {
       setAdults(quote.data.adults)
@@ -2195,12 +2244,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       setChildren(0)
     }
     if (quote.data.carFees) setCarFees(quote.data.carFees)
-    if (quote.data.tickets) {
-      setTickets(normalizeTicketsForVariant(quote.data.tickets, variant))
+    if (normalizedSavedTickets) {
+      setTickets(normalizedSavedTickets)
     }
     if (quote.data.useDefaultTickets !== undefined) setUseDefaultTickets(quote.data.useDefaultTickets)
     // 載入新增欄位
-    if (quote.data.hotels) setHotels(quote.data.hotels)
+    if (quote.data.hotels) {
+      setHotels(quote.data.hotels)
+      setNextHotelId(getNextHotelIdFromSavedHotels(quote.data.hotels))
+    }
     if (quote.data.exchangeRate !== undefined) setExchangeRate(quote.data.exchangeRate)
     if (quote.data.includeAccommodation !== undefined) setIncludeAccommodation(quote.data.includeAccommodation)
     if (quote.data.includeMeals !== undefined) setIncludeMeals(quote.data.includeMeals)
@@ -2257,13 +2309,24 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.makeupCount !== undefined) setMakeupCount(quote.data.makeupCount)
     if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
     if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
+    setParsedItinerary(restoredParseState.parsedItinerary)
+    setParseResult(restoredParseState.parseResult)
+    setParseWarnings(restoredParseState.parseWarnings)
+    setIsParseConfirmed(restoredParseState.isParseConfirmed)
+    setSavedParsedTickets(restoredParseState.savedParsedTickets)
+    setThaiDressDay(restoredParseState.thaiDressDay)
     setCurrentQuoteName(quote.name)
     setEditingQuoteId(quote.id)
-    // 如果有行程文字，自動打開解析器
-    if (quote.data.itineraryText) {
-      setShowParser(true)
-    }
-    alert(`✅ 已載入「${quote.name}」\n${quote.data.itineraryText ? '💡 請點「解析行程」重新解析' : ''}`)
+    setShowParser(restoredParseState.shouldShowParser)
+    alert(
+      `✅ 已載入「${quote.name}」\n${
+        restoredParseState.parseResult || restoredParseState.parsedItinerary.length > 0
+          ? '💡 已一併還原上次解析與調整內容'
+          : quote.data.itineraryText
+            ? '💡 請點「解析行程」重新解析'
+            : ''
+      }`
+    )
   }
 
   // 複製報價（Fork）
