@@ -9,6 +9,7 @@ import {
   formatCurrency,
   formatRate,
 } from '@/lib/accounting'
+import { canAccessStudioTool } from '@/sanity/studio-access'
 import { useSessionToken } from '../../hooks/useSessionToken'
 import './styles.css'
 
@@ -16,7 +17,7 @@ export function AccountingTool() {
   const { email, getAuthHeaders, isAuthenticated, isLoading: authLoading, error: authError } = useSessionToken()
 
   // 認證狀態決定存取權限
-  const hasAccess = isAuthenticated() || (!authLoading && !authError && email)
+  const hasAccess = Boolean(email) && canAccessStudioTool('accounting', email) && isAuthenticated()
 
   // 表單狀態
   const [form, setForm] = useState<AccountingFormData>({

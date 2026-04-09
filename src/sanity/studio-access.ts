@@ -1,3 +1,7 @@
+const FULL_ACCESS_STUDIO_EMAILS = new Set([
+  'eric19921204@gmail.com',
+])
+
 const RESTRICTED_STUDIO_EMAILS = new Set([
   'lyc32580@gmail.com',
   'moon12sun20@yahoo.com.tw',
@@ -22,14 +26,22 @@ export function isRestrictedStudioEmail(email?: string | null): boolean {
   return RESTRICTED_STUDIO_EMAILS.has(normalizeStudioEmail(email))
 }
 
+export function hasFullStudioAccess(email?: string | null): boolean {
+  return FULL_ACCESS_STUDIO_EMAILS.has(normalizeStudioEmail(email))
+}
+
 export function getVisibleStudioToolNames(email?: string | null): string[] {
-  return isRestrictedStudioEmail(email)
-    ? [...RESTRICTED_TOOL_NAMES]
-    : [...FULL_TOOL_NAMES]
+  return hasFullStudioAccess(email)
+    ? [...FULL_TOOL_NAMES]
+    : [...RESTRICTED_TOOL_NAMES]
 }
 
 export function getStudioToolTitle(name: string): string {
   return STUDIO_TOOL_TITLES[name as keyof typeof STUDIO_TOOL_TITLES] ?? name
+}
+
+export function canAccessStudioTool(name: string, email?: string | null): boolean {
+  return getVisibleStudioToolNames(email).includes(name)
 }
 
 export function customizeStudioTools<T extends { name: string; title?: string }>(

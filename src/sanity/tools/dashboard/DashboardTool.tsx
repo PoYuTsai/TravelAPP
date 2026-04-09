@@ -7,6 +7,7 @@ import { PendingTable } from './components/PendingTable'
 import { YearMonthSelector } from './components/YearMonthSelector'
 import { YearComparison } from './components/YearComparison'
 import { YearlyTrendChart } from './components/YearlyTrendChart'
+import { canAccessStudioTool } from '@/sanity/studio-access'
 import { useSessionToken } from '../../hooks/useSessionToken'
 import './styles.css'
 
@@ -22,7 +23,7 @@ export function DashboardTool() {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1)
 
   // 認證狀態決定存取權限
-  const hasAccess = isAuthenticated() || (!authLoading && !authError && email)
+  const hasAccess = Boolean(email) && canAccessStudioTool('dashboard', email) && isAuthenticated()
 
   const fetchData = useCallback(async (year: number, month: number) => {
     setLoading(true)

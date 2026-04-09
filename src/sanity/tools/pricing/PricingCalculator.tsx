@@ -11,7 +11,7 @@ import {
   type ActivityMatchResult,
 } from '@/lib/itinerary'
 import { apiVersion } from '@/sanity/config'
-import { isRestrictedStudioEmail } from '@/sanity/studio-access'
+import { canAccessStudioTool, isRestrictedStudioEmail } from '@/sanity/studio-access'
 import {
   calculateFormalProfitShares,
   getPricingStorageKeys,
@@ -2948,6 +2948,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const photographerPricingNote = variantUi.showThaiDressCostCopy
     ? '售價 2,500 / 成本 500 /位（1 小時，1 位最多服務 10 位）'
     : '2,500 /位（1 小時，1 位最多服務 10 位）'
+  const currentToolName = variant === 'formal' ? 'pricing-formal' : 'pricing'
+  const canUseCurrentTool = canAccessStudioTool(currentToolName, currentUser?.email)
   const currentToolPath = variant === 'formal' ? '/studio/pricing-formal' : '/studio/pricing'
   const tabButtonStyle = (isActive: boolean, accentColor = '#5c4a2a') => ({
     padding: responsive.isCompact ? '10px 12px' : '10px 20px',
@@ -2966,6 +2968,36 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         minute: '2-digit',
       })
     : null
+
+  if (!canUseCurrentTool) {
+    return (
+      <div
+        style={{
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          maxWidth: 720,
+          margin: '32px auto',
+          padding: 24,
+          background: '#fff8ef',
+          border: '1px solid #e3c995',
+          borderRadius: 16,
+          color: '#5c4338',
+          boxShadow: '0 10px 24px rgba(92, 67, 56, 0.08)',
+        }}
+      >
+        <div style={{ fontSize: 28, marginBottom: 12 }}>🔒</div>
+        <h1 style={{ margin: '0 0 12px 0', fontSize: 24, color: '#5c4338' }}>無權限存取</h1>
+        <p style={{ margin: '0 0 10px 0', lineHeight: 1.7 }}>
+          這個工具僅限內部帳號使用。夥伴帳號目前只開放 `Structure` 與 `報價計算(正式版)`。
+        </p>
+        <p style={{ margin: '0 0 6px 0', fontSize: 13, color: '#7a6255' }}>
+          目前登入：{currentUser?.email || '未取得 email'}
+        </p>
+        <p style={{ margin: 0, fontSize: 13, color: '#7a6255' }}>
+          可改用正式版：<strong>/studio/pricing-formal</strong>
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div
