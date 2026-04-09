@@ -54,6 +54,7 @@
 | 維護 2026-04-05 | 對外報價置中單欄版頭精修 | ✅ 完成 |
 | 維護 2026-04-05 | 對外報價資訊層級與付款卡片精修 | ✅ 完成 |
 | 維護 2026-04-09 | 共享案例還原解析與調整狀態 | ✅ 完成 |
+| 維護 2026-04-09 | 泰服體驗按解析天數分組顯示修正 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -457,4 +458,4 @@ NOTION_TOKEN=
 - Studio pricing calculator now supports adjustable meal days, child-seat days, per-day guide cost/price, and editable daily car cost/price in both legacy and formal tools.
 - Shared pricing examples keep the new service-day and guide-rate fields, so saved cases reload consistently across collaborators.
 
-<!-- Last build trigger: 2026-04-09 shared pricing parse state -->
+<!-- Last build trigger: 2026-04-09 thai dress day grouping fix -->
