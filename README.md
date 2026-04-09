@@ -458,4 +458,10 @@ NOTION_TOKEN=
 - Studio pricing calculator now supports adjustable meal days, child-seat days, per-day guide cost/price, and editable daily car cost/price in both legacy and formal tools.
 - Shared pricing examples keep the new service-day and guide-rate fields, so saved cases reload consistently across collaborators.
 
-<!-- Last build trigger: 2026-04-09 thai dress day grouping fix -->
+### 維護：Studio hard access guard (2026-04-09)
+
+- Only the owner allowlist now keeps full Studio access.
+- Unknown or missing emails now fall back to `Structure` + `報價計算(正式版)` instead of the full tool list.
+- `Dashboard` / `Calculate` / `報價計算測試v1` now enforce tool-level access checks, so direct clicks show `無權限存取` for collaborator sessions.
+
+<!-- Last build trigger: 2026-04-09 studio hard access guard -->
