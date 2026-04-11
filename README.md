@@ -470,4 +470,9 @@ NOTION_TOKEN=
 - Moved the homepage FAQ structured data to a homepage-only component and changed `FAQSection` to stay visual-only by default.
 - Added regression coverage for layout-level and FAQ-section-level deduplication.
 
-<!-- Last build trigger: 2026-04-11 FAQ structured-data dedup -->
+### Maintenance: FAQ layout schema cleanup (2026-04-11)
+
+- Removed the leftover unused FAQ schema constant from `src/app/layout.tsx` after the dedup fix shipped.
+- Re-ran the FAQ regression test and production build to confirm the cleanup did not change runtime behavior.
+
+<!-- Last build trigger: 2026-04-11 FAQ layout schema cleanup -->

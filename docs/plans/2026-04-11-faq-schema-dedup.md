@@ -28,3 +28,12 @@ That created duplicate FAQPage structured data on the same URL, which Google Sea
 
 - `npm.cmd run test:run -- src/components/__tests__/faq-structured-data.test.tsx`
 - `npm.cmd run build`
+
+## Follow-up Cleanup
+
+- **Completed:** 2026-04-11
+- **Goal:** remove the leftover unused FAQ schema constant from `src/app/layout.tsx` after the dedup fix shipped.
+- **Code commit:** `93861da` `chore: remove unused FAQ layout schema`
+- **Verification:**
+  - `npm.cmd run test:run -- src/components/__tests__/faq-structured-data.test.tsx`
+  - `npm.cmd run build`
