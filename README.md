@@ -464,4 +464,10 @@ NOTION_TOKEN=
 - Unknown or missing emails now fall back to `Structure` + `報價計算(正式版)` instead of the full tool list.
 - `Dashboard` / `Calculate` / `報價計算測試v1` now enforce tool-level access checks, so direct clicks show `無權限存取` for collaborator sessions.
 
-<!-- Last build trigger: 2026-04-09 studio hard access guard -->
+### Maintenance: FAQ structured-data dedup (2026-04-11)
+
+- Removed the global `FAQPage` schema from the root layout so inner pages no longer inherit duplicate FAQ structured data.
+- Moved the homepage FAQ structured data to a homepage-only component and changed `FAQSection` to stay visual-only by default.
+- Added regression coverage for layout-level and FAQ-section-level deduplication.
+
+<!-- Last build trigger: 2026-04-11 FAQ structured-data dedup -->
