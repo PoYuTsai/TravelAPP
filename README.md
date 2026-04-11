@@ -55,6 +55,7 @@
 | 維護 2026-04-05 | 對外報價資訊層級與付款卡片精修 | ✅ 完成 |
 | 維護 2026-04-09 | 共享案例還原解析與調整狀態 | ✅ 完成 |
 | 維護 2026-04-09 | 泰服體驗按解析天數分組顯示修正 | ✅ 完成 |
+| 維護 2026-04-11 | Repository line ending 正規化 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | ✅ 規格完善 |
 | Phase 7.1 | Webhook + 需求抽取 + TG Topics | 📋 待實作 |
 | Phase 7.2 | 草稿生成 + 一鍵回覆 + 圖片發送 | 📋 待實作 |
@@ -475,4 +476,10 @@ NOTION_TOKEN=
 - Removed the leftover unused FAQ schema constant from `src/app/layout.tsx` after the dedup fix shipped.
 - Re-ran the FAQ regression test and production build to confirm the cleanup did not change runtime behavior.
 
-<!-- Last build trigger: 2026-04-11 FAQ layout schema cleanup -->
+### Maintenance: repository line-ending normalization (2026-04-11)
+
+- Added a repo-level `.gitattributes` so Windows Git, WSL, and other tooling agree on text file line endings.
+- Renormalized tracked text files that had drifted to mixed `CRLF` / `LF`, including skill data files and a few app source files.
+- Re-ran `git diff --cached --check` and `npm.cmd run build` before shipping to confirm the normalization stayed non-functional.
+
+<!-- Last build trigger: 2026-04-11 repository line-ending normalization -->
