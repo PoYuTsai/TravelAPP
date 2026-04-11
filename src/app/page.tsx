@@ -59,6 +59,7 @@ import ToursPreview from '@/components/sections/ToursPreview'
 import Testimonials from '@/components/sections/Testimonials'
 import FeaturedArticles from '@/components/sections/FeaturedArticles'
 import CTA from '@/components/sections/CTA'
+import HomePageFaqSchema from '@/components/schema/HomePageFaqSchema'
 
 const landingPageQuery = `*[_type == "landingPage"][0]{
   heroBackgroundImage,
@@ -107,6 +108,7 @@ export default async function Home() {
 
   return (
     <>
+      <HomePageFaqSchema />
       <Hero
         backgroundImage={data?.heroBackgroundImage}
         title={data?.heroTitle || '清微旅行｜清邁親子包車，交給 Eric & Min'}

@@ -12,7 +12,7 @@ interface FAQSectionProps {
   schemaType?: 'FAQPage' | 'none'
 }
 
-export default function FAQSection({ items, schemaType = 'FAQPage' }: FAQSectionProps) {
+export default function FAQSection({ items, schemaType = 'none' }: FAQSectionProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
 
   if (!items || items.length === 0) return null
