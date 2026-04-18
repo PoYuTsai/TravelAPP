@@ -31,51 +31,52 @@ interface Testimonial {
   source?: 'facebook' | 'google'
 }
 
-// Real customer reviews from Facebook and Google (一字不漏)
+// Real customer reviews from Google (一字不漏，優先挑選親子相關評價)
 const defaultTestimonials: Testimonial[] = [
-  // Google Reviews
   {
-    name: '魏文陽',
+    name: '王婉蓉',
     location: '台灣',
-    content: '第一次安排清邁自由行～行程排好後發現有幾天行程較遠需要包車上網找到微清旅行～包車含油12小時價格算偏高一點點，但有問題詢問老闆阿裕都能即時回覆親切，很快就敲定時間預約，安排去清萊的導遊郭姐也很熱情介紹當地文化景點，想要朝聖的餐廳訂位也可幫忙預訂，因為是自己安排的行程第一次造訪有些景點時間沒抓好較可惜停留時間不夠，基本上都蠻彈性的可以討論，老闆也會有建議的方向想法，有機會再次深度造訪清邁！！',
-    highlight: '即時回覆，彈性討論',
+    content: '整個服務非常的好…在詢問的時候就非常的細心而且很耐心的回覆，當天服務也非常到位，司機兼導遊中文非常好…會介紹清邁歷史和沿途風光，嬰兒座椅非常舒服安全讓小朋友坐上去…還能睡著多次😀😀尤其是車子很乾淨也有冷氣，真的非常好的體驗👍👍👍推薦大家來清邁可以找他們包車，價格含油錢我覺得非常合理😊…能按照你的需要調整行程，下次去清邁包車還會再光顧！！',
+    highlight: '嬰兒座椅安全舒服，小朋友還能睡著',
     source: 'google',
   },
   {
-    name: 'Lu Lu',
+    name: 'Sky',
     location: '台灣',
-    content: '可以提供中文溝通、服務貼心，更棒的是有提供汽車座椅，這個服務在清邁少有。',
-    highlight: '有提供汽車座椅',
+    kids: '2大2小',
+    content: '我們1家4口，2+2第一次來清邁，選擇了包車+導遊服務，行程可以自由變動，很彈性且方便，導遊和司機都很親切～重點是小朋友都很開心！！大推👍👍',
+    highlight: '重點是小朋友都很開心',
     source: 'google',
   },
   {
-    name: 'Tsai Wei Wei',
+    name: 'Milu Jen',
     location: '台灣',
-    content: '這次清邁郊區有包車三天，都開車大概一小時可到，第一天司機大哥人很好，雖然語言不通但很努力用翻譯跟我們溝通，開車也很小心謹慎。二、三天是開朗活潑會講中文的J導遊小姐帶我們遊玩，除了事前規劃的行程，中間有想去哪，J導遊都會給我們建議和安排，也很自由的帶我們去。這趟清邁旅遊真的是很美好😊',
-    highlight: '導遊開朗活潑，行程自由',
+    kids: '6大2小',
+    content: '6大2小清邁包車+導遊旅行，找清微省了很多時間與煩惱，有任何問題只要詢問，老闆阿裕都會認真解答～行程與用餐也會依據我們的需求給出建議，也能代訂位與訂票，我們的隨車導遊是小胖，很健談對各景點介紹詳細，對小朋友也很有耐心，當大人在化妝或拍照、按摩時，也願意陪伴他們真的很感謝！另外小胖也會依據我們的時間與景點狀況給出建議讓我們參考是否要調整，很感謝這趟旅行能有清微與小胖，讓大家渡過一個輕鬆快樂的年假！',
+    highlight: '對小朋友很有耐心，大人放鬆時會陪伴孩子',
     source: 'google',
   },
-  // Facebook Reviews (最新 3 則，一字不漏)
   {
-    name: '王薪驊',
+    name: 'Esun Chuang',
     location: '台灣',
-    content: '地陪跟司機人都超好的，親力親為，也超有耐心，真心推薦！',
-    highlight: '親力親為，超有耐心',
-    source: 'facebook',
+    content: '第一次規劃清邁家族旅遊，很幸運的遇到了清微旅行，官方賴全程有中文客服即時回覆，行程上的安排非常流暢，導遊專業有耐心、司機和善親切，五天的家族旅遊十分順利、非常愉快…',
+    highlight: '家族旅遊十分順利，導遊專業有耐心',
+    source: 'google',
   },
   {
-    name: 'Feather Chin',
+    name: '勞美美',
     location: '台灣',
-    content: '值得推薦的包車旅遊～地陪親力親為～很貼心和很棒～如果下次朋友要來玩一定會推薦你們家的包車行程。',
-    highlight: '值得推薦，很貼心',
-    source: 'facebook',
+    content: '這趟旅行真的要大力感謝郭姐和包車司機❤️一路上不只行程安排得很順，對孩子更是貼心到不行。我們大人和大哥哥姐姐出去玩時，會主動幫忙照顧最小的兩歲孩子，讓我們可以放心玩；孩子太累在車上睡著，也會陪著照顧，醒了再帶來找正在逛街的我們，真的超貼心！不論是帶小孩或長輩的家庭，都非常適合！郭姐和司機讓人超安心，推薦的景點、餐廳也都很棒，不論多晚在哪兒都能找到好吃又適合全家的地方，還幫忙預訂餐廳，預約任何行程！厲害的是導遊郭姐還會幫忙側拍好多照片影片，都好好看！這是一趟讓人留下滿滿美好回憶的旅程，真心大推✨',
+    highlight: '主動照顧兩歲孩子，讓爸媽放心玩',
+    source: 'google',
   },
   {
-    name: 'Vicky Lin',
+    name: '洪偉傑',
     location: '台灣',
-    content: '從行前的討論安排，都很細心，都能中文溝通完全不用擔心，還有中文解說的導遊，很盡責喔！全程陪伴走完解說不會到點了就把大家放生，超nice，推推～',
-    highlight: '中文溝通完全不用擔心',
-    source: 'facebook',
+    kids: '2大2小',
+    content: '我們包車清萊一日遊，客製化的行程，雖然只有2大2小，仍然給我們一台11人座的麵包車，位置非常寬敞，價格公道，司機從頭到尾都非常親切有禮貌，給了我們一個很美好的包車體驗與旅程👍👍👍',
+    highlight: '2大2小也給寬敞車型，價格公道',
+    source: 'google',
   },
 ]
 
@@ -171,7 +172,7 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
     <section className="py-16 bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionTitle
-          title="家庭真實回饋"
+          title="Google 五星真實評價"
           subtitle="聽聽其他爸媽怎麼說"
         />
 
@@ -238,8 +239,8 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
           <p className="text-center text-xs text-gray-400 mt-2">← 左右滑動查看更多 →</p>
         </div>
 
-        {/* Links to more reviews */}
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-8">
+        {/* Link to more reviews */}
+        <div className="flex justify-center mt-8">
           <a
             href="https://maps.app.goo.gl/8MbRV4PPBggwj2pF6"
             target="_blank"
@@ -252,19 +253,7 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
             </svg>
-            <span>Google 評價</span>
-          </a>
-          <span className="hidden sm:block text-gray-300">|</span>
-          <a
-            href="https://www.facebook.com/profile.php?id=61569067776768&sk=reviews"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-gray-700 hover:text-gray-900 font-medium text-sm transition-colors"
-          >
-            <svg className="w-4 h-4 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-            <span>Facebook 評價</span>
+            <span>查看更多 Google 評價</span>
           </a>
         </div>
       </div>
