@@ -137,7 +137,7 @@ export const siteSettingsQuery = `*[_type == "siteSettings"][0]{
 
 export const defaultSiteSettings: SiteSettings = {
   businessName: '清微旅行 Chiangway Travel',
-  description: '清邁親子包車首選！台灣爸爸 Eric ＋ 泰國媽媽 Min 在地經營，專業中文導遊、安全舒適包車服務，為您的家庭打造難忘的清邁之旅。',
+  description: '爸媽開的清邁親子包車 — 台灣爸爸 Eric × 泰國媽媽 Min 經營，司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
   telephone: '+66-63-790-0666',
   email: 'eric19921204@gmail.com',
   priceRange: 'NT$ 3,000 - 10,000',
@@ -154,7 +154,7 @@ export const defaultSiteSettings: SiteSettings = {
   },
   footer: {
     description:
-      '清邁親子包車首選！我們是台灣爸爸 Eric ＋ 泰國媽媽 Min，住在清邁的在地家庭，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。',
+      '爸媽開的清邁親子包車。台灣爸爸 Eric × 泰國媽媽 Min，司機導遊專業分工，專為帶小孩的家庭設計，深受台灣家庭信賴。',
     addressText: '444, Wiang, Fang District, Chiang Mai 50110',
     addressUrl: 'https://share.google/p6anNFwTvi9Sc7JAt',
     taiwanPhone: '+886 987-591-322',
@@ -166,7 +166,7 @@ export const defaultSiteSettings: SiteSettings = {
     eyebrow: 'About Chiangway',
     imageAlt: 'Eric 與 Min，清微旅行在地家庭團隊',
     name: 'Eric & Min',
-    description: '台灣爸爸與泰國媽媽組成的在地家庭，專注協助親子旅客安排清邁包車與客製行程。',
+    description: '爸媽開的清邁親子包車，由台灣爸爸 Eric 與泰國媽媽 Min 經營，專為帶小孩的家庭設計。',
     serviceLabel: '服務方式',
     serviceValue: '司機 + 導遊',
     summary: '文章內容會從親子旅行、交通、景點與在地生活角度出發，幫你把清邁自由行需要的資訊先整理順。',
