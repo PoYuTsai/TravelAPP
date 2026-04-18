@@ -3,9 +3,9 @@ import LineCTAButton from '@/components/ui/LineCTAButton'
 
 // Default values
 const defaults = {
-  title: '準備好帶孩子來清邁了嗎？',
-  description: '免費諮詢，讓在地爸媽幫你規劃最適合的親子行程',
-  primaryCta: { text: 'LINE 免費諮詢', link: 'https://line.me/R/ti/p/@037nyuwk' },
+  title: '讓爸媽幫你規劃親子行程',
+  description: '聊聊你的想法，我們幫你安排最適合小孩的清邁旅程',
+  primaryCta: { text: 'LINE 聊聊行程', link: 'https://line.me/R/ti/p/@037nyuwk' },
   secondaryCta: { text: '瀏覽服務內容', link: '/services/car-charter' },
 }
 

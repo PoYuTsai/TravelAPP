@@ -7,11 +7,11 @@ import { fetchTotalFamilyCount } from '@/lib/notion'
 export const revalidate = 60
 
 export const metadata: Metadata = {
-  title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
-  description: '清微旅行 - 清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，在地家庭提供司機導遊分工服務。兒童座椅、中文溝通、客製行程，100+ 組家庭好評推薦。',
+  title: '爸媽開的清邁親子包車｜深受台灣家庭信賴｜清微旅行',
+  description: '清微旅行 — 台灣爸爸 Eric × 泰國媽媽 Min 經營的清邁親子包車。司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
   openGraph: {
-    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽的在地服務｜清微旅行',
-    description: '清邁親子包車首選！台灣爸爸 Eric + 泰國媽媽 Min，司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
+    title: '爸媽開的清邁親子包車｜深受台灣家庭信賴｜清微旅行',
+    description: '台灣爸爸 Eric × 泰國媽媽 Min 經營的清邁親子包車。司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
     url: 'https://chiangway-travel.com/',
     siteName: '清微旅行 Chiangway Travel',
     locale: 'zh_TW',
@@ -21,14 +21,14 @@ export const metadata: Metadata = {
         url: '/images/og-image.png',
         width: 1200,
         height: 630,
-        alt: '清微旅行 - 清邁親子包車',
+        alt: '爸媽開的清邁親子包車 — 清微旅行',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '清邁親子包車2026｜台灣爸爸×泰國媽媽｜清微旅行',
-    description: '清邁親子包車首選！司機導遊分工、兒童座椅、中文溝通。100+ 組家庭好評推薦。',
+    title: '爸媽開的清邁親子包車｜清微旅行',
+    description: '台灣爸爸 Eric × 泰國媽媽 Min 經營的清邁親子包車。司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
     images: ['/images/og-image.png'],
   },
   alternates: {
@@ -111,8 +111,8 @@ export default async function Home() {
       <HomePageFaqSchema />
       <Hero
         backgroundImage={data?.heroBackgroundImage}
-        title={data?.heroTitle || '清微旅行｜清邁親子包車，交給 Eric & Min'}
-        subtitle={data?.heroSubtitle || '專為爸媽設計的包車旅程'}
+        title={data?.heroTitle || '爸媽開的清邁親子包車'}
+        subtitle={data?.heroSubtitle || '台灣爸爸 Eric × 泰國媽媽 Min，深受台灣家庭信賴'}
         description={heroDescription}
         primaryCta={data?.heroPrimaryCta}
         secondaryCta={data?.heroSecondaryCta}
@@ -137,8 +137,8 @@ export default async function Home() {
         showCount={data?.articlesShowCount}
       />
       <CTA
-        title={data?.ctaTitle || '每個家庭都不一樣'}
-        description={data?.ctaDescription || '聊聊你們的想法，我們幫你規劃'}
+        title={data?.ctaTitle || '讓爸媽幫你規劃親子行程'}
+        description={data?.ctaDescription || '聊聊你的想法，我們幫你安排最適合小孩的清邁旅程'}
         primaryCta={data?.ctaPrimaryCta}
         secondaryCta={data?.ctaSecondaryCta}
       />

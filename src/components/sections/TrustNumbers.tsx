@@ -199,17 +199,17 @@ export default function TrustNumbers({ compact = false, familyCountValue = 114 }
           <ExternalLinkIcon className="w-4 h-4 text-yellow-500/60 transition-all duration-300 group-hover:text-yellow-600 group-hover:scale-110" />
         </a>
 
-        {/* Badge 3: 在地台泰家庭 */}
+        {/* Badge 3: 爸媽經營 */}
         <Link
-          href="/homestay"
+          href="/services/car-charter"
           className={`group ${badgeBase} border-primary/30 cursor-pointer hover:border-primary hover:bg-primary/10 ${hoverGlow} hover:-translate-y-1 active:scale-95 ${animationClass}`}
           style={{ transitionDelay: '200ms' }}
         >
           {/* Animated pulse ring on mobile */}
           {showPulse && <PulseRing delay={400} />}
 
-          <span className="text-base md:text-lg font-bold text-primary">在地台泰</span>
-          <span className="text-sm text-gray-700 font-medium">家庭</span>
+          <span className="text-base md:text-lg font-bold text-primary">爸媽經營</span>
+          <span className="text-sm text-gray-700 font-medium">更懂帶小孩</span>
           <ArrowIcon className="w-4 h-4 text-primary/60 transition-all duration-300 group-hover:translate-x-1 group-hover:text-primary" />
         </Link>
       </div>

@@ -19,26 +19,14 @@ const defaultServices: ServiceItem[] = [
   {
     title: '親子包車服務',
     features: [
-      '專屬司機 + 中文導遊',
-      '兒童安全座椅',
-      '行程彈性不趕路',
+      '專屬司機 + 中文導遊，專業分工',
+      '兒童安全座椅，爸媽更安心',
+      '行程彈性不趕路，配合小孩節奏',
       '接機 / 送機服務',
     ],
     price: '每日 NT$ 3,700 起',
     ctaText: '了解包車服務',
     ctaLink: '/services/car-charter',
-  },
-  {
-    title: '芳縣特色民宿',
-    subtitle: 'Huen San Fang Hotel',
-    features: [
-      '遠離觀光區的寧靜',
-      '體驗泰北在地生活',
-      '適合長住深度旅遊',
-      '民宿主人親自接待',
-    ],
-    ctaText: '了解民宿',
-    ctaLink: '/homestay',
   },
 ]
 
@@ -50,7 +38,7 @@ interface ServicesProps {
 
 export default function Services({
   sectionTitle = '我們的服務',
-  sectionSubtitle = '包車 + 住宿，一站式親子旅遊體驗',
+  sectionSubtitle = '爸媽開的包車，專為帶小孩的家庭設計',
   items,
 }: ServicesProps) {
   const services = items && items.length > 0 ? items : defaultServices
@@ -59,7 +47,7 @@ export default function Services({
     <section className="py-16 md:py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <SectionTitle title={sectionTitle} subtitle={sectionSubtitle} />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 max-w-lg mx-auto">
           {services.map((service, index) => (
             <div
               key={index}
