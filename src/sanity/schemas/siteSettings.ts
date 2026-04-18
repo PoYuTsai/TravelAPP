@@ -69,7 +69,7 @@ export default defineType({
       description: '控制網站頁尾的品牌說明、地址與聯絡電話。',
       initialValue: {
         description:
-          '清邁親子包車首選！我們是台灣爸爸 Eric ＋ 泰國媽媽 Min，住在清邁的在地家庭，提供專業中文導遊、安全舒適的包車服務，為您的家庭打造難忘的清邁之旅。',
+          '爸媽開的清邁親子包車。台灣爸爸 Eric × 泰國媽媽 Min，司機導遊專業分工，專為帶小孩的家庭設計，深受台灣家庭信賴。',
         addressText: '444, Wiang, Fang District, Chiang Mai 50110',
         addressUrl: 'https://share.google/p6anNFwTvi9Sc7JAt',
         taiwanPhone: '+886 987-591-322',
@@ -129,7 +129,7 @@ export default defineType({
         eyebrow: 'About Chiangway',
         imageAlt: 'Eric 與 Min，清微旅行在地家庭團隊',
         name: 'Eric & Min',
-        description: '台灣爸爸與泰國媽媽組成的在地家庭，專注協助親子旅客安排清邁包車與客製行程。',
+        description: '爸媽開的清邁親子包車，由台灣爸爸 Eric 與泰國媽媽 Min 經營，專為帶小孩的家庭設計。',
         serviceLabel: '服務方式',
         serviceValue: '司機 + 導遊',
         summary: '文章內容會從親子旅行、交通、景點與在地生活角度出發，幫你把清邁自由行需要的資訊先整理順。',
@@ -380,9 +380,9 @@ export default defineType({
           },
           {
             metric: 'brand',
-            title: '在地台泰家庭',
-            description: '不是轉單業者，而是住在清邁、理解親子節奏的家庭自己接手服務。',
-            href: '/homestay',
+            title: '爸媽經營，更懂帶小孩',
+            description: '不是車隊或旅行社，而是自己也帶小孩的爸媽親自經營的包車服務。',
+            href: '/services/car-charter',
             external: false,
             valueOverride: 'Eric + Min',
           },

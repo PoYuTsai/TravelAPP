@@ -39,7 +39,7 @@ export default defineType({
       title: 'Hero Title / 主標題',
       type: 'string',
       group: 'hero',
-      initialValue: '清邁親子包車，由住在清邁的 Eric & Min 協助安排',
+      initialValue: '爸媽開的清邁親子包車',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
@@ -47,7 +47,7 @@ export default defineType({
       title: 'Hero Subtitle / 副標',
       type: 'string',
       group: 'hero',
-      initialValue: '司機與中文導遊分工，幫家庭旅客把行程節奏先安排順',
+      initialValue: '台灣爸爸 Eric × 泰國媽媽 Min，深受台灣家庭信賴',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
@@ -177,7 +177,7 @@ export default defineType({
       title: 'Who We Are Title / 區塊標題',
       type: 'string',
       group: 'whoWeAre',
-      initialValue: '在清邁協助你安排旅行的 Eric & Min',
+      initialValue: '爸媽開的包車，更懂帶小孩',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
@@ -185,7 +185,7 @@ export default defineType({
       title: 'Who We Are Subtitle / 區塊副標',
       type: 'string',
       group: 'whoWeAre',
-      initialValue: '台灣爸爸與住在清邁 30+ 年的泰國媽媽',
+      initialValue: '台灣爸爸 Eric × 泰國媽媽 Min',
     }),
     defineField({
       name: 'whoWeAreDescription',
@@ -252,7 +252,7 @@ export default defineType({
       title: 'CTA Title / 底部 CTA 標題',
       type: 'string',
       group: 'cta',
-      initialValue: '想開始安排清邁旅程，現在就可以先聊',
+      initialValue: '讓爸媽幫你規劃親子行程',
       validation: (Rule) => Rule.required(),
     }),
     defineField({
@@ -260,7 +260,7 @@ export default defineType({
       title: 'CTA Description / 底部 CTA 說明',
       type: 'string',
       group: 'cta',
-      initialValue: '先告訴我們日期、旅伴和大方向，我們會一起把節奏和玩法收斂得更清楚。',
+      initialValue: '聊聊你的想法，我們幫你安排最適合小孩的清邁旅程',
     }),
     defineField({
       name: 'ctaHelperText',
