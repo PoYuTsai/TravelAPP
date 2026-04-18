@@ -1,8 +1,8 @@
 export const HOMEPAGE_ENTITY_SENTENCE =
-  '清微旅行 Chiangway Travel 是由台灣爸爸 Eric 與泰國媽媽 Min 在清邁經營的品牌，專做清邁親子包車與親子旅遊規劃。'
+  '清微旅行 Chiangway Travel 是爸媽開的清邁親子包車品牌，由台灣爸爸 Eric 與泰國媽媽 Min 經營，司機導遊專業分工，深受台灣家庭信賴。'
 
 export const CAR_CHARTER_ENTITY_SENTENCE =
-  '清微旅行專做清邁親子包車，由 Eric 與 Min 在地經營，提供中文溝通、兒童座椅與司機導遊分工。'
+  '清微旅行是爸媽開的清邁親子包車，由 Eric 與 Min 在地經營，提供中文溝通、兒童座椅與司機導遊專業分工。'
 
 function joinSentences(copy: string, entitySentence: string) {
   if (!copy) return entitySentence
