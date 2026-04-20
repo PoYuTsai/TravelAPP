@@ -2177,14 +2177,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   }
 
   // 儲存當前報價
-  const saveCurrentQuote = async () => {
+  const saveCurrentQuote = async (): Promise<string> => {
     const normalizedName = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
     const now = new Date().toISOString()
     const existingQuote = editingQuoteId
       ? savedQuotes.find((quote) => quote.id === editingQuoteId)
       : null
+    const quoteId = editingQuoteId ?? Date.now().toString()
     const newQuote: SavedQuote = {
-      id: editingQuoteId ?? Date.now().toString(),
+      id: quoteId,
       name: normalizedName,
       createdAt: existingQuote?.createdAt ?? now,
       updatedAt: now,
@@ -2312,17 +2313,17 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     } finally {
       setIsSavingQuote(false)
     }
+    return quoteId
   }
 
   // 產生報價連結
   const handleGenerateLink = async () => {
     setIsGeneratingLink(true)
     try {
-      // 先儲存目前報價（確保 Sanity 文件存在）
-      await saveCurrentQuote()
+      // 先儲存目前報價（確保 Sanity 文件存在），取得實際的 quoteId
+      const savedQuoteId = await saveCurrentQuote()
 
-      const quoteId = editingQuoteId ?? Date.now().toString()
-      const docId = getPricingExampleDocumentId(variant, quoteId)
+      const docId = getPricingExampleDocumentId(variant, savedQuoteId)
 
       // 查詢是否已有 publicSlug
       const existing = await client.fetch<{ publicSlug?: { current?: string } } | null>(
