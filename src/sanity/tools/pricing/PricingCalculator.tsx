@@ -1474,6 +1474,7 @@ interface SavedQuote {
     makeupCount?: number
     mealLevel?: number  // 餐費等級
     collectDeposit?: boolean
+    includeTickets?: boolean
     parsedItinerary?: SavedParsedItineraryDay[]
     parseResult?: ActivityMatchResult | null
     parseWarnings?: SavedParseWarning[]
@@ -2221,6 +2222,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         makeupCount,
         mealLevel,
         collectDeposit,
+        includeTickets,
         parsedItinerary: parsedItinerary.map((day) => ({
           ...day,
           items: [...day.items],
@@ -2419,6 +2421,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     )
 
     if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
+    if (quote.data.includeTickets !== undefined) setIncludeTickets(quote.data.includeTickets)
     setIncludeInsurance(
       resolveSavedInsuranceSelection({
         savedIncludeInsurance: quote.data.includeInsurance,
@@ -2531,6 +2534,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setMealServiceDays(config.mealDays)
     setIncludeInsurance(true)
     setIncludeGuide(true)
+    setIncludeTickets(true)
     setGuideServiceDays(config.guideDays)
     setGuideCostPerDay(config.guidePerDay.cost)
     setGuidePricePerDay(config.guidePerDay.price)
