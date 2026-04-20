@@ -1,4 +1,13 @@
-import { client } from '@/sanity/client'
+import { createClient } from 'next-sanity'
+import { projectId, dataset, apiVersion } from '@/sanity/config'
+
+const client = createClient({
+  projectId,
+  dataset,
+  apiVersion,
+  useCdn: false,
+  token: process.env.SANITY_API_TOKEN,
+})
 import { inferTimelineItem } from './inferTimelineItem'
 import { buildQuoteItinerary } from '@/sanity/tools/pricing/quoteDetails'
 import type { QuoteData, QuotePhoto } from './types'
