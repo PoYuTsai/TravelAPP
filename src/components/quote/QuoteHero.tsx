@@ -1,11 +1,9 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ArrowDown, MessageCircle, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import Image from 'next/image'
 import type { QuoteData } from '@/lib/quote/types'
-
-const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
 interface QuoteHeroProps {
   quote: QuoteData
@@ -112,7 +110,7 @@ export function QuoteHero({ quote }: QuoteHeroProps) {
         </div>
 
         {/* Main content */}
-        <div className="mt-14 max-w-4xl md:mt-24">
+        <div className="mt-10 max-w-4xl md:mt-16">
           {/* Badge pill */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -152,40 +150,6 @@ export function QuoteHero({ quote }: QuoteHeroProps) {
             {subtitle}
           </motion.p>
 
-          {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
-            className="mt-8 flex flex-wrap gap-3"
-          >
-            <button
-              onClick={() => {
-                document
-                  .getElementById('itinerary')
-                  ?.scrollIntoView({ behavior: 'smooth' })
-              }}
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold transition-all hover:-translate-y-[1px]"
-              style={{
-                background: '#0F0B05',
-                color: '#FDFBF4',
-                boxShadow: '0 8px 20px rgba(15,11,5,0.22)',
-              }}
-            >
-              {ctaScroll} <ArrowDown size={16} />
-            </button>
-
-            <a
-              href={LINE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full px-6 py-3.5 text-[15px] font-bold text-white"
-              style={{ background: '#06C755' }}
-            >
-              <MessageCircle size={16} />
-              {ctaLine}
-            </a>
-          </motion.div>
         </div>
       </div>
     </motion.section>
