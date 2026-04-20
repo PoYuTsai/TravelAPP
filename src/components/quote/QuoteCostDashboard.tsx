@@ -72,7 +72,7 @@ function IncludedExcludedSection({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
         transition={{ duration: 0.6 }}
         className="relative overflow-hidden rounded-[24px] p-7 md:p-8"
         style={{
@@ -118,7 +118,7 @@ function IncludedExcludedSection({
                 key={item}
                 initial={{ opacity: 0, x: -10 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: false }}
                 transition={{ delay: 0.08 * i, duration: 0.4 }}
                 className="flex gap-3"
               >
@@ -146,7 +146,7 @@ function IncludedExcludedSection({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        viewport={{ once: false }}
         transition={{ duration: 0.6, delay: 0.1 }}
         className="relative overflow-hidden rounded-[24px] p-7 md:p-8"
         style={{
@@ -191,7 +191,7 @@ function IncludedExcludedSection({
                 key={item}
                 initial={{ opacity: 0, x: -10 }}
                 whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
+                viewport={{ once: false }}
                 transition={{ delay: 0.08 * i, duration: 0.4 }}
                 className="flex gap-3"
               >
@@ -237,7 +237,7 @@ function LineItemBreakdown({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       transition={{ duration: 0.6 }}
       className="overflow-hidden rounded-[24px] p-7 md:p-8"
       style={{
@@ -324,7 +324,7 @@ function TotalQuoteCard({
     <motion.div
       initial={{ opacity: 0, y: 24 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       transition={{ duration: 0.7, delay: 0.25 }}
       className="relative mt-10 overflow-hidden rounded-[28px] p-8 text-center md:p-12"
       style={{
@@ -445,7 +445,7 @@ function PaymentNotesSection({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       transition={{ duration: 0.6 }}
       className="overflow-hidden rounded-[24px] p-7 md:p-8"
       style={{
@@ -495,7 +495,7 @@ function BankTransferSection() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       transition={{ duration: 0.6 }}
       className="overflow-hidden rounded-[24px] p-7 md:p-8"
       style={{
@@ -547,7 +547,7 @@ function HotelDepositSection({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       transition={{ duration: 0.6 }}
       className="overflow-hidden rounded-[24px] p-7 md:p-8"
       style={{
@@ -603,7 +603,7 @@ function NullQuoteFallback() {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
+      viewport={{ once: false }}
       className="rounded-[24px] p-8 text-center"
       style={{
         background: 'rgba(255, 255, 255, 0.55)',
