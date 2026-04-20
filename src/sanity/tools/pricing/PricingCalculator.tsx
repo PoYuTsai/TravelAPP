@@ -1569,6 +1569,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
   const [isGeneratingLink, setIsGeneratingLink] = useState(false)
 
+  // 每日照片（dayIndex → 照片陣列）
+  const [dayPhotos, setDayPhotos] = useState<Record<number, { _key: string; asset: { _type: 'reference'; _ref: string }; url?: string }[]>>({})
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+
   // Form states - 成人/小孩分開計算
   const [adults, setAdults] = useState(8)
   const [children, setChildren] = useState(2)
@@ -2135,6 +2139,43 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     }
   }, [refreshSavedQuotes])
 
+  // 照片上傳
+  const handlePhotoUpload = async (dayIndex: number, files: FileList) => {
+    const existing = dayPhotos[dayIndex] ?? []
+    if (existing.length >= 3) return // 每天最多 3 張
+
+    setIsUploadingPhoto(true)
+    try {
+      for (const file of Array.from(files).slice(0, 3 - existing.length)) {
+        const asset = await client.assets.upload('image', file)
+        setDayPhotos((prev) => ({
+          ...prev,
+          [dayIndex]: [
+            ...(prev[dayIndex] ?? []),
+            {
+              _key: Math.random().toString(36).slice(2, 8),
+              asset: { _type: 'reference' as const, _ref: asset._id },
+              url: asset.url,
+            },
+          ],
+        }))
+      }
+    } catch (e) {
+      console.error('照片上傳失敗:', e)
+      alert('照片上傳失敗，請重試')
+    } finally {
+      setIsUploadingPhoto(false)
+    }
+  }
+
+  // 照片刪除
+  const handlePhotoDelete = (dayIndex: number, photoKey: string) => {
+    setDayPhotos((prev) => ({
+      ...prev,
+      [dayIndex]: (prev[dayIndex] ?? []).filter((p) => p._key !== photoKey),
+    }))
+  }
+
   // 儲存當前報價
   const saveCurrentQuote = async () => {
     const normalizedName = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
@@ -2228,6 +2269,21 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           email: newQuote.createdByEmail,
         })
       )
+
+      // 儲存每日照片到 Sanity 文件
+      const docId = getPricingExampleDocumentId(variant, newQuote.id)
+      const photosArray = Object.entries(dayPhotos)
+        .filter(([, images]) => images.length > 0)
+        .map(([idx, images]) => ({
+          _key: `day-${idx}`,
+          dayIndex: Number(idx),
+          images: images.map((img) => ({
+            _key: img._key,
+            _type: 'image' as const,
+            asset: img.asset,
+          })),
+        }))
+      await client.patch(docId).set({ photos: photosArray.length > 0 ? photosArray : [] }).commit()
 
       const updatedQuotes = mergeSavedQuoteRecords(
         [newQuote],
@@ -2397,6 +2453,33 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setCurrentQuoteName(quote.name)
     setEditingQuoteId(quote.id)
     setShowParser(restoredParseState.shouldShowParser)
+
+    // 從 Sanity 載入每日照片
+    const docId = getPricingExampleDocumentId(variant, quote.id)
+    client
+      .fetch<{ photos?: { dayIndex: number; images: { _key: string; asset: { _ref: string } }[] }[] } | null>(
+        `*[_id == $docId][0]{ photos[]{ dayIndex, images[]{ _key, asset->{ _id, url } } } }`,
+        { docId }
+      )
+      .then((doc) => {
+        if (doc?.photos) {
+          const restored: Record<number, { _key: string; asset: { _type: 'reference'; _ref: string }; url?: string }[]> = {}
+          for (const day of doc.photos) {
+            if (day.images?.length) {
+              restored[day.dayIndex] = day.images.map((img: any) => ({
+                _key: img._key,
+                asset: { _type: 'reference' as const, _ref: img.asset?._id ?? img.asset?._ref ?? '' },
+                url: img.asset?.url,
+              }))
+            }
+          }
+          setDayPhotos(restored)
+        } else {
+          setDayPhotos({})
+        }
+      })
+      .catch(() => setDayPhotos({}))
+
     alert(
       `✅ 已載入「${quote.name}」\n${
         restoredParseState.parseResult || restoredParseState.parsedItinerary.length > 0
@@ -2523,6 +2606,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 清空報價名稱
     setCurrentQuoteName('')
     setEditingQuoteId(null)
+    setDayPhotos({})
     setShowParser(false)
     clearDraftFromStorage(draftStorageKey)
     alert('✅ 已清空所有欄位，可以開始新報價')
@@ -4232,72 +4316,145 @@ Day 5｜送機
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {carFees.map((cf, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: responsive.carFeeGridTemplateColumns,
-                      gap: 8,
-                      alignItems: 'center',
-                      padding: 8,
-                      background: '#fff',
-                      border: '1px solid #e0e0e0',
-                      borderRadius: 6,
-                    }}
-                  >
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{cf.day}</span>
-                    <input
-                      type="text"
-                      value={cf.date}
-                      onChange={e => updateCarFee(index, 'date', e.target.value)}
-                      placeholder="2/12"
-                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
-                    />
-                    <input
-                      type="text"
-                      value={cf.name}
-                      onChange={e => updateCarFee(index, 'name', e.target.value)}
-                      placeholder="行程名稱"
-                      style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 10, color: '#888' }}>成本</span>
-                      <input
-                        type="number"
-                        value={cf.cost}
-                        onChange={e => updateCarFee(index, 'cost', Number(e.target.value))}
-                        placeholder="成本"
-                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontSize: 10, color: '#888' }}>售價</span>
-                      <input
-                        type="number"
-                        value={cf.price}
-                        onChange={e => updateCarFee(index, 'price', Number(e.target.value))}
-                        placeholder="售價"
-                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
-                      />
-                    </div>
-                    <span style={{ fontSize: 11, color: '#666' }}>
-                      ×{calculation.carCount}台
-                    </span>
-                    <button
-                      onClick={() => removeCarFeeDay(index)}
-                      disabled={carFees.length <= 1}
+                  <div key={index}>
+                    <div
                       style={{
-                        padding: 4,
-                        background: carFees.length <= 1 ? '#eee' : '#ffebee',
-                        color: carFees.length <= 1 ? '#999' : '#c62828',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: carFees.length <= 1 ? 'not-allowed' : 'pointer',
-                        fontSize: 12,
+                        display: 'grid',
+                        gridTemplateColumns: responsive.carFeeGridTemplateColumns,
+                        gap: 8,
+                        alignItems: 'center',
+                        padding: 8,
+                        background: '#fff',
+                        border: '1px solid #e0e0e0',
+                        borderRadius: 6,
                       }}
                     >
-                      ✕
-                    </button>
+                      <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>{cf.day}</span>
+                      <input
+                        type="text"
+                        value={cf.date}
+                        onChange={e => updateCarFee(index, 'date', e.target.value)}
+                        placeholder="2/12"
+                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+                      />
+                      <input
+                        type="text"
+                        value={cf.name}
+                        onChange={e => updateCarFee(index, 'name', e.target.value)}
+                        placeholder="行程名稱"
+                        style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 10, color: '#888' }}>成本</span>
+                        <input
+                          type="number"
+                          value={cf.cost}
+                          onChange={e => updateCarFee(index, 'cost', Number(e.target.value))}
+                          placeholder="成本"
+                          style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontSize: 10, color: '#888' }}>售價</span>
+                        <input
+                          type="number"
+                          value={cf.price}
+                          onChange={e => updateCarFee(index, 'price', Number(e.target.value))}
+                          placeholder="售價"
+                          style={{ padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12, textAlign: 'right' }}
+                        />
+                      </div>
+                      <span style={{ fontSize: 11, color: '#666' }}>
+                        ×{calculation.carCount}台
+                      </span>
+                      <button
+                        onClick={() => removeCarFeeDay(index)}
+                        disabled={carFees.length <= 1}
+                        style={{
+                          padding: 4,
+                          background: carFees.length <= 1 ? '#eee' : '#ffebee',
+                          color: carFees.length <= 1 ? '#999' : '#c62828',
+                          border: 'none',
+                          borderRadius: 4,
+                          cursor: carFees.length <= 1 ? 'not-allowed' : 'pointer',
+                          fontSize: 12,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {/* 每日照片上傳（僅正式版） */}
+                    {variant === 'formal' && (
+                      <div style={{ marginTop: 4, marginLeft: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {(dayPhotos[index] ?? []).map((photo) => (
+                          <div key={photo._key} style={{ position: 'relative', width: 60, height: 60 }}>
+                            {photo.url && (
+                              <img
+                                src={photo.url}
+                                alt={`${cf.day} 照片`}
+                                style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8 }}
+                              />
+                            )}
+                            <button
+                              onClick={() => handlePhotoDelete(index, photo._key)}
+                              style={{
+                                position: 'absolute',
+                                top: -6,
+                                right: -6,
+                                background: '#ef4444',
+                                color: 'white',
+                                borderRadius: '50%',
+                                width: 18,
+                                height: 18,
+                                fontSize: 11,
+                                border: 'none',
+                                cursor: 'pointer',
+                                lineHeight: '16px',
+                                textAlign: 'center',
+                                padding: 0,
+                              }}
+                            >
+                              &times;
+                            </button>
+                          </div>
+                        ))}
+                        {(dayPhotos[index] ?? []).length < 3 && (
+                          <label
+                            style={{
+                              width: 60,
+                              height: 60,
+                              border: '2px dashed #d1d5db',
+                              borderRadius: 8,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              cursor: isUploadingPhoto ? 'wait' : 'pointer',
+                              fontSize: 20,
+                              color: '#9ca3af',
+                              opacity: isUploadingPhoto ? 0.5 : 1,
+                            }}
+                          >
+                            {isUploadingPhoto ? '...' : '+'}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              hidden
+                              disabled={isUploadingPhoto}
+                              onChange={(e) => {
+                                if (e.target.files) handlePhotoUpload(index, e.target.files)
+                                e.target.value = '' // 允許重複選同一檔案
+                              }}
+                            />
+                          </label>
+                        )}
+                        {(dayPhotos[index] ?? []).length > 0 && (
+                          <span style={{ fontSize: 10, color: '#999' }}>
+                            {(dayPhotos[index] ?? []).length}/3
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
