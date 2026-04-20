@@ -1480,6 +1480,21 @@ interface SavedQuote {
     isParseConfirmed?: boolean
     savedParsedTickets?: DynamicTicket[]
     thaiDressDay?: number | null
+    // 報價快照（展示頁用）
+    _quoteSnapshot?: {
+      externalQuote: {
+        items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
+        included: string[]
+        excluded: string[]
+        paymentNotes: string[]
+        totalTHB: number
+        totalTWD: number
+      }
+      collectDeposit: boolean
+      hotelsWithDeposit: { name: string; deposit: number; rooms: number }[]
+      totalDeposit: number
+      carCount: number
+    }
   }
 }
 
@@ -2184,6 +2199,25 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         isParseConfirmed,
         savedParsedTickets: savedParsedTickets.map((ticket) => ({ ...ticket })),
         thaiDressDay,
+        // 報價快照：展示頁直接讀取，不用重新計算
+        _quoteSnapshot: {
+          externalQuote: {
+            items: externalQuote.items,
+            included: externalQuote.included,
+            excluded: externalQuote.excluded,
+            paymentNotes: externalQuote.paymentNotes,
+            totalTHB: externalQuote.totalTHB,
+            totalTWD: externalQuote.totalTWD,
+          },
+          collectDeposit,
+          hotelsWithDeposit: calculation.hotelsWithDeposit.map(h => ({
+            name: h.name,
+            deposit: calculation.getHotelDeposit(h),
+            rooms: calculation.getHotelRoomCount(h),
+          })),
+          totalDeposit: calculation.totalDeposit,
+          carCount: calculation.carCount,
+        },
       },
     }
     setIsSavingQuote(true)
