@@ -2264,20 +2264,19 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     }
     setIsSavingQuote(true)
     try {
+      const docId = getPricingExampleDocumentId(variant, newQuote.id)
+
+      // 在 createOrReplace 之前先保存現有的 publicSlug（因為 createOrReplace 會覆蓋整份文件）
+      const existingDoc = await client.fetch<{ publicSlug?: { _type: string; current: string } } | null>(
+        `*[_id == $docId][0]{ publicSlug }`,
+        { docId }
+      )
+
       await client.createOrReplace(
         buildPricingExampleDocument(variant, newQuote, {
           name: newQuote.createdByName,
           email: newQuote.createdByEmail,
         })
-      )
-
-      // 儲存後重新 patch publicSlug + photos（createOrReplace 會覆蓋整份文件）
-      const docId = getPricingExampleDocumentId(variant, newQuote.id)
-
-      // 先取回現有的 publicSlug（如果有的話）
-      const existingDoc = await client.fetch<{ publicSlug?: { _type: string; current: string } } | null>(
-        `*[_id == $docId][0]{ publicSlug }`,
-        { docId }
       )
 
       const photosArray = Object.entries(dayPhotos)
