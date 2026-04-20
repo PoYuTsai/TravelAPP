@@ -203,9 +203,6 @@ function PathNode({ day, color, glyph, active, onClick, index }: PathNodeProps) 
       >
         {day.title}
       </motion.div>
-      <div className="mt-0.5 text-[12px]" style={{ color: '#7A6F5C' }}>
-        {day.day}
-      </div>
     </motion.button>
   )
 }
@@ -240,9 +237,6 @@ function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeP
           style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
         >
           {day.title}
-        </div>
-        <div className="text-[12px]" style={{ color: '#7A6F5C' }}>
-          {day.day}
         </div>
       </div>
       {active ? (
