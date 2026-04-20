@@ -3018,8 +3018,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         guidePrice: calculation.guidePrice,
         luggageCost: calculation.luggageCost,
         childSeatCost: calculation.childSeatCost,
-        ticketPrice: calculation.ticketPrice,
-        thaiDressPrice: calculation.thaiDressPrice,
+        ticketPrice: includeTickets ? calculation.ticketPrice : 0,
+        thaiDressPrice: includeTickets ? calculation.thaiDressPrice : 0,
         insuranceCost: calculation.insuranceCost,
         totalPrice: calculation.totalPrice,
         exchangeRate,
@@ -3030,10 +3030,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         carCount: calculation.carCount,
         childSeatDays: calculation.childSeatDays,
         totalChildSeatCount,
-        selectedTicketCount: calculation.selectedTickets.length,
-        hasThaiDress: calculation.thaiDressPrice > 0,
+        selectedTicketCount: includeTickets ? calculation.selectedTickets.length : 0,
+        hasThaiDress: includeTickets ? calculation.thaiDressPrice > 0 : false,
       }),
-    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, totalChildSeatCount, totalNights]
+    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, includeTickets, totalChildSeatCount, totalNights]
   )
 
   const toggleTicket = (id: string) => {
