@@ -1,0 +1,23 @@
+/* Quote page: hide global Header, Footer, and FloatingLineButton */
+/* These are rendered by the root layout but not needed on /quote/* pages */
+
+/* Global site header */
+header {
+  display: none !important;
+}
+
+/* Global site footer */
+body > footer,
+main#main-content + footer {
+  display: none !important;
+}
+
+/* Floating LINE button (bottom-20 right-4) */
+.fixed.bottom-20.right-4 {
+  display: none !important;
+}
+
+/* Remove padding-top from main (header is hidden) */
+main#main-content {
+  padding-top: 0 !important;
+}

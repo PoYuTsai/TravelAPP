@@ -22,15 +22,15 @@ function ScrollToTopButton() {
   return (
     <button
       onClick={() => document.getElementById('itinerary')?.scrollIntoView({ behavior: 'smooth' })}
-      className="fixed bottom-6 right-6 z-50 flex items-center gap-1.5 rounded-full px-4 py-3 text-[13px] font-bold shadow-lg transition-transform hover:scale-105 active:scale-95"
+      className="fixed bottom-8 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
       style={{
-        background: '#0F0B05',
-        color: '#FACC15',
-        boxShadow: '0 8px 24px rgba(15,11,5,0.3)',
+        background: '#FACC15',
+        color: '#0F0B05',
+        boxShadow: '0 6px 20px rgba(250,204,21,0.5), 0 2px 8px rgba(15,11,5,0.15)',
       }}
+      aria-label="回到行程"
     >
-      <ArrowUp size={16} />
-      行程
+      <ArrowUp size={22} strokeWidth={2.5} />
     </button>
   )
 }
