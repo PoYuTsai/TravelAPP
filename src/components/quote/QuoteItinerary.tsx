@@ -361,7 +361,7 @@ interface Props {
 }
 
 export function QuoteItinerary({ quote }: Props) {
-  const [activeDay, setActiveDay] = useState<number | null>(null)
+  const [activeDay, setActiveDay] = useState<number | null>(0)
   const timelineRef = useRef<HTMLDivElement>(null)
 
   const toggle = (i: number) => setActiveDay(activeDay === i ? null : i)

@@ -94,12 +94,13 @@ export async function fetchQuoteBySlug(
   const hotels = data.hotels ?? []
   const includeAccommodation = data.includeAccommodation ?? false
 
-  // Build itinerary — use parsedItinerary if available, otherwise fallback parse from text
-  const hasParsedItinerary = Array.isArray(data.parsedItinerary) && data.parsedItinerary.length > 0
-  const fallbackParsed = !hasParsedItinerary ? parseItineraryTextFallback(data.itineraryText ?? '') : []
+  // Build itinerary — always prefer fallback text parser (cleaner results)
+  // parsedItinerary from calculator can be corrupted (multi-line items)
+  const textParsed = parseItineraryTextFallback(data.itineraryText ?? '')
+  const useParsed = textParsed.length > 0 ? textParsed : (data.parsedItinerary ?? [])
 
   const rawItinerary = buildQuoteItinerary({
-    parsedItinerary: hasParsedItinerary ? data.parsedItinerary : fallbackParsed,
+    parsedItinerary: useParsed,
     carFees,
     tripDays,
     includeAccommodation,
