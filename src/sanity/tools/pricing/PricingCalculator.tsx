@@ -4386,7 +4386,8 @@ Day 5｜送機
                     </div>
                     {/* 每日照片上傳（僅正式版） */}
                     {variant === 'formal' && (
-                      <div style={{ marginTop: 4, marginLeft: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <div style={{ marginTop: 8, marginLeft: 0, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>📷 報價頁照片：</span>
                         {(dayPhotos[index] ?? []).map((photo) => (
                           <div key={photo._key} style={{ position: 'relative', width: 60, height: 60 }}>
                             {photo.url && (
