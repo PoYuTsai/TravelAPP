@@ -642,7 +642,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
   const breakdown = quote.quote
 
   return (
-    <section className="relative overflow-hidden px-6 py-20 md:px-10 md:py-28">
+    <section className="relative overflow-hidden px-6 py-10 md:px-10 md:py-14">
       {/* Background gradient (HTML line 1025-1027) */}
       <div
         className="pointer-events-none absolute inset-0 -z-10"
