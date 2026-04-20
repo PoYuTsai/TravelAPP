@@ -63,6 +63,37 @@ export default defineType({
       hidden: true,
       validation: (Rule) => Rule.required(),
     }),
+    defineField({
+      name: 'publicSlug',
+      title: '公開連結代碼',
+      type: 'slug',
+      description: '報價展示頁的公開網址。產生後不要修改。',
+      options: {
+        source: 'name',
+        maxLength: 12,
+      },
+    }),
+    defineField({
+      name: 'photos',
+      title: '行程照片',
+      type: 'array',
+      description: '每日行程照片，每天最多 3 張',
+      of: [
+        {
+          type: 'object',
+          fields: [
+            { name: 'dayIndex', title: '第幾天 (0-based)', type: 'number' },
+            {
+              name: 'images',
+              title: '照片 (最多3張)',
+              type: 'array',
+              of: [{ type: 'image', options: { hotspot: true } }],
+              validation: (Rule: any) => Rule.max(3),
+            },
+          ],
+        },
+      ],
+    }),
   ],
   preview: {
     select: {
