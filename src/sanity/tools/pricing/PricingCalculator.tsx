@@ -779,7 +779,7 @@ function downloadExternalQuote(
         <div style="font-weight:bold;color:#9a6b2a;margin-bottom:4px;">⏱️ 超時費說明</div>
         <div style="color:#555;">
           • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-          • 超時費：<strong>200 泰銖/小時 × ${c.carCount}台車</strong>${includeGuide ? '（導遊不另收）' : ''}
+          • 超時費：<strong>300 泰銖/小時 × ${c.carCount}台車</strong>${includeGuide ? '（導遊不另收）' : ''}
         </div>
       </div>
       <!-- 台幣匯款資訊 -->
@@ -1280,7 +1280,7 @@ function downloadSimpleExternalQuote(
           <div><strong>加時說明</strong></div>
           <div style="margin-top: 4px; color: ${EXTERNAL_QUOTE_THEME.textSoft};">
             • 每日包車服務最多 10 小時，如需超時另計 12 小時。<br />
-            • 加班費為 <strong>200 泰銖/小時 × ${c.carCount} 台車</strong>。
+            • 加班費為 <strong>300 泰銖/小時 × ${c.carCount} 台車</strong>。
           </div>
         </div>
       </div>
@@ -3980,7 +3980,7 @@ Day 5｜送機
               <strong>⏱️ 超時費規則</strong><br />
               • 清邁行程：10 小時/天<br />
               • 清萊行程：12 小時/天<br />
-              • 超時費：200 泰銖/小時
+              • 超時費：300 泰銖/小時
             </div>
 
             {/* 兒童座椅 */}
@@ -4713,8 +4713,8 @@ Day 5｜送機
 
               {/* 超時費規則 */}
               <SectionRow title="⏱️ 超時費規則（未計入報價）" />
-              <InfoRow text="清邁行程：10小時/天，超時 200 泰銖/小時" />
-              <InfoRow text="清萊行程：12小時/天，超時 200 泰銖/小時" />
+              <InfoRow text="清邁行程：10小時/天，超時 300 泰銖/小時" />
+              <InfoRow text="清萊行程：12小時/天，超時 300 泰銖/小時" />
             </tbody>
           </table>
 
@@ -5200,7 +5200,7 @@ Day 5｜送機
                   <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 4 }}>⏱️ 超時費說明</div>
                   <div style={{ color: '#555' }}>
                     • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-                    • 超時費：<strong>200 泰銖/小時 × {calculation.carCount}台車</strong>{includeGuide ? '（導遊不另收）' : ''}
+                    • 超時費：<strong>300 泰銖/小時 × {calculation.carCount}台車</strong>{includeGuide ? '（導遊不另收）' : ''}
                   </div>
                 </div>
 
@@ -5698,7 +5698,7 @@ function ExternalQuoteTab({
             <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.accentDeep, marginBottom: 4 }}>加時說明</div>
             <div style={{ color: EXTERNAL_QUOTE_THEME.textSoft }}>
               • 每日包車服務最多 10 小時，如需超時另計 12 小時<br />
-              • 加班費為 <strong>200 泰銖/小時 × {calculation.carCount} 台車</strong>
+              • 加班費為 <strong>300 泰銖/小時 × {calculation.carCount} 台車</strong>
             </div>
           </div>
         </div>
