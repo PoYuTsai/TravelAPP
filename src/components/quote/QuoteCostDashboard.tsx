@@ -732,16 +732,6 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
 
             {/* 5. Bank Transfer — customer only */}
             {!isSample && <BankTransferSection />}
-
-            {/* 6. Hotel Deposit — conditional, customer only */}
-            {!isSample &&
-              quote.collectDeposit &&
-              quote.hotelsWithDeposit.length > 0 && (
-                <HotelDepositSection
-                  hotels={quote.hotelsWithDeposit}
-                  totalDeposit={quote.totalDeposit}
-                />
-              )}
           </div>
         )}
       </div>
