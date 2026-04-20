@@ -92,3 +92,97 @@ body[data-lightbox-open] #floating-line-button {
 .animate-fade-in {
   animation: fade-in-up 0.3s ease-out;
 }
+
+/* ===================================================================
+   Quote page visual effects — ported from Claude Design HTML
+   =================================================================== */
+
+/* Grain overlay */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: radial-gradient(rgba(15, 11, 5, 0.04) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* Dash flow animation (SVG stroke-dashoffset) */
+@keyframes dash-flow {
+  to { stroke-dashoffset: -32; }
+}
+.animate-dash-flow {
+  animation: dash-flow 2.5s linear infinite;
+}
+
+/* Pulse ring (expanding circle) */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+/* Float (gentle vertical bob) */
+@keyframes quote-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: quote-float 4s ease-in-out infinite;
+}
+
+/* Breathing glow for timeline rail */
+@keyframes breath-line {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px #FACC15) drop-shadow(0 0 18px rgba(250, 204, 21, 0.67));
+    opacity: 0.95;
+  }
+  50% {
+    filter: drop-shadow(0 0 12px #FACC15) drop-shadow(0 0 28px #FACC15);
+    opacity: 1;
+  }
+}
+.animate-breath-line {
+  animation: breath-line 3.4s ease-in-out infinite;
+}
+
+/* Flowing dashes */
+@keyframes path-dash {
+  to { stroke-dashoffset: -200; }
+}
+.animate-path-dash {
+  animation: path-dash 6s linear infinite;
+}
+
+/* Icon pulse (scale breathing) */
+@keyframes icon-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.animate-icon-pulse {
+  animation: icon-pulse 1.8s ease-in-out infinite;
+}
+
+/* Pin bounce (MapPin) */
+@keyframes pin-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(-3deg); }
+}
+.animate-pin-bounce {
+  animation: pin-bounce 2.4s ease-in-out infinite;
+}
+
+/* Ripple out (for magnetic icons) */
+@keyframes ripple-out {
+  0% { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+.ripple-layer {
+  animation: ripple-out 1.4s ease-out forwards;
+  pointer-events: none;
+}

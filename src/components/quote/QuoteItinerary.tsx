@@ -1,16 +1,41 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+} from 'framer-motion'
+import { ChevronUp, ChevronDown, X } from 'lucide-react'
 import type { QuoteData, QuoteItineraryDay } from '@/lib/quote/types'
 import { DayTimeline } from './DayTimeline'
 import { DayPhotos } from './DayPhotos'
 
 const DAY_COLORS = ['#E8A23B', '#4A6B3A', '#A8C8DC', '#CA8A04', '#B85C38', '#9333EA', '#059669', '#DC2626']
-const DAY_GLYPHS = ['🛬', '🐘', '🏊', '🎢', '✈️', '🏔️', '🌴', '🎪']
 
-/* ───── Desktop Path Node ───── */
+const TITLE_GLYPHS: [RegExp, string][] = [
+  [/抵達|機場|接機/i, '🛬'],
+  [/大象/i, '🐘'],
+  [/水上|泳|水樂園/i, '🏊'],
+  [/冒險|攀岩|繩索/i, '🎢'],
+  [/送機|回國|返/i, '✈️'],
+  [/山|高山/i, '🏔️'],
+  [/海|沙灘/i, '🌴'],
+  [/夜市|市集/i, '🎪'],
+]
+const DEFAULT_GLYPHS = ['🛬', '🐘', '🏊', '🎢', '✈️', '🏔️', '🌴', '🎪']
+
+function inferGlyph(title: string, index: number): string {
+  for (const [pattern, glyph] of TITLE_GLYPHS) {
+    if (pattern.test(title)) return glyph
+  }
+  return DEFAULT_GLYPHS[index % DEFAULT_GLYPHS.length]
+}
+
+/* ===================================================================
+   PathNode — 3D Magnetic Hover (HTML lines 369-454)
+   =================================================================== */
 
 interface PathNodeProps {
   index: number
@@ -21,82 +46,184 @@ interface PathNodeProps {
   onClick: () => void
 }
 
-function PathNode({ index, day, color, glyph, active, onClick }: PathNodeProps) {
+function PathNode({ day, color, glyph, active, onClick, index }: PathNodeProps) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [hover, setHover] = useState(false)
+
+  // Mouse-following motion values
+  const mx = useMotionValue(0)
+  const my = useMotionValue(0)
+  const rx = useMotionValue(0)
+  const ry = useMotionValue(0)
+
+  // Springs for magnetic effect
+  const sx = useSpring(mx, { damping: 15, stiffness: 220, mass: 0.6 })
+  const sy = useSpring(my, { damping: 15, stiffness: 220, mass: 0.6 })
+  const srx = useSpring(rx, { damping: 18, stiffness: 200 })
+  const sry = useSpring(ry, { damping: 18, stiffness: 200 })
+
+  const onMove = useCallback(
+    (e: React.MouseEvent) => {
+      const r = ref.current?.getBoundingClientRect()
+      if (!r) return
+      const cx = r.left + r.width / 2
+      const cy = r.top + r.height / 2
+      const dx = e.clientX - cx
+      const dy = e.clientY - cy
+      mx.set(dx * 0.25)
+      my.set(dy * 0.25)
+      ry.set(dx * 0.15)
+      rx.set(-dy * 0.15)
+    },
+    [mx, my, rx, ry],
+  )
+
+  const onLeave = useCallback(() => {
+    mx.set(0)
+    my.set(0)
+    rx.set(0)
+    ry.set(0)
+    setHover(false)
+  }, [mx, my, rx, ry])
+
+  const dateLabel = `DAY ${String(index + 1).padStart(2, '0')}`
+
   return (
     <motion.button
+      ref={ref}
       onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={onLeave}
+      onMouseMove={onMove}
       whileTap={{ scale: 0.96 }}
-      className="relative flex flex-col items-center text-left cursor-pointer group"
-      style={{ outline: 'none' }}
+      style={{
+        x: sx,
+        y: sy,
+        outline: 'none',
+        transformStyle: 'preserve-3d',
+      }}
+      className="relative flex cursor-pointer flex-col items-center text-left group"
     >
-      {/* Pulse ring when active */}
-      {active && (
-        <span
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[88px] h-[88px] rounded-full animate-ping"
-          style={{ background: color, opacity: 0.2 }}
-        />
-      )}
-
-      {/* Main disc */}
       <motion.div
-        animate={{
-          scale: active ? 1.05 : 1,
-          boxShadow: active
-            ? `0 14px 32px ${color}77, 0 0 0 6px ${color}22`
-            : '0 4px 10px rgba(15,11,5,0.08)',
-        }}
-        whileHover={{
-          scale: 1.08,
-          boxShadow: `0 16px 36px ${color}88, 0 0 0 4px ${color}33`,
-        }}
-        transition={{ type: 'spring', damping: 16, stiffness: 260 }}
-        className="relative w-[88px] h-[88px] rounded-full flex items-center justify-center"
+        className="relative"
         style={{
-          background: active ? '#0F0B05' : '#FDFBF4',
-          border: `3px solid ${active ? color : '#0F0B05'}`,
+          rotateX: srx,
+          rotateY: sry,
+          transformStyle: 'preserve-3d',
         }}
       >
-        <motion.span
-          whileHover={{ rotate: [0, -8, 6, -4, 0], scale: 1.18 }}
-          transition={{ duration: 0.6 }}
-          className="text-[36px] block"
+        {/* Active pulse ring */}
+        {active && (
+          <span
+            className="absolute inset-0 rounded-full animate-pulse-ring"
+            style={{ background: color, opacity: 0.35 }}
+          />
+        )}
+
+        {/* Hover radial glow */}
+        <AnimatePresence>
+          {hover && !active && (
+            <motion.span
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1.25, opacity: 1 }}
+              exit={{ scale: 1.5, opacity: 0 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none absolute inset-0 rounded-full"
+              style={{
+                background: `radial-gradient(circle, ${color}88 0%, ${color}00 65%)`,
+                filter: 'blur(8px)',
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Hover expanding ripple */}
+        <AnimatePresence>
+          {hover && (
+            <motion.span
+              key="ripple"
+              initial={{ scale: 0.5, opacity: 0.7 }}
+              animate={{ scale: 2.2, opacity: 0 }}
+              transition={{ duration: 1.1, ease: 'easeOut', repeat: Infinity }}
+              className="pointer-events-none absolute inset-0 rounded-full"
+              style={{
+                border: `2px solid ${color}`,
+                boxShadow: `0 0 20px ${color}66`,
+              }}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Main disc */}
+        <motion.div
+          animate={{
+            scale: hover ? 1.08 : 1,
+            boxShadow: active
+              ? `0 14px 32px ${color}77, 0 0 0 6px ${color}22`
+              : hover
+                ? `0 16px 36px ${color}88, 0 0 0 4px ${color}33`
+                : '0 4px 10px rgba(15,11,5,0.08)',
+          }}
+          transition={{ type: 'spring', damping: 16, stiffness: 260 }}
+          className="relative flex h-[88px] w-[88px] items-center justify-center rounded-full"
+          style={{
+            background: active ? '#0F0B05' : hover ? color : '#FDFBF4',
+            border: `3px solid ${active || hover ? color : '#0F0B05'}`,
+            transformStyle: 'preserve-3d',
+          }}
         >
-          {glyph}
-        </motion.span>
+          <motion.span
+            animate={{
+              rotate: hover ? [0, -8, 6, -4, 0] : 0,
+              scale: hover ? 1.18 : 1,
+            }}
+            transition={{ duration: hover ? 0.6 : 0.3 }}
+            className="block text-[36px]"
+            style={{
+              transform: 'translateZ(14px)',
+              filter: hover ? `drop-shadow(0 4px 8px ${color}aa)` : 'none',
+            }}
+          >
+            {glyph}
+          </motion.span>
+        </motion.div>
       </motion.div>
 
       {/* Labels */}
-      <div
-        className="mt-3 text-[10px] tracking-[0.2em] font-medium"
-        style={{ color: '#7A6F5C' }}
+      <motion.div
+        animate={{ color: hover ? '#0F0B05' : '#7A6F5C', y: hover ? -2 : 0 }}
+        className="mt-3 text-[10px] tracking-[0.2em]"
       >
-        DAY {index + 1}
-      </div>
-      <div
-        className="font-bold mt-1 text-[17px]"
-        style={{ color: '#0F0B05' }}
+        {dateLabel}
+      </motion.div>
+      <motion.div
+        animate={{ y: hover ? -2 : 0 }}
+        className="mt-1 text-[17px] font-black"
+        style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
       >
         {day.title}
-      </div>
-      <div className="text-[12px] mt-0.5" style={{ color: '#7A6F5C' }}>
+      </motion.div>
+      <div className="mt-0.5 text-[12px]" style={{ color: '#7A6F5C' }}>
         {day.day}
       </div>
     </motion.button>
   )
 }
 
-/* ───── Mobile Path Node ───── */
+/* ===================================================================
+   PathNodeMobile
+   =================================================================== */
 
 function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeProps) {
   return (
     <motion.button
       onClick={onClick}
       whileTap={{ scale: 0.98 }}
-      className="relative flex items-center gap-4 w-full text-left pl-0"
+      className="relative flex w-full items-center gap-4 pl-0 text-left"
       style={{ outline: 'none' }}
     >
       <div
-        className="relative z-10 w-[58px] h-[58px] rounded-full flex items-center justify-center shrink-0"
+        className="relative z-10 flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full"
         style={{
           background: active ? '#0F0B05' : '#FDFBF4',
           border: `2.5px solid ${active ? color : '#0F0B05'}`,
@@ -104,16 +231,13 @@ function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeP
       >
         <span className="text-[26px]">{glyph}</span>
       </div>
-      <div className="flex-1 min-w-0">
-        <div
-          className="text-[10px] tracking-[0.2em]"
-          style={{ color: '#7A6F5C' }}
-        >
-          DAY {index + 1}
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] tracking-[0.2em]" style={{ color: '#7A6F5C' }}>
+          DAY {String(index + 1).padStart(2, '0')}
         </div>
         <div
-          className="font-bold text-[18px] truncate"
-          style={{ color: '#0F0B05' }}
+          className="truncate text-[18px] font-black"
+          style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
         >
           {day.title}
         </div>
@@ -130,7 +254,107 @@ function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeP
   )
 }
 
-/* ───── Main Component ───── */
+/* ===================================================================
+   AmbientParticles Canvas (HTML lines 567-606)
+   =================================================================== */
+
+function getAmbientTone(color: string): 'forest' | 'water' | 'warm' {
+  const c = color.toLowerCase()
+  if (c.includes('4a6b3a') || c.includes('059669')) return 'forest'
+  if (c.includes('a8c8dc')) return 'water'
+  return 'warm'
+}
+
+function AmbientParticles({ tone }: { tone: 'forest' | 'water' | 'warm' }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const c = canvasRef.current
+    if (!c) return
+    const ctx = c.getContext('2d')
+    if (!ctx) return
+
+    const resize = () => {
+      const parent = c.parentElement
+      if (!parent) return
+      const r = parent.getBoundingClientRect()
+      c.width = r.width
+      c.height = r.height
+    }
+    resize()
+
+    const ro = new ResizeObserver(resize)
+    if (c.parentElement) ro.observe(c.parentElement)
+
+    const palette =
+      tone === 'forest'
+        ? [
+            [180, 210, 180],
+            [140, 180, 155],
+          ]
+        : tone === 'water'
+          ? [
+              [168, 200, 220],
+              [200, 220, 235],
+            ]
+          : [
+              [250, 204, 21],
+              [232, 162, 59],
+            ]
+
+    const N = 55
+    const dots = Array.from({ length: N }, () => ({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      r: 1.5 + Math.random() * 3.5,
+      vx: (Math.random() - 0.5) * 0.22,
+      vy: -0.08 - Math.random() * 0.28,
+      a: 0.35 + Math.random() * 0.55,
+      t: Math.random() * 6.28,
+      col: palette[Math.floor(Math.random() * palette.length)],
+    }))
+
+    let raf: number
+    const tick = () => {
+      ctx.clearRect(0, 0, c.width, c.height)
+      for (const p of dots) {
+        p.x += p.vx
+        p.y += p.vy
+        p.t += 0.02
+        if (p.y < -10) {
+          p.y = c.height + 10
+          p.x = Math.random() * c.width
+        }
+        const alpha = p.a * (0.55 + 0.45 * Math.sin(p.t))
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 3.5)
+        g.addColorStop(0, `rgba(${p.col[0]},${p.col[1]},${p.col[2]},${alpha})`)
+        g.addColorStop(1, `rgba(${p.col[0]},${p.col[1]},${p.col[2]},0)`)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.r * 3.5, 0, 6.28)
+        ctx.fill()
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [tone])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none absolute inset-0 z-[1]"
+      style={{ opacity: 0.95, mixBlendMode: 'screen' }}
+    />
+  )
+}
+
+/* ===================================================================
+   Main Component
+   =================================================================== */
 
 interface Props {
   quote: QuoteData
@@ -138,44 +362,45 @@ interface Props {
 
 export function QuoteItinerary({ quote }: Props) {
   const [activeDay, setActiveDay] = useState<number | null>(null)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   const toggle = (i: number) => setActiveDay(activeDay === i ? null : i)
 
   return (
     <section
       id="itinerary"
-      className="relative py-20 px-6 md:px-10"
+      className="relative px-6 py-20 md:px-10 md:py-28"
       style={{ background: '#FDFBF4' }}
     >
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto max-w-6xl">
         {/* Section header */}
-        <div className="text-center mb-14">
+        <div className="mb-14 text-center">
           <div
-            className="inline-block text-[11px] tracking-[0.2em] font-bold"
+            className="inline-block text-[11px] tracking-[0.2em]"
             style={{ color: '#CA8A04' }}
           >
             THE PATH FLOW
           </div>
           <h2
-            className="font-bold mt-3"
+            className="mt-3 font-black"
             style={{
               fontSize: 'clamp(28px, 4vw, 44px)',
               color: '#0F0B05',
+              fontFamily: 'var(--font-display, serif)',
             }}
           >
             {quote.tripDays}日，一條路徑
           </h2>
           <p
-            className="mt-4 text-[15px] max-w-xl mx-auto"
+            className="mx-auto mt-4 max-w-xl text-[15px] md:text-[17px]"
             style={{ color: '#3A3224' }}
           >
-            點擊任一節點，展開當日的完整流程。
+            點擊任一節點，展開當日的完整流程、親子提醒與用餐細節。
           </p>
         </div>
 
         {/* Desktop: horizontal path nodes */}
-        <div className="hidden md:block relative">
-          {/* Dashed SVG path connecting nodes */}
+        <div className="relative hidden md:block">
           <svg
             className="absolute left-0 right-0 top-[72px] w-full"
             height="60"
@@ -203,7 +428,7 @@ export function QuoteItinerary({ quote }: Props) {
                 index={i}
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
-                glyph={DAY_GLYPHS[i % DAY_GLYPHS.length]}
+                glyph={inferGlyph(day.title, i)}
                 active={activeDay === i}
                 onClick={() => toggle(i)}
               />
@@ -212,7 +437,7 @@ export function QuoteItinerary({ quote }: Props) {
         </div>
 
         {/* Mobile: vertical path nodes */}
-        <div className="md:hidden relative">
+        <div className="relative md:hidden">
           <div
             className="absolute left-[28px] top-0 bottom-0 w-[2px] border-l-2 border-dashed"
             style={{ borderColor: '#FACC15' }}
@@ -224,7 +449,7 @@ export function QuoteItinerary({ quote }: Props) {
                 index={i}
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
-                glyph={DAY_GLYPHS[i % DAY_GLYPHS.length]}
+                glyph={inferGlyph(day.title, i)}
                 active={activeDay === i}
                 onClick={() => toggle(i)}
               />
@@ -243,69 +468,142 @@ export function QuoteItinerary({ quote }: Props) {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="mt-8 overflow-hidden"
             >
-              <div className="rounded-[28px] overflow-hidden border-2 bg-white" style={{ borderColor: '#0F0B05', boxShadow: '12px 12px 0 #0F0B05' }}>
-                {/* Day header bar */}
-                <div
-                  className="relative px-6 md:px-10 py-6 md:py-8"
-                  style={{ background: DAY_COLORS[activeDay % DAY_COLORS.length] }}
-                >
-                  <svg
-                    className="absolute right-0 top-0 h-full"
-                    viewBox="0 0 300 200"
-                    preserveAspectRatio="none"
-                    style={{ width: '50%', opacity: 0.18 }}
-                  >
-                    <path
-                      d="M 10 180 Q 100 40 200 100 T 290 30"
-                      stroke="#0F0B05"
-                      strokeWidth="3"
-                      strokeDasharray="8 8"
-                      fill="none"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="relative flex justify-between items-start gap-4 flex-wrap">
-                    <div>
-                      <div
-                        className="text-[12px] tracking-[0.22em]"
-                        style={{ color: '#0F0B05' }}
-                      >
-                        {quote.itinerary[activeDay].day}
-                      </div>
-                      <h3
-                        className="font-bold mt-2 leading-tight"
-                        style={{
-                          fontSize: 'clamp(28px, 4vw, 48px)',
-                          color: '#0F0B05',
-                        }}
-                      >
-                        {quote.itinerary[activeDay].title}
-                      </h3>
-                    </div>
-                    <button
-                      onClick={() => setActiveDay(null)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-[13px]"
-                      style={{ background: '#0F0B05', color: '#FDFBF4' }}
-                    >
-                      <ChevronUp size={14} /> 收合
-                    </button>
-                  </div>
-                </div>
-
-                {/* Body */}
-                <div className="p-6 md:p-10">
-                  <DayPhotos photos={quote.photos} dayIndex={activeDay} />
-                  <DayTimeline
-                    items={quote.itinerary[activeDay].items}
-                    hotel={quote.itinerary[activeDay].hotel}
-                    heroColor={DAY_COLORS[activeDay % DAY_COLORS.length]}
-                  />
-                </div>
-              </div>
+              <DayDetailCard
+                day={quote.itinerary[activeDay]}
+                dayIndex={activeDay}
+                color={DAY_COLORS[activeDay % DAY_COLORS.length]}
+                photos={quote.photos}
+                onClose={() => setActiveDay(null)}
+                timelineRef={timelineRef}
+              />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
     </section>
+  )
+}
+
+/* ===================================================================
+   DayDetailCard — rounded card with offset shadow (HTML lines 887-971)
+   =================================================================== */
+
+function DayDetailCard({
+  day,
+  dayIndex,
+  color,
+  photos,
+  onClose,
+  timelineRef,
+}: {
+  day: QuoteItineraryDay
+  dayIndex: number
+  color: string
+  photos: QuoteData['photos']
+  onClose: () => void
+  timelineRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const ambientTone = getAmbientTone(color)
+
+  return (
+    <div
+      className="overflow-hidden rounded-[28px] border-2"
+      style={{
+        borderColor: '#0F0B05',
+        boxShadow: '12px 12px 0 #0F0B05',
+      }}
+    >
+      {/* Day header bar */}
+      <div
+        className="relative px-6 py-8 md:px-10 md:py-12"
+        style={{ background: color }}
+      >
+        {/* Decorative SVG dashes */}
+        <svg
+          className="absolute right-0 top-0 h-full"
+          viewBox="0 0 300 200"
+          preserveAspectRatio="none"
+          style={{ width: '50%', opacity: 0.18 }}
+        >
+          <path
+            d="M 10 180 Q 100 40 200 100 T 290 30"
+            stroke="#0F0B05"
+            strokeWidth="3"
+            strokeDasharray="8 8"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </svg>
+
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-[12px] tracking-[0.22em]" style={{ color: '#0F0B05' }}>
+              {day.day}
+            </div>
+            <h3
+              className="mt-2 font-black leading-[1]"
+              style={{
+                fontSize: 'clamp(34px, 5vw, 64px)',
+                color: '#0F0B05',
+                textWrap: 'balance',
+                fontFamily: 'var(--font-display, serif)',
+              }}
+            >
+              {day.title}
+            </h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold"
+            style={{ background: '#0F0B05', color: '#FDFBF4' }}
+          >
+            <X size={14} /> 收合
+          </button>
+        </div>
+      </div>
+
+      {/* Body: 2-column layout */}
+      <div
+        ref={bodyRef}
+        className="relative overflow-hidden p-6 md:p-10"
+        style={{ background: '#FFFFFF' }}
+      >
+        {/* Ambient particles */}
+        <AmbientParticles tone={ambientTone} />
+
+        {/* Brand watermark */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-[0.05]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/logo.png"
+            alt=""
+            className="h-[360px] w-[360px]"
+            style={{ filter: 'grayscale(1) brightness(0) invert(1)' }}
+          />
+        </div>
+
+        <div className="relative z-[2] grid gap-10 lg:grid-cols-[1fr_320px]">
+          {/* LEFT — Timeline */}
+          <div>
+            <DayTimeline
+              items={day.items}
+              hotel={day.hotel}
+              heroColor={color}
+            />
+
+            {/* Mobile photos interleaved */}
+            <div className="lg:hidden">
+              <DayPhotos photos={photos} dayIndex={dayIndex} />
+            </div>
+          </div>
+
+          {/* RIGHT — Photo ribbon (desktop only) */}
+          <div className="hidden lg:block">
+            <DayPhotos photos={photos} dayIndex={dayIndex} />
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
