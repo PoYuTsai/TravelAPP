@@ -22,6 +22,7 @@ import {
 } from './variants'
 import {
   buildPricingExampleDocument,
+  getPricingExampleDocumentId,
   mergeSavedQuoteRecords,
   parsePricingExampleDocument,
   type PricingExampleDocument,
@@ -60,6 +61,12 @@ import { getPricingResponsiveLayout } from './ui'
 async function loadHtml2Pdf() {
   const html2pdfModule = await import('html2pdf.js')
   return (html2pdfModule.default ?? html2pdfModule) as any
+}
+
+// 產生 8 字元短 slug（用於公開報價連結）
+function generateShortSlug(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
 // 互斥群組定義 - 同群組只能選一個
@@ -1544,6 +1551,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [isQuotesLoading, setIsQuotesLoading] = useState(false)
   const [isSavingQuote, setIsSavingQuote] = useState(false)
   const [lastQuotesSyncAt, setLastQuotesSyncAt] = useState<string | null>(null)
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null)
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false)
 
   // Form states - 成人/小孩分開計算
   const [adults, setAdults] = useState(8)
@@ -2212,6 +2221,41 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       alert(`⚠️ 共享同步失敗，已先保留在這台裝置：「${normalizedName}」`)
     } finally {
       setIsSavingQuote(false)
+    }
+  }
+
+  // 產生報價連結
+  const handleGenerateLink = async () => {
+    setIsGeneratingLink(true)
+    try {
+      // 先儲存目前報價（確保 Sanity 文件存在）
+      await saveCurrentQuote()
+
+      const quoteId = editingQuoteId ?? Date.now().toString()
+      const docId = getPricingExampleDocumentId(variant, quoteId)
+
+      // 查詢是否已有 publicSlug
+      const existing = await client.fetch<{ publicSlug?: { current?: string } } | null>(
+        `*[_id == $docId][0]{ publicSlug }`,
+        { docId }
+      )
+
+      let slug = existing?.publicSlug?.current
+      if (!slug) {
+        slug = generateShortSlug()
+        await client
+          .patch(docId)
+          .set({ publicSlug: { _type: 'slug', current: slug } })
+          .commit()
+      }
+
+      const url = `${window.location.origin}/quote/${slug}`
+      setGeneratedUrl(url)
+    } catch (e) {
+      console.error('產生報價連結失敗:', e)
+      alert('產生報價連結失敗，請先儲存報價後再試')
+    } finally {
+      setIsGeneratingLink(false)
     }
   }
 
@@ -3081,7 +3125,78 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           })
                           downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
         }} style={tabButtonStyle(false, '#b89b4d')}>📥 下載報價</button>
+        <button
+          onClick={handleGenerateLink}
+          disabled={isGeneratingLink}
+          style={tabButtonStyle(false, isGeneratingLink ? '#999' : '#2e7d32')}
+        >
+          {isGeneratingLink ? '⏳ 產生中...' : '🔗 產生報價連結'}
+        </button>
       </div>
+
+      {/* 報價連結顯示 */}
+      {generatedUrl && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 16,
+          padding: 12,
+          background: '#e8f5e9',
+          border: '1px solid #a5d6a7',
+          borderRadius: 8,
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#2e7d32', whiteSpace: 'nowrap' }}>報價連結：</span>
+          <input
+            value={generatedUrl}
+            readOnly
+            onClick={(e) => (e.target as HTMLInputElement).select()}
+            style={{
+              flex: 1,
+              minWidth: 200,
+              padding: '6px 10px',
+              border: '1px solid #c8e6c9',
+              borderRadius: 4,
+              fontSize: 13,
+              background: 'white',
+              color: '#333',
+            }}
+          />
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(generatedUrl)
+              alert('已複製報價連結！')
+            }}
+            style={{
+              padding: '6px 14px',
+              background: '#2e7d32',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            📋 複製
+          </button>
+          <button
+            onClick={() => setGeneratedUrl(null)}
+            style={{
+              padding: '6px 10px',
+              background: 'transparent',
+              color: '#999',
+              border: '1px solid #ccc',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 12,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Input Tab */}
       {activeTab === 'input' && (
