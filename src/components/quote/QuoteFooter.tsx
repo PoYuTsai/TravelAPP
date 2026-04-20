@@ -4,7 +4,7 @@ import { ExternalLink } from 'lucide-react'
 
 export function QuoteFooter({ isSample }: { isSample: boolean }) {
   return (
-    <footer className="px-6 py-10 text-center" style={{ background: '#FDFBF4' }}>
+    <footer className="px-6 py-6 text-center" style={{ background: '#FDFBF4' }}>
       <a
         href="https://chiangway-travel.com/"
         target="_blank"

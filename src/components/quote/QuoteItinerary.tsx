@@ -369,7 +369,7 @@ export function QuoteItinerary({ quote }: Props) {
   return (
     <section
       id="itinerary"
-      className="relative px-6 py-20 md:px-10 md:py-28"
+      className="relative px-6 py-8 md:px-10 md:py-12"
       style={{ background: '#FDFBF4' }}
     >
       <div className="mx-auto max-w-6xl">
