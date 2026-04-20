@@ -4389,6 +4389,7 @@ Day 5｜送機
                         {(dayPhotos[index] ?? []).map((photo) => (
                           <div key={photo._key} style={{ position: 'relative', width: 60, height: 60 }}>
                             {photo.url && (
+                              // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={photo.url}
                                 alt={`${cf.day} 照片`}

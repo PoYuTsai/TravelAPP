@@ -160,13 +160,13 @@ function LineItemBreakdown({
   tripDays,
   tripNights,
   adults,
-  children,
+  childCount,
 }: {
   items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
   tripDays: number
   tripNights: number
   adults: number
-  children: number
+  childCount: number
 }) {
   return (
     <motion.div
@@ -187,7 +187,7 @@ function LineItemBreakdown({
           <h3 className="text-lg font-bold text-[#5c4338]">價格明細</h3>
         </div>
         <p className="text-xs text-[#9a826f]">
-          {tripDays}天{tripNights}夜 · {adults}大{children}小
+          {tripDays}天{tripNights}夜 · {adults}大{childCount}小
         </p>
       </div>
       <div className="space-y-0">
@@ -509,7 +509,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               tripDays={quote.tripDays}
               tripNights={quote.tripNights}
               adults={quote.adults}
-              children={quote.children}
+              childCount={quote.children}
             />
 
             {/* 3. Total Quote */}
