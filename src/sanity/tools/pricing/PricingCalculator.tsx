@@ -2472,11 +2472,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setEditingQuoteId(quote.id)
     setShowParser(restoredParseState.shouldShowParser)
 
-    // 從 Sanity 載入每日照片
+    // 從 Sanity 載入每日照片 + publicSlug
     const docId = getPricingExampleDocumentId(variant, quote.id)
     client
-      .fetch<{ photos?: { dayIndex: number; images: { _key: string; asset: { _ref: string } }[] }[] } | null>(
-        `*[_id == $docId][0]{ photos[]{ dayIndex, images[]{ _key, asset->{ _id, url } } } }`,
+      .fetch<{ photos?: { dayIndex: number; images: { _key: string; asset: { _ref: string } }[] }[]; publicSlug?: { current?: string } } | null>(
+        `*[_id == $docId][0]{ photos[]{ dayIndex, images[]{ _key, asset->{ _id, url } } }, publicSlug }`,
         { docId }
       )
       .then((doc) => {
@@ -2495,8 +2495,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         } else {
           setDayPhotos({})
         }
+        // 自動顯示報價連結（如果有的話）
+        if (doc?.publicSlug?.current) {
+          setGeneratedUrl(`${window.location.origin}/quote/${doc.publicSlug.current}`)
+        } else {
+          setGeneratedUrl(null)
+        }
       })
-      .catch(() => setDayPhotos({}))
+      .catch(() => { setDayPhotos({}); setGeneratedUrl(null) })
 
     alert(
       `✅ 已載入「${quote.name}」\n${
