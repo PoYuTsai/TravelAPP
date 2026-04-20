@@ -1,20 +1,10 @@
 'use client'
 
 import type { QuoteData } from '@/lib/quote/types'
-
-// Placeholder components — will be replaced by Tasks 6-9
-function QuoteHero({ quote }: { quote: QuoteData }) {
-  return <div>Hero: {quote.name}</div>
-}
-function QuoteItinerary({ quote }: { quote: QuoteData }) {
-  return <div>Itinerary: {quote.itinerary.length} days</div>
-}
-function QuoteCostDashboard({ quote }: { quote: QuoteData }) {
-  return <div>Cost: {quote.quote?.totalTWD ?? 'N/A'}</div>
-}
-function QuoteFooter({ isSample }: { isSample: boolean }) {
-  return <div>Footer (sample: {String(isSample)})</div>
-}
+import { QuoteHero } from '@/components/quote/QuoteHero'
+import { QuoteItinerary } from '@/components/quote/QuoteItinerary'
+import { QuoteCostDashboard } from '@/components/quote/QuoteCostDashboard'
+import { QuoteFooter } from '@/components/quote/QuoteFooter'
 
 export function QuotePageClient({ quote }: { quote: QuoteData }) {
   return (
