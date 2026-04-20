@@ -2271,8 +2271,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         })
       )
 
-      // 儲存每日照片到 Sanity 文件
+      // 儲存後重新 patch publicSlug + photos（createOrReplace 會覆蓋整份文件）
       const docId = getPricingExampleDocumentId(variant, newQuote.id)
+
+      // 先取回現有的 publicSlug（如果有的話）
+      const existingDoc = await client.fetch<{ publicSlug?: { _type: string; current: string } } | null>(
+        `*[_id == $docId][0]{ publicSlug }`,
+        { docId }
+      )
+
       const photosArray = Object.entries(dayPhotos)
         .filter(([, images]) => images.length > 0)
         .map(([idx, images]) => ({
@@ -2284,7 +2291,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             asset: img.asset,
           })),
         }))
-      await client.patch(docId).set({ photos: photosArray.length > 0 ? photosArray : [] }).commit()
+
+      // patch photos + 保留 publicSlug
+      const patchData: Record<string, unknown> = {
+        photos: photosArray.length > 0 ? photosArray : [],
+      }
+      if (existingDoc?.publicSlug?.current) {
+        patchData.publicSlug = existingDoc.publicSlug
+      }
+      await client.patch(docId).set(patchData).commit()
 
       const updatedQuotes = mergeSavedQuoteRecords(
         [newQuote],
