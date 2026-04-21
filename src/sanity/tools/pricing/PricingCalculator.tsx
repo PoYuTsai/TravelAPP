@@ -3685,7 +3685,7 @@ Day 5｜送機
                 <label style={{ fontWeight: 'bold' }}>匯率</label>
                 <input type="number" value={exchangeRate} onChange={e => setExchangeRate(Number(e.target.value))} min={0.85} max={1.05} step={0.01} style={{ ...inputStyle, width: 80 }} />
               </div>
-              {people < 4 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 4 人（目前 {people} 人）</span>}
+              {people < 1 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 1 人（目前 {people} 人）</span>}
               <span style={{ ...noteStyle, fontWeight: 'bold', color: '#5c4a2a' }}>共 {people} 人</span>
             </div>
             <div
