@@ -1536,6 +1536,10 @@ interface SavedQuote {
     makeupCount?: number
     mealLevel?: number  // 餐費等級
     collectDeposit?: boolean
+    outboundStayEnabled?: boolean
+    outboundStayPerNight?: number
+    outboundStayNights?: number
+    outboundStayRooms?: number
     includeTickets?: boolean
     parsedItinerary?: SavedParsedItineraryDay[]
     parseResult?: ActivityMatchResult | null
@@ -1757,6 +1761,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [childSeatServiceDays, setChildSeatServiceDays] = useState(
     config.dailyCarFees.length
   )
+  // 外地住宿補貼（司機導遊過夜費用）
+  const [outboundStayEnabled, setOutboundStayEnabled] = useState(false)
+  const [outboundStayPerNight, setOutboundStayPerNight] = useState(1500) // 泰銖/間/晚
+  const [outboundStayNights, setOutboundStayNights] = useState(1)
+  const [outboundStayRooms, setOutboundStayRooms] = useState(2) // 通常司機1間+導遊1間
   const [collectDeposit, setCollectDeposit] = useState(false)  // 代收押金（預設不收）
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})  // 房型分類展開狀態
   const [activeTab, setActiveTab] = useState<'input' | 'internal' | 'external'>('input')
@@ -2284,6 +2293,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         makeupCount,
         mealLevel,
         collectDeposit,
+        outboundStayEnabled,
+        outboundStayPerNight,
+        outboundStayNights,
+        outboundStayRooms,
         includeTickets,
         parsedItinerary: parsedItinerary.map((day) => ({
           ...day,
@@ -2524,6 +2537,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.makeupCount !== undefined) setMakeupCount(quote.data.makeupCount)
     if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
     if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
+    if (quote.data.outboundStayEnabled !== undefined) setOutboundStayEnabled(quote.data.outboundStayEnabled)
+    if (quote.data.outboundStayPerNight !== undefined) setOutboundStayPerNight(quote.data.outboundStayPerNight)
+    if (quote.data.outboundStayNights !== undefined) setOutboundStayNights(quote.data.outboundStayNights)
+    if (quote.data.outboundStayRooms !== undefined) setOutboundStayRooms(quote.data.outboundStayRooms)
     setParsedItinerary(restoredParseState.parsedItinerary)
     setParseResult(restoredParseState.parseResult)
     setParseWarnings(restoredParseState.parseWarnings)
@@ -2607,6 +2624,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setGuideCostPerDay(config.guidePerDay.cost)
     setGuidePricePerDay(config.guidePerDay.price)
     setCollectDeposit(true)
+    setOutboundStayEnabled(false)
+    setOutboundStayPerNight(1500)
+    setOutboundStayNights(1)
+    setOutboundStayRooms(2)
     // 重置車費
     setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({ ...d, date: '' })))
     setLuggageCar(true)
@@ -3045,9 +3066,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const effectiveThaiDressCost = includeTickets ? thaiDressCost : 0
     const effectiveThaiDressPrice = includeTickets ? thaiDressPrice : 0
 
+    // 外地住宿補貼
+    const outboundStayCost = outboundStayEnabled
+      ? outboundStayPerNight * outboundStayNights * outboundStayRooms
+      : 0
+
     // Totals
-    const totalCost = accommodationCost + mealCost + transportCost + effectiveTicketCost + effectiveThaiDressCost + insuranceCost + luggageCost
-    const totalPrice = accommodationCost + mealCost + transportPrice + effectiveTicketPrice + effectiveThaiDressPrice + insuranceCost
+    const totalCost = accommodationCost + mealCost + transportCost + effectiveTicketCost + effectiveThaiDressCost + insuranceCost + luggageCost + outboundStayCost
+    const totalPrice = accommodationCost + mealCost + transportPrice + effectiveTicketPrice + effectiveThaiDressPrice + insuranceCost + outboundStayCost
 
     const yourTotalProfit = transportProfit + (includeTickets ? ticketYourProfit : 0) + (includeTickets ? thaiDressYourProfit : 0)
     const partnerTotalProfit = (includeTickets ? ticketPartnerProfit : 0) + (includeTickets ? thaiDressPartnerProfit : 0)
@@ -3065,11 +3091,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       photographerCount,
       selectedTickets, ticketCost, ticketPrice, ticketYourProfit, ticketPartnerProfit,
       thaiDressCost, thaiDressPrice, thaiDressYourProfit, thaiDressPartnerProfit,
-      insuranceCost, totalCost, totalPrice, yourTotalProfit, partnerTotalProfit,
+      insuranceCost, outboundStayCost, totalCost, totalPrice, yourTotalProfit, partnerTotalProfit,
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, guideCostPerDay, guidePricePerDay, carFees])
+  }, [config, adults, children, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, luggageCar, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, guideCostPerDay, guidePricePerDay, carFees, outboundStayEnabled, outboundStayPerNight, outboundStayNights, outboundStayRooms])
 
   const fmt = (n: number) => n.toLocaleString()
   const formalProfitShares =
@@ -3077,8 +3103,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       ? calculateFormalProfitShares(calculation.yourTotalProfit + calculation.partnerTotalProfit)
       : []
   const externalQuote = useMemo(
-    () =>
-      buildExternalQuoteBreakdown({
+    () => {
+      const breakdown = buildExternalQuoteBreakdown({
         includeAccommodation,
         includeMeals,
         includeGuide,
@@ -3103,8 +3129,24 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         totalChildSeatCount,
         selectedTicketCount: includeTickets ? calculation.selectedTickets.length : 0,
         hasThaiDress: includeTickets ? calculation.thaiDressPrice > 0 : false,
-      }),
-    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, includeTickets, totalChildSeatCount, totalNights]
+      })
+
+      // 外地住宿補貼（獨立於客人住宿）
+      if (calculation.outboundStayCost > 0) {
+        breakdown.items.push({
+          label: '外地住宿補貼',
+          amountTHB: calculation.outboundStayCost,
+          amountTWD: Math.round(calculation.outboundStayCost / exchangeRate),
+          description: `${outboundStayRooms} 間 × ${outboundStayNights} 晚`,
+        })
+        breakdown.included.push('外地住宿補貼')
+        breakdown.totalTHB += calculation.outboundStayCost
+        breakdown.totalTWD += Math.round(calculation.outboundStayCost / exchangeRate)
+      }
+
+      return breakdown
+    },
+    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, includeTickets, totalChildSeatCount, totalNights, outboundStayRooms, outboundStayNights]
   )
 
   const toggleTicket = (id: string) => {
@@ -4398,6 +4440,27 @@ Day 5｜送機
               )}
             </div>
 
+            {/* 外地住宿補貼 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={outboundStayEnabled} onChange={e => setOutboundStayEnabled(e.target.checked)} style={{ width: 16, height: 16 }} />
+                🏨 外地住宿補貼
+              </label>
+              {outboundStayEnabled && (
+                <>
+                  <input type="number" value={outboundStayPerNight} onChange={e => setOutboundStayPerNight(Number(e.target.value))} style={{ width: 70, padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }} />
+                  <span style={{ fontSize: 12, color: '#666' }}>泰銖/間/晚</span>
+                  <span style={{ fontSize: 12, color: '#666' }}>×</span>
+                  <input type="number" value={outboundStayRooms} onChange={e => setOutboundStayRooms(Math.max(1, Number(e.target.value)))} min={1} style={{ width: 50, padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }} />
+                  <span style={{ fontSize: 12, color: '#666' }}>間</span>
+                  <span style={{ fontSize: 12, color: '#666' }}>×</span>
+                  <input type="number" value={outboundStayNights} onChange={e => setOutboundStayNights(Math.max(1, Number(e.target.value)))} min={1} style={{ width: 50, padding: 4, border: '1px solid #ddd', borderRadius: 4, fontSize: 12 }} />
+                  <span style={{ fontSize: 12, color: '#666' }}>晚</span>
+                  <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>= {(outboundStayPerNight * outboundStayRooms * outboundStayNights).toLocaleString()} 泰銖</span>
+                </>
+              )}
+            </div>
+
             {/* 每日車費明細 */}
             <div style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -5111,6 +5174,7 @@ Day 5｜送機
               <DataRow name={`導遊 (${calculation.guideDays}天 × ${fmt(calculation.guidePricePerDay)}/天)`} cost={calculation.guideCost} price={calculation.guidePrice} profit={calculation.guidePrice - calculation.guideCost} />
               {calculation.needLuggageCar && <DataRow name="行李車 (2趟)" cost={0} price={calculation.luggageCost} profit={calculation.luggageCost} />}
               {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${totalChildSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
+              {calculation.outboundStayCost > 0 && <DataRow name={`外地住宿補貼 (${outboundStayRooms}間 × ${outboundStayNights}晚)`} cost={calculation.outboundStayCost} price={calculation.outboundStayCost} profit={0} />}
               <SubtotalRow name="車導總計" cost={calculation.transportCost} price={calculation.transportPrice} profit={calculation.transportProfit} />
               <InfoRow text="※ 接送機已含在 D1/D6 車費" />
 
@@ -5382,6 +5446,7 @@ Day 5｜送機
                 • 中文導遊 {calculation.guideDays} 天（{fmt(calculation.guidePricePerDay)}/天）
                 {calculation.needLuggageCar && <><br />• 行李車（接機＋送機）</>}
                 {calculation.childSeatCost > 0 && <><br />• 兒童座椅 {totalChildSeatCount}張 × {calculation.childSeatDays}天</>}
+                {calculation.outboundStayCost > 0 && <><br />• 外地住宿補貼 {outboundStayRooms}間 × {outboundStayNights}晚</>}
               </div>
 
               {/* 門票+泰服明細（合併顯示） */}
