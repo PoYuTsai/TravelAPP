@@ -3140,8 +3140,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           description: `${outboundStayRooms} 間 × ${outboundStayNights} 晚`,
         })
         breakdown.included.push('外地住宿補貼')
-        breakdown.totalTHB += calculation.outboundStayCost
-        breakdown.totalTWD += Math.round(calculation.outboundStayCost / exchangeRate)
+        // totalTHB/totalTWD 不再重複加 — calculation.totalPrice 已包含 outboundStayCost
       }
 
       return breakdown
