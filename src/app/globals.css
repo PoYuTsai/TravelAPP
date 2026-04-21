@@ -128,6 +128,12 @@ body[data-lightbox-open] #floating-line-button {
   100% { left: 95%; top: 0px; }
 }
 
+/* Van driving vertically (mobile) */
+@keyframes vanDriveVertical {
+  0% { top: 0%; transform: rotate(90deg); }
+  100% { top: 92%; transform: rotate(90deg); }
+}
+
 /* Pulse ring (expanding circle) */
 @keyframes pulse-ring {
   0% { transform: scale(1); opacity: 0.7; }

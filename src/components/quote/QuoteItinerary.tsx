@@ -524,9 +524,19 @@ export function QuoteItinerary({ quote }: Props) {
         {/* Mobile: vertical path nodes */}
         <div className="relative md:hidden">
           <div
-            className="absolute left-[28px] top-0 bottom-0 w-[2px] border-l-2 border-dashed"
+            className="absolute left-[28px] top-0 bottom-0 w-[2px] border-l-2 border-dashed animate-dash-flow"
             style={{ borderColor: '#FACC15' }}
           />
+          {/* Van driving down the vertical path */}
+          <div
+            className="pointer-events-none absolute left-[18px] z-20 text-[18px]"
+            style={{
+              animation: 'vanDriveVertical 15s linear infinite',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
+            }}
+          >
+            🚐
+          </div>
           <div className="space-y-4">
             {quote.itinerary.map((day, i) => (
               <PathNodeMobile
