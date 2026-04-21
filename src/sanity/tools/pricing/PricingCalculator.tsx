@@ -63,6 +63,68 @@ async function loadHtml2Pdf() {
   return (html2pdfModule.default ?? html2pdfModule) as any
 }
 
+/**
+ * 把客人日期格式轉成標準格式
+ * 「6/15 (一)\n8：00 出發」→「Day 1｜行程標題\n・出發」
+ */
+function convertToStandardFormat(text: string): string {
+  const dateRegex = /(\d{1,2}\/\d{1,2})\s*[（(]\s*([一二三四五六日])\s*[）)]/g
+  const markers: { date: string; pos: number; len: number }[] = []
+  let match: RegExpExecArray | null
+  while ((match = dateRegex.exec(text)) !== null) {
+    markers.push({ date: match[1], pos: match.index, len: match[0].length })
+  }
+
+  if (markers.length === 0) return text
+
+  const days: string[] = []
+
+  markers.forEach((mk, i) => {
+    const sectionStart = mk.pos + mk.len
+    const sectionEnd = i < markers.length - 1 ? markers[i + 1].pos : text.length
+    const section = text.slice(sectionStart, sectionEnd)
+
+    const items: string[] = []
+    let title = ''
+    let hotel = ''
+
+    for (const raw of section.split('\n')) {
+      const line = raw.trim()
+      if (!line) continue
+      if (/^[（(]\s*可停/.test(line)) continue
+
+      if (/check\s*in/i.test(line)) {
+        hotel = line.replace(/^\d{1,2}[：:]\d{2}\s*[-~]?\s*(\d{1,2}[：:]\d{2})?\s*/, '').trim()
+        continue
+      }
+
+      const content = line.replace(/^\d{1,2}[：:]\d{2}\s*[-~]?\s*(\d{1,2}[：:]\d{2})?\s*/, '').trim()
+      if (!content) continue
+
+      if (!title && content.length > 1 && !/^出發/.test(content)) {
+        title = content.split(/[（(]/)[0].trim()
+      }
+
+      items.push(content)
+    }
+
+    if (!title) title = mk.date + ' 行程'
+
+    let dayText = 'Day ' + (i + 1) + '｜' + title + '\n'
+    for (const item of items) {
+      if (/^(午餐|晚餐|早餐|下午茶)/.test(item)) {
+        dayText += item + '\n'
+      } else {
+        dayText += '\u30FB' + item + '\n'  // ・
+      }
+    }
+    if (hotel) dayText += '\u30FB住宿：' + hotel + '\n'
+    days.push(dayText)
+  })
+
+  return days.join('\n')
+}
+
 // 產生 8 字元短 slug（用於公開報價連結）
 function generateShortSlug(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
@@ -3487,8 +3549,16 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
             {showParser && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ marginBottom: 8, fontSize: 12, color: '#666' }}>
-                  💡 貼入完整行程文字，系統會自動解析天數、日期、活動、飯店
+                <div style={{ marginBottom: 8, fontSize: 12, color: '#666', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>💡 貼入完整行程文字，系統會自動解析天數、日期、活動、飯店</span>
+                  {itineraryText && !itineraryText.includes('Day ') && (
+                    <button
+                      onClick={() => setItineraryText(convertToStandardFormat(itineraryText))}
+                      style={{ padding: '4px 12px', background: '#e3f2fd', color: '#1565c0', border: '1px solid #90caf9', borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      🔄 轉換成標準格式
+                    </button>
+                  )}
                 </div>
                 <textarea
                   value={itineraryText}
