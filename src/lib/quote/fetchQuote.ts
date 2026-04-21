@@ -81,15 +81,13 @@ function parseSection(section: string): { items: string[]; hotel: string | null 
     const line = raw.trim()
     if (!line) continue
 
-    // 住宿 / check in
-    if (/住宿[：:]/.test(line) || /check\s*in/i.test(line)) {
-      const name = line
-        .replace(/^[・·\-*]?\s*/, '')
-        .replace(/^[\d：:]+[-~]?\s*[\d：:]*\s*/, '') // 去時間前綴
-        .trim()
-      if (name && !/^住宿[：:]?\s*$/.test(name)) hotel = name
+    // 住宿行：只有「・住宿：XXX」格式才提取為 hotel（不顯示在行程列表）
+    if (/^[・·\-*]?\s*住宿[：:]\s*\S/.test(line)) {
+      hotel = line.replace(/^[・·\-*]?\s*住宿[：:]\s*/, '').trim()
       continue
     }
+    // 空的「・住宿：」跳過
+    if (/^[・·\-*]?\s*住宿[：:]\s*$/.test(line)) continue
 
     // 跳過 header 行
     if (/^[📅👨<]/.test(line)) continue
