@@ -722,15 +722,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               exchangeRate={quote.exchangeRate}
             />
 
-            {/* 4. Payment Notes — customer only */}
-            {!isSample && (
-              <PaymentNotesSection
-                paymentNotes={breakdown.paymentNotes}
-                carCount={quote.carCount}
-              />
-            )}
-
-            {/* Bank transfer removed — 匯款資訊改在 LINE 私訊提供 */}
+            {/* 付款說明、匯款帳號已移除 — 在 LINE 私訊溝通 */}
           </div>
         )}
       </div>
