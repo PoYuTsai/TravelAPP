@@ -390,29 +390,6 @@ function TotalQuoteCard({
           </div>
         )}
 
-        {/* CTAs */}
-        <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <a
-            href={LINE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-bold"
-            style={{ background: '#06C755', color: '#fff' }}
-          >
-            <MessageCircle size={15} /> {isSample ? 'LINE 聊聊行程' : '我要確認這份報價'}
-          </a>
-          <a
-            href="#itinerary"
-            className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-[14px] font-bold"
-            style={{
-              background: 'rgba(250,204,21,0.18)',
-              border: '1.5px solid #FACC15',
-              color: '#FACC15',
-            }}
-          >
-            <ArrowUp size={15} /> 重新瀏覽行程
-          </a>
-        </div>
       </div>
     </motion.div>
   )
