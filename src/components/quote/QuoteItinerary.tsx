@@ -362,12 +362,18 @@ export function QuoteItinerary({ quote }: Props) {
   const timelineRef = useRef<HTMLDivElement>(null)
 
   const toggle = (i: number) => {
+    // 確保該天展開
     setExpandedDays(prev => {
       const next = new Set(prev)
       if (next.has(i)) next.delete(i)
       else next.add(i)
       return next
     })
+    // 滾動到該天的內容
+    setTimeout(() => {
+      const el = document.getElementById(`day-detail-${i}`)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }
   // Backward compat — activeDay for PathNode highlight
   const activeDay = expandedDays.size === 1 ? Array.from(expandedDays)[0] : null
@@ -473,6 +479,7 @@ export function QuoteItinerary({ quote }: Props) {
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              id={`day-detail-${i}`}
               className="mt-8 overflow-hidden"
             >
               <DayDetailCard

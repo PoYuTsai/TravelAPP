@@ -11,11 +11,11 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
 
   const title = isSample
     ? `清邁親子\n${tripDays}天${tripNights}夜經典套餐`
-    : quote.name
+    : `清邁親子\n${tripDays}天${tripNights}夜`
 
   const subtitle = isSample
-    ? `${tripDays}天${tripNights}夜 · 2大2小`
-    : `${tripDays}天${tripNights}夜 · ${quote.adults}大${quote.children}小${quote.createdAt ? ` · ${formatDateRange(quote.createdAt)}` : ''}`
+    ? '2大2小 · 經典路線'
+    : `${quote.adults}大${quote.children}小${quote.createdAt ? ` · ${formatDateRange(quote.createdAt)}` : ''}`
 
   return (
     <section
@@ -137,7 +137,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
             className="text-[12px] font-black tracking-[0.32em]"
             style={{ color: '#FFD700', fontFamily: 'var(--font-latin, sans-serif)' }}
           >
-            清邁 · {tripDays}天{tripNights}夜
+            PRIVATE · FAMILY · ITINERARY
           </div>
           <div className="h-[2px] w-10 rounded-full" style={{ background: '#FFD700' }} />
         </motion.div>
