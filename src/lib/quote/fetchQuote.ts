@@ -15,14 +15,27 @@ import type { QuoteData, QuotePhoto } from './types'
 const SAMPLE_SLUG = 'sample'
 
 /**
- * Fallback: parse itineraryText into per-day items when parsedItinerary is empty.
- * Handles format like: "Day 1｜title\n・item1\n午餐：item2\n..."
+ * Fallback: parse itineraryText into per-day items.
+ *
+ * Supports two formats:
+ * 1. 標準格式：「Day 1｜title\n・item1\n午餐：item2」
+ * 2. 客人格式：「6/15 (一)\n8：00 出發\n11：30-13：30 午餐」
  */
 function parseItineraryTextFallback(
   text: string
 ): { day: string; title: string; items: string[]; hotel: string | null }[] {
   if (!text?.trim()) return []
 
+  // 先嘗試標準格式
+  const standardResult = parseStandardFormat(text)
+  if (standardResult.length > 0) return standardResult
+
+  // 再嘗試客人日期格式
+  return parseDateFormat(text)
+}
+
+/** 標準格式：Day N｜標題 */
+function parseStandardFormat(text: string) {
   const dayRegex = /Day\s*(\d+)\s*[｜|]\s*(.+)/gi
   const markers: { dayNum: string; title: string; pos: number; len: number }[] = []
   let m: RegExpExecArray | null
@@ -34,31 +47,83 @@ function parseItineraryTextFallback(
   return markers.map((mk, i) => {
     const start = mk.pos + mk.len
     const end = i < markers.length - 1 ? markers[i + 1].pos : text.length
+    return { day: `DAY ${mk.dayNum}`, title: mk.title, ...parseSection(text.slice(start, end)) }
+  })
+}
+
+/** 客人日期格式：6/15 (一) 或 6/15（一）*/
+function parseDateFormat(text: string) {
+  const dateRegex = /(\d{1,2}\/\d{1,2})\s*[（(]\s*[一二三四五六日]\s*[）)]/g
+  const markers: { date: string; pos: number; len: number }[] = []
+  let m: RegExpExecArray | null
+  while ((m = dateRegex.exec(text)) !== null) {
+    markers.push({ date: m[1], pos: m.index, len: m[0].length })
+  }
+  if (markers.length === 0) return []
+
+  return markers.map((mk, i) => {
+    const start = mk.pos + mk.len
+    const end = i < markers.length - 1 ? markers[i + 1].pos : text.length
     const section = text.slice(start, end)
+    const parsed = parseSection(section)
+    // 用第一個行程項目做標題（如果有的話）
+    const title = parsed.items[0] || `${mk.date} 行程`
+    return { day: `DAY ${i + 1}`, title, ...parsed }
+  })
+}
 
-    const items: string[] = []
-    let hotel: string | null = null
+/** 從一段文字中提取行程項目 */
+function parseSection(section: string): { items: string[]; hotel: string | null } {
+  const items: string[] = []
+  let hotel: string | null = null
 
-    for (const raw of section.split('\n')) {
-      const line = raw.trim()
-      if (!line) continue
-      if (/住宿[：:]/.test(line)) {
-        const name = line.replace(/^[・·\-*]?\s*住宿[：:]\s*/, '').trim()
-        if (name) hotel = name
-        continue
-      }
-      if (/^[📅👨<]/.test(line)) continue
-      if (/^[・·\-*]/.test(line)) {
-        items.push(line.replace(/^[・·\-*]\s*/, '').trim())
-      } else if (/^(午餐|晚餐|早餐|下午茶)[：:]/.test(line)) {
-        items.push(line)
-      } else if (/^\*\*/.test(line)) {
-        items.push(line.replace(/\*\*/g, '').trim())
-      }
+  for (const raw of section.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+
+    // 住宿 / check in
+    if (/住宿[：:]/.test(line) || /check\s*in/i.test(line)) {
+      const name = line
+        .replace(/^[・·\-*]?\s*/, '')
+        .replace(/^[\d：:]+[-~]?\s*[\d：:]*\s*/, '') // 去時間前綴
+        .trim()
+      if (name && !/^住宿[：:]?\s*$/.test(name)) hotel = name
+      continue
     }
 
-    return { day: `DAY ${mk.dayNum}`, title: mk.title, items, hotel }
-  })
+    // 跳過 header 行
+    if (/^[📅👨<]/.test(line)) continue
+    if (/^[（(]\s*[可停]/.test(line)) continue // （可停）備註行
+
+    // ・項目符號開頭
+    if (/^[・·\-*]/.test(line)) {
+      items.push(line.replace(/^[・·\-*]\s*/, '').trim())
+    }
+    // 午餐/晚餐/早餐 開頭
+    else if (/^(午餐|晚餐|早餐|下午茶)[：:]/.test(line)) {
+      items.push(line)
+    }
+    // **粗體** 開頭
+    else if (/^\*\*/.test(line)) {
+      items.push(line.replace(/\*\*/g, '').trim())
+    }
+    // 時間開頭：8：00、11：30-13：30、14:00-15:30
+    else if (/^\d{1,2}[：:]\d{2}/.test(line)) {
+      // 提取時間後面的內容
+      const content = line.replace(/^\d{1,2}[：:]\d{2}\s*[-~]?\s*(\d{1,2}[：:]\d{2})?\s*/, '').trim()
+      if (content) items.push(content)
+    }
+    // 「晚餐 XXX」沒有冒號的格式
+    else if (/^晚餐\s+\S/.test(line)) {
+      items.push(line)
+    }
+    // 「早餐後退房」等無符號行
+    else if (/退房|出發/.test(line)) {
+      items.push(line)
+    }
+  }
+
+  return { items, hotel }
 }
 
 const QUERY = `*[_type == "pricingExample" && publicSlug.current == $slug][0]{
