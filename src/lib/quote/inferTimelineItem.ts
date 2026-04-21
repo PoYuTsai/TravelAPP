@@ -56,14 +56,37 @@ function inferIcon(text: string, kind: ItemKind): string {
 // --- Time estimation (kind-aware) ---
 
 /**
- * Try to extract a time from text like:
- *  "已預約17:00" "8:00出發" "長榮 BR257 7:20~10:35"
+ * Extract time from text. Special handling:
+ * - 接機/航班 "7:20~10:35" → 取到達時間 10:35 + 30 分鐘（出關領行李）
+ * - 送機 "11:50~16:30" → 取起飛前 2 小時 = 09:50（提前到機場）
+ * - 一般 "已預約17:00" → 直接用
  */
-function extractTime(text: string): string | null {
-  const match = text.match(/(\d{1,2})[：:](\d{2})/)
-  if (!match) return null
-  const h = parseInt(match[1], 10)
-  const m = parseInt(match[2], 10)
+function extractTime(text: string, kind: ItemKind): string | null {
+  // 航班時間格式：7:20~10:35 或 7:20-10:35
+  const flightMatch = text.match(/(\d{1,2})[：:](\d{2})\s*[~\-]\s*(\d{1,2})[：:](\d{2})/)
+  if (flightMatch) {
+    if (/接機|抵達/.test(text)) {
+      // 接機：到達時間 + 30 分鐘
+      const h = parseInt(flightMatch[3], 10)
+      const m = parseInt(flightMatch[4], 10) + 30
+      const totalMin = h * 60 + m
+      return `${String(Math.floor(totalMin / 60)).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`
+    }
+    if (/送機/.test(text)) {
+      // 送機：起飛時間 - 2 小時
+      const h = parseInt(flightMatch[1], 10)
+      const m = parseInt(flightMatch[2], 10)
+      const totalMin = Math.max(h * 60 + m - 120, 7 * 60)
+      return `${String(Math.floor(totalMin / 60)).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')}`
+    }
+  }
+
+  // 一般時間：取最後一個出現的時間（避免抓到起飛時間）
+  const matches = Array.from(text.matchAll(/(\d{1,2})[：:](\d{2})/g))
+  if (matches.length === 0) return null
+  const last = matches[matches.length - 1]
+  const h = parseInt(last[1], 10)
+  const m = parseInt(last[2], 10)
   if (h < 0 || h > 23 || m < 0 || m > 59) return null
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
@@ -115,7 +138,7 @@ function inferSmartTime(kind: ItemKind, text: string, index: number, total: numb
 export function inferTimelineItem(text: string, index: number, total?: number): TimelineItem {
   const kind = inferKind(text)
   const icon = inferIcon(text, kind)
-  const time = extractTime(text) || inferSmartTime(kind, text, index, total ?? (index + 3))
+  const time = extractTime(text, kind) || inferSmartTime(kind, text, index, total ?? (index + 3))
 
   return {
     label: text,
