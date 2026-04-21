@@ -53,26 +53,11 @@ function inferIcon(text: string, kind: ItemKind): string {
   return defaultIcons[kind]
 }
 
-// --- Time estimation ---
-
-const DAY_START_HOUR = 8
-const DAY_START_MIN = 30
-const GAP_MINUTES = 100 // ~1h40m between items
-const MAX_HOUR = 21
-
-function inferTime(index: number): string {
-  const totalMinutes = DAY_START_HOUR * 60 + DAY_START_MIN + index * GAP_MINUTES
-  const capped = Math.min(totalMinutes, MAX_HOUR * 60)
-  const h = Math.floor(capped / 60)
-  const m = capped % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-// --- Main export ---
+// --- Time estimation (kind-aware) ---
 
 /**
  * Try to extract a time from text like:
- *  "已預約17:00" "已預約19:30晚餐" "8:00出發" "17：00按摩"
+ *  "已預約17:00" "8:00出發" "長榮 BR257 7:20~10:35"
  */
 function extractTime(text: string): string | null {
   const match = text.match(/(\d{1,2})[：:](\d{2})/)
@@ -83,10 +68,54 @@ function extractTime(text: string): string | null {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-export function inferTimelineItem(text: string, index: number): TimelineItem {
+/**
+ * Smart time estimation based on item kind and position.
+ * Uses realistic travel schedule anchors:
+ *   早餐 ~07:30, 出發 ~08:00-09:00, 午餐 ~12:00, 下午茶 ~15:00,
+ *   晚餐 ~18:30, check in ~16:00-17:00, 夜間活動 ~19:00-20:00
+ */
+function inferSmartTime(kind: ItemKind, text: string, index: number, total: number): string {
+  // Anchor times for known meal types
+  if (/早餐/.test(text)) return '07:30'
+  if (/午餐/.test(text)) return '12:00'
+  if (/下午茶|芒果|甜點|點心/.test(text)) return '15:00'
+  if (/晚餐/.test(text)) return '18:30'
+  if (/人妖秀|夜間|night/i.test(text)) return '20:00'
+  if (/check\s*in|入住/i.test(text)) return '16:00'
+  if (/按摩|spa/i.test(text)) return '17:00'
+
+  // For non-anchored items, distribute based on position in the day
+  // Morning items (before lunch): 08:00 - 11:30
+  // Afternoon items (after lunch): 13:30 - 17:30
+
+  // Find how many non-meal items there are and this item's position among them
+  const morningEnd = 11 * 60 + 30  // 11:30
+  const afternoonStart = 13 * 60 + 30  // 13:30
+  const eveningStart = 17 * 60 + 30  // 17:30
+
+  // Simple distribution: spread items across the day
+  const dayStart = 8 * 60  // 08:00
+  const dayEnd = 18 * 60   // 18:00
+  const slot = total > 1
+    ? dayStart + (index / (total - 1)) * (dayEnd - dayStart)
+    : dayStart + 60
+
+  // Skip lunch zone (12:00-13:00)
+  let adjusted = slot
+  if (adjusted >= 12 * 60 && adjusted < 13 * 60) {
+    adjusted = index < total / 2 ? 11 * 60 + 30 : 13 * 60 + 30
+  }
+
+  const capped = Math.min(Math.max(adjusted, dayStart), 21 * 60)
+  const h = Math.floor(capped / 60)
+  const m = Math.round((capped % 60) / 30) * 30
+  return `${String(h).padStart(2, '0')}:${String(m === 60 ? 0 : m).padStart(2, '0')}`
+}
+
+export function inferTimelineItem(text: string, index: number, total?: number): TimelineItem {
   const kind = inferKind(text)
   const icon = inferIcon(text, kind)
-  const time = extractTime(text) || inferTime(index)
+  const time = extractTime(text) || inferSmartTime(kind, text, index, total ?? (index + 3))
 
   return {
     label: text,

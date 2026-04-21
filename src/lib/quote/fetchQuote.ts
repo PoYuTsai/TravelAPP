@@ -173,7 +173,7 @@ export async function fetchQuoteBySlug(
   const itinerary = rawItinerary.map((day) => ({
     ...day,
     items: day.items.map((item, itemIndex) =>
-      inferTimelineItem(item, itemIndex)
+      inferTimelineItem(item, itemIndex, day.items.length)
     ),
   }))
 
