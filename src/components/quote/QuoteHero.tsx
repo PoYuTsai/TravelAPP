@@ -38,7 +38,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
   return (
     <section
       className="relative overflow-hidden"
-      style={{ minHeight: 'min(100vh, 960px)', background: '#0B0A08' }}
+      style={{ minHeight: 'min(100vh, 960px)', background: '#1a1814' }}
     >
       {/* ── Background layers ── */}
       <div className="absolute inset-0">
@@ -47,7 +47,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           alt=""
           fill
           className="object-cover"
-          style={{ filter: 'blur(3px) saturate(1.05)' }}
+          style={{ filter: 'blur(1.5px) saturate(1.1) brightness(1.1)' }}
           priority
         />
         {/* Rim blur */}
@@ -67,7 +67,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(180deg, rgba(11,10,8,0.55) 0%, rgba(11,10,8,0.20) 25%, rgba(11,10,8,0.18) 50%, rgba(11,10,8,0.62) 75%, rgba(11,10,8,0.94) 100%)',
+            background: 'linear-gradient(180deg, rgba(11,10,8,0.35) 0%, rgba(11,10,8,0.10) 25%, rgba(11,10,8,0.12) 50%, rgba(11,10,8,0.30) 75%, rgba(11,10,8,0.50) 100%)',
           }}
         />
         {/* Gold whisper */}
