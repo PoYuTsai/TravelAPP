@@ -14,6 +14,17 @@ import type { QuoteData, QuotePhoto } from './types'
 
 const SAMPLE_SLUG = 'sample'
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function minutesToTime(min: number): string {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 /**
  * Fallback: parse itineraryText into per-day items.
  *
@@ -170,12 +181,21 @@ export async function fetchQuoteBySlug(
     hotels,
   })
 
-  const itinerary = rawItinerary.map((day) => ({
-    ...day,
-    items: day.items.map((item, itemIndex) =>
+  const itinerary = rawItinerary.map((day) => {
+    const items = day.items.map((item, itemIndex) =>
       inferTimelineItem(item, itemIndex, day.items.length)
-    ),
-  }))
+    )
+    // 保證時間遞增：如果某項時間比前一項早，往後推 30 分鐘
+    for (let i = 1; i < items.length; i++) {
+      const prevMin = timeToMinutes(items[i - 1].time)
+      const currMin = timeToMinutes(items[i].time)
+      if (currMin <= prevMin) {
+        const newMin = Math.min(prevMin + 30, 22 * 60)
+        items[i] = { ...items[i], time: minutesToTime(newMin) }
+      }
+    }
+    return { ...day, items }
+  })
 
   // Read pre-computed quote snapshot if available
   const snapshot = data._quoteSnapshot ?? null

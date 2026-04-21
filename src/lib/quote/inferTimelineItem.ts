@@ -103,7 +103,8 @@ function inferSmartTime(kind: ItemKind, text: string, index: number, total: numb
   if (/午餐/.test(text)) return '12:00'
   if (/下午茶|芒果|甜點|點心/.test(text)) return '15:00'
   if (/晚餐/.test(text)) return '18:30'
-  if (/人妖秀|夜間|night/i.test(text)) return '20:00'
+  if (/人妖秀/i.test(text)) return '20:00'
+  if (/夜間|night/i.test(text)) return '16:30'  // 到達時間，非開場時間
   if (/check\s*in|入住/i.test(text)) return '16:00'
   if (/按摩|spa/i.test(text)) return '17:00'
 
