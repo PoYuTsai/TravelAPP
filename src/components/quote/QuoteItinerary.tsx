@@ -7,7 +7,7 @@ import {
   useMotionValue,
   useSpring,
 } from 'framer-motion'
-import { ChevronUp, ChevronDown, X } from 'lucide-react'
+import { ChevronDown, X } from 'lucide-react'
 import type { QuoteData, QuoteItineraryDay } from '@/lib/quote/types'
 import { DayTimeline } from './DayTimeline'
 import { DayPhotos } from './DayPhotos'
@@ -215,19 +215,48 @@ function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeP
   return (
     <motion.button
       onClick={onClick}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.97 }}
       className="relative flex w-full items-center gap-4 pl-0 text-left"
       style={{ outline: 'none' }}
     >
-      <div
-        className="relative z-10 flex h-[58px] w-[58px] shrink-0 items-center justify-center rounded-full"
-        style={{
-          background: active ? '#0F0B05' : '#FDFBF4',
-          border: `2.5px solid ${active ? color : '#0F0B05'}`,
-        }}
-      >
-        <span className="text-[26px]">{glyph}</span>
+      {/* Circle with day color + glow */}
+      <div className="relative z-10 shrink-0">
+        {/* Glow ring */}
+        {active && (
+          <motion.span
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: color,
+              opacity: 0.3,
+              filter: 'blur(10px)',
+            }}
+            animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0.15, 0.3] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
+        <motion.div
+          className="relative flex h-[58px] w-[58px] items-center justify-center rounded-full"
+          style={{
+            background: `linear-gradient(135deg, ${color}dd, ${color})`,
+            border: `2.5px solid ${color}`,
+            boxShadow: active
+              ? `0 0 20px ${color}66, 0 4px 12px rgba(0,0,0,0.15)`
+              : `0 2px 8px rgba(0,0,0,0.1)`,
+          }}
+          animate={active ? { scale: [1, 1.05, 1] } : { scale: 1 }}
+          transition={active ? { duration: 3, repeat: Infinity, ease: 'easeInOut' } : {}}
+        >
+          <motion.span
+            className="text-[28px]"
+            style={{ filter: `drop-shadow(0 2px 4px rgba(0,0,0,0.3))` }}
+            animate={active ? { scale: [1, 1.15, 1], rotate: [0, -3, 3, 0] } : {}}
+            transition={active ? { duration: 3, repeat: Infinity, ease: 'easeInOut' } : {}}
+          >
+            {glyph}
+          </motion.span>
+        </motion.div>
       </div>
+
       <div className="min-w-0 flex-1">
         <div className="text-[10px] tracking-[0.2em]" style={{ color: '#7A6F5C' }}>
           DAY {String(index + 1).padStart(2, '0')}
@@ -239,11 +268,8 @@ function PathNodeMobile({ index, day, color, glyph, active, onClick }: PathNodeP
           {day.title}
         </div>
       </div>
-      {active ? (
-        <ChevronUp size={20} className="shrink-0" style={{ color: '#7A6F5C' }} />
-      ) : (
-        <ChevronDown size={20} className="shrink-0" style={{ color: '#7A6F5C' }} />
-      )}
+      {/* Arrow — always pointing down to "go to this day" */}
+      <ChevronDown size={20} className="shrink-0" style={{ color: active ? color : '#7A6F5C' }} />
     </motion.button>
   )
 }
@@ -361,19 +387,25 @@ export function QuoteItinerary({ quote }: Props) {
   )
   const timelineRef = useRef<HTMLDivElement>(null)
 
-  const toggle = (i: number) => {
-    // 確保該天展開
+  const scrollToDay = (i: number) => {
+    // 確保展開，然後滾動
     setExpandedDays(prev => {
       const next = new Set(prev)
-      if (next.has(i)) next.delete(i)
-      else next.add(i)
+      next.add(i) // 只加不刪 — 點擊永遠是「去到那天」
       return next
     })
-    // 滾動到該天的內容
     setTimeout(() => {
       const el = document.getElementById(`day-detail-${i}`)
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
+    }, 150)
+  }
+
+  const collapseDay = (i: number) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev)
+      next.delete(i)
+      return next
+    })
   }
   // Backward compat — activeDay for PathNode highlight
   const activeDay = expandedDays.size === 1 ? Array.from(expandedDays)[0] : null
@@ -442,7 +474,7 @@ export function QuoteItinerary({ quote }: Props) {
                 color={DAY_COLORS[i % DAY_COLORS.length]}
                 glyph={inferGlyph(day.title, i)}
                 active={expandedDays.has(i)}
-                onClick={() => toggle(i)}
+                onClick={() => scrollToDay(i)}
               />
             ))}
           </div>
@@ -463,7 +495,7 @@ export function QuoteItinerary({ quote }: Props) {
                 color={DAY_COLORS[i % DAY_COLORS.length]}
                 glyph={inferGlyph(day.title, i)}
                 active={expandedDays.has(i)}
-                onClick={() => toggle(i)}
+                onClick={() => scrollToDay(i)}
               />
             ))}
           </div>
@@ -487,7 +519,7 @@ export function QuoteItinerary({ quote }: Props) {
                 dayIndex={i}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
                 photos={quote.photos}
-                onClose={() => toggle(i)}
+                onClose={() => collapseDay(i)}
                 timelineRef={timelineRef}
               />
             </motion.div>
