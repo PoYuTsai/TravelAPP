@@ -204,6 +204,7 @@ export async function fetchQuoteBySlug(
     photos: (doc.photos ?? []).filter(
       (p: QuotePhoto) => p.images?.length > 0
     ),
+    travelerLabel: snapshot?.travelerLabel || data.travelerLabel || undefined,
     isSample,
   }
 }

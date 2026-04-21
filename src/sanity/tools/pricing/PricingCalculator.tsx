@@ -1536,6 +1536,7 @@ interface SavedQuote {
     makeupCount?: number
     mealLevel?: number  // 餐費等級
     collectDeposit?: boolean
+    travelerLabel?: string
     outboundStayEnabled?: boolean
     outboundStayPerNight?: number
     outboundStayNights?: number
@@ -1561,6 +1562,7 @@ interface SavedQuote {
       hotelsWithDeposit: { name: string; deposit: number; rooms: number }[]
       totalDeposit: number
       carCount: number
+      travelerLabel?: string
     }
   }
 }
@@ -1762,6 +1764,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     config.dailyCarFees.length
   )
   // 外地住宿補貼（司機導遊過夜費用）
+  const [travelerLabel, setTravelerLabel] = useState('') // 旅客描述（選填，如「3位好友」）
   const [outboundStayEnabled, setOutboundStayEnabled] = useState(false)
   const [outboundStayPerNight, setOutboundStayPerNight] = useState(1500) // 泰銖/間/晚
   const [outboundStayNights, setOutboundStayNights] = useState(1)
@@ -2293,6 +2296,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         makeupCount,
         mealLevel,
         collectDeposit,
+        travelerLabel,
         outboundStayEnabled,
         outboundStayPerNight,
         outboundStayNights,
@@ -2336,6 +2340,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           })),
           totalDeposit: calculation.totalDeposit,
           carCount: calculation.carCount,
+          travelerLabel: travelerLabel || undefined,
         },
       },
     }
@@ -2537,6 +2542,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.makeupCount !== undefined) setMakeupCount(quote.data.makeupCount)
     if (quote.data.mealLevel !== undefined) setMealLevel(quote.data.mealLevel)
     if (quote.data.collectDeposit !== undefined) setCollectDeposit(quote.data.collectDeposit)
+    if (quote.data.travelerLabel !== undefined) setTravelerLabel(quote.data.travelerLabel)
     if (quote.data.outboundStayEnabled !== undefined) setOutboundStayEnabled(quote.data.outboundStayEnabled)
     if (quote.data.outboundStayPerNight !== undefined) setOutboundStayPerNight(quote.data.outboundStayPerNight)
     if (quote.data.outboundStayNights !== undefined) setOutboundStayNights(quote.data.outboundStayNights)
@@ -2624,6 +2630,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setGuideCostPerDay(config.guidePerDay.cost)
     setGuidePricePerDay(config.guidePerDay.price)
     setCollectDeposit(true)
+    setTravelerLabel('')
     setOutboundStayEnabled(false)
     setOutboundStayPerNight(1500)
     setOutboundStayNights(1)
@@ -3795,6 +3802,11 @@ Day 5｜送機
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <label style={{ fontWeight: 'bold' }}>匯率</label>
                 <input type="number" value={exchangeRate} onChange={e => setExchangeRate(Number(e.target.value))} min={0.85} max={1.05} step={0.01} style={{ ...inputStyle, width: 80 }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ fontWeight: 'bold' }}>旅客描述</label>
+                <input type="text" value={travelerLabel} onChange={e => setTravelerLabel(e.target.value)} placeholder={children > 0 ? `${adults}大${children}小` : `${people} 位貴賓`} style={{ ...inputStyle, width: 140 }} />
+                <span style={{ ...noteStyle, color: '#888' }}>選填，如「3位好友」</span>
               </div>
               {people < 1 && <span style={{ color: '#f44336', fontSize: 13 }}>⚠️ 最低 1 人（目前 {people} 人）</span>}
               <span style={{ ...noteStyle, fontWeight: 'bold', color: '#5c4a2a' }}>共 {people} 人</span>

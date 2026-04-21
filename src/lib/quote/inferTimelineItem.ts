@@ -39,7 +39,7 @@ const iconOverrides: { pattern: RegExp; icon: string }[] = [
   { pattern: /瀑布|水上|泳/i,             icon: 'Droplets' },
   { pattern: /動物園|safari/i,            icon: 'Moon' },
   { pattern: /夜市/i,                     icon: 'ShoppingBag' },
-  { pattern: /寺|廟|temple/i,             icon: 'Building' },
+  { pattern: /寺|廟|temple|博物館|黑屋/i,   icon: 'Building' },
   { pattern: /攀岩|冒險|繩索|溜索/i,       icon: 'MountainSnow' },
   { pattern: /泰服|拍照|攝影/i,            icon: 'Camera' },
   { pattern: /按摩|spa/i,                 icon: 'Heart' },
@@ -70,10 +70,23 @@ function inferTime(index: number): string {
 
 // --- Main export ---
 
+/**
+ * Try to extract a time from text like:
+ *  "已預約17:00" "已預約19:30晚餐" "8:00出發" "17：00按摩"
+ */
+function extractTime(text: string): string | null {
+  const match = text.match(/(\d{1,2})[：:](\d{2})/)
+  if (!match) return null
+  const h = parseInt(match[1], 10)
+  const m = parseInt(match[2], 10)
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
 export function inferTimelineItem(text: string, index: number): TimelineItem {
   const kind = inferKind(text)
   const icon = inferIcon(text, kind)
-  const time = inferTime(index)
+  const time = extractTime(text) || inferTime(index)
 
   return {
     label: text,

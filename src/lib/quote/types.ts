@@ -39,5 +39,6 @@ export interface QuoteData {
 
   photos: QuotePhoto[]
 
+  travelerLabel?: string
   isSample: boolean
 }
