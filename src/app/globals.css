@@ -119,6 +119,15 @@ body[data-lightbox-open] #floating-line-button {
   animation: dash-flow 2.5s linear infinite;
 }
 
+/* Van driving animation */
+@keyframes vanDrive {
+  0% { left: 2%; top: 0px; }
+  25% { left: 25%; top: -12px; }
+  50% { left: 50%; top: 0px; }
+  75% { left: 75%; top: -8px; }
+  100% { left: 95%; top: 0px; }
+}
+
 /* Pulse ring (expanding circle) */
 @keyframes pulse-ring {
   0% { transform: scale(1); opacity: 0.7; }

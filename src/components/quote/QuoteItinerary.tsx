@@ -461,6 +461,21 @@ export function QuoteItinerary({ quote }: Props) {
             viewBox="0 0 1000 60"
             preserveAspectRatio="none"
           >
+            <defs>
+              <filter id="road-glow">
+                <feGaussianBlur stdDeviation="3" />
+              </filter>
+            </defs>
+            {/* Glow layer */}
+            <path
+              d="M 40 30 Q 220 -10 400 30 T 760 30 T 960 30"
+              stroke="#FACC15"
+              strokeWidth="10"
+              fill="none"
+              opacity="0.15"
+              filter="url(#road-glow)"
+            />
+            {/* Animated dashed road */}
             <path
               d="M 40 30 Q 220 -10 400 30 T 760 30 T 960 30"
               stroke="#FACC15"
@@ -468,8 +483,24 @@ export function QuoteItinerary({ quote }: Props) {
               strokeDasharray="6 8"
               strokeLinecap="round"
               fill="none"
+              className="animate-dash-flow"
             />
           </svg>
+          {/* Van driving along the path */}
+          <div
+            className="pointer-events-none absolute top-[52px] left-0 right-0"
+            style={{ height: 40 }}
+          >
+            <div
+              className="absolute text-[22px]"
+              style={{
+                animation: 'vanDrive 12s linear infinite',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
+              }}
+            >
+              🚐
+            </div>
+          </div>
           <div
             className="relative grid gap-4"
             style={{
