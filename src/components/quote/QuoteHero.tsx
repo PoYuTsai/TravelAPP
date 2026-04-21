@@ -22,7 +22,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
       className="relative overflow-hidden"
       style={{ minHeight: 'min(100vh, 960px)', background: '#0B0A08' }}
     >
-      {/* ── Background: photo + depth-of-field layers ── */}
+      {/* ── Background layers ── */}
       <div className="absolute inset-0">
         <Image
           src="/images/hero-bg.jpg"
@@ -32,7 +32,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           style={{ filter: 'blur(3px) saturate(1.05)' }}
           priority
         />
-        {/* Rim blur layer */}
+        {/* Rim blur */}
         <div
           className="absolute inset-0"
           style={{
@@ -71,86 +71,69 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
       {/* ── Content ── */}
       <div className="relative z-10 mx-auto flex min-h-[min(100vh,960px)] max-w-5xl flex-col items-center justify-center px-6 py-16 md:px-10">
 
-        {/* ── Logo container (frosted glass capsule) ── */}
+        {/* ── Logo 大、無白框 ── */}
         <motion.div
+          className="flex flex-col items-center"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.15, ease }}
-          className="flex items-center gap-5 rounded-[32px] px-6 py-4 md:px-8 md:py-5"
-          style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05))',
-            backdropFilter: 'blur(44px) saturate(1.6)',
-            WebkitBackdropFilter: 'blur(44px) saturate(1.6)',
-            border: '1px solid rgba(255,255,255,0.3)',
-            boxShadow: '0 26px 60px rgba(0,0,0,0.52), inset 0 1.5px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(255,255,255,0.08)',
-          }}
         >
           <Image
             src="/images/logo.png"
             alt="清微旅行"
-            width={80}
-            height={80}
-            className="rounded-[20px] object-contain p-1.5"
+            width={120}
+            height={120}
+            className="rounded-3xl object-contain p-2"
             style={{
-              background: 'rgba(255,255,255,0.92)',
+              background: 'transparent',
+              filter: 'drop-shadow(0 8px 24px rgba(0,0,0,0.5))',
             }}
           />
-          <div>
-            <div
-              className="text-[11px] font-black tracking-[0.34em]"
-              style={{
-                color: '#FFD700',
-                fontFamily: 'var(--font-latin, sans-serif)',
-              }}
-            >
-              CHIANGWAY TRAVEL
-            </div>
-            <div
-              className="mt-1 font-black tracking-[0.18em]"
-              style={{
-                fontSize: 'clamp(22px, 2.6vw, 30px)',
-                color: '#FDFCF0',
-                fontFamily: 'var(--font-display, serif)',
-                textShadow: '0 2px 14px rgba(0,0,0,0.55)',
-              }}
-            >
-              清微旅行
-            </div>
-            <div
-              className="mt-0.5 text-[11px] tracking-[0.22em]"
-              style={{ color: 'rgba(255,255,255,0.62)' }}
-            >
-              爸媽開的 · 清邁親子包車
-            </div>
-          </div>
         </motion.div>
 
-        {/* ── Divider ── */}
+        {/* ── 品牌名 + 定位語 ── */}
         <motion.div
-          className="mx-auto my-8 flex items-center gap-4 md:my-10"
+          className="mt-5 text-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.35, duration: 0.5 }}
+          transition={{ delay: 0.25, duration: 0.5 }}
         >
-          <div className="h-[2px] w-10 rounded-full" style={{ background: '#FFD700' }} />
           <div
-            className="text-[12px] font-black tracking-[0.32em]"
-            style={{ color: '#FFD700', fontFamily: 'var(--font-latin, sans-serif)' }}
+            className="text-[26px] font-black tracking-[0.1em] md:text-[30px]"
+            style={{
+              color: '#FDFCF0',
+              fontFamily: 'var(--font-display, serif)',
+              textShadow: '0 2px 14px rgba(0,0,0,0.55)',
+            }}
           >
-            PRIVATE · FAMILY · ITINERARY
+            清微旅行
           </div>
-          <div className="h-[2px] w-10 rounded-full" style={{ background: '#FFD700' }} />
+          <div
+            className="mt-2 text-[14px] font-bold tracking-[0.15em] md:text-[15px]"
+            style={{ color: '#FFD700' }}
+          >
+            爸媽開的清邁親子包車
+          </div>
         </motion.div>
 
-        {/* ── Title ── */}
+        {/* ── 金色分隔線 ── */}
+        <motion.div
+          className="mx-auto my-7 h-[2px] w-16 rounded-full md:my-9"
+          style={{ background: 'rgba(255,215,0,0.5)' }}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.35, duration: 0.4 }}
+        />
+
+        {/* ── 標題 ── */}
         <motion.h1
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45, duration: 0.9, ease }}
           className="whitespace-pre-line text-center font-black leading-[1.04]"
           style={{
-            fontSize: 'clamp(38px, 7.8vw, 88px)',
-            letterSpacing: '0.045em',
+            fontSize: 'clamp(40px, 8vw, 92px)',
+            letterSpacing: '0.04em',
             fontFamily: 'var(--font-display, serif)',
             background: 'linear-gradient(180deg, #FDFCF0 0%, #F7EFD3 55%, #E8D9A7 100%)',
             WebkitBackgroundClip: 'text',
@@ -161,7 +144,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           {title}
         </motion.h1>
 
-        {/* ── Subtitle ── */}
+        {/* ── 副標題 ── */}
         <motion.p
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -172,7 +155,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           {subtitle}
         </motion.p>
 
-        {/* ── Client badge (customer mode only) ── */}
+        {/* ── 客戶專屬 badge ── */}
         {!isSample && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
