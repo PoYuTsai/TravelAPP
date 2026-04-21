@@ -213,16 +213,6 @@ function PolaroidCard({
             'linear-gradient(155deg, rgba(255,255,255,0.22) 0%, transparent 35%, transparent 65%, rgba(15,11,5,0.08) 100%)',
         }}
       />
-      {/* Tape decoration */}
-      <div
-        className="absolute -top-[12px] left-1/2 z-20 h-[18px] w-[54px] rounded-sm"
-        style={{
-          transform: 'translateX(-50%) rotate(-2deg)',
-          background: 'rgba(250,204,21,0.55)',
-          border: '1px solid rgba(15,11,5,0.12)',
-          boxShadow: '0 2px 6px rgba(15,11,5,0.12)',
-        }}
-      />
 
       {/* Photo area */}
       <div className="w-full" style={{ aspectRatio: '4/5' }}>
@@ -565,10 +555,10 @@ function MobilePhoto({
   const rotate = index % 2 === 0 ? -1.8 : 1.8
   return (
     <motion.div
-      initial={{ opacity: 0, y: 30, scale: 0.85 }}
-      whileInView={{ opacity: 1, y: 0, scale: 1 }}
-      viewport={{ once: false, amount: 0.3 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, y: 40, scale: 0.7 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1.02 }}
+      viewport={{ once: false, amount: 0.2 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       className="mx-auto my-5"
       style={{ width: '78%', transform: `rotate(${rotate}deg)` }}
     >
