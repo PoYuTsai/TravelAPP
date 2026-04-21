@@ -14,8 +14,8 @@ export function QuoteFooter({ isSample }: { isSample: boolean }) {
       >
         <ExternalLink size={14} /> chiangway-travel.com
       </a>
-      <div className="mt-4 text-[11px] tracking-[0.1em]" style={{ color: '#7A6F5C' }}>
-        &copy; {new Date().getFullYear()} 清微旅行 CHIANGWAY TRAVEL · 爸媽開的清邁親子包車
+      <div className="mt-3 text-[11px] tracking-[0.1em]" style={{ color: '#9A8E7E' }}>
+        清微旅行 · 爸媽開的清邁親子包車
       </div>
     </footer>
   )

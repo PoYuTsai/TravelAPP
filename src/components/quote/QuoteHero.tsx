@@ -99,8 +99,8 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           <Image
             src="/images/logo.png"
             alt="清微旅行"
-            width={120}
-            height={120}
+            width={140}
+            height={140}
             className="rounded-3xl object-contain p-2"
             style={{
               background: 'transparent',
