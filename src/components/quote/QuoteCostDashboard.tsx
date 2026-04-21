@@ -730,8 +730,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               />
             )}
 
-            {/* 5. Bank Transfer — customer only */}
-            {!isSample && <BankTransferSection />}
+            {/* Bank transfer removed — 匯款資訊改在 LINE 私訊提供 */}
           </div>
         )}
       </div>

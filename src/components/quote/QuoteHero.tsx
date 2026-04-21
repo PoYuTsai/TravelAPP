@@ -55,10 +55,10 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
           <Image
             src="/images/logo.png"
             alt="清微旅行"
-            width={72}
-            height={72}
-            className="rounded-2xl object-contain p-1.5"
-            style={{ background: '#FCD34D' }}
+            width={88}
+            height={88}
+            className="rounded-2xl object-contain p-2"
+            style={{ background: '#0F0B05' }}
           />
           <div
             className="mt-3 text-[20px] font-black tracking-[0.05em]"
