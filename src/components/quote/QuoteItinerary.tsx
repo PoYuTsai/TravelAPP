@@ -355,10 +355,22 @@ interface Props {
 }
 
 export function QuoteItinerary({ quote }: Props) {
-  const [activeDay, setActiveDay] = useState<number | null>(0)
+  // 預設展開所有天（手機直接往下滑看完）
+  const [expandedDays, setExpandedDays] = useState<Set<number>>(
+    () => new Set(quote.itinerary.map((_, i) => i))
+  )
   const timelineRef = useRef<HTMLDivElement>(null)
 
-  const toggle = (i: number) => setActiveDay(activeDay === i ? null : i)
+  const toggle = (i: number) => {
+    setExpandedDays(prev => {
+      const next = new Set(prev)
+      if (next.has(i)) next.delete(i)
+      else next.add(i)
+      return next
+    })
+  }
+  // Backward compat — activeDay for PathNode highlight
+  const activeDay = expandedDays.size === 1 ? Array.from(expandedDays)[0] : null
 
   return (
     <section
@@ -423,7 +435,7 @@ export function QuoteItinerary({ quote }: Props) {
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
                 glyph={inferGlyph(day.title, i)}
-                active={activeDay === i}
+                active={expandedDays.has(i)}
                 onClick={() => toggle(i)}
               />
             ))}
@@ -444,18 +456,19 @@ export function QuoteItinerary({ quote }: Props) {
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
                 glyph={inferGlyph(day.title, i)}
-                active={activeDay === i}
+                active={expandedDays.has(i)}
                 onClick={() => toggle(i)}
               />
             ))}
           </div>
         </div>
 
-        {/* Expanded day detail */}
-        <AnimatePresence mode="wait">
-          {activeDay !== null && (
+        {/* Expanded day details */}
+        <AnimatePresence>
+          {quote.itinerary.map((day, i) =>
+            expandedDays.has(i) ? (
             <motion.div
-              key={activeDay}
+              key={i}
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
@@ -463,15 +476,15 @@ export function QuoteItinerary({ quote }: Props) {
               className="mt-8 overflow-hidden"
             >
               <DayDetailCard
-                day={quote.itinerary[activeDay]}
-                dayIndex={activeDay}
-                color={DAY_COLORS[activeDay % DAY_COLORS.length]}
+                day={day}
+                dayIndex={i}
+                color={DAY_COLORS[i % DAY_COLORS.length]}
                 photos={quote.photos}
-                onClose={() => setActiveDay(null)}
+                onClose={() => toggle(i)}
                 timelineRef={timelineRef}
               />
             </motion.div>
-          )}
+          ) : null)}
         </AnimatePresence>
       </div>
     </section>

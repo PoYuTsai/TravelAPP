@@ -367,35 +367,21 @@ function TotalQuoteCard({
           {isSample ? '參考報價' : `${name} 專屬行程總報價`}
         </div>
 
-        {/* Big price */}
+        {/* Big price — NT$ prominent for Taiwan customers */}
         <div className="mt-6 flex flex-wrap items-end justify-center gap-3">
           <span
             className="font-black leading-[0.9]"
             style={{
-              fontSize: 'clamp(56px, 10vw, 110px)',
+              fontSize: 'clamp(48px, 9vw, 100px)',
               color: '#FACC15',
               letterSpacing: '-0.02em',
             }}
           >
-            {fmt(totalTHB)}
-          </span>
-          <span
-            className="pb-3 font-black"
-            style={{ fontSize: 'clamp(22px, 3vw, 32px)', color: '#FACC15' }}
-          >
-            THB
+            NT$ {fmt(totalTWD)}
           </span>
         </div>
-
-        {/* Exchange rate badge */}
-        <div
-          className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] tracking-[0.12em]"
-          style={{
-            background: 'rgba(253,251,244,0.08)',
-            border: '1px solid rgba(253,251,244,0.18)',
-          }}
-        >
-          <Calculator size={13} /> ≈ NT$ {fmt(totalTWD)} · 匯率 {exchangeRate.toFixed(3)}
+        <div className="mt-3 text-[16px] font-bold md:text-[18px]" style={{ color: 'rgba(253,251,244,0.6)' }}>
+          約 {fmt(totalTHB)} 泰銖 · 匯率 {exchangeRate.toFixed(3)}
         </div>
 
         {isSample && (
