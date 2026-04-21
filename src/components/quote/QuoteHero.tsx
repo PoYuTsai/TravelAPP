@@ -6,16 +6,35 @@ import type { QuoteData } from '@/lib/quote/types'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
+/**
+ * 從後台名稱拆解客人名和行程描述
+ * 格式：「客人名-行程描述」或「客人名」
+ * 例如：「林小姐-清邁4天3夜」→ { client: '林小姐', trip: '清邁4天3夜' }
+ *       「清邁親子5天4夜經典套餐」→ { client: null, trip: '清邁親子5天4夜經典套餐' }
+ */
+function parseQuoteName(name: string): { client: string | null; trip: string } {
+  const sep = name.indexOf('-')
+  if (sep > 0 && sep < name.length - 1) {
+    return { client: name.slice(0, sep).trim(), trip: name.slice(sep + 1).trim() }
+  }
+  return { client: null, trip: name }
+}
+
 export function QuoteHero({ quote }: { quote: QuoteData }) {
   const { tripDays, tripNights, isSample } = quote
+  const { client, trip } = parseQuoteName(quote.name)
 
+  // 標題：行程描述（自動換行）
   const title = isSample
     ? `清邁親子\n${tripDays}天${tripNights}夜經典套餐`
-    : `清邁親子\n${tripDays}天${tripNights}夜`
+    : trip.replace(/(\d+天\d+夜)/, '\n$1') // 在「X天X夜」前換行
 
   const subtitle = isSample
     ? '2大2小 · 經典路線'
     : `${quote.adults}大${quote.children}小${quote.createdAt ? ` · ${formatDateRange(quote.createdAt)}` : ''}`
+
+  // 客戶名：從 name 拆出，或 null（sample 模式）
+  const clientName = isSample ? null : client
 
   return (
     <section
@@ -156,7 +175,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
         </motion.p>
 
         {/* ── 客戶專屬 badge ── */}
-        {!isSample && (
+        {!isSample && clientName && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -189,7 +208,7 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
                 filter: 'drop-shadow(0 0 6px rgba(255,215,0,0.55)) drop-shadow(0 1px 0 rgba(90,60,10,0.55))',
               }}
             >
-              {quote.name} 專屬行程
+              {clientName} 專屬行程
             </span>
           </motion.div>
         )}
