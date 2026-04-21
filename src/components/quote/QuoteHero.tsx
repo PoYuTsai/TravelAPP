@@ -29,9 +29,9 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
     ? `清邁親子\n${tripDays}天${tripNights}夜經典套餐`
     : trip.replace(/(\d+天\d+夜)/, '\n$1') // 在「X天X夜」前換行
 
-  const subtitle = isSample
-    ? '2大2小 · 經典路線'
-    : `${quote.adults}大${quote.children}小${quote.createdAt ? ` · ${formatDateRange(quote.createdAt)}` : ''}`
+  const subtitle = quote.children > 0
+    ? `${quote.adults}大${quote.children}小`
+    : `${quote.adults}位旅客`
 
   // 客戶名：從 name 拆出，或 null（sample 模式）
   const clientName = isSample ? null : client
