@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-04-24 README / CLAUDE.md cleanup -->
+<!-- Last build trigger: 2026-04-24 CLAUDE.md 禁入表 + Common Pitfalls -->
