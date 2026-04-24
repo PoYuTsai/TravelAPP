@@ -7,6 +7,23 @@
 - **網站**: https://chiangway-travel.com
 - **技術架構**: Next.js 14 + Sanity CMS + Tailwind CSS
 
+> **本檔自律**：目標 ≤ 100 行、上限 120 行。超過請搬內容到 `docs/`。最後重審：2026-04-24。
+
+## 🚫 本檔禁入（違反視同 review 失敗）
+
+| 禁止內容 | 正確去處 |
+|---------|---------|
+| Bug 修復記錄（`[YYYY-MM-DD] 症狀/修復`） | `docs/plans/` 對應計畫檔 |
+| 已完成功能清單 | `git log` |
+| 單次 commit/PR 的實作細節 | PR description |
+| 第三方服務配置詳情（Sanity project ID / webhook 步驟） | `docs/` 對應設定檔 |
+| SEO 文章大綱草稿 | 直接生成到 `src/` 或 Sanity Studio |
+| Session 特定除錯過程 | `~/.claude/learnings/cross-project-tech/` 跨專案踩雷 |
+| 與全域 `~/.claude/CLAUDE.md` 重複的規則（Green Discipline、Git 安全、模型選擇、Superpowers 流程） | 刪除本地副本，靠全域注入 |
+| 未實作的設計藍圖（含從他專案借鑑的 spec） | 等對方實作驗證後再搬，或放 `docs/plans/` 標註 `status: draft` |
+
+**保鮮期原則**：硬規則加「保鮮期到 YYYY-MM-DD」或「保留條件」。到期或條件消失即刪。
+
 ## 品牌定位（2026-04 定稿）
 
 - **核心差異化（一個詞）**：「爸媽開的」—— 台灣爸爸 Eric × 泰國媽媽 Min，住在清邁、自己也帶小孩
@@ -58,6 +75,13 @@ LINE 聊聊行程 ↓
 | `comprehensive-review` | `/comprehensive-review` | 10 角色全面審查網站（架構、UX、SEO、資安等）|
 
 審查的執行流程、角色定義、SOP、歷史記錄都在 `.claude/skills/comprehensive-review.md` 裡，不重複。
+
+## ⚠️ Common Pitfalls（現役，真的會再踩）
+
+保鮮期原則：若某條 Pitfall 連續 3 個月沒再踩 + 已在 code 層面防呆，就刪掉。
+
+- **Discord bot 上線但「耳聾」**（2026-04-24 實戰）→ 雙根因：(1) 全域 `~/.claude/settings.json` 停用了 discord plugin；(2) start.sh 用錯 `--channels server:discord` 語法。
+  正解：專案 `.claude/settings.local.json` 加 `enabledPlugins` 陣列 override 全域停用；start.sh 用 `--channels plugin:discord@claude-plugins-official`（不是 `server:discord`）。跨專案踩雷全集 + TL;DR 推薦模式：`~/.claude/learnings/cross-project-tech/discord-plugin-gotchas.md`。
 
 ## 工作流程
 
