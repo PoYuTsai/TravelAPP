@@ -37,18 +37,19 @@ describe('pricing external quote breakdown', () => {
       '行李加大車',
       '兒童安全座椅',
       '住宿',
-      '門票活動',
+      '票券 / 活動 / 代訂',
       '旅遊保險',
     ])
     expect(
-      breakdown.items.find((item) => item.label === '門票活動')?.description
-    ).toBe('2 項門票活動 + 泰服體驗')
+      breakdown.items.find((item) => item.label === '票券 / 活動 / 代訂')?.description
+    ).toBe('2 項票券 / 活動 / 代訂 + 泰服體驗')
     expect(
       breakdown.items.find((item) => item.label === '兒童安全座椅')?.description
     ).toBe('1 張 / 2 天')
     expect(breakdown.included).toContain('中文導遊')
     expect(breakdown.excluded).toContain('餐食')
     expect(breakdown.excluded).not.toContain('旅遊保險')
+    expect(breakdown.paymentNotes.join(' ')).toContain('票券、活動或代訂')
   })
 
   it('uses the real total price for TWD summary and removes auto split-payment percentages', () => {

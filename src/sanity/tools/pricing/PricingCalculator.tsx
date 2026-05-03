@@ -55,7 +55,12 @@ import {
   isThaiDressText,
   shouldOfferExtraPhotographer,
 } from './thaiDress'
-import { buildExternalQuoteBreakdown, type ExternalQuoteBreakdown } from './externalQuote'
+import {
+  ACTIVITY_BOOKING_LABEL,
+  COMPACT_ACTIVITY_BOOKING_LABEL,
+  buildExternalQuoteBreakdown,
+  type ExternalQuoteBreakdown,
+} from './externalQuote'
 import { getPricingResponsiveLayout } from './ui'
 
 async function loadHtml2Pdf() {
@@ -417,24 +422,24 @@ function downloadExternalQuote(
 
   // 計算各項金額
   const mealsAmount = c.mealCost  // 餐費
-  const actualTicketsAmount = c.ticketPrice + c.thaiDressPrice  // 真正的門票/泰服（不含保險）
+  const actualTicketsAmount = c.ticketPrice + c.thaiDressPrice  // 票券/活動/代訂/泰服（不含保險）
   const insuranceAmount = c.insuranceCost  // 保險
   const mealsTicketsAmount = mealsAmount + actualTicketsAmount + insuranceAmount  // 總和
   const carAmount = c.transportPrice  // 車導費用
 
   // 判斷勾選狀態（標籤用）
   const hasMeals = includeMeals && mealsAmount > 0
-  const hasActualTickets = actualTicketsAmount > 0  // 有門票或泰服
+  const hasActualTickets = actualTicketsAmount > 0  // 有票券/活動/代訂或泰服
   const hasInsurance = insuranceAmount > 0
   const hasMealsOrTicketsOrInsurance = hasMeals || hasActualTickets || hasInsurance
   const isCarOnly = !includeAccommodation && !hasMealsOrTicketsOrInsurance
 
-  // 動態標籤（只看餐費和門票，保險不影響標籤）
+  // 動態標籤（只看餐費和票券/活動/代訂，保險不影響標籤）
   const getMealsTicketsLabel = () => {
-    if (hasMeals && hasActualTickets) return '餐費＋門票'
+    if (hasMeals && hasActualTickets) return `餐費＋${COMPACT_ACTIVITY_BOOKING_LABEL}`
     if (hasMeals && hasInsurance && !hasActualTickets) return '餐費'
     if (hasMeals) return '餐費'
-    if (hasActualTickets) return '門票'
+    if (hasActualTickets) return COMPACT_ACTIVITY_BOOKING_LABEL
     if (hasInsurance) return '保險'
     return ''
   }
@@ -443,7 +448,7 @@ function downloadExternalQuote(
   const getMealsTicketsItems = () => {
     const items = []
     if (hasMeals) items.push('餐費')
-    if (hasActualTickets) items.push('門票活動、泰服')
+    if (hasActualTickets) items.push(`${ACTIVITY_BOOKING_LABEL}、泰服`)
     if (hasInsurance) items.push('保險')
     return items.join('、')
   }
@@ -716,7 +721,7 @@ function downloadExternalQuote(
 
         ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `
         <div class="price-row category">
-          <span>🎫 門票活動（${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
+          <span>🎫 ${ACTIVITY_BOOKING_LABEL}（${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
           <span>${fmt(c.ticketPrice + c.thaiDressPrice)} 泰銖</span>
         </div>
         ${c.selectedTickets.slice(0, 6).map((t: any) => `<div class="price-detail">• ${t.name.replace(/^D\\d /, '')} (成人${t.adultNum}+兒童${t.childNum}) ${fmt(t.calculatedPrice)}</div>`).join('')}
@@ -754,7 +759,7 @@ function downloadExternalQuote(
           ${includeMeals ? `<li>• ${c.mealDays}天餐食（每日預設午餐＋晚餐）</li>` : ''}
           <li>• 全程包車（${c.carCount}台）</li>
           ${includeGuide ? `<li>• 專業中文導遊</li>` : ''}
-          ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `<li>• ${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項門票活動</li>` : ''}
+          ${c.includeTickets && (c.selectedTickets.length > 0 || c.thaiDressPrice > 0) ? `<li>• ${c.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項${ACTIVITY_BOOKING_LABEL}</li>` : ''}
           ${c.insuranceCost > 0 ? `<li>• 旅遊保險</li>` : ''}
         </ul>
       </div>
@@ -764,7 +769,7 @@ function downloadExternalQuote(
           <li>• 來回機票</li>
           ${!includeAccommodation ? `<li>• 住宿</li>` : ''}
           ${!includeMeals ? `<li>• 餐費</li>` : ''}
-          ${c.selectedTickets.length === 0 ? `<li>• 門票（現場）</li>` : ''}
+          ${c.selectedTickets.length === 0 ? `<li>• ${ACTIVITY_BOOKING_LABEL}（現場付費）</li>` : ''}
           ${!includeGuide ? `<li>• 導遊</li>` : ''}
           <li>• 個人消費、小費</li>
         </ul>
@@ -792,7 +797,7 @@ function downloadExternalQuote(
         <div class="amount">💰 ${fmt(Math.round(carAmount * 0.7))} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span></div>
       </div>
       ` : includeAccommodation ? `
-      <!-- 有住宿：住宿 → 餐費/門票 → 車導全額 -->
+      <!-- 有住宿：住宿 → 餐費/票券/活動/代訂 → 車導全額 -->
       <div class="payment-phase">
         <div class="label">📍 第一階段｜住宿全額</div>
         <div class="timing">⏰ 出發前 1.5～2 個月</div>
@@ -821,7 +826,7 @@ function downloadExternalQuote(
         <div class="amount">💰 ${fmt(carAmount)} 泰銖 <span style="font-weight:normal;color:#666;">≈ NT$ ${fmt(Math.round(carAmount / exchangeRate))}</span></div>
       </div>
       ` : `
-      <!-- 無住宿但有餐費/門票：餐費/門票全額 → 車30%訂金 → 車70%尾款 -->
+      <!-- 無住宿但有餐費/票券/活動/代訂：餐費/票券/活動/代訂全額 → 車30%訂金 → 車70%尾款 -->
       <div class="payment-phase">
         <div class="label">📍 第一階段｜${getMealsTicketsLabel()}全額</div>
         <div class="timing">⏰ 出發前 1 個月</div>
@@ -902,7 +907,7 @@ function downloadExternalQuote(
         <div class="title">📋 退款政策</div>
         <div class="content">
           <strong>車導服務</strong>：14天前全額｜7-13天50%｜4-6天30%｜3天內不退<br />
-          <strong>住宿</strong>：依各飯店政策　<strong>門票餐費</strong>：訂購後不退
+          <strong>住宿</strong>：依各飯店政策　<strong>票券/活動/代訂/餐費</strong>：訂購後不退
         </div>
       </div>
     </div>
@@ -3829,7 +3834,7 @@ Day 5｜送機
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeTickets} onChange={e => setIncludeTickets(e.target.checked)} style={{ width: 16, height: 16 }} />
-                <span>🎫 含門票</span>
+                <span>🎫 含票券 / 活動 / 代訂</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                 <input type="checkbox" checked={includeInsurance} onChange={e => setIncludeInsurance(e.target.checked)} style={{ width: 16, height: 16 }} />
@@ -3982,7 +3987,7 @@ Day 5｜送機
                 💡 {[
                   !includeAccommodation && '住宿',
                   !includeMeals && '餐費',
-                  noActivitiesSelected && '門票/活動',
+                  noActivitiesSelected && ACTIVITY_BOOKING_LABEL,
                   !includeInsurance && '保險',
                   !includeGuide && '導遊'
                 ].filter(Boolean).join('、')}由客人自理
@@ -4648,21 +4653,21 @@ Day 5｜送機
           </Section>
 
 
-          {/* 門票 */}
-          <Section title={`🎫 門票活動${!useDefaultTickets ? '（解析自行程）' : ''}${!includeTickets ? '（客人自理）' : ''}`} style={!includeTickets ? { opacity: 0.5 } : {}}>
+          {/* 票券 / 活動 / 代訂 */}
+          <Section title={`🎫 ${ACTIVITY_BOOKING_LABEL}${!useDefaultTickets ? '（解析自行程）' : ''}${!includeTickets ? '（客人自理）' : ''}`} style={!includeTickets ? { opacity: 0.5 } : {}}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 {variantUi.showTicketRefundSplitNote && (
                   <p style={{ ...noteStyle, margin: 0 }}>★ = 退款對分</p>
                 )}
-                {/* 門票管理按鈕 */}
+                {/* 票券 / 活動 / 代訂管理按鈕 */}
                 <button
                   onClick={() => setShowTicketManager(!showTicketManager)}
                   style={{ padding: '4px 8px', background: showTicketManager ? '#5c4a2a' : '#9e9e9e', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
                 >
-                  ⚙️ 管理門票
+                  ⚙️ 管理票券 / 代訂
                 </button>
-                {/* 切換按鈕：解析門票 ↔ 預設門票 */}
+                {/* 切換按鈕：解析票券 ↔ 預設票券 */}
                 {!useDefaultTickets && (
                   <button
                     onClick={() => {
@@ -4672,7 +4677,7 @@ Day 5｜送機
                     }}
                     style={{ padding: '4px 8px', background: '#607d8b', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
                   >
-                    🔄 回預設門票
+                    🔄 回預設票券
                   </button>
                 )}
                 {useDefaultTickets && savedParsedTickets.length > 0 && (
@@ -4683,7 +4688,7 @@ Day 5｜送機
                     }}
                     style={{ padding: '4px 8px', background: '#1976d2', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 11 }}
                   >
-                    📋 回解析門票
+                    📋 回解析票券
                   </button>
                 )}
               </div>
@@ -4706,16 +4711,16 @@ Day 5｜送機
             </div>
             {noActivitiesSelected && (
               <div style={{ background: '#fff3e0', padding: 10, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
-                💡 門票/活動由客人現場付給導遊
+                💡 票券 / 活動 / 代訂由客人現場付給導遊
               </div>
             )}
 
-            {/* 門票管理面板 - 全域設定 */}
+            {/* 票券 / 活動 / 代訂管理面板 - 全域設定 */}
             {showTicketManager && (
               <div style={{ background: '#e8f5e9', border: '2px solid #4caf50', borderRadius: 8, padding: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <div>
-                    <h4 style={{ margin: 0, color: '#2e7d32' }}>💾 全域門票設定</h4>
+                    <h4 style={{ margin: 0, color: '#2e7d32' }}>💾 全域票券 / 活動 / 代訂設定</h4>
                     <p style={{ margin: '4px 0 0 0', fontSize: 11, color: '#666' }}>修改此處 = 儲存為新行程的預設值（自動儲存）</p>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -4723,7 +4728,7 @@ Day 5｜送機
                       onClick={() => {
                         const newTicket: DynamicTicket = {
                           id: `custom-${Date.now()}`,
-                          name: '新門票',
+                          name: '新票券 / 代訂',
                           price: 0,
                           childPrice: undefined,
                           rebate: 0,
@@ -4738,11 +4743,11 @@ Day 5｜送機
                       }}
                       style={{ padding: '6px 12px', background: '#4caf50', color: 'white', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}
                     >
-                      ➕ 新增門票
+                      ➕ 新增票券 / 代訂
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('確定要重置為預設門票嗎？所有自訂的門票都會被清除。')) {
+                        if (confirm('確定要重置為預設票券 / 活動 / 代訂嗎？所有自訂項目都會被清除。')) {
                           const defaults = resetTicketsToDefault(ticketStorageKey, defaultTickets)
                           setBaseTickets(defaults)
                           setTickets(defaults.map(t => ({ ...t, checked: false })))
@@ -4875,7 +4880,7 @@ Day 5｜送機
             <div style={{ background: '#fff3e0', padding: 8, borderRadius: 6, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 14 }}>📋</span>
               <span style={{ fontSize: 13, fontWeight: 'bold', color: '#e65100' }}>當前報價</span>
-              <span style={{ fontSize: 11, color: '#666' }}>— 勾選門票後可調整數量和價格（不影響全域設定）</span>
+              <span style={{ fontSize: 11, color: '#666' }}>— 勾選項目後可調整數量和價格（不影響全域設定）</span>
             </div>
 
             {/* 按日期分組顯示（當有解析結果時） */}
@@ -5196,7 +5201,7 @@ Day 5｜送機
             </tbody>
           </table>
 
-          {/* 門票活動 - 統一格式 */}
+          {/* 票券 / 活動 / 代訂 - 統一格式 */}
           <table style={{ width: '100%', minWidth: responsive.internalTableMinWidth, borderCollapse: 'collapse', fontSize: 13, marginTop: 16 }}>
             <thead>
               <tr style={{ background: '#f5f5f5' }}>
@@ -5207,7 +5212,7 @@ Day 5｜送機
               </tr>
             </thead>
             <tbody>
-              <SectionRow title={`🎫 門票活動`} />
+              <SectionRow title={`🎫 ${ACTIVITY_BOOKING_LABEL}`} />
               {calculation.selectedTickets.map((t: any, i: number) => (
                 <DataRow
                   key={i}
@@ -5249,7 +5254,7 @@ Day 5｜送機
                   />
                 )
               })()}
-              <SubtotalRow name="門票+泰服總計" cost={calculation.ticketCost + calculation.thaiDressCost} price={calculation.ticketPrice + calculation.thaiDressPrice} profit={calculation.ticketYourProfit + calculation.ticketPartnerProfit + calculation.thaiDressYourProfit + calculation.thaiDressPartnerProfit} />
+              <SubtotalRow name={`${COMPACT_ACTIVITY_BOOKING_LABEL}+泰服總計`} cost={calculation.ticketCost + calculation.thaiDressCost} price={calculation.ticketPrice + calculation.thaiDressPrice} profit={calculation.ticketYourProfit + calculation.ticketPartnerProfit + calculation.thaiDressYourProfit + calculation.thaiDressPartnerProfit} />
               {variantUi.showLegacyPartnerProfitRows && (
                 <>
                   <tr style={{ background: '#c8e6c9' }}>
@@ -5460,11 +5465,11 @@ Day 5｜送機
                 {calculation.outboundStayCost > 0 && <><br />• 外地住宿補貼 {outboundStayRooms}間 × {outboundStayNights}晚</>}
               </div>
 
-              {/* 門票+泰服明細（合併顯示） */}
+              {/* 票券 / 活動 / 代訂 + 泰服明細（合併顯示） */}
               {includeTickets && (calculation.selectedTickets.length > 0 || calculation.thaiDressPrice > 0) && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8, marginTop: 12 }}>
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🎫 門票活動（{calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
+                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🎫 {ACTIVITY_BOOKING_LABEL}（{calculation.selectedTickets.length + (thaiDressCloth || thaiDressPhoto || makeupCount > 0 ? 1 : 0)}項）</span>
                     <span style={{ fontWeight: 'bold' }}>{fmt(calculation.ticketPrice + calculation.thaiDressPrice)} 泰銖</span>
                   </div>
                   <div style={{ paddingLeft: 16, fontSize: 12, color: '#555', lineHeight: 1.8 }}>
@@ -5514,7 +5519,7 @@ Day 5｜送機
                 {includeMeals && <>• {calculation.mealDays}天餐食（每日預設午餐＋晚餐）<br /></>}
                 • 全程包車（{calculation.carCount}台）<br />
                 {includeGuide && <>• 專業中文導遊<br /></>}
-                {includeTickets && calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項門票活動<br /></>}
+                {includeTickets && calculation.selectedTickets.length > 0 && <>• {calculation.selectedTickets.length}項{ACTIVITY_BOOKING_LABEL}<br /></>}
                 {includeTickets && calculation.thaiDressPrice > 0 && <>• 泰服體驗<br /></>}
                 {calculation.insuranceCost > 0 && <>• 旅遊保險</>}
               </div>
@@ -5525,7 +5530,7 @@ Day 5｜送機
                 • 來回機票<br />
                 {!includeAccommodation && <>• 住宿<br /></>}
                 {!includeMeals && <>• 餐費<br /></>}
-                {calculation.selectedTickets.length === 0 && <>• 門票（現場付費）<br /></>}
+                {calculation.selectedTickets.length === 0 && <>• {ACTIVITY_BOOKING_LABEL}（現場付費）<br /></>}
                 {!includeGuide && <>• 導遊<br /></>}
                 • 個人消費<br />
                                 • 小費
@@ -5537,24 +5542,24 @@ Day 5｜送機
           {(() => {
             // 計算各項金額
             const mealsAmount = calculation.mealCost
-            const actualTicketsAmount = calculation.ticketPrice + calculation.thaiDressPrice  // 真正的門票/泰服（不含保險）
+            const actualTicketsAmount = calculation.ticketPrice + calculation.thaiDressPrice  // 票券/活動/代訂/泰服（不含保險）
             const insuranceAmount = calculation.insuranceCost
             const mealsTicketsAmount = mealsAmount + actualTicketsAmount + insuranceAmount  // 總額
             const carAmount = calculation.transportPrice
 
             // 判斷勾選狀態（標籤用）
             const hasMeals = includeMeals && mealsAmount > 0
-            const hasActualTickets = actualTicketsAmount > 0  // 有門票或泰服
+            const hasActualTickets = actualTicketsAmount > 0  // 有票券/活動/代訂或泰服
             const hasInsurance = insuranceAmount > 0
             const hasMealsOrTicketsOrInsurance = hasMeals || hasActualTickets || hasInsurance
             const isCarOnly = !includeAccommodation && !hasMealsOrTicketsOrInsurance
 
-            // 動態標籤（只看餐費和門票，保險不影響標籤）
+            // 動態標籤（只看餐費和票券/活動/代訂，保險不影響標籤）
             const getMealsTicketsLabel = () => {
-              if (hasMeals && hasActualTickets) return '餐費＋門票'
-              if (hasMeals && hasInsurance && !hasActualTickets) return '餐費'  // 有餐費+保險但沒門票
+              if (hasMeals && hasActualTickets) return `餐費＋${COMPACT_ACTIVITY_BOOKING_LABEL}`
+              if (hasMeals && hasInsurance && !hasActualTickets) return '餐費'  // 有餐費+保險但沒票券/活動/代訂
               if (hasMeals) return '餐費'
-              if (hasActualTickets) return '門票'
+              if (hasActualTickets) return COMPACT_ACTIVITY_BOOKING_LABEL
               if (hasInsurance) return '保險'  // 只有保險（邊緣情況）
               return ''
             }
@@ -5562,7 +5567,7 @@ Day 5｜送機
             const getMealsTicketsItems = () => {
               const items = []
               if (hasMeals) items.push('餐費')
-              if (hasActualTickets) items.push('門票活動、泰服')
+              if (hasActualTickets) items.push(`${ACTIVITY_BOOKING_LABEL}、泰服`)
               if (hasInsurance) items.push('保險')
               return items.join('、')
             }
@@ -5598,7 +5603,7 @@ Day 5｜送機
                   </>
                 ) : includeAccommodation ? (
                   <>
-                    {/* 有住宿：住宿 → 餐費/門票 → 車導全額 */}
+                    {/* 有住宿：住宿 → 餐費/票券/活動/代訂 → 車導全額 */}
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 4 }}>📍 第一階段｜住宿全額</div>
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1.5～2 個月</div>
@@ -5640,7 +5645,7 @@ Day 5｜送機
                   </>
                 ) : (
                   <>
-                    {/* 無住宿但有餐費/門票：餐費/門票全額 → 車30%訂金 → 車70%尾款 */}
+                    {/* 無住宿但有餐費/票券/活動/代訂：餐費/票券/活動/代訂全額 → 車30%訂金 → 車70%尾款 */}
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 4 }}>📍 第一階段｜{getMealsTicketsLabel()}全額</div>
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 出發前 1 個月</div>
@@ -5734,7 +5739,7 @@ Day 5｜送機
           {/* 實際收取金額摘要 */}
           {(() => {
             const mealsAmount = calculation.mealCost
-            const actualTicketsAmount = calculation.ticketPrice + calculation.thaiDressPrice  // 真正的門票/泰服
+            const actualTicketsAmount = calculation.ticketPrice + calculation.thaiDressPrice  // 票券/活動/代訂/泰服
             const insuranceAmount = calculation.insuranceCost
             const mealsTicketsAmount = mealsAmount + actualTicketsAmount + insuranceAmount
             const carAmount = calculation.transportPrice
@@ -5745,10 +5750,10 @@ Day 5｜送機
             const isCarOnly = !includeAccommodation && !hasMealsOrTicketsOrInsurance
 
             const getMealsTicketsLabel = () => {
-              if (hasMeals && hasActualTickets) return '餐費+門票'
+              if (hasMeals && hasActualTickets) return `餐費+${COMPACT_ACTIVITY_BOOKING_LABEL}`
               if (hasMeals && hasInsurance && !hasActualTickets) return '餐費'
               if (hasMeals) return '餐費'
-              if (hasActualTickets) return '門票'
+              if (hasActualTickets) return COMPACT_ACTIVITY_BOOKING_LABEL
               if (hasInsurance) return '保險'
               return ''
             }
@@ -5771,7 +5776,7 @@ Day 5｜送機
                     </>
                   ) : includeAccommodation ? (
                     <>
-                      {/* 有住宿：住宿 → 餐費/門票 → 車導 */}
+                      {/* 有住宿：住宿 → 餐費/票券/活動/代訂 → 車導 */}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>住宿</span>
                         <span>NT$ {fmt(Math.round(calculation.accommodationCost / exchangeRate))}</span>
@@ -5789,7 +5794,7 @@ Day 5｜送機
                     </>
                   ) : (
                     <>
-                      {/* 無住宿但有餐費/門票：餐費/門票 → 車30% → 車70% */}
+                      {/* 無住宿但有餐費/票券/活動/代訂：餐費/票券/活動/代訂 → 車30% → 車70% */}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>{getMealsTicketsLabel()}</span>
                         <span>NT$ {fmt(Math.round(mealsTicketsAmount / exchangeRate))}</span>
@@ -5830,7 +5835,7 @@ Day 5｜送機
                 • 4-6 天前取消：退款 30%<br />
                 • 3 天內取消：不予退款<br /><br />
                 <strong>【住宿】</strong>依各飯店取消政策為準<br />
-                <strong>【門票/餐費】</strong>訂購後恕不退款<br />
+                <strong>【票券/活動/代訂/餐費】</strong>訂購後恕不退款<br />
                 <strong>【不可抗力】</strong>天災、疫情、班機取消另案協商
               </div>
             </div>

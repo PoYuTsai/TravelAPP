@@ -41,6 +41,9 @@ export interface ExternalQuoteBreakdown {
   totalTWD: number
 }
 
+export const ACTIVITY_BOOKING_LABEL = '票券 / 活動 / 代訂'
+export const COMPACT_ACTIVITY_BOOKING_LABEL = '票券/活動/代訂'
+
 function toTwd(amountTHB: number, exchangeRate: number) {
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) return 0
   return Math.round(amountTHB / exchangeRate)
@@ -48,11 +51,11 @@ function toTwd(amountTHB: number, exchangeRate: number) {
 
 function getActivityDescription(selectedTicketCount: number, hasThaiDress: boolean) {
   if (selectedTicketCount > 0 && hasThaiDress) {
-    return `${selectedTicketCount} 項門票活動 + 泰服體驗`
+    return `${selectedTicketCount} 項${ACTIVITY_BOOKING_LABEL} + 泰服體驗`
   }
 
   if (selectedTicketCount > 0) {
-    return `${selectedTicketCount} 項門票活動`
+    return `${selectedTicketCount} 項${ACTIVITY_BOOKING_LABEL}`
   }
 
   if (hasThaiDress) {
@@ -123,7 +126,7 @@ export function buildExternalQuoteBreakdown(
 
   if (activityAmount > 0) {
     items.push({
-      label: '門票活動',
+      label: ACTIVITY_BOOKING_LABEL,
       amountTHB: activityAmount,
       amountTWD: toTwd(activityAmount, input.exchangeRate),
       description: getActivityDescription(input.selectedTicketCount, input.hasThaiDress),
@@ -142,7 +145,7 @@ export function buildExternalQuoteBreakdown(
   const excluded = [
     !input.includeAccommodation ? '住宿' : null,
     !input.includeMeals ? '餐食' : null,
-    activityAmount <= 0 ? '門票活動' : null,
+    activityAmount <= 0 ? ACTIVITY_BOOKING_LABEL : null,
     !input.includeGuide ? '中文導遊' : null,
     !input.includeInsurance ? '旅遊保險' : null,
     '機票',
@@ -157,7 +160,7 @@ export function buildExternalQuoteBreakdown(
 
   const paymentNotes = hasPrepaidItems
     ? [
-        '若本行程含住宿、門票或其他需預訂項目，付款時程將依實際預訂內容另行確認。',
+        '若本行程含住宿、票券、活動或代訂項目，付款時程將依實際預訂內容另行確認。',
         '實際付款節點與金額，請以報價單或雙方確認訊息為準。',
       ]
     : ['本行程付款方式可依雙方確認後安排。']
