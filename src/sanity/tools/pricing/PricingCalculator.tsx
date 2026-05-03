@@ -28,6 +28,7 @@ import {
   type PricingExampleDocument,
 } from './sharedExamples'
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
+import { buildParsedActivityTickets } from './activityTickets'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
   buildQuoteItinerary,
@@ -1935,66 +1936,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
     // 2. 根據匹配結果生成動態門票
     if (result.matched.length > 0) {
-      // 從匹配結果生成動態門票列表
-      const dynamicTickets: DynamicTicket[] = []
-      const addedGroups = new Set<string>()  // 追蹤已加入的互斥群組
-
-      for (const matched of result.matched) {
-        // 找對應的 DEFAULT_TICKET 範本
-        const template = defaultTickets.find(t =>
-          matched.activityName.includes(t.name) ||
-          t.name.includes(matched.activityName) ||
-          // 也嘗試用 id 匹配
-          matched.activityId.includes(t.id) ||
-          t.id.includes(matched.activityId.replace(/-/g, ''))
-        )
-
-        if (template) {
-          // 檢查互斥群組
-          if (template.exclusiveGroup) {
-            if (addedGroups.has(template.exclusiveGroup)) {
-              // 同群組已有項目，跳過
-              continue
-            }
-            addedGroups.add(template.exclusiveGroup)
-
-            // 加入整個互斥群組的所有選項
-            const groupTickets = defaultTickets.filter(t => t.exclusiveGroup === template.exclusiveGroup)
-            groupTickets.forEach(gt => {
-              dynamicTickets.push({
-                ...gt,
-                dayNumber: matched.dayNumber,
-                source: 'parsed',
-                checked: gt.id === template.id,  // 只勾選匹配到的那個
-              })
-            })
-          } else {
-            // 非互斥群組，直接加入
-            dynamicTickets.push({
-              ...template,
-              dayNumber: matched.dayNumber,
-              source: 'parsed',
-              checked: true,
-            })
-          }
-        } else {
-          // 沒有範本，從資料庫資料建立新門票
-          dynamicTickets.push({
-            id: matched.activityId,
-            name: matched.activityName,
-            price: matched.price,
-            rebate: matched.rebate,
-            split: matched.splitRebate,
-            checked: true,
-            dayNumber: matched.dayNumber,
-            source: 'parsed',
-            exclusiveGroup: matched.exclusiveGroup,
-          })
-        }
-      }
-
-      // 按 dayNumber 排序
-      dynamicTickets.sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
+      const dynamicTickets: DynamicTicket[] = buildParsedActivityTickets(result.matched, defaultTickets)
 
       // DEBUG: 顯示動態門票（勾選狀態）
       console.log('生成的動態門票:', dynamicTickets.map(t => `${t.name} (checked: ${t.checked})`))
