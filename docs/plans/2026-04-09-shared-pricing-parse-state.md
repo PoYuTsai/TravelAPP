@@ -70,3 +70,26 @@
 ### Commit
 
 - Fix: `bac4d33` `Fix parsed activity ticket mapping`
+
+## 2026-05-03 Update - Generic Ticket Label Dedup
+
+- Fixed duplicate activity labels where one stored ticket uses the base activity name and another default ticket adds a generic suffix like `門票`, `票券`, or `入場券`.
+- The matcher now treats `茵他儂國家公園` and `茵他儂國家公園門票` as the same activity for the same day.
+- When duplicate variants exist, the parser and UI ticket builder prefer the richer ticket template with a child price, preserving the correct `茵他儂國家公園門票` adult/child pricing.
+
+### Files Changed
+
+- `src/lib/itinerary/activity-matcher.ts`
+- `src/lib/itinerary/activity-matcher.test.ts`
+- `src/sanity/tools/pricing/activityTickets.ts`
+- `src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+
+### Verification
+
+- `npm.cmd run test:run -- src/lib/itinerary/activity-matcher.test.ts src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__ src/lib/itinerary/activity-matcher.test.ts`
+- `npm.cmd run build`
+
+### Commit
+
+- Fix: `7c0e18d` `Deduplicate generic activity ticket labels`

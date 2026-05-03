@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-05-03 parsed activity ticket mapping fix -->
+<!-- Last build trigger: 2026-05-03 generic activity ticket label dedup -->
