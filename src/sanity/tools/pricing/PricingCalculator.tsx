@@ -196,8 +196,8 @@ const CHILD_AGE_THRESHOLD = 12
 // 門票關鍵字對照表 - 用於智能匹配
 const TICKET_KEYWORDS: Record<string, string[]> = {
   // 大象
-  'elephant-meal': ['大象', 'elephant', '保護營', '湄登', '含餐', 'maetang'],
-  'elephant': ['大象', 'elephant', '保護營', '湄登', '不含餐', 'maetang'],
+  'elephant-meal': ['大象保護營', '象營', 'elephant camp', '保護營', '湄登', '含餐', 'maetang'],
+  'elephant': ['大象保護營', '象營', 'elephant camp', '保護營', '湄登', '不含餐', 'maetang'],
   // 射擊
   'shooting': ['射擊', 'shooting', '靶場', 'mae rim', '基本'],
   'shooting-pro': ['射擊', 'shooting', '靶場', '進階', 'pro'],
@@ -212,6 +212,12 @@ const TICKET_KEYWORDS: Record<string, string[]> = {
   // 其他活動
   'waterPark': ['水上樂園', '大峽谷', 'grand canyon', 'waterpark'],
   'nightSafari': ['夜間動物園', 'night safari', '動物園'],
+  'doiInthanon': ['茵他儂', '茵他儂國家公園', 'doi inthanon', 'inthanon', '主峰'],
+  'twoChedis': ['國王皇后雙塔', '雙龍塔', '雙塔', 'the two chedis', 'two chedis'],
+  'lampangLuangTemple': ['南邦鑾寺', 'wat phra that lampang luang', 'lampang luang'],
+  'lampangHorseCarriage3km': ['南邦馬車遊城', '馬車遊城', 'Museum Lampang', '3公里'],
+  'lampangHorseCarriage5km': ['南邦馬車遊城', '馬車遊城', 'Museum Lampang', '5公里'],
+  'lampangHorseCarriageCharter': ['南邦馬車遊城', '馬車遊城', 'Museum Lampang', '包車自由路線'],
   'zipline-a': ['叢林飛索', '叢林飛越', 'zipline', 'coaster', 'pong yang', '飛索'],
   'zipline-b': ['叢林飛索', '叢林飛越', 'zipline', 'eagle track'],
   'zipline-c': ['叢林飛索', '叢林飛越', 'zipline', 'flight of gibbon'],
@@ -226,7 +232,12 @@ const TICKET_KEYWORDS: Record<string, string[]> = {
   // 鳳凰冒險公園
   'phoenixPark': ['鳳凰', 'phoenix', '冒險公園', 'adventure park', 'phoenix adventure'],
   // 大象粑粑造紙公園
-  'elephantPoop': ['粑粑', '造紙', 'poop', 'paper', '大象粑粑', '造紙公園', 'elephant poop'],
+  'elephantPoop': ['粑粑', '便便', '造紙', 'poop', 'paper', '大象粑粑', '大象便便', '造紙公園', 'elephant poop'],
+  // 火車票代訂
+  'trainFirstLower': ['曼谷－清邁夜火車', '夜火車', '一等', '臥鋪', '下鋪', '冷氣'],
+  'trainFirstUpper': ['曼谷－清邁夜火車', '夜火車', '一等', '臥鋪', '上鋪', '冷氣'],
+  'trainSecondLower': ['曼谷－清邁夜火車', '夜火車', '二等', '臥鋪', '下鋪', '冷氣'],
+  'trainSecondUpper': ['曼谷－清邁夜火車', '夜火車', '二等', '臥鋪', '上鋪', '冷氣'],
   // 康托克帝王餐
   'khantoke': ['康托克', 'khantoke', '帝王餐', '帝王宴', '文化表演秀'],
   // 天使瀑布
@@ -252,6 +263,12 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   // 其他活動
   { id: 'waterPark', name: '水上樂園', price: 950, rebate: 250, split: true, checked: false, source: 'default' },
   { id: 'nightSafari', name: '夜間動物園', price: 1200, rebate: 550, split: true, checked: false, source: 'default' },
+  { id: 'doiInthanon', name: '茵他儂國家公園門票', price: 300, childPrice: 150, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'twoChedis', name: '國王皇后雙塔', price: 100, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'lampangLuangTemple', name: '南邦鑾寺', price: 40, rebate: 0, split: false, checked: false, source: 'default' },
+  { id: 'lampangHorseCarriage3km', name: '活動｜南邦馬車遊城 3公里', price: 300, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'lampangHorseCarriage' },
+  { id: 'lampangHorseCarriage5km', name: '活動｜南邦馬車遊城 5公里', price: 400, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'lampangHorseCarriage' },
+  { id: 'lampangHorseCarriageCharter', name: '活動｜南邦馬車遊城 包車自由路線', price: 500, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'lampangHorseCarriage' },
   // 叢林飛索（三擇一）
   { id: 'zipline-a', name: '叢林飛索 A', price: 2400, rebate: 500, split: true, checked: false, source: 'default', exclusiveGroup: 'zipline' },
   { id: 'zipline-b', name: '叢林飛索 B', price: 2200, rebate: 450, split: true, checked: false, source: 'default', exclusiveGroup: 'zipline' },
@@ -270,6 +287,11 @@ const DEFAULT_TICKETS: DynamicTicket[] = [
   { id: 'phoenixPark', name: '鳳凰冒險公園', price: 90, rebate: 0, split: false, checked: false, source: 'default' },
   // 大象粑粑造紙公園
   { id: 'elephantPoop', name: '大象粑粑造紙公園', price: 200, rebate: 0, split: false, checked: false, source: 'default' },
+  // 火車票代訂
+  { id: 'trainFirstLower', name: '代訂｜曼谷－清邁夜火車 一等臥鋪冷氣 下鋪', price: 1653, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'bangkokChiangMaiTrain' },
+  { id: 'trainFirstUpper', name: '代訂｜曼谷－清邁夜火車 一等臥鋪冷氣 上鋪', price: 1453, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'bangkokChiangMaiTrain' },
+  { id: 'trainSecondLower', name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 下鋪', price: 1041, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'bangkokChiangMaiTrain' },
+  { id: 'trainSecondUpper', name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 上鋪', price: 941, rebate: 0, split: false, checked: false, source: 'default', exclusiveGroup: 'bangkokChiangMaiTrain' },
   // 康托克帝王餐
   { id: 'khantoke', name: '康托克帝王餐', price: 800, rebate: 150, split: true, checked: false, source: 'default' },
   // 天使瀑布
@@ -284,6 +306,17 @@ interface TicketConfig {
 
 function cloneTickets(tickets: DynamicTicket[]): DynamicTicket[] {
   return tickets.map((ticket) => ({ ...ticket }))
+}
+
+function mergeTicketsWithDefaults(tickets: DynamicTicket[], defaultTickets: DynamicTicket[]): DynamicTicket[] {
+  const existingIds = new Set(tickets.map((ticket) => ticket.id))
+  const missingDefaults = defaultTickets.filter((ticket) => !existingIds.has(ticket.id))
+  return [...cloneTickets(tickets), ...cloneTickets(missingDefaults)]
+}
+
+function loadTicketsOrDefaults(storageKey: string, defaultTickets: DynamicTicket[]): DynamicTicket[] {
+  const stored = loadTicketsFromStorage(storageKey)
+  return stored ? mergeTicketsWithDefaults(stored, defaultTickets) : cloneTickets(defaultTickets)
 }
 
 // 從 localStorage 載入自訂門票
@@ -367,8 +400,7 @@ function clearDraftFromStorage(storageKey: string) {
 // 將門票轉換為 ActivityRecord 格式（供匹配器使用）
 // 優先使用 localStorage 的自訂門票，否則用 DEFAULT_TICKETS
 function getActivitiesForMatching(storageKey: string, defaultTickets: DynamicTicket[]): ActivityRecord[] {
-  const storedTickets = loadTicketsFromStorage(storageKey)
-  const tickets = storedTickets || defaultTickets
+  const tickets = loadTicketsOrDefaults(storageKey, defaultTickets)
   return tickets.map(ticket => ({
     _id: ticket.id,
     name: ticket.name,
@@ -1737,12 +1769,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [mealLevel, setMealLevel] = useState(900)
   // 門票狀態 - 優先從 localStorage 載入
   const [tickets, setTickets] = useState<DynamicTicket[]>(() => {
-    const stored = loadTicketsFromStorage(ticketStorageKey)
-    return stored || cloneTickets(defaultTickets)
+    return loadTicketsOrDefaults(ticketStorageKey, defaultTickets)
   })
   const [baseTickets, setBaseTickets] = useState<DynamicTicket[]>(() => {
-    const stored = loadTicketsFromStorage(ticketStorageKey)
-    return stored || cloneTickets(defaultTickets)
+    return loadTicketsOrDefaults(ticketStorageKey, defaultTickets)
   })  // 基礎門票列表（用於管理面板編輯）
   const [showTicketManager, setShowTicketManager] = useState(false)  // 門票管理面板開關
   const [useDefaultTickets, setUseDefaultTickets] = useState(true)  // 是否使用預設門票（vs 解析後動態門票）

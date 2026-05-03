@@ -96,12 +96,15 @@ const ACTIVITY_INDICATORS = [
   '烹飪', 'cooking',
   '豬豬', '溜滑梯',
   '泰拳', 'muay thai',
-  '騎馬', 'horse', '馬場',
+  '騎馬', 'horse', '馬場', '馬車', '馬車遊城',
 
   // 特色景點/活動
   '康托克', 'khantoke', '帝王餐', '帝王宴', '文化表演',
   '天使瀑布', 'dantewada', '仙境造景',
-  '造紙', '粑粑', 'poop', 'paper park',
+  '造紙', '粑粑', '便便', 'poop', 'paper park',
+  '夜火車', '火車票', '臥鋪',
+  '茵他儂', 'doi inthanon', '國王皇后雙塔', '雙塔', '雙龍塔',
+  '南邦鑾寺', 'wat phra that lampang luang', 'museum lampang',
 ]
 
 /**
@@ -111,6 +114,7 @@ const ACTIVITY_INDICATORS = [
 const IGNORE_INDICATORS = [
   '關園', '關閉', '停業', '暫停',
   '休息', '整修', '維修', '取消',
+  '大象民宿', '大象叫澡', '大象叫早',
   'closed', 'closed temporarily',
 ]
 
@@ -127,6 +131,68 @@ function shouldIgnoreActivity(line: string): boolean {
   }
 
   return false
+}
+
+const DERIVED_NAME_KEYWORDS = [
+  '曼谷－清邁夜火車',
+  '曼谷-清邁夜火車',
+  '夜火車',
+  '火車票',
+  '臥鋪',
+  '一等',
+  '二等',
+  '上鋪',
+  '下鋪',
+  '南邦馬車遊城',
+  '馬車遊城',
+  '馬車',
+  '3公里',
+  '5公里',
+  '包車自由路線',
+  '茵他儂國家公園',
+  '茵他儂',
+  '國王皇后雙塔',
+  '雙龍塔',
+  '雙塔',
+  '南邦鑾寺',
+  'Wat Phra That Lampang Luang',
+  '大象便便',
+  '大象粑粑',
+  '造紙',
+  '鳳凰冒險公園',
+]
+
+const OPTION_DISCRIMINATORS = [
+  '一等',
+  '二等',
+  '上鋪',
+  '下鋪',
+  '3公里',
+  '5公里',
+  '包車自由路線',
+]
+
+function getActivityKeywords(activity: ActivityRecord): string[] {
+  const keywords = new Set(activity.keywords || [])
+  const normalizedName = activity.name.toLowerCase()
+
+  for (const keyword of DERIVED_NAME_KEYWORDS) {
+    if (normalizedName.includes(keyword.toLowerCase())) {
+      keywords.add(keyword)
+    }
+  }
+
+  return Array.from(keywords)
+}
+
+function hasMissingRequiredOption(text: string, activityName: string): boolean {
+  const normalizedText = text.toLowerCase()
+  const normalizedName = activityName.toLowerCase()
+  const requiredOptions = OPTION_DISCRIMINATORS.filter((option) =>
+    normalizedName.includes(option.toLowerCase())
+  )
+
+  return requiredOptions.some((option) => !normalizedText.includes(option.toLowerCase()))
 }
 
 /**
@@ -344,14 +410,19 @@ export function matchActivitiesToDatabase(
       const possibleActivities = extractPossibleActivities(activityText)
       if (possibleActivities.length === 0) continue
 
-      // 嘗試匹配資料庫中的活動
-      let bestMatch: { activity: ActivityRecord; score: number } | null = null
+      // 嘗試匹配資料庫中的活動；同一行可能包含多個票券，例如「茵他儂 + 雙塔」。
+      const scoredMatches: { activity: ActivityRecord; score: number; keywordCount: number }[] = []
 
       // DEBUG: 顯示正在匹配的文字
       console.log(`[Matcher] 嘗試匹配: "${activityText.slice(0, 30)}..."`)
 
       for (const activity of activeActivities) {
-        const score = calculateMatchScore(activityText, activity.keywords || [])
+        if (hasMissingRequiredOption(activityText, activity.name)) {
+          continue
+        }
+
+        const keywords = getActivityKeywords(activity)
+        const score = calculateMatchScore(activityText, keywords)
 
         // 也嘗試用活動名稱匹配
         const nameScore = activityText.toLowerCase().includes(activity.name.toLowerCase())
@@ -365,37 +436,53 @@ export function matchActivitiesToDatabase(
           console.log(`  → ${activity.name}: keywordScore=${score}, nameScore=${nameScore}, total=${totalScore}`)
         }
 
-        if (totalScore > 0 && (!bestMatch || totalScore > bestMatch.score)) {
-          bestMatch = { activity, score: totalScore }
+        if (totalScore > 0) {
+          scoredMatches.push({ activity, score: totalScore, keywordCount: keywords.length })
         }
       }
 
+      const bestScore = Math.max(0, ...scoredMatches.map((match) => match.score))
+      const matchesToAdd = scoredMatches
+        .filter((match) => match.score >= 6 || (match.score >= 3 && match.score >= bestScore * 0.5))
+        .sort((a, b) => b.score - a.score)
+
       // DEBUG: 顯示最終匹配結果
-      if (bestMatch) {
-        console.log(`  ✓ 最佳匹配: ${bestMatch.activity.name} (score=${bestMatch.score}, threshold=3)`)
+      if (matchesToAdd.length > 0) {
+        console.log(`  ✓ 匹配: ${matchesToAdd.map((match) => `${match.activity.name} (${match.score})`).join('、')}`)
       } else {
         console.log(`  ✗ 無匹配`)
       }
 
-      if (bestMatch && bestMatch.score >= 3) {
-        // 檢查是否已經匹配過同一個活動
-        const alreadyMatched = matched.some(
-          m => m.activityId === bestMatch!.activity._id && m.dayNumber === day.dayNumber
-        )
+      if (matchesToAdd.length > 0) {
+        const addedExclusiveGroups = new Set<string>()
+        for (const match of matchesToAdd) {
+          if (match.activity.exclusiveGroup && addedExclusiveGroups.has(match.activity.exclusiveGroup)) {
+            continue
+          }
 
-        if (!alreadyMatched) {
+          // 檢查是否已經匹配過同一個活動
+          const alreadyMatched = matched.some(
+            m => m.activityId === match.activity._id && m.dayNumber === day.dayNumber
+          )
+
+          if (alreadyMatched) continue
+
           matched.push({
-            activityId: bestMatch.activity._id,
-            activityName: bestMatch.activity.name,
+            activityId: match.activity._id,
+            activityName: match.activity.name,
             matchedText: activityText,
             dayNumber: day.dayNumber,
-            price: bestMatch.activity.adultPrice,
-            rebate: bestMatch.activity.rebate,
-            splitRebate: bestMatch.activity.splitRebate,
-            exclusiveGroup: bestMatch.activity.exclusiveGroup,
-            isDefaultInGroup: bestMatch.activity.isDefaultInGroup,
-            confidence: getConfidence(bestMatch.score, (bestMatch.activity.keywords || []).length),
+            price: match.activity.adultPrice,
+            rebate: match.activity.rebate,
+            splitRebate: match.activity.splitRebate,
+            exclusiveGroup: match.activity.exclusiveGroup,
+            isDefaultInGroup: match.activity.isDefaultInGroup,
+            confidence: getConfidence(match.score, match.keywordCount),
           })
+
+          if (match.activity.exclusiveGroup) {
+            addedExclusiveGroups.add(match.activity.exclusiveGroup)
+          }
         }
       } else {
         // 未匹配的活動
