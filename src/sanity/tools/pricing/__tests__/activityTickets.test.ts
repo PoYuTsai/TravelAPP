@@ -127,4 +127,45 @@ describe('activity ticket builder', () => {
       }),
     ])
   })
+
+  it('allows train upper and lower bunk tickets to be selected together with parsed counts', () => {
+    const matchedText = '火車票代訂：先以「二等臥鋪冷氣」估算，建議配置為 5 個下舖 + 5 個上舖，共 10 個床位。'
+    const tickets = buildParsedActivityTickets(
+      [
+        match({
+          activityId: 'trainSecondLower',
+          activityName: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 下鋪',
+          matchedText,
+          price: 1041,
+          exclusiveGroup: 'bangkokChiangMaiTrain',
+        }),
+        match({
+          activityId: 'trainSecondUpper',
+          activityName: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 上鋪',
+          matchedText,
+          price: 941,
+          exclusiveGroup: 'bangkokChiangMaiTrain',
+        }),
+      ],
+      [
+        { id: 'trainSecondLower', name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 下鋪', price: 1041, exclusiveGroup: 'bangkokChiangMaiTrain', ...baseTicket },
+        { id: 'trainSecondUpper', name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 上鋪', price: 941, exclusiveGroup: 'bangkokChiangMaiTrain', ...baseTicket },
+      ]
+    )
+
+    expect(tickets).toEqual([
+      expect.objectContaining({
+        id: 'trainSecondLower',
+        checked: true,
+        adultCount: 5,
+        childCount: 0,
+      }),
+      expect.objectContaining({
+        id: 'trainSecondUpper',
+        checked: true,
+        adultCount: 5,
+        childCount: 0,
+      }),
+    ])
+  })
 })

@@ -54,6 +54,55 @@ function getTicketPriority(ticket: ActivityTicketLike): number {
   return priority
 }
 
+const MULTI_SELECT_EXCLUSIVE_GROUPS = new Set(['bangkokChiangMaiTrain'])
+
+function shouldUseExclusiveGroup(group?: string): group is string {
+  return Boolean(group && !MULTI_SELECT_EXCLUSIVE_GROUPS.has(group))
+}
+
+function normalizeTrainText(text: string): string {
+  return text
+    .replace(/舖|铺/g, '鋪')
+    .replace(/卧/g, '臥')
+    .replace(/冷气/g, '冷氣')
+}
+
+function getTrainBunkLabel(activityName: string): '上鋪' | '下鋪' | undefined {
+  const normalizedName = normalizeTrainText(activityName)
+  if (normalizedName.includes('下鋪')) return '下鋪'
+  if (normalizedName.includes('上鋪')) return '上鋪'
+  return undefined
+}
+
+function getParsedTrainBunkCount(matched: MatchedActivity, activityName: string): number | undefined {
+  const bunkLabel = getTrainBunkLabel(activityName)
+  if (!bunkLabel) return undefined
+
+  const normalizedText = normalizeTrainText(matched.matchedText)
+  const countPatterns = [
+    new RegExp(`(\\d+)\\s*(?:個|位|張|床)?\\s*${bunkLabel}`),
+    new RegExp(`${bunkLabel}\\s*(?:約)?\\s*(\\d+)\\s*(?:個|位|張|床)?`),
+  ]
+
+  for (const pattern of countPatterns) {
+    const match = normalizedText.match(pattern)
+    if (match) return Number(match[1])
+  }
+
+  return undefined
+}
+
+function applyParsedCountOverrides<T extends ActivityTicketLike>(ticket: T, matched: MatchedActivity): T {
+  const trainBunkCount = getParsedTrainBunkCount(matched, ticket.name)
+  if (trainBunkCount === undefined) return ticket
+
+  return {
+    ...ticket,
+    adultCount: trainBunkCount,
+    childCount: 0,
+  }
+}
+
 function shouldReplaceDuplicateTicket(current: ActivityTicketLike, candidate: ActivityTicketLike): boolean {
   return getTicketPriority(candidate) > getTicketPriority(current)
 }
@@ -97,7 +146,7 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
   for (const matched of matches) {
     const template = getTicketTemplate(matched, defaultTickets)
 
-    if (template?.exclusiveGroup) {
+    if (template && shouldUseExclusiveGroup(template.exclusiveGroup)) {
       const groupKey = `${matched.dayNumber}:${template.exclusiveGroup}`
       if (addedGroups.has(groupKey)) continue
       addedGroups.add(groupKey)
@@ -110,7 +159,7 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
           source: 'parsed',
           checked: groupTicket.id === template.id,
         } as T
-        addTicket(parsedTicket)
+        addTicket(applyParsedCountOverrides(parsedTicket, matched))
       })
       continue
     }
@@ -124,7 +173,7 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
         } as T)
       : (getMatchedFallbackTicket(matched) as T)
 
-    addTicket(parsedTicket)
+    addTicket(applyParsedCountOverrides(parsedTicket, matched))
   }
 
   return dynamicTickets.sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))

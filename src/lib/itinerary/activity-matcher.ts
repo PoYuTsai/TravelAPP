@@ -126,6 +126,10 @@ const IGNORE_INDICATORS = [
  * 檢查行程文字是否應該被忽略（備註）
  */
 function shouldIgnoreActivity(line: string): boolean {
+  if (isActionableTrainBookingLine(line)) {
+    return false
+  }
+
   const normalized = line.toLowerCase()
 
   for (const indicator of IGNORE_INDICATORS) {
@@ -138,7 +142,34 @@ function shouldIgnoreActivity(line: string): boolean {
 }
 
 function normalizeMatchingText(text: string): string {
-  return text.toLowerCase().replace(/(\d)\s+公里/g, '$1公里')
+  return text
+    .toLowerCase()
+    .replace(/舖|铺/g, '鋪')
+    .replace(/卧/g, '臥')
+    .replace(/冷气/g, '冷氣')
+    .replace(/(\d)\s+公里/g, '$1公里')
+}
+
+function isActionableTrainBookingLine(line: string): boolean {
+  const normalized = normalizeMatchingText(line)
+  const hasTrainBooking = ['火車票', '夜火車', '臥鋪'].some((term) => normalized.includes(term))
+  const hasClass = ['一等', '二等'].some((term) => normalized.includes(term))
+  const hasBunk = ['上鋪', '下鋪'].some((term) => normalized.includes(term))
+  const hasBookingIntent = ['估算', '配置', '床位', '代訂'].some((term) => normalized.includes(term))
+  const hasBunkCount = [
+    /\d+\s*(?:個|位|張|床)\s*上鋪/,
+    /\d+\s*(?:個|位|張|床)\s*下鋪/,
+    /上鋪\s*(?:約)?\s*\d+\s*(?:個|位|張|床)/,
+    /下鋪\s*(?:約)?\s*\d+\s*(?:個|位|張|床)/,
+  ].some((pattern) => pattern.test(normalized))
+
+  return hasTrainBooking && hasClass && hasBunk && hasBookingIntent && hasBunkCount
+}
+
+const MULTI_SELECT_EXCLUSIVE_GROUPS = new Set(['bangkokChiangMaiTrain'])
+
+function shouldUseExclusiveGroup(group?: string): group is string {
+  return Boolean(group && !MULTI_SELECT_EXCLUSIVE_GROUPS.has(group))
 }
 
 function getActivityNameDedupKey(name: string): string {
@@ -493,7 +524,11 @@ export function matchActivitiesToDatabase(
       if (matchesToAdd.length > 0) {
         const addedExclusiveGroups = new Set<string>()
         for (const match of matchesToAdd) {
-          if (match.activity.exclusiveGroup && addedExclusiveGroups.has(match.activity.exclusiveGroup)) {
+          const exclusiveGroup = shouldUseExclusiveGroup(match.activity.exclusiveGroup)
+            ? match.activity.exclusiveGroup
+            : undefined
+
+          if (exclusiveGroup && addedExclusiveGroups.has(exclusiveGroup)) {
             continue
           }
 
@@ -519,8 +554,8 @@ export function matchActivitiesToDatabase(
             confidence: getConfidence(match.score, match.keywordCount),
           })
 
-          if (match.activity.exclusiveGroup) {
-            addedExclusiveGroups.add(match.activity.exclusiveGroup)
+          if (exclusiveGroup) {
+            addedExclusiveGroups.add(exclusiveGroup)
           }
         }
       } else {
@@ -591,7 +626,7 @@ export function handleExclusiveGroup(
   selectedActivities: MatchedActivity[],
   newSelection: MatchedActivity
 ): MatchedActivity[] {
-  if (!newSelection.exclusiveGroup) {
+  if (!shouldUseExclusiveGroup(newSelection.exclusiveGroup)) {
     // 沒有互斥群組，直接添加
     return [...selectedActivities, newSelection]
   }

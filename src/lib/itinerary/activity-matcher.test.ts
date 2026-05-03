@@ -84,6 +84,34 @@ describe('activity matcher', () => {
     ])
   })
 
+  it('matches train booking estimate lines with upper and lower bunks', () => {
+    const result = matchActivitiesToDatabase(
+      parseResult(['火車票代訂：先以「二等臥鋪冷氣」估算，建議配置為 5 個下舖 + 5 個上舖，共 10 個床位。']),
+      [
+        activity({
+          _id: 'trainSecondLower',
+          name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 下鋪',
+          keywords: ['曼谷－清邁夜火車', '夜火車', '二等', '臥鋪', '下鋪', '冷氣'],
+          adultPrice: 1041,
+          exclusiveGroup: 'bangkokChiangMaiTrain',
+        }),
+        activity({
+          _id: 'trainSecondUpper',
+          name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 上鋪',
+          keywords: ['曼谷－清邁夜火車', '夜火車', '二等', '臥鋪', '上鋪', '冷氣'],
+          adultPrice: 941,
+          exclusiveGroup: 'bangkokChiangMaiTrain',
+        }),
+      ]
+    )
+
+    expect(result.matched.map((match) => match.activityId)).toEqual([
+      'trainSecondLower',
+      'trainSecondUpper',
+    ])
+    expect(result.unmatched).toHaveLength(0)
+  })
+
   it('matches Lampang carriage and temple plus Doi Inthanon ticket keywords', () => {
     const result = matchActivitiesToDatabase(
       parseResult([
@@ -330,11 +358,10 @@ Day 4｜南邦一日
     ])
   })
 
-  it('does not treat train booking explanation notes as unmatched activities', () => {
+  it('does not treat train booking price explanation notes as unmatched activities', () => {
     const result = matchActivitiesToDatabase(
       parseResult([
         '火車票代訂：',
-        '先以「二等臥鋪冷氣」估算，建議配置為 5 個下舖 + 5 個上舖，共 10 個床位。',
         '參考票價：二等臥鋪冷氣下舖約 1,041 泰銖 / 位，上舖約 941 泰銖 / 位。',
         '若想升級一等臥鋪冷氣雙人包廂，參考票價為下舖約 1,653 泰銖 / 位、上舖約 1,453 泰銖 / 位。',
         '實際票價與床位配置需依泰鐵開票系統為準，無法保證一定搶到指定車次或指定上下舖。',
