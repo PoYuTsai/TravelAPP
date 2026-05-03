@@ -115,6 +115,10 @@ const IGNORE_INDICATORS = [
   '關園', '關閉', '停業', '暫停',
   '休息', '整修', '維修', '取消',
   '大象民宿', '大象叫澡', '大象叫早',
+  '火車票代訂', '參考票價', '建議配置',
+  '臥鋪冷氣」估算', '臥鋪冷氣估算',
+  '若想升級', '實際票價', '開票系統',
+  '無法保證', '指定車次', '指定上下舖',
   'closed', 'closed temporarily',
 ]
 
@@ -131,6 +135,10 @@ function shouldIgnoreActivity(line: string): boolean {
   }
 
   return false
+}
+
+function normalizeMatchingText(text: string): string {
+  return text.toLowerCase().replace(/(\d)\s+公里/g, '$1公里')
 }
 
 const DERIVED_NAME_KEYWORDS = [
@@ -174,10 +182,10 @@ const OPTION_DISCRIMINATORS = [
 
 function getActivityKeywords(activity: ActivityRecord): string[] {
   const keywords = new Set(activity.keywords || [])
-  const normalizedName = activity.name.toLowerCase()
+  const normalizedName = normalizeMatchingText(activity.name)
 
   for (const keyword of DERIVED_NAME_KEYWORDS) {
-    if (normalizedName.includes(keyword.toLowerCase())) {
+    if (normalizedName.includes(normalizeMatchingText(keyword))) {
       keywords.add(keyword)
     }
   }
@@ -186,13 +194,13 @@ function getActivityKeywords(activity: ActivityRecord): string[] {
 }
 
 function hasMissingRequiredOption(text: string, activityName: string): boolean {
-  const normalizedText = text.toLowerCase()
-  const normalizedName = activityName.toLowerCase()
+  const normalizedText = normalizeMatchingText(text)
+  const normalizedName = normalizeMatchingText(activityName)
   const requiredOptions = OPTION_DISCRIMINATORS.filter((option) =>
-    normalizedName.includes(option.toLowerCase())
+    normalizedName.includes(normalizeMatchingText(option))
   )
 
-  return requiredOptions.some((option) => !normalizedText.includes(option.toLowerCase()))
+  return requiredOptions.some((option) => !normalizedText.includes(normalizeMatchingText(option)))
 }
 
 /**
@@ -200,7 +208,7 @@ function hasMissingRequiredOption(text: string, activityName: string): boolean {
  */
 function extractPossibleActivities(line: string): string[] {
   const activities: string[] = []
-  const normalized = line.toLowerCase()
+  const normalized = normalizeMatchingText(line)
 
   // 先檢查是否應該忽略（備註中的關園、關閉等）
   if (shouldIgnoreActivity(line)) {
@@ -208,7 +216,7 @@ function extractPossibleActivities(line: string): string[] {
   }
 
   for (const indicator of ACTIVITY_INDICATORS) {
-    if (normalized.includes(indicator.toLowerCase())) {
+    if (normalized.includes(normalizeMatchingText(indicator))) {
       activities.push(line.trim())
       break
     }
@@ -301,8 +309,8 @@ function checkTypoMatch(text: string, keyword: string): boolean {
  * 2. TYPO_MAPPINGS 中定義的已知打錯字
  */
 function fuzzyMatch(text: string, keyword: string): { matched: boolean; score: number } {
-  const normalizedText = text.toLowerCase()
-  const normalizedKeyword = keyword.toLowerCase()
+  const normalizedText = normalizeMatchingText(text)
+  const normalizedKeyword = normalizeMatchingText(keyword)
 
   // 直接包含（精確匹配）
   if (normalizedText.includes(normalizedKeyword)) {
@@ -322,12 +330,12 @@ function fuzzyMatch(text: string, keyword: string): { matched: boolean; score: n
  * 計算兩個字串的匹配分數（含模糊匹配）
  */
 function calculateMatchScore(text: string, keywords: string[]): number {
-  const normalizedText = text.toLowerCase()
+  const normalizedText = normalizeMatchingText(text)
   let score = 0
   let matchedKeywords = 0
 
   for (const keyword of keywords) {
-    const normalizedKeyword = keyword.toLowerCase()
+    const normalizedKeyword = normalizeMatchingText(keyword)
 
     // 先嘗試精確匹配
     if (normalizedText.includes(normalizedKeyword)) {
@@ -425,7 +433,7 @@ export function matchActivitiesToDatabase(
         const score = calculateMatchScore(activityText, keywords)
 
         // 也嘗試用活動名稱匹配
-        const nameScore = activityText.toLowerCase().includes(activity.name.toLowerCase())
+        const nameScore = normalizeMatchingText(activityText).includes(normalizeMatchingText(activity.name))
           ? activity.name.length * 2
           : 0
 

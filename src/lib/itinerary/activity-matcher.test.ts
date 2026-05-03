@@ -241,5 +241,56 @@ Day 4｜南邦一日
       ])
     )
     expect(result.matched.map((match) => match.activityId)).not.toContain('elephant')
+    expect(result.unmatched.map((item) => item.text).join('\n')).not.toContain('火車票代訂')
+    expect(result.unmatched.map((item) => item.text).join('\n')).not.toContain('二等臥鋪冷氣')
+  })
+
+  it('matches Lampang 5 km carriage when the itinerary has a space before 公里', () => {
+    const result = matchActivitiesToDatabase(
+      parseResult(['南邦馬車遊城 5 公里（Museum Lampang 上車，先以 5 公里方案估算）']),
+      [
+        activity({
+          _id: 'lampangHorseCarriage3km',
+          name: '活動｜南邦馬車遊城 3公里',
+          keywords: ['南邦馬車遊城', '馬車遊城', '3公里'],
+          adultPrice: 300,
+        }),
+        activity({
+          _id: 'lampangHorseCarriage5km',
+          name: '活動｜南邦馬車遊城 5公里',
+          keywords: ['南邦馬車遊城', '馬車遊城', '5公里'],
+          adultPrice: 400,
+        }),
+      ]
+    )
+
+    expect(result.matched.map((match) => match.activityId)).toEqual(['lampangHorseCarriage5km'])
+  })
+
+  it('does not treat train booking explanation notes as unmatched activities', () => {
+    const result = matchActivitiesToDatabase(
+      parseResult([
+        '火車票代訂：',
+        '先以「二等臥鋪冷氣」估算，建議配置為 5 個下舖 + 5 個上舖，共 10 個床位。',
+        '參考票價：二等臥鋪冷氣下舖約 1,041 泰銖 / 位，上舖約 941 泰銖 / 位。',
+        '若想升級一等臥鋪冷氣雙人包廂，參考票價為下舖約 1,653 泰銖 / 位、上舖約 1,453 泰銖 / 位。',
+        '實際票價與床位配置需依泰鐵開票系統為準，無法保證一定搶到指定車次或指定上下舖。',
+      ]),
+      [
+        activity({
+          _id: 'trainSecondLower',
+          name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 下舖',
+          adultPrice: 1041,
+        }),
+        activity({
+          _id: 'trainSecondUpper',
+          name: '代訂｜曼谷－清邁夜火車 二等臥鋪冷氣 上舖',
+          adultPrice: 941,
+        }),
+      ]
+    )
+
+    expect(result.matched).toHaveLength(0)
+    expect(result.unmatched).toHaveLength(0)
   })
 })
