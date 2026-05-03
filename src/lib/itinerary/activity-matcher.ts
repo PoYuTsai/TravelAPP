@@ -141,6 +141,12 @@ function normalizeMatchingText(text: string): string {
   return text.toLowerCase().replace(/(\d)\s+公里/g, '$1公里')
 }
 
+function getActivityNameDedupKey(name: string): string {
+  return normalizeMatchingText(name)
+    .replace(/^(票券|活動|代訂)\s*[｜|]\s*/, '')
+    .replace(/\s+/g, '')
+}
+
 const DERIVED_NAME_KEYWORDS = [
   '曼谷－清邁夜火車',
   '曼谷-清邁夜火車',
@@ -468,10 +474,12 @@ export function matchActivitiesToDatabase(
             continue
           }
 
-          // 檢查是否已經匹配過同一個活動
-          const alreadyMatched = matched.some(
-            m => m.activityId === match.activity._id && m.dayNumber === day.dayNumber
-          )
+          // 同一天同名活動只保留最高分那筆，避免自訂票券和預設票券重複計算。
+          const currentNameKey = getActivityNameDedupKey(match.activity.name)
+          const alreadyMatched = matched.some((m) => (
+            m.dayNumber === day.dayNumber &&
+            (m.activityId === match.activity._id || getActivityNameDedupKey(m.activityName) === currentNameKey)
+          ))
 
           if (alreadyMatched) continue
 

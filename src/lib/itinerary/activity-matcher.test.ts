@@ -267,6 +267,37 @@ Day 4｜南邦一日
     expect(result.matched.map((match) => match.activityId)).toEqual(['lampangHorseCarriage5km'])
   })
 
+  it('deduplicates same-name activities matched from custom and default records on one day', () => {
+    const result = matchActivitiesToDatabase(
+      parseResult(['茵他儂國家公園主峰與雙龍塔']),
+      [
+        activity({
+          _id: 'customDoiInthanon',
+          name: '茵他儂國家公園門票',
+          keywords: ['茵他儂', '茵他儂國家公園'],
+          adultPrice: 300,
+        }),
+        activity({
+          _id: 'defaultDoiInthanon',
+          name: '茵他儂國家公園門票',
+          keywords: ['茵他儂', '茵他儂國家公園', '主峰'],
+          adultPrice: 300,
+        }),
+        activity({
+          _id: 'twoChedis',
+          name: '國王皇后雙塔',
+          keywords: ['雙龍塔', '雙塔', '國王皇后雙塔'],
+          adultPrice: 100,
+        }),
+      ]
+    )
+
+    expect(result.matched.map((match) => match.activityName)).toEqual([
+      '茵他儂國家公園門票',
+      '國王皇后雙塔',
+    ])
+  })
+
   it('does not treat train booking explanation notes as unmatched activities', () => {
     const result = matchActivitiesToDatabase(
       parseResult([
