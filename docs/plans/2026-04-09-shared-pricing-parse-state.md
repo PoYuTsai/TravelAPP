@@ -93,3 +93,27 @@
 ### Commit
 
 - Fix: `7c0e18d` `Deduplicate generic activity ticket labels`
+
+## 2026-05-04 Update - Train Ticket Parsing
+
+- Fixed train ticket parsing so actionable booking estimate lines are detected when they include train class, bunk type, and bunk counts.
+- `bangkokChiangMaiTrain` is now treated as a multi-select group, allowing upper and lower bunk tickets to be selected together instead of replacing each other.
+- Parsed train bunk counts now populate ticket quantities, so `5 個下舖 + 5 個上舖` becomes 5 lower-bunk tickets and 5 upper-bunk tickets.
+- Pure train price explanation notes remain ignored, so reference pricing text does not create unintended tickets.
+
+### Files Changed
+
+- `src/lib/itinerary/activity-matcher.ts`
+- `src/lib/itinerary/activity-matcher.test.ts`
+- `src/sanity/tools/pricing/activityTickets.ts`
+- `src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+
+### Verification
+
+- `npm.cmd run test:run -- src/lib/itinerary/activity-matcher.test.ts src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__ src/lib/itinerary/activity-matcher.test.ts`
+- `npm.cmd run build`
+
+### Commit
+
+- Fix: `de159a5` `Fix train ticket parsing`
