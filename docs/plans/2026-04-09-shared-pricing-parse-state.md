@@ -48,3 +48,25 @@
 ### Commit
 
 - Fix: `2babe22` `Deduplicate itinerary activity matches`
+
+## 2026-05-03 Update - Parsed Ticket Mapping
+
+- Fixed the UI ticket builder so parsed activity IDs are matched by exact normalized ID first, not substring matching.
+- This prevents `elephantPoop` from being mapped to the `elephant` ticket group, so `大象便便造紙公園` no longer selects `大象保護營`.
+- Added a second UI-layer deduplication guard for same-name tickets on the same day, so duplicate `茵他儂國家公園門票` records cannot reappear while rendering parsed tickets.
+
+### Files Changed
+
+- `src/sanity/tools/pricing/activityTickets.ts`
+- `src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+- `src/sanity/tools/pricing/PricingCalculator.tsx`
+
+### Verification
+
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__/activityTickets.test.ts`
+- `npm.cmd run test:run -- src/sanity/tools/pricing/__tests__ src/lib/itinerary/activity-matcher.test.ts`
+- `npm.cmd run build`
+
+### Commit
+
+- Fix: `bac4d33` `Fix parsed activity ticket mapping`
