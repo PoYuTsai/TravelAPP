@@ -144,7 +144,21 @@ function normalizeMatchingText(text: string): string {
 function getActivityNameDedupKey(name: string): string {
   return normalizeMatchingText(name)
     .replace(/^(票券|活動|代訂)\s*[｜|]\s*/, '')
+    .replace(/(門票|票券|入場券)$/g, '')
     .replace(/\s+/g, '')
+}
+
+function isPreferredActivityMatch(
+  candidate: { activity: ActivityRecord; score: number },
+  current: { activity: ActivityRecord; score: number }
+): boolean {
+  const candidateHasChildPrice = candidate.activity.childPrice !== undefined
+  const currentHasChildPrice = current.activity.childPrice !== undefined
+  if (candidateHasChildPrice !== currentHasChildPrice) {
+    return candidateHasChildPrice
+  }
+
+  return candidate.score > current.score
 }
 
 const DERIVED_NAME_KEYWORDS = [
@@ -456,9 +470,18 @@ export function matchActivitiesToDatabase(
       }
 
       const bestScore = Math.max(0, ...scoredMatches.map((match) => match.score))
-      const matchesToAdd = scoredMatches
+      const dedupedMatches = new Map<string, { activity: ActivityRecord; score: number; keywordCount: number }>()
+      scoredMatches
         .filter((match) => match.score >= 6 || (match.score >= 3 && match.score >= bestScore * 0.5))
-        .sort((a, b) => b.score - a.score)
+        .forEach((match) => {
+          const dedupKey = getActivityNameDedupKey(match.activity.name)
+          const currentMatch = dedupedMatches.get(dedupKey)
+          if (!currentMatch || isPreferredActivityMatch(match, currentMatch)) {
+            dedupedMatches.set(dedupKey, match)
+          }
+        })
+
+      const matchesToAdd = Array.from(dedupedMatches.values()).sort((a, b) => b.score - a.score)
 
       // DEBUG: 顯示最終匹配結果
       if (matchesToAdd.length > 0) {

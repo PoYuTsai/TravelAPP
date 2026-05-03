@@ -85,4 +85,46 @@ describe('activity ticket builder', () => {
       '國王皇后雙塔',
     ])
   })
+
+  it('deduplicates generic ticket suffix variants and keeps the child-price template', () => {
+    const tickets = buildParsedActivityTickets(
+      [
+        match({
+          activityId: 'customDoiInthanon',
+          activityName: '茵他儂國家公園',
+          dayNumber: 1,
+          price: 300,
+        }),
+        match({
+          activityId: 'doiInthanon',
+          activityName: '茵他儂國家公園門票',
+          dayNumber: 1,
+          price: 300,
+        }),
+        match({
+          activityId: 'twoChedis',
+          activityName: '國王皇后雙塔',
+          dayNumber: 1,
+          price: 100,
+        }),
+      ],
+      [
+        { id: 'customDoiInthanon', name: '茵他儂國家公園', price: 300, ...baseTicket },
+        { id: 'doiInthanon', name: '茵他儂國家公園門票', price: 300, childPrice: 150, ...baseTicket },
+        { id: 'twoChedis', name: '國王皇后雙塔', price: 100, ...baseTicket },
+      ]
+    )
+
+    expect(tickets).toEqual([
+      expect.objectContaining({
+        id: 'doiInthanon',
+        name: '茵他儂國家公園門票',
+        childPrice: 150,
+      }),
+      expect.objectContaining({
+        id: 'twoChedis',
+        name: '國王皇后雙塔',
+      }),
+    ])
+  })
 })

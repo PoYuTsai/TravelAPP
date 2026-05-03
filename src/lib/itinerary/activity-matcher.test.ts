@@ -298,6 +298,38 @@ Day 4｜南邦一日
     ])
   })
 
+  it('deduplicates generic ticket suffix variants for the same activity on one day', () => {
+    const result = matchActivitiesToDatabase(
+      parseResult(['茵他儂國家公園主峰與雙龍塔']),
+      [
+        activity({
+          _id: 'customDoiInthanon',
+          name: '茵他儂國家公園',
+          keywords: ['茵他儂', '茵他儂國家公園'],
+          adultPrice: 300,
+        }),
+        activity({
+          _id: 'doiInthanon',
+          name: '茵他儂國家公園門票',
+          keywords: ['茵他儂', '茵他儂國家公園', '主峰'],
+          adultPrice: 300,
+          childPrice: 150,
+        }),
+        activity({
+          _id: 'twoChedis',
+          name: '國王皇后雙塔',
+          keywords: ['雙龍塔', '雙塔', '國王皇后雙塔'],
+          adultPrice: 100,
+        }),
+      ]
+    )
+
+    expect(result.matched.map((match) => match.activityName)).toEqual([
+      '茵他儂國家公園門票',
+      '國王皇后雙塔',
+    ])
+  })
+
   it('does not treat train booking explanation notes as unmatched activities', () => {
     const result = matchActivitiesToDatabase(
       parseResult([

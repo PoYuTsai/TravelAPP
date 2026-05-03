@@ -26,6 +26,7 @@ function normalizeActivityName(name: string): string {
   return name
     .toLowerCase()
     .replace(/^(票券|活動|代訂)\s*[｜|]\s*/, '')
+    .replace(/(門票|票券|入場券)$/g, '')
     .replace(/\s+/g, '')
 }
 
@@ -43,6 +44,18 @@ function getTicketTemplate<T extends ActivityTicketLike>(
 
 function getDedupKey(ticket: Pick<ActivityTicketLike, 'name' | 'dayNumber'>): string {
   return `${ticket.dayNumber || 0}:${normalizeActivityName(ticket.name)}`
+}
+
+function getTicketPriority(ticket: ActivityTicketLike): number {
+  let priority = 0
+  if (ticket.childPrice !== undefined) priority += 4
+  if (/(門票|票券|入場券)$/.test(ticket.name)) priority += 1
+  if (ticket.priceNote) priority += 1
+  return priority
+}
+
+function shouldReplaceDuplicateTicket(current: ActivityTicketLike, candidate: ActivityTicketLike): boolean {
+  return getTicketPriority(candidate) > getTicketPriority(current)
 }
 
 function getMatchedFallbackTicket(matched: MatchedActivity): ActivityTicketLike {
@@ -65,7 +78,21 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
 ): T[] {
   const dynamicTickets: T[] = []
   const addedGroups = new Set<string>()
-  const addedTickets = new Set<string>()
+  const addedTicketIndexes = new Map<string, number>()
+
+  const addTicket = (ticket: T) => {
+    const dedupKey = getDedupKey(ticket)
+    const existingIndex = addedTicketIndexes.get(dedupKey)
+    if (existingIndex !== undefined) {
+      if (shouldReplaceDuplicateTicket(dynamicTickets[existingIndex], ticket)) {
+        dynamicTickets[existingIndex] = ticket
+      }
+      return
+    }
+
+    addedTicketIndexes.set(dedupKey, dynamicTickets.length)
+    dynamicTickets.push(ticket)
+  }
 
   for (const matched of matches) {
     const template = getTicketTemplate(matched, defaultTickets)
@@ -83,8 +110,7 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
           source: 'parsed',
           checked: groupTicket.id === template.id,
         } as T
-        dynamicTickets.push(parsedTicket)
-        addedTickets.add(getDedupKey(parsedTicket))
+        addTicket(parsedTicket)
       })
       continue
     }
@@ -98,11 +124,7 @@ export function buildParsedActivityTickets<T extends ActivityTicketLike>(
         } as T)
       : (getMatchedFallbackTicket(matched) as T)
 
-    const dedupKey = getDedupKey(parsedTicket)
-    if (addedTickets.has(dedupKey)) continue
-
-    dynamicTickets.push(parsedTicket)
-    addedTickets.add(dedupKey)
+    addTicket(parsedTicket)
   }
 
   return dynamicTickets.sort((a, b) => (a.dayNumber || 0) - (b.dayNumber || 0))
