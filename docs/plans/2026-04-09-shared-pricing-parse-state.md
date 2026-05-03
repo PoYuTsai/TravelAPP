@@ -27,3 +27,24 @@
 
 - Feature: `7fad4f5` `feat: restore saved pricing parse state`
 - Fix: `65082cd` `fix: detect thai dress day from parsed itinerary`
+
+## 2026-05-03 Update - Activity Match Dedup
+
+- Fixed duplicate ticket/activity matches when a custom database record and a default record share the same activity name on the same day.
+- The itinerary day title remains a summary label (`Day X｜...`), so repeating an activity keyword in the detailed itinerary is allowed and should not double-count the same ticket.
+- Added regression coverage for duplicate `茵他儂國家公園門票` matches while keeping distinct variants like train upper/lower bunks and horse carriage distances separate by name.
+
+### Files Changed
+
+- `src/lib/itinerary/activity-matcher.ts`
+- `src/lib/itinerary/activity-matcher.test.ts`
+
+### Verification
+
+- `npm.cmd run test:run -- src/lib/itinerary/activity-matcher.test.ts`
+- `npm.cmd run test:run -- src/lib/itinerary/activity-matcher.test.ts src/sanity/tools/pricing/__tests__`
+- `npm.cmd run build`
+
+### Commit
+
+- Fix: `2babe22` `Deduplicate itinerary activity matches`
