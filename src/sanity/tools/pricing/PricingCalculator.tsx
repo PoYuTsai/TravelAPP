@@ -1041,6 +1041,7 @@ function downloadSimpleExternalQuote(
     totalPrice: c.totalPrice,
     exchangeRate,
     totalNights,
+    accommodationRoomCount: c.includedAccommodationRoomCount,
     selfBookedAccommodationNights,
     mealDays: c.mealDays,
     guideDays: c.guideDays,
@@ -2983,6 +2984,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
       return sum + h.rooms[cat.key].reduce((catSum, subRoom) => catSum + subRoom.quantity, 0)
     }, 0)
+    const includedAccommodationRoomCount = quoteHotels.reduce((sum, h) => sum + getHotelRoomCount(h), 0)
 
     // 計算飯店總容量（含加床）
     const getHotelCapacity = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
@@ -3138,7 +3140,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     return {
       people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel, guideCostPerDay: guideRate.cost, guidePricePerDay: guideRate.price,
       includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, quoteHotels, hotelsWithDeposit, totalRoomCapacity,
-      includedAccommodationNights, selfBookedAccommodationNights,
+      includedAccommodationNights, includedAccommodationRoomCount, selfBookedAccommodationNights,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost, childSeatCost,
@@ -3175,6 +3177,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         totalPrice: calculation.totalPrice,
         exchangeRate,
         totalNights: calculation.includedAccommodationNights,
+        accommodationRoomCount: calculation.includedAccommodationRoomCount,
         selfBookedAccommodationNights: calculation.selfBookedAccommodationNights,
         mealDays: calculation.mealDays,
         guideDays: calculation.guideDays,

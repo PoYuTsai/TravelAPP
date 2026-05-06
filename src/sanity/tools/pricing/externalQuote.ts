@@ -15,6 +15,7 @@ export interface ExternalQuoteBreakdownInput {
   totalPrice: number
   exchangeRate: number
   totalNights: number
+  accommodationRoomCount?: number
   selfBookedAccommodationNights?: number
   mealDays: number
   guideDays: number
@@ -108,11 +109,16 @@ export function buildExternalQuoteBreakdown(
   }
 
   if (input.includeAccommodation && input.accommodationCost > 0) {
+    const roomDescription =
+      input.accommodationRoomCount && input.accommodationRoomCount > 0
+        ? `，共 ${input.accommodationRoomCount} 間房`
+        : ''
+
     items.push({
       label: '住宿',
       amountTHB: input.accommodationCost,
       amountTWD: toTwd(input.accommodationCost, input.exchangeRate),
-      description: `${input.totalNights} 晚`,
+      description: `${input.totalNights} 晚住宿${roomDescription}`,
     })
   }
 

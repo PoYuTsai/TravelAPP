@@ -105,6 +105,7 @@ describe('pricing external quote breakdown', () => {
       totalPrice: 12500,
       exchangeRate: 0.93,
       totalNights: 1,
+      accommodationRoomCount: 5,
       selfBookedAccommodationNights: 2,
       mealDays: 0,
       guideDays: 0,
@@ -117,7 +118,7 @@ describe('pricing external quote breakdown', () => {
     })
 
     const accommodationItem = breakdown.items.find((item) => item.amountTHB === 2500)
-    expect(accommodationItem?.description).toContain('1')
+    expect(accommodationItem?.description).toBe('1 晚住宿，共 5 間房')
     expect(breakdown.excluded.some((item) => item.includes('自理'))).toBe(true)
   })
 })
