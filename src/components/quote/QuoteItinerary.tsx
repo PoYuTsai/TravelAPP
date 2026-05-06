@@ -9,39 +9,11 @@ import {
 } from 'framer-motion'
 import { ChevronDown, X } from 'lucide-react'
 import type { QuoteData, QuoteItineraryDay } from '@/lib/quote/types'
+import { inferItineraryGlyph } from '@/lib/quote/itineraryGlyph'
 import { DayTimeline } from './DayTimeline'
 import { DayPhotos } from './DayPhotos'
 
 const DAY_COLORS = ['#E8A23B', '#4A6B3A', '#A8C8DC', '#CA8A04', '#B85C38', '#9333EA', '#059669', '#DC2626']
-
-const TITLE_GLYPHS: [RegExp, string][] = [
-  [/抵達|機場|接機/i, '🛬'],
-  [/送機|回國|返程/i, '✈️'],
-  [/大象/i, '🐘'],
-  [/水上|泳|水樂園|峽谷/i, '🏊'],
-  [/冒險|攀岩|繩索|叢林/i, '🎢'],
-  [/動物園|safari/i, '🦁'],
-  [/白廟|藍廟|黑廟|黑屋|博物館|寺|temple/i, '🏛️'],
-  [/清萊/i, '🏔️'],
-  [/夜市|市集|週末|週日|週六/i, '🎪'],
-  [/瀑布|黏黏/i, '💦'],
-  [/泰服|拍照|攝影/i, '📸'],
-  [/按摩|spa|SPA|放鬆/i, '💆'],
-  [/慢遊|收心|自由/i, '☀️'],
-  [/山|高山|茵他儂/i, '🏔️'],
-  [/海|沙灘|海邊/i, '🌴'],
-  [/料理|烹飪|廚藝/i, '🍳'],
-  [/咖啡|下午茶/i, '☕'],
-  [/湄林|親子/i, '👨‍👩‍👧‍👦'],
-]
-const DEFAULT_GLYPHS = ['🛬', '🐘', '🏊', '🎢', '✈️', '🏔️', '🌴', '🎪', '☀️', '💦']
-
-function inferGlyph(title: string, index: number): string {
-  for (const [pattern, glyph] of TITLE_GLYPHS) {
-    if (pattern.test(title)) return glyph
-  }
-  return DEFAULT_GLYPHS[index % DEFAULT_GLYPHS.length]
-}
 
 /* ===================================================================
    PathNode — 3D Magnetic Hover (HTML lines 369-454)
@@ -498,7 +470,7 @@ export function QuoteItinerary({ quote }: Props) {
                 index={i}
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
-                glyph={inferGlyph(day.title, i)}
+                glyph={inferItineraryGlyph(day, i)}
                 active={expandedDays.has(i)}
                 onClick={() => scrollToDay(i)}
               />
@@ -519,7 +491,7 @@ export function QuoteItinerary({ quote }: Props) {
                 index={i}
                 day={day}
                 color={DAY_COLORS[i % DAY_COLORS.length]}
-                glyph={inferGlyph(day.title, i)}
+                glyph={inferItineraryGlyph(day, i)}
                 active={expandedDays.has(i)}
                 onClick={() => scrollToDay(i)}
               />
