@@ -29,6 +29,7 @@ describe('pricing external quote breakdown', () => {
       totalChildSeatCount: 1,
       selectedTicketCount: 2,
       hasThaiDress: true,
+      travelerCount: 8,
     })
 
     expect(breakdown.items.map((item) => item.label)).toEqual([
@@ -46,6 +47,12 @@ describe('pricing external quote breakdown', () => {
     expect(
       breakdown.items.find((item) => item.label === '兒童安全座椅')?.description
     ).toBe('1 張 / 2 天')
+    expect(
+      breakdown.items.find((item) => item.label === '行李加大車')?.description
+    ).toBe('行李車放置行李')
+    expect(
+      breakdown.items.find((item) => item.label === '旅遊保險')?.description
+    ).toBe('共 8 位旅客')
     expect(breakdown.included).toContain('中文導遊')
     expect(breakdown.excluded).toContain('餐食')
     expect(breakdown.excluded).not.toContain('旅遊保險')

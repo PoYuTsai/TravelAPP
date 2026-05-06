@@ -17,11 +17,11 @@ import {
   Ticket,
   UserCheck,
   UtensilsCrossed,
-  ArrowUp,
   Droplets,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import type { QuoteData } from '@/lib/quote/types'
+import { getIncludedDisplayLabel } from '@/lib/quote/quoteDisplay'
 
 const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
@@ -62,9 +62,11 @@ function pickIcon(text: string, map: [RegExp, LucideIcon][], fallback: LucideIco
 function IncludedExcludedSection({
   included,
   excluded,
+  includedItems,
 }: {
   included: string[]
   excluded: string[]
+  includedItems: { label: string; description?: string }[]
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -113,6 +115,7 @@ function IncludedExcludedSection({
         <ul className="relative space-y-4">
           {included.map((item, i) => {
             const Icon = pickIcon(item, INCLUDED_ICON_MAP, Check)
+            const displayLabel = getIncludedDisplayLabel(item, includedItems)
             return (
               <motion.li
                 key={item}
@@ -133,7 +136,7 @@ function IncludedExcludedSection({
                     className="text-[15px] font-bold"
                     style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
                   >
-                    {item}
+                    {displayLabel}
                   </div>
                 </div>
               </motion.li>
@@ -605,7 +608,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
   const breakdown = quote.quote
 
   return (
-    <section className="relative overflow-hidden px-6 py-10 md:px-10 md:py-14">
+    <section id="quote-pricing" className="relative overflow-hidden px-6 py-10 md:px-10 md:py-14">
       {/* Background gradient (HTML line 1025-1027) */}
       <div
         className="pointer-events-none absolute inset-0 -z-10"
@@ -663,6 +666,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
             <IncludedExcludedSection
               included={breakdown.included}
               excluded={breakdown.excluded}
+              includedItems={breakdown.items}
             />
 
             {/* 2. Line Item Breakdown */}

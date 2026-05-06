@@ -1051,6 +1051,7 @@ function downloadSimpleExternalQuote(
     totalChildSeatCount: _babySeatCount + _childSeatCount,
     selectedTicketCount: c.selectedTickets.length,
     hasThaiDress: c.thaiDressPrice > 0,
+    travelerCount: _people,
   })
 
   const itineraryToShow =
@@ -3187,6 +3188,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         totalChildSeatCount,
         selectedTicketCount: includeTickets ? calculation.selectedTickets.length : 0,
         hasThaiDress: includeTickets ? calculation.thaiDressPrice > 0 : false,
+        travelerCount: calculation.people,
       })
 
       // 外地住宿補貼（獨立於客人住宿）

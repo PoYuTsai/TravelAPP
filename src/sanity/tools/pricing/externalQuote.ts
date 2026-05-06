@@ -25,6 +25,7 @@ export interface ExternalQuoteBreakdownInput {
   totalChildSeatCount: number
   selectedTicketCount: number
   hasThaiDress: boolean
+  travelerCount?: number
 }
 
 export interface ExternalQuoteBreakdownItem {
@@ -96,6 +97,7 @@ export function buildExternalQuoteBreakdown(
       label: '行李加大車',
       amountTHB: input.luggageCost,
       amountTWD: toTwd(input.luggageCost, input.exchangeRate),
+      description: '行李車放置行李',
     })
   }
 
@@ -145,6 +147,10 @@ export function buildExternalQuoteBreakdown(
       label: '旅遊保險',
       amountTHB: input.insuranceCost,
       amountTWD: toTwd(input.insuranceCost, input.exchangeRate),
+      description:
+        input.travelerCount && input.travelerCount > 0
+          ? `共 ${input.travelerCount} 位旅客`
+          : undefined,
     })
   }
 

@@ -11,6 +11,7 @@ const client = createClient({
 import { inferTimelineItem } from './inferTimelineItem'
 import { buildQuoteItinerary } from '@/sanity/tools/pricing/quoteDetails'
 import type { QuoteData, QuotePhoto } from './types'
+import { enhanceQuoteBreakdown } from './quoteDisplay'
 
 const SAMPLE_SLUG = 'sample'
 
@@ -199,7 +200,11 @@ export async function fetchQuoteBySlug(
 
   // Read pre-computed quote snapshot if available
   const snapshot = data._quoteSnapshot ?? null
-  const quote = snapshot?.externalQuote ?? null
+  const quote = enhanceQuoteBreakdown(snapshot?.externalQuote ?? null, {
+    hotels,
+    includeAccommodation,
+    travelerCount: adults + children,
+  })
 
   const isSample = slug === SAMPLE_SLUG
 
