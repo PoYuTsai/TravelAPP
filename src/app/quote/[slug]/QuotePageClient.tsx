@@ -8,6 +8,41 @@ import { QuoteItinerary } from '@/components/quote/QuoteItinerary'
 import { QuoteCostDashboard } from '@/components/quote/QuoteCostDashboard'
 import { QuoteFooter } from '@/components/quote/QuoteFooter'
 
+const SCROLL_DURATION_MS = 850
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+function scrollToSection(id: string) {
+  const element = document.getElementById(id)
+  if (!element) return
+
+  const shouldReduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const targetY = element.getBoundingClientRect().top + window.scrollY
+
+  if (shouldReduceMotion) {
+    window.scrollTo({ top: targetY })
+    return
+  }
+
+  const startY = window.scrollY
+  const distance = targetY - startY
+  const startTime = performance.now()
+
+  const step = (now: number) => {
+    const elapsed = now - startTime
+    const progress = Math.min(elapsed / SCROLL_DURATION_MS, 1)
+    window.scrollTo(0, startY + distance * easeOutCubic(progress))
+
+    if (progress < 1) {
+      requestAnimationFrame(step)
+    }
+  }
+
+  requestAnimationFrame(step)
+}
+
 function ScrollNavigationButtons() {
   const [showUp, setShowUp] = useState(false)
   const [showDown, setShowDown] = useState(false)
@@ -42,9 +77,7 @@ function ScrollNavigationButtons() {
     <div className="fixed bottom-8 right-5 z-50 flex flex-col gap-3">
       {showDown && (
         <button
-          onClick={() =>
-            document.getElementById('quote-pricing')?.scrollIntoView({ behavior: 'smooth' })
-          }
+          onClick={() => scrollToSection('quote-pricing')}
           className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
           style={{
             background: '#4A6B3A',
@@ -58,9 +91,7 @@ function ScrollNavigationButtons() {
       )}
       {showUp && (
         <button
-          onClick={() =>
-            document.getElementById('itinerary')?.scrollIntoView({ behavior: 'smooth' })
-          }
+          onClick={() => scrollToSection('itinerary')}
           className="flex h-14 w-14 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
           style={{
             background: '#FACC15',
