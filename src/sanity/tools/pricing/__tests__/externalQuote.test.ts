@@ -86,4 +86,38 @@ describe('pricing external quote breakdown', () => {
     expect(breakdown.paymentNotes.join(' ')).not.toContain('30%')
     expect(breakdown.paymentNotes.join(' ')).not.toContain('70%')
   })
+
+  it('keeps self-booked accommodation nights out of the included accommodation total', () => {
+    const breakdown = buildExternalQuoteBreakdown({
+      includeAccommodation: true,
+      includeMeals: false,
+      includeGuide: false,
+      includeInsurance: false,
+      accommodationCost: 2500,
+      mealCost: 0,
+      carPriceTotal: 10000,
+      guidePrice: 0,
+      luggageCost: 0,
+      childSeatCost: 0,
+      ticketPrice: 0,
+      thaiDressPrice: 0,
+      insuranceCost: 0,
+      totalPrice: 12500,
+      exchangeRate: 0.93,
+      totalNights: 1,
+      selfBookedAccommodationNights: 2,
+      mealDays: 0,
+      guideDays: 0,
+      carServiceDays: 3,
+      carCount: 1,
+      childSeatDays: 0,
+      totalChildSeatCount: 0,
+      selectedTicketCount: 0,
+      hasThaiDress: false,
+    })
+
+    const accommodationItem = breakdown.items.find((item) => item.amountTHB === 2500)
+    expect(accommodationItem?.description).toContain('1')
+    expect(breakdown.excluded.some((item) => item.includes('自理'))).toBe(true)
+  })
 })

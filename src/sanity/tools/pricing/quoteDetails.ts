@@ -54,6 +54,18 @@ interface QuoteDetailCarFee {
 
 interface QuoteDetailHotel {
   name: string
+  includeInQuote?: boolean
+}
+
+function isHotelIncludedInQuote(hotel: QuoteDetailHotel): boolean {
+  return hotel.includeInQuote !== false
+}
+
+function shouldShowHotelInQuote(hotelName: string | null, hotels: QuoteDetailHotel[]): boolean {
+  if (!hotelName) return false
+
+  const matchedHotel = hotels.find((hotel) => hotel.name === hotelName)
+  return matchedHotel ? isHotelIncludedInQuote(matchedHotel) : true
 }
 
 export function buildQuoteItinerary(params: {
@@ -68,14 +80,16 @@ export function buildQuoteItinerary(params: {
   if (parsedItinerary.length > 0) {
     return parsedItinerary.slice(0, tripDays).map((day) => ({
       ...day,
-      hotel: includeAccommodation ? day.hotel ?? null : null,
+      hotel: includeAccommodation && shouldShowHotelInQuote(day.hotel, hotels) ? day.hotel ?? null : null,
     }))
   }
+
+  const includedHotels = hotels.filter(isHotelIncludedInQuote)
 
   return carFees.map((carFee, index) => ({
     day: `DAY ${index + 1}${carFee.date ? ` (${carFee.date})` : ''}`,
     title: carFee.name || `第 ${index + 1} 天`,
     items: [],
-    hotel: includeAccommodation ? hotels[0]?.name ?? null : null,
+    hotel: includeAccommodation ? includedHotels[0]?.name ?? null : null,
   }))
 }

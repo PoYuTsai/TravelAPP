@@ -49,6 +49,7 @@ import {
   type SavedParseWarning,
   type SavedParsedItineraryDay,
 } from './savedQuoteState'
+import { movePhotoByKey } from './photoOrdering'
 import {
   detectThaiDressDay,
   getThaiDressPhotographerCount,
@@ -1004,7 +1005,7 @@ function downloadSimpleExternalQuote(
   c: any,
   _people: number,
   exchangeRate: number,
-  hotels: Hotel[],
+  _hotels: Hotel[],
   _mealLevel: number,
   _thaiDressCloth: boolean,
   _thaiDressPhoto: boolean,
@@ -1014,6 +1015,7 @@ function downloadSimpleExternalQuote(
   includeMeals: boolean,
   includeGuide: boolean,
   totalNights: number,
+  selfBookedAccommodationNights: number,
   _babySeatCount: number,
   _childSeatCount: number,
   collectDeposit: boolean,
@@ -1039,6 +1041,7 @@ function downloadSimpleExternalQuote(
     totalPrice: c.totalPrice,
     exchangeRate,
     totalNights,
+    selfBookedAccommodationNights,
     mealDays: c.mealDays,
     guideDays: c.guideDays,
     carServiceDays: c.carServiceDays,
@@ -1518,6 +1521,7 @@ interface Hotel {
   name: string
   nights: number
   startNight: number  // 從第幾晚開始入住（1-indexed），預設 1。用於處理分批住宿
+  includeInQuote?: boolean // false = 客人自理，不納入住宿報價
   // 4 種房型分類，每種有 3 個子房型
   rooms: {
     double: CategoryRooms
@@ -1528,6 +1532,36 @@ interface Hotel {
   // 押金政策
   hasDeposit: boolean
   depositPerRoom: number  // 每間房押金（check-in 時收取）
+}
+
+type DayPhoto = {
+  _key: string
+  asset: { _type: 'reference'; _ref: string }
+  url?: string
+}
+
+function isHotelIncludedInQuote(hotel: Pick<Hotel, 'includeInQuote'>): boolean {
+  return hotel.includeInQuote !== false
+}
+
+function normalizeHotelForQuote(hotel: Hotel): Hotel {
+  return {
+    ...hotel,
+    includeInQuote: hotel.includeInQuote !== false,
+  }
+}
+
+function getHotelCoveredNightCount(hotels: Pick<Hotel, 'startNight' | 'nights'>[]): number {
+  const coveredNights = new Set<number>()
+
+  hotels.forEach((hotel) => {
+    const startNight = hotel.startNight || 1
+    for (let offset = 0; offset < hotel.nights; offset += 1) {
+      coveredNights.add(startNight + offset)
+    }
+  })
+
+  return coveredNights.size
 }
 
 // 動態車費類型
@@ -1677,8 +1711,9 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [isGeneratingLink, setIsGeneratingLink] = useState(false)
 
   // 每日照片（dayIndex → 照片陣列）
-  const [dayPhotos, setDayPhotos] = useState<Record<number, { _key: string; asset: { _type: 'reference'; _ref: string }; url?: string }[]>>({})
+  const [dayPhotos, setDayPhotos] = useState<Record<number, DayPhoto[]>>({})
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [draggingPhoto, setDraggingPhoto] = useState<{ dayIndex: number; photoKey: string } | null>(null)
 
   // Form states - 成人/小孩分開計算
   const [adults, setAdults] = useState(8)
@@ -1709,6 +1744,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       name: '香格里拉酒店',
       nights: 3,
       startNight: 1,  // 從第 1 晚開始
+      includeInQuote: true,
       rooms: {
         double: [
           { name: '豪華客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
@@ -1739,6 +1775,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       name: '清邁美平洲際酒店',
       nights: 2,
       startNight: 4,  // 從第 4 晚開始（香格里拉 3 晚之後）
+      includeInQuote: true,
       rooms: {
         double: [
           { name: '經典客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
@@ -1985,6 +2022,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             name,
             nights: stats.nights,
             startNight: stats.startNight,  // 使用解析到的起始晚數
+            includeInQuote: true,
             rooms: {
               double: [
                 { name: roomName, quantity: defaultRoomCount, price: 2500, hasExtraBed: false },
@@ -2228,6 +2266,29 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     }))
   }
 
+  const handlePhotoDrop = (
+    event: React.DragEvent<HTMLDivElement>,
+    dayIndex: number,
+    targetPhotoKey: string
+  ) => {
+    event.preventDefault()
+    const draggedPhotoKey =
+      draggingPhoto?.dayIndex === dayIndex
+        ? draggingPhoto.photoKey
+        : event.dataTransfer.getData('text/plain')
+
+    if (!draggedPhotoKey) {
+      setDraggingPhoto(null)
+      return
+    }
+
+    setDayPhotos((prev) => ({
+      ...prev,
+      [dayIndex]: movePhotoByKey(prev[dayIndex] ?? [], draggedPhotoKey, targetPhotoKey),
+    }))
+    setDraggingPhoto(null)
+  }
+
   // 儲存當前報價
   const saveCurrentQuote = async (): Promise<string> => {
     const normalizedName = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
@@ -2253,7 +2314,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         tickets: tickets.map(t => ({ ...t })),
         useDefaultTickets,
         // 新增欄位
-        hotels: hotels.map(h => ({ ...h })),
+        hotels: hotels.map(h => ({ ...normalizeHotelForQuote(h) })),
         exchangeRate,
         includeAccommodation,
         includeMeals,
@@ -2459,8 +2520,9 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.useDefaultTickets !== undefined) setUseDefaultTickets(quote.data.useDefaultTickets)
     // 載入新增欄位
     if (quote.data.hotels) {
-      setHotels(quote.data.hotels)
-      setNextHotelId(getNextHotelIdFromSavedHotels(quote.data.hotels))
+      const restoredHotels = quote.data.hotels.map(normalizeHotelForQuote)
+      setHotels(restoredHotels)
+      setNextHotelId(getNextHotelIdFromSavedHotels(restoredHotels))
     }
     if (quote.data.exchangeRate !== undefined) setExchangeRate(quote.data.exchangeRate)
     if (quote.data.includeAccommodation !== undefined) setIncludeAccommodation(quote.data.includeAccommodation)
@@ -2543,7 +2605,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       )
       .then((doc) => {
         if (doc?.photos) {
-          const restored: Record<number, { _key: string; asset: { _type: 'reference'; _ref: string }; url?: string }[]> = {}
+          const restored: Record<number, DayPhoto[]> = {}
           for (const day of doc.photos) {
             if (day.images?.length) {
               restored[day.dayIndex] = day.images.map((img: any) => ({
@@ -2625,6 +2687,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         name: '香格里拉酒店',
         nights: 3,
         startNight: 1,  // 從第 1 晚開始
+        includeInQuote: true,
         rooms: {
           double: [
             { name: '豪華客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
@@ -2655,6 +2718,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         name: '清邁美平洲際酒店',
         nights: 2,
         startNight: 4,  // 從第 4 晚開始
+        includeInQuote: true,
         rooms: {
           double: [
             { name: '經典客房（大床）', quantity: 5, price: 2500, hasExtraBed: false },  // 10人=5間
@@ -2753,6 +2817,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       name: '新飯店',
       nights: 1,
       startNight: newStartNight,  // 接在最後一間之後
+      includeInQuote: true,
       rooms: createEmptyRooms(),
       hasDeposit: false,
       depositPerRoom: 3000
@@ -2906,9 +2971,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       }, 0)
       return roomTotal * h.nights
     }
-    const accommodationCost = includeAccommodation
-      ? hotels.reduce((sum, h) => sum + getHotelCost(h), 0)
+    const quoteHotels = includeAccommodation ? hotels.filter(isHotelIncludedInQuote) : []
+    const selfBookedHotels = includeAccommodation ? hotels.filter(h => !isHotelIncludedInQuote(h)) : []
+    const includedAccommodationNights = includeAccommodation ? getHotelCoveredNightCount(quoteHotels) : 0
+    const selfBookedAccommodationNights = includeAccommodation
+      ? getHotelCoveredNightCount(selfBookedHotels)
       : 0
+    const accommodationCost = quoteHotels.reduce((sum, h) => sum + getHotelCost(h), 0)
 
     // 計算飯店總房間數（所有子房型數量加總）
     const getHotelRoomCount = (h: Hotel) => ROOM_CATEGORIES.reduce((sum, cat) => {
@@ -2927,12 +2996,12 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     }, 0)
 
     // 總房間容量（平均）
-    const totalRoomCapacity = hotels.length > 0
-      ? hotels.reduce((sum, h) => sum + getHotelCapacity(h), 0) / hotels.length
+    const totalRoomCapacity = quoteHotels.length > 0
+      ? quoteHotels.reduce((sum, h) => sum + getHotelCapacity(h), 0) / quoteHotels.length
       : 0
 
     // 有押金的飯店（只有勾選住宿時才考慮）
-    const hotelsWithDeposit = includeAccommodation ? hotels.filter(h => h.hasDeposit) : []
+    const hotelsWithDeposit = quoteHotels.filter(h => h.hasDeposit)
 
     // 計算押金：每間房押金 × 房間數（check-in 時收取，退房退還）
     const getHotelDeposit = (h: Hotel) => {
@@ -3068,7 +3137,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
     return {
       people, adults, children, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel, guideCostPerDay: guideRate.cost, guidePricePerDay: guideRate.price,
-      includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, hotelsWithDeposit, totalRoomCapacity,
+      includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, quoteHotels, hotelsWithDeposit, totalRoomCapacity,
+      includedAccommodationNights, selfBookedAccommodationNights,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
       accommodationCost, mealCost, transportCost, transportPrice, transportProfit,
       carCostTotal, carPriceTotal, guideCost, guidePrice, luggageCost, childSeatCost,
@@ -3104,7 +3174,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         insuranceCost: calculation.insuranceCost,
         totalPrice: calculation.totalPrice,
         exchangeRate,
-        totalNights,
+        totalNights: calculation.includedAccommodationNights,
+        selfBookedAccommodationNights: calculation.selfBookedAccommodationNights,
         mealDays: calculation.mealDays,
         guideDays: calculation.guideDays,
         carServiceDays: calculation.carServiceDays,
@@ -3129,7 +3200,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
       return breakdown
     },
-    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, includeTickets, totalChildSeatCount, totalNights, outboundStayRooms, outboundStayNights]
+    [calculation, exchangeRate, includeAccommodation, includeGuide, includeInsurance, includeMeals, includeTickets, totalChildSeatCount, outboundStayRooms, outboundStayNights]
   )
 
   const toggleTicket = (id: string) => {
@@ -3353,7 +3424,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             includeAccommodation,
             hotels,
           })
-                          downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, totalNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
+                          downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, calculation.includedAccommodationNights, calculation.selfBookedAccommodationNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
         }} style={tabButtonStyle(false, '#b89b4d')}>📥 下載報價</button>
         <button
           onClick={handleGenerateLink}
@@ -3977,6 +4048,7 @@ Day 5｜送機
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {hotels.map((hotel, index) => {
+                    const isIncludedHotel = isHotelIncludedInQuote(hotel)
                     const hotelTotal = calculation.getHotelCost(hotel)
                     const hotelCapacity = calculation.getHotelCapacity(hotel)
                     const hotelRoomCount = calculation.getHotelRoomCount(hotel)
@@ -3985,7 +4057,19 @@ Day 5｜送機
                       hotel.rooms[cat.key].some(subRoom => subRoom.quantity > 0)
                     )
                     return (
-                      <div key={hotel.id} style={{ background: '#fafafa', borderRadius: 8, padding: 16, border: hotel.hasDeposit ? '2px solid #b89b4d' : '1px solid #e0e0e0' }}>
+                      <div
+                        key={hotel.id}
+                        style={{
+                          background: isIncludedHotel ? '#fafafa' : '#fff8ef',
+                          borderRadius: 8,
+                          padding: 16,
+                          border: !isIncludedHotel
+                            ? '2px dashed #d89b47'
+                            : hotel.hasDeposit
+                              ? '2px solid #b89b4d'
+                              : '1px solid #e0e0e0',
+                        }}
+                      >
                         {/* 第一行：飯店名稱、晚數、刪除 */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 'bold', color: '#5c4a2a', minWidth: 70 }}>飯店 {index + 1}</span>
@@ -4022,6 +4106,22 @@ Day 5｜送機
                           <span style={{ fontSize: 12, color: '#888' }}>
                             D{hotel.startNight || 1}-D{(hotel.startNight || 1) + hotel.nights - 1}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => updateHotel(hotel.id, 'includeInQuote', !isIncludedHotel)}
+                            style={{
+                              padding: '6px 12px',
+                              background: isIncludedHotel ? '#e8f5e9' : '#fff3d9',
+                              color: isIncludedHotel ? '#2e7d32' : '#9a6b2a',
+                              border: `1px solid ${isIncludedHotel ? '#81c784' : '#d89b47'}`,
+                              borderRadius: 999,
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {isIncludedHotel ? '納入報價' : '客人自理'}
+                          </button>
                           {hotels.length > 1 && (
                             <button
                               onClick={() => removeHotel(hotel.id)}
@@ -4031,6 +4131,12 @@ Day 5｜送機
                             </button>
                           )}
                         </div>
+
+                        {!isIncludedHotel && (
+                          <div style={{ marginBottom: 12, padding: 10, background: '#fff', border: '1px solid #f0d6a8', borderRadius: 6, color: '#8a5a00', fontSize: 12 }}>
+                            此飯店不計入住宿費；對外報價與 PDF 不會顯示飯店名稱，費用不含會提醒「客人自理」。
+                          </div>
+                        )}
 
                         {/* 第二行：4 種固定房型分類，每種有 3 個子房型 */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
@@ -4262,9 +4368,15 @@ Day 5｜送機
                     + 新增飯店
                   </button>
                   <p style={{ ...noteStyle, margin: 0 }}>
-                    住宿總計：<strong>{fmt(calculation.accommodationCost)} 泰銖</strong>（{totalNights} 晚）
+                    住宿總計：<strong>{fmt(calculation.accommodationCost)} 泰銖</strong>（納入報價 {calculation.includedAccommodationNights} 晚）
                   </p>
                 </div>
+
+                {calculation.selfBookedAccommodationNights > 0 && (
+                  <div style={{ marginTop: 8, padding: 10, background: '#fff8ef', border: '1px solid #f0d6a8', borderRadius: 6, color: '#8a5a00', fontSize: 12 }}>
+                    另有 {calculation.selfBookedAccommodationNights} 晚住宿設定為客人自理，不會列入對外報價金額。
+                  </div>
+                )}
 
                 {tripNights !== totalNights && (
                   <div style={{ ...warningStyle, marginTop: 12 }}>
@@ -4533,16 +4645,67 @@ Day 5｜送機
                     {variant === 'formal' && (
                       <div style={{ marginTop: 8, marginLeft: 0, padding: '8px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 12, color: '#15803d', fontWeight: 600, whiteSpace: 'nowrap' }}>📷 報價頁照片：</span>
-                        {(dayPhotos[index] ?? []).map((photo) => (
-                          <div key={photo._key} style={{ position: 'relative', width: 60, height: 60 }}>
+                        {(dayPhotos[index] ?? []).map((photo) => {
+                          const isDraggingThisPhoto =
+                            draggingPhoto?.dayIndex === index && draggingPhoto.photoKey === photo._key
+
+                          return (
+                            <div
+                              key={photo._key}
+                              draggable
+                              onDragStart={(event) => {
+                                event.dataTransfer.effectAllowed = 'move'
+                                event.dataTransfer.setData('text/plain', photo._key)
+                                setDraggingPhoto({ dayIndex: index, photoKey: photo._key })
+                              }}
+                              onDragOver={(event) => {
+                                if (draggingPhoto?.dayIndex === index) {
+                                  event.preventDefault()
+                                  event.dataTransfer.dropEffect = 'move'
+                                }
+                              }}
+                              onDrop={(event) => handlePhotoDrop(event, index, photo._key)}
+                              onDragEnd={() => setDraggingPhoto(null)}
+                              title="拖曳調整照片順序"
+                              style={{
+                                position: 'relative',
+                                width: 60,
+                                height: 60,
+                                cursor: isDraggingThisPhoto ? 'grabbing' : 'grab',
+                                opacity: isDraggingThisPhoto ? 0.45 : 1,
+                                transform: isDraggingThisPhoto ? 'scale(0.96)' : 'scale(1)',
+                                transition: 'opacity 0.15s ease, transform 0.15s ease',
+                              }}
+                            >
                             {photo.url && (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
                                 src={photo.url}
                                 alt={`${cf.day} 照片`}
-                                style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8 }}
+                                draggable={false}
+                                style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: isDraggingThisPhoto ? '2px solid #16a34a' : '1px solid #bbf7d0' }}
                               />
                             )}
+                            <span
+                              style={{
+                                position: 'absolute',
+                                left: -5,
+                                bottom: -5,
+                                width: 18,
+                                height: 18,
+                                borderRadius: '50%',
+                                background: '#15803d',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 11,
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              ↕
+                            </span>
                             <button
                               onClick={() => handlePhotoDelete(index, photo._key)}
                               style={{
@@ -4564,8 +4727,9 @@ Day 5｜送機
                             >
                               &times;
                             </button>
-                          </div>
-                        ))}
+                            </div>
+                          )
+                        })}
                         {(dayPhotos[index] ?? []).length < 3 && (
                           <label
                             style={{
@@ -4598,7 +4762,7 @@ Day 5｜送機
                         )}
                         {(dayPhotos[index] ?? []).length > 0 && (
                           <span style={{ fontSize: 10, color: '#999' }}>
-                            {(dayPhotos[index] ?? []).length}/3
+                            {(dayPhotos[index] ?? []).length}/3，可拖曳排序
                           </span>
                         )}
                       </div>
@@ -5400,14 +5564,19 @@ Day 5｜送機
               {includeAccommodation && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '2px solid #5c4a2a', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🏨 住宿（{totalNights}晚）</span>
+                    <span style={{ fontWeight: 'bold', color: '#5c4a2a' }}>🏨 住宿（納入 {calculation.includedAccommodationNights}晚）</span>
                     <span style={{ fontWeight: 'bold' }}>{fmt(calculation.accommodationCost)} 泰銖</span>
                   </div>
-                  {hotels.map(h => (
+                  {calculation.quoteHotels.map(h => (
                     <div key={h.id} style={{ paddingLeft: 16, fontSize: 12, color: '#555', marginBottom: 4 }}>
                       • {h.name}（{h.nights}晚）
                     </div>
                   ))}
+                  {calculation.selfBookedAccommodationNights > 0 && (
+                    <div style={{ paddingLeft: 16, fontSize: 12, color: '#9a6b2a', marginBottom: 4 }}>
+                      • 其餘住宿 {calculation.selfBookedAccommodationNights} 晚由客人自理
+                    </div>
+                  )}
                 </>
               )}
 
@@ -5487,7 +5656,7 @@ Day 5｜送機
             <div style={{ background: '#f9f8f6', padding: 12, borderRadius: 8 }}>
               <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginBottom: 8 }}>✅ 費用包含</div>
               <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
-                {includeAccommodation && <>• {totalNights}晚住宿<br /></>}
+                {includeAccommodation && calculation.includedAccommodationNights > 0 && <>• {calculation.includedAccommodationNights}晚住宿<br /></>}
                 {includeMeals && <>• {calculation.mealDays}天餐食（每日預設午餐＋晚餐）<br /></>}
                 • 全程包車（{calculation.carCount}台）<br />
                 {includeGuide && <>• 專業中文導遊<br /></>}
@@ -5501,6 +5670,7 @@ Day 5｜送機
               <div style={{ fontSize: 13, color: '#333', lineHeight: 1.8 }}>
                 • 來回機票<br />
                 {!includeAccommodation && <>• 住宿<br /></>}
+                {includeAccommodation && calculation.selfBookedAccommodationNights > 0 && <>• 其餘住宿（{calculation.selfBookedAccommodationNights}晚，客人自理）<br /></>}
                 {!includeMeals && <>• 餐費<br /></>}
                 {calculation.selectedTickets.length === 0 && <>• {ACTIVITY_BOOKING_LABEL}（現場付費）<br /></>}
                 {!includeGuide && <>• 導遊<br /></>}

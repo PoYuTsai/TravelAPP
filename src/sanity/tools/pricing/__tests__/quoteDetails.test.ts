@@ -55,6 +55,35 @@ describe('pricing quote details', () => {
     ])
   })
 
+  it('only shows hotels that are included in the quote', () => {
+    const itinerary = buildQuoteItinerary({
+      parsedItinerary: [
+        {
+          day: 'DAY 1',
+          title: 'First night',
+          items: [],
+          hotel: 'Included Hotel',
+        },
+        {
+          day: 'DAY 2',
+          title: 'Self booked night',
+          items: [],
+          hotel: 'Self Booked Hotel',
+        },
+      ],
+      carFees: [],
+      tripDays: 2,
+      includeAccommodation: true,
+      hotels: [
+        { name: 'Included Hotel', includeInQuote: true },
+        { name: 'Self Booked Hotel', includeInQuote: false },
+      ],
+    })
+
+    expect(itinerary[0]?.hotel).toBe('Included Hotel')
+    expect(itinerary[1]?.hotel).toBeNull()
+  })
+
   it('keeps external quote layout dimensions shared between page and pdf', () => {
     expect(EXTERNAL_QUOTE_LAYOUT).toEqual({
       maxWidth: 640,

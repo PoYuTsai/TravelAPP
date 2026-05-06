@@ -15,6 +15,7 @@ export interface ExternalQuoteBreakdownInput {
   totalPrice: number
   exchangeRate: number
   totalNights: number
+  selfBookedAccommodationNights?: number
   mealDays: number
   guideDays: number
   carServiceDays: number
@@ -142,8 +143,12 @@ export function buildExternalQuoteBreakdown(
   }
 
   const included = items.map((item) => item.label)
+  const selfBookedAccommodationNights = Math.max(0, input.selfBookedAccommodationNights ?? 0)
   const excluded = [
     !input.includeAccommodation ? '住宿' : null,
+    input.includeAccommodation && selfBookedAccommodationNights > 0
+      ? `其餘住宿（${selfBookedAccommodationNights}晚，客人自理）`
+      : null,
     !input.includeMeals ? '餐食' : null,
     activityAmount <= 0 ? ACTIVITY_BOOKING_LABEL : null,
     !input.includeGuide ? '中文導遊' : null,
