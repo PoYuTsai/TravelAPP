@@ -654,7 +654,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
             className="mx-auto mt-4 max-w-2xl text-[15px] leading-[1.8] md:text-[17px]"
             style={{ color: '#3A3224' }}
           >
-            我們把所有費用攤開給你看，沒有隱藏項目 —— 每一筆都為了這趟旅行更舒服。
+            以下為本次行程已含與未含項目，實際預訂內容以雙方確認訊息為準。
           </p>
         </div>
 

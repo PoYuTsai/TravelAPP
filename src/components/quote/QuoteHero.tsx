@@ -2,7 +2,9 @@
 
 import { motion } from 'framer-motion'
 import Image from 'next/image'
+import { CalendarDays, ReceiptText } from 'lucide-react'
 import type { QuoteData } from '@/lib/quote/types'
+import { scrollToSection } from '@/lib/quote/scrollToSection'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
@@ -211,6 +213,41 @@ export function QuoteHero({ quote }: { quote: QuoteData }) {
             </span>
           </motion.div>
         )}
+
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9, duration: 0.5, ease }}
+          className="mt-7 flex w-full max-w-[360px] flex-col gap-3 sm:max-w-none sm:flex-row sm:justify-center"
+        >
+          <button
+            type="button"
+            onClick={() => scrollToSection('itinerary')}
+            className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[14px] font-black tracking-[0.08em] transition-transform hover:scale-[1.03] active:scale-95"
+            style={{
+              background: 'rgba(253, 251, 244, 0.92)',
+              color: '#0F0B05',
+              border: '1px solid rgba(255,255,255,0.5)',
+              boxShadow: '0 14px 34px rgba(0,0,0,0.28)',
+            }}
+          >
+            <CalendarDays size={17} strokeWidth={2.4} />
+            查看行程
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToSection('quote-pricing')}
+            className="inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-[14px] font-black tracking-[0.08em] transition-transform hover:scale-[1.03] active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #FACC15, #F59E0B)',
+              color: '#0F0B05',
+              boxShadow: '0 14px 34px rgba(250,204,21,0.34), 0 6px 16px rgba(0,0,0,0.22)',
+            }}
+          >
+            <ReceiptText size={17} strokeWidth={2.4} />
+            查看報價
+          </button>
+        </motion.div>
       </div>
     </section>
   )
