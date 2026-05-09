@@ -12,6 +12,7 @@ import { inferTimelineItem } from './inferTimelineItem'
 import { buildQuoteItinerary } from '@/sanity/tools/pricing/quoteDetails'
 import type { QuoteData, QuotePhoto } from './types'
 import { enhanceQuoteBreakdown } from './quoteDisplay'
+import { resolveQuotePublicPageMode } from './publicPageMode'
 
 const SAMPLE_SLUG = 'sample'
 
@@ -207,6 +208,9 @@ export async function fetchQuoteBySlug(
   })
 
   const isSample = slug === SAMPLE_SLUG
+  const publicPageMode = isSample
+    ? 'package'
+    : resolveQuotePublicPageMode(data.publicPageMode)
 
   return {
     name: doc.name,
@@ -228,6 +232,7 @@ export async function fetchQuoteBySlug(
       (p: QuotePhoto) => p.images?.length > 0
     ),
     travelerLabel: snapshot?.travelerLabel || data.travelerLabel || undefined,
+    publicPageMode,
     isSample,
   }
 }

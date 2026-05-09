@@ -22,6 +22,7 @@ import {
 import type { ComponentType } from 'react'
 import type { QuoteData } from '@/lib/quote/types'
 import { getIncludedDisplayLabel } from '@/lib/quote/quoteDisplay'
+import { formatPackageEstimateBasis } from '@/lib/quote/publicPageMode'
 
 const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
@@ -229,12 +230,14 @@ function LineItemBreakdown({
   tripNights,
   adults,
   childCount,
+  isPackageShowcase,
 }: {
   items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
   tripDays: number
   tripNights: number
   adults: number
   childCount: number
+  isPackageShowcase: boolean
 }) {
   return (
     <motion.div
@@ -258,7 +261,7 @@ function LineItemBreakdown({
             className="text-[20px] font-black"
             style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
           >
-            價格明細
+            {isPackageShowcase ? '參考價格明細' : '價格明細'}
           </h3>
         </div>
         <p className="text-[12px]" style={{ color: '#7A6F5C' }}>
@@ -304,24 +307,63 @@ function LineItemBreakdown({
   )
 }
 
+function PackageEstimateNotice({ basisLabel }: { basisLabel: string }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: false }}
+      transition={{ duration: 0.55 }}
+      className="overflow-hidden rounded-[24px] p-6 md:p-7"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,11,5,0.92), rgba(58,50,36,0.9))',
+        border: '1.5px solid rgba(250, 204, 21, 0.35)',
+        boxShadow: '0 24px 50px -22px rgba(15,11,5,0.45)',
+        color: '#FDFBF4',
+      }}
+    >
+      <div className="flex gap-4">
+        <span
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+          style={{ background: '#FACC15', color: '#0F0B05' }}
+        >
+          <Calculator size={20} strokeWidth={2.4} />
+        </span>
+        <div className="min-w-0">
+          <div className="text-[10px] tracking-[0.25em]" style={{ color: '#FACC15' }}>
+            PACKAGE REFERENCE
+          </div>
+          <h3
+            className="mt-1 text-[20px] font-black md:text-[24px]"
+            style={{ fontFamily: 'var(--font-display, serif)' }}
+          >
+            這是套餐參考試算，不是固定團費
+          </h3>
+          <p className="mt-3 text-[14px] leading-[1.8]" style={{ color: 'rgba(253,251,244,0.78)' }}>
+            {basisLabel}。實際報價會依人數、車數、住宿等級、是否含導遊、門票活動與餐食需求調整。
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 /* ─── Sub: Total Quote Card — Dark (HTML lines 1110-1141) ─── */
 
 function TotalQuoteCard({
   name,
   totalTHB,
   totalTWD,
-  isSample,
-  tripDays,
-  tripNights,
   exchangeRate,
+  isPackageShowcase,
+  basisLabel,
 }: {
   name: string
   totalTHB: number
   totalTWD: number
-  isSample: boolean
-  tripDays: number
-  tripNights: number
   exchangeRate: number
+  isPackageShowcase: boolean
+  basisLabel: string
 }) {
   return (
     <motion.div
@@ -356,7 +398,7 @@ function TotalQuoteCard({
 
       <div className="relative">
         <div className="mb-4 text-[11px] tracking-[0.3em]" style={{ color: '#FACC15' }}>
-          {isSample ? 'REFERENCE QUOTE' : `${name.toUpperCase()} · EXCLUSIVE QUOTE`}
+          {isPackageShowcase ? 'REFERENCE ESTIMATE' : `${name.toUpperCase()} · EXCLUSIVE QUOTE`}
         </div>
         <div
           className="font-black leading-[1.05]"
@@ -367,7 +409,7 @@ function TotalQuoteCard({
             fontFamily: 'var(--font-display, serif)',
           }}
         >
-          {isSample ? '參考報價' : `${name} 專屬行程總報價`}
+          {isPackageShowcase ? `${name} 參考試算價格` : `${name} 專屬行程總報價`}
         </div>
 
         {/* Big price — NT$ prominent for Taiwan customers */}
@@ -387,9 +429,9 @@ function TotalQuoteCard({
           約 {fmt(totalTHB)} 泰銖 · 匯率 {exchangeRate.toFixed(3)}
         </div>
 
-        {isSample && (
+        {isPackageShowcase && (
           <div className="mt-4 text-[12px]" style={{ color: 'rgba(253,251,244,0.5)' }}>
-            以一家四口 · {tripDays}天{tripNights}夜為例，實際費用依人數與行程客製
+            {basisLabel}，實際費用依需求客製調整
           </div>
         )}
 
@@ -604,8 +646,16 @@ interface QuoteCostDashboardProps {
 }
 
 export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
-  const { isSample } = quote
   const breakdown = quote.quote
+  const isPackageShowcase = quote.publicPageMode === 'package'
+  const packageEstimateBasis = formatPackageEstimateBasis({
+    adults: quote.adults,
+    children: quote.children,
+    tripDays: quote.tripDays,
+    tripNights: quote.tripNights,
+    carCount: quote.carCount,
+    travelerLabel: quote.travelerLabel,
+  })
 
   return (
     <section id="quote-pricing" className="relative overflow-hidden px-6 py-10 md:px-10 md:py-14">
@@ -637,7 +687,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
         {/* Section header */}
         <div className="mb-14 text-center">
           <div className="inline-block text-[11px] tracking-[0.22em]" style={{ color: '#CA8A04' }}>
-            PROFESSIONAL SERVICES · QUOTE
+            {isPackageShowcase ? 'SIGNATURE PACKAGE · REFERENCE' : 'PROFESSIONAL SERVICES · QUOTE'}
           </div>
           <h2
             className="mt-3 font-black"
@@ -648,13 +698,15 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               fontFamily: 'var(--font-display, serif)',
             }}
           >
-            費用清單與專屬報價
+            {isPackageShowcase ? '套餐內容與參考試算' : '費用清單與專屬報價'}
           </h2>
           <p
             className="mx-auto mt-4 max-w-2xl text-[15px] leading-[1.8] md:text-[17px]"
             style={{ color: '#3A3224' }}
           >
-            以下為本次行程已含與未含項目，實際預訂內容以雙方確認訊息為準。
+            {isPackageShowcase
+              ? '這份頁面用來快速了解行程方向與價格級距，實際安排會依家庭人數與需求客製。'
+              : '以下為本次行程已含與未含項目，實際預訂內容以雙方確認訊息為準。'}
           </p>
         </div>
 
@@ -662,6 +714,10 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
           <NullQuoteFallback />
         ) : (
           <div className="space-y-8">
+            {isPackageShowcase && (
+              <PackageEstimateNotice basisLabel={packageEstimateBasis} />
+            )}
+
             {/* 1. Included / Not Included */}
             <IncludedExcludedSection
               included={breakdown.included}
@@ -676,6 +732,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               tripNights={quote.tripNights}
               adults={quote.adults}
               childCount={quote.children}
+              isPackageShowcase={isPackageShowcase}
             />
 
             {/* 3. Total Quote Card */}
@@ -683,10 +740,9 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               name={quote.name}
               totalTHB={breakdown.totalTHB}
               totalTWD={breakdown.totalTWD}
-              isSample={isSample}
-              tripDays={quote.tripDays}
-              tripNights={quote.tripNights}
               exchangeRate={quote.exchangeRate}
+              isPackageShowcase={isPackageShowcase}
+              basisLabel={packageEstimateBasis}
             />
 
             {/* 付款說明、匯款帳號已移除 — 在 LINE 私訊溝通 */}

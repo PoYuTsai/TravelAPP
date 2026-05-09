@@ -64,6 +64,10 @@ import {
   type ExternalQuoteBreakdown,
 } from './externalQuote'
 import { getPricingResponsiveLayout } from './ui'
+import {
+  resolveQuotePublicPageMode,
+  type QuotePublicPageMode,
+} from '@/lib/quote/publicPageMode'
 
 async function loadHtml2Pdf() {
   const html2pdfModule = await import('html2pdf.js')
@@ -1622,6 +1626,7 @@ interface SavedQuote {
     isParseConfirmed?: boolean
     savedParsedTickets?: DynamicTicket[]
     thaiDressDay?: number | null
+    publicPageMode?: QuotePublicPageMode
     // 報價快照（展示頁用）
     _quoteSnapshot?: {
       externalQuote: {
@@ -1706,6 +1711,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
   const [currentQuoteName, setCurrentQuoteName] = useState('')
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
+  const [publicPageMode, setPublicPageMode] = useState<QuotePublicPageMode>('quote')
   const [isQuotesLoading, setIsQuotesLoading] = useState(false)
   const [isSavingQuote, setIsSavingQuote] = useState(false)
   const [lastQuotesSyncAt, setLastQuotesSyncAt] = useState<string | null>(null)
@@ -2342,6 +2348,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         outboundStayNights,
         outboundStayRooms,
         includeTickets,
+        publicPageMode,
         parsedItinerary: parsedItinerary.map((day) => ({
           ...day,
           items: [...day.items],
@@ -2588,6 +2595,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     if (quote.data.outboundStayPerNight !== undefined) setOutboundStayPerNight(quote.data.outboundStayPerNight)
     if (quote.data.outboundStayNights !== undefined) setOutboundStayNights(quote.data.outboundStayNights)
     if (quote.data.outboundStayRooms !== undefined) setOutboundStayRooms(quote.data.outboundStayRooms)
+    setPublicPageMode(resolveQuotePublicPageMode(quote.data.publicPageMode))
     setParsedItinerary(restoredParseState.parsedItinerary)
     setParseResult(restoredParseState.parseResult)
     setParseWarnings(restoredParseState.parseWarnings)
@@ -2672,6 +2680,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setGuidePricePerDay(config.guidePerDay.price)
     setCollectDeposit(true)
     setTravelerLabel('')
+    setPublicPageMode('quote')
     setOutboundStayEnabled(false)
     setOutboundStayPerNight(1500)
     setOutboundStayNights(1)
@@ -3534,6 +3543,53 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                 ✨ 新建
               </button>
             </div>
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                gridTemplateColumns: responsive.isCompact ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+                marginBottom: 12,
+              }}
+            >
+              {[
+                {
+                  value: 'quote' as const,
+                  title: '正式客人報價',
+                  description: '價格會以專屬總報價呈現，適合已確認人數與需求的客人。',
+                },
+                {
+                  value: 'package' as const,
+                  title: '套餐展示模式',
+                  description: '公開頁會標示參考試算，適合放在 LINE OA 給客人看行程靈感。',
+                },
+              ].map((option) => {
+                const isActive = publicPageMode === option.value
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setPublicPageMode(option.value)}
+                    style={{
+                      padding: '10px 12px',
+                      textAlign: 'left',
+                      borderRadius: 8,
+                      border: isActive ? '2px solid #9c27b0' : '1px solid #d7c5dc',
+                      background: isActive ? '#f8eafc' : '#fff',
+                      color: '#3a2442',
+                      cursor: 'pointer',
+                      boxShadow: isActive ? '0 2px 8px rgba(156, 39, 176, 0.18)' : 'none',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 700 }}>
+                      {isActive ? '✅ ' : ''}{option.title}
+                    </div>
+                    <div style={{ marginTop: 3, fontSize: 11, lineHeight: 1.5, color: '#6f5f75' }}>
+                      {option.description}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
             <div style={{ fontSize: 12, color: '#666', marginBottom: 12 }}>
               {isQuotesLoading
                 ? '共享案例同步中...'
@@ -3581,6 +3637,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, overflowWrap: 'anywhere' }}>
                           📄 {q.name}
+                          {resolveQuotePublicPageMode(q.data.publicPageMode) === 'package' && (
+                            <span style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 999, background: '#fff3cd', color: '#8a5a00', fontSize: 10 }}>
+                              套餐展示
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
                           {new Date(q.updatedAt ?? q.createdAt).toLocaleDateString('zh-TW')}
