@@ -22,6 +22,7 @@
 | Phase 6 | 記帳系統 + 知識庫 + 報價計算系統 | ✅ 完成 |
 | 品牌 2026-04 | 「爸媽開的」定位全面同步（官網 / Sanity / 評價 / bio）| ✅ 完成 |
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
+| 功能 2026-05 | `/quote/[slug]` 訂金付款 MVP（ECPay、付款狀態、Studio 開單操作） | ✅ 分支開發中 |
 | **Phase 7** | **LINE OA AI 客服助理** | 📋 規格完善、待實作 |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。
@@ -39,6 +40,7 @@
 - **Sanity Studio** — 內容管理 + 工具入口
 - **報價計算器（正式版）** — 智慧行程解析、多飯店房型、門票互斥群組、泰服體驗、三階段付款、超時計算、共享案例同步
 - **報價展示頁 `/quote/[slug]`** — 計算器「產生報價連結」→ LINE 貼給客戶看動態互動報價；`/quote/sample` 為 LINE OA 公開 showcase
+- **`/quote/[slug]` 訂金付款 MVP** — 客戶專屬報價頁可開啟服務訂金付款；ECPay callback、付款狀態、過期控制與 Studio 開單 action 已完成於功能分支
 - **財務 Dashboard / 記帳** — Notion 業務成本串接、40 萬門檻警示，僅 owner 可存取
 - **知識庫** — Notion 資料庫（餐廳、咖啡、飯店、景點、門票、話術 共 96 筆）
 
@@ -110,4 +112,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-05-11 Thai phrase learning launch -->
+<!-- Last build trigger: 2026-05-11 quote deposit payment mvp -->
