@@ -44,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: baseUrl, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 1 },
     { url: `${baseUrl}/tours`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.9 },
     { url: `${baseUrl}/services/car-charter`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${baseUrl}/thai`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.85 },
     { url: `${baseUrl}/homestay`, lastModified: lastUpdated, changeFrequency: 'monthly', priority: 0.8 },
     { url: `${baseUrl}/blog`, lastModified: lastUpdated, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${baseUrl}/contact`, lastModified: lastUpdated, changeFrequency: 'monthly', priority: 0.7 },

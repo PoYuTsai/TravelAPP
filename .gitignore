@@ -25,6 +25,12 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.next-dev-*.log
+.next-start-*.log
+
+# Local Thai audio recording drafts and source batches
+public/audio/thai-drafts/
+docs/assets/thai-audio-source/
 
 # Local env files
 .env
