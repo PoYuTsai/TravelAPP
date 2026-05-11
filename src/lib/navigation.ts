@@ -10,6 +10,7 @@ export const headerNavLinks = [
   { href: '/', label: '首頁' },
   { href: '/services/car-charter', label: '包車服務' },
   { href: '/tours', label: '行程案例' },
+  { href: '/thai', label: '泰文小卡' },
   { href: '/blog', label: '部落格' },
 ] as const
 
@@ -17,6 +18,7 @@ export const footerNavLinks = [
   { href: '/', label: '首頁' },
   { href: '/services/car-charter', label: '包車服務' },
   { href: '/tours', label: '行程案例' },
+  { href: '/thai', label: '泰文小卡' },
   { href: '/homestay', label: '芳縣民宿' },
   { href: '/blog', label: '部落格' },
   { href: '/blog/eric-story-taiwan-to-chiang-mai', label: '我們的故事' },
