@@ -13,6 +13,7 @@ import { buildQuoteItinerary } from '@/sanity/tools/pricing/quoteDetails'
 import type { QuoteData, QuotePhoto } from './types'
 import { enhanceQuoteBreakdown } from './quoteDisplay'
 import { resolveQuotePublicPageMode } from './publicPageMode'
+import { normalizeQuotePayment } from './paymentState'
 
 const SAMPLE_SLUG = 'sample'
 
@@ -142,6 +143,16 @@ const QUERY = `*[_type == "pricingExample" && publicSlug.current == $slug][0]{
   "publicSlug": publicSlug.current,
   createdAt,
   updatedAt,
+  orderNo,
+  paymentState,
+  depositAmountTWD,
+  depositLabel,
+  paymentProvider,
+  paymentTradeNo,
+  paymentUrl,
+  paymentCreatedAt,
+  paymentExpiresAt,
+  paymentPaidAt,
   payload,
   "photos": photos[]{
     dayIndex,
@@ -234,5 +245,6 @@ export async function fetchQuoteBySlug(
     travelerLabel: snapshot?.travelerLabel || data.travelerLabel || undefined,
     publicPageMode,
     isSample,
+    payment: normalizeQuotePayment(doc),
   }
 }

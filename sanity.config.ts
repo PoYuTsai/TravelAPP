@@ -1,41 +1,60 @@
 import { defineConfig } from 'sanity'
 import { structureTool } from 'sanity/structure'
-import { schemaTypes } from './src/sanity/schemas'
-import { projectId, dataset } from './src/sanity/config'
-import { structure } from './src/sanity/structure'
-import { exportPdfAction } from './src/sanity/actions/exportPdfAction'
+
 import { exportExcelAction } from './src/sanity/actions/exportExcelAction'
+import { exportPdfAction } from './src/sanity/actions/exportPdfAction'
 import { exportTextAction } from './src/sanity/actions/exportTextAction'
+import { expireQuotePaymentAction } from './src/sanity/actions/expireQuotePaymentAction'
+import { openQuotePageAction } from './src/sanity/actions/openQuotePageAction'
+import { prepareQuotePaymentAction } from './src/sanity/actions/prepareQuotePaymentAction'
 import { syncFromTextAction } from './src/sanity/actions/syncFromTextAction'
+import { projectId, dataset } from './src/sanity/config'
+import { schemaTypes } from './src/sanity/schemas'
+import { structure } from './src/sanity/structure'
 import { customizeStudioTools } from './src/sanity/studio-access'
-import { dashboardTool } from './src/sanity/tools/dashboard'
 import { accountingTool } from './src/sanity/tools/accounting'
+import { dashboardTool } from './src/sanity/tools/dashboard'
 import { formalPricingTool, pricingTool } from './src/sanity/tools/pricing'
 
 export default defineConfig({
   name: 'chiangway-travel',
-  title: '清微旅行 CMS',
+  title: 'Chiangway Travel CMS',
   projectId,
   dataset,
   basePath: '/studio',
   auth: {
     loginMethod: 'token',
   },
-  plugins: [structureTool({ structure }), dashboardTool(), accountingTool(), pricingTool(), formalPricingTool()],
+  plugins: [
+    structureTool({ structure }),
+    dashboardTool(),
+    accountingTool(),
+    pricingTool(),
+    formalPricingTool(),
+  ],
   tools: (prev, { currentUser }) => customizeStudioTools(prev, currentUser?.email),
   schema: { types: schemaTypes },
   document: {
     actions: (prev, context) => {
-      // 在 itinerary 類型加入自訂 actions
       if (context.schemaType === 'itinerary') {
         return [
           ...prev,
-          syncFromTextAction,    // 文字編輯
-          exportTextAction,      // 匯出 LINE 文字
-          exportPdfAction,       // 匯出 PDF
-          exportExcelAction,     // 匯出 Excel
+          syncFromTextAction,
+          exportTextAction,
+          exportPdfAction,
+          exportExcelAction,
         ]
       }
+
+      if (context.schemaType === 'pricingExample') {
+        return [
+          openQuotePageAction,
+          prepareQuotePaymentAction,
+          expireQuotePaymentAction,
+          ...prev,
+        ]
+      }
+
       return prev
     },
   },

@@ -1,6 +1,7 @@
 import type { TimelineItem } from './inferTimelineItem'
 import type { ExternalQuoteBreakdown } from '@/sanity/tools/pricing/externalQuote'
 import type { QuotePublicPageMode } from './publicPageMode'
+import type { QuotePayment } from './paymentState'
 
 export interface QuotePhoto {
   dayIndex: number
@@ -43,4 +44,5 @@ export interface QuoteData {
   travelerLabel?: string
   publicPageMode: QuotePublicPageMode
   isSample: boolean
+  payment: QuotePayment
 }

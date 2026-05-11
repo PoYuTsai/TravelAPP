@@ -6,6 +6,7 @@ import type { QuoteData } from '@/lib/quote/types'
 import { QuoteHero } from '@/components/quote/QuoteHero'
 import { QuoteItinerary } from '@/components/quote/QuoteItinerary'
 import { QuoteCostDashboard } from '@/components/quote/QuoteCostDashboard'
+import { QuotePaymentCard } from '@/components/quote/QuotePaymentCard'
 import { QuoteFooter } from '@/components/quote/QuoteFooter'
 import { scrollToSection } from '@/lib/quote/scrollToSection'
 
@@ -74,11 +75,20 @@ function ScrollNavigationButtons() {
 }
 
 export function QuotePageClient({ quote }: { quote: QuoteData }) {
+  const paymentLaunchUrl =
+    quote.payment.paymentUrl ??
+    `/api/quote/${encodeURIComponent(quote.publicSlug)}/payment-link`
+
   return (
     <main style={{ background: '#FDFBF4', minHeight: '100vh' }}>
       <QuoteHero quote={quote} />
       <QuoteItinerary quote={quote} />
       <QuoteCostDashboard quote={quote} />
+      <section className="px-6 pb-6 md:px-10">
+        <div className="mx-auto max-w-6xl">
+          <QuotePaymentCard payment={quote.payment} launchUrl={paymentLaunchUrl} />
+        </div>
+      </section>
       <QuoteFooter isSample={quote.isSample} />
       <ScrollNavigationButtons />
     </main>
