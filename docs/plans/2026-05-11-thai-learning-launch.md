@@ -49,3 +49,25 @@
 
 - Push is currently blocked by GitHub SSH authentication: `Permission denied (publickey)`.
 - After GitHub access is restored, push `codex/thai-learning-launch` and inspect the Vercel preview before merging to production.
+
+## 2026-05-26 Update - Conservative Audio Cleanup
+
+- Applied a conservative cleanup filter to all 150 production Thai MP3 files:
+  - `highpass=f=90`
+  - `lowpass=f=9000`
+  - `afftdn=nf=-25:tn=1`
+  - `loudnorm=I=-18:TP=-1.5:LRA=11`
+- The goal is to reduce computer/room noise while preserving Min's Thai pronunciation and sentence endings.
+- Original production MP3s were backed up locally under `docs/assets/thai-audio-source/formal-backup-denoise-20260526-033311`.
+- Recording drafts remain excluded from production.
+
+### Verification
+
+- Confirmed production Thai MP3 count remains `150`.
+- Confirmed backup MP3 count is `150`.
+- `npm.cmd run test:run -- src/lib/thai/__tests__/content.test.ts src/lib/thai/__tests__/audio-storage.test.ts`
+- `npm.cmd run build`
+
+### Commit
+
+- Audio: `0f1bb9e` `Clean Thai phrase audio noise`
