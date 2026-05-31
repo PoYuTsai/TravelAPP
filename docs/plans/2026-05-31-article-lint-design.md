@@ -1,11 +1,16 @@
 ---
-status: ready-to-implement
+status: implemented
 author: Eric + Claude (brainstorm)
 date: 2026-05-31
 topic: SEO 文章自動檢核腳本 article-lint
 ---
 
 # article-lint 設計文件
+
+> **實作完成 2026-05-31（commit 6c0e8de）**：`scripts/article-lint.mjs`（純函式 export）
+> + `scripts/article-lint.test.mjs`（34 個 vitest 單元測試，TDD）+ npm script `lint:article`。
+> SEO/AEO 分桶採 §7 旁的預設分法（Eric 拍板）：SEO＝標題/描述/關鍵字/封面+alt/字數；
+> AEO＝FAQ/問號≥8/提示框/螢光≥3/內文圖≥3。執行：`npm run lint:article <slug>`。
 
 > **一句話**：把 `seo-article-prompt.md` 第五部分檢核表 + 禁止事項，變成一支「給 slug 就吐 PASS/FAIL + ⭐評級」的機器閘門。發布前最後一道關，不能被模型嘴硬騙過。
 >
