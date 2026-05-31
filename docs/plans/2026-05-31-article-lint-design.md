@@ -53,7 +53,7 @@ topic: SEO 文章自動檢核腳本 article-lint
 | 檢核需要 | Sanity 欄位 | 備註 |
 |----------|-------------|------|
 | SEO Title | `seoTitle`（留空 → fallback `title`） | 有效標題 = `seoTitle \|\| title`，schema 限 max 60 |
-| SEO Description | `seoDescription`（留空 → fallback `excerpt`） | 有效描述 = `seoDescription \|\| excerpt`；目標 120-160 |
+| SEO Description | `seoDescription`（留空 → fallback `excerpt`） | 有效描述 = `seoDescription \|\| excerpt`；**空才 FAIL**，長度只 WARN，甜蜜區 60-90 字（CJK 尺度，見 §5 註） |
 | Keywords | `seoKeywords`（string 陣列） | 算長度 |
 | 封面 | `mainImage` + `mainImage.alt` | 兩者都要 |
 | 字數 / FAQ / 問號 / 禁用詞 | `body`（Portable Text 陣列） | 見 §4 抽取規則 |
@@ -82,13 +82,14 @@ topic: SEO 文章自動檢核腳本 article-lint
 | FAQ 段落 | 找不到「常見問題/FAQ」H2 |
 | 問號數 | < 5 |
 | SEO Title | 有效標題缺、或 > 60 字 |
-| SEO Description | 有效描述缺、或不在 120-160 字 |
+| SEO Description | **有效描述完全缺**（seoDescription 與 excerpt 都空）。長度不再 FAIL — 見下方 WARN 與註 |
 | Keywords | `seoKeywords` < 5 |
 | 封面圖 | `mainImage` 缺、或 `mainImage.alt` 缺 |
 
 ### 🟡 WARN（提醒不擋）
 | 檢查 | 條件 |
 |------|------|
+| SEO Description 長度 | < 60 字（略短）或 > 90 字（偏長、恐被 Google 截斷）|
 | 字數 | 1500-1999（建議 2000+） |
 | 問號數 | 5-7（建議 8+） |
 | 螢光標記 | < 3 |
@@ -96,6 +97,11 @@ topic: SEO 文章自動檢核腳本 article-lint
 | 內文圖 | < 3（或某張缺 alt） |
 | H2/H3 層級 | 出現跳級（如 H2 後直接 H4） |
 | 禁用「句型」命中 | 見 §6 WARN patterns |
+
+> **註：SEO 描述長度為何用 60-90（CJK 尺度）而非 120-160（2026-05-31 校正）**
+> 初版照英文 SEO 慣例設 120-160（≈155 個拉丁字母）並當 FAIL。全站盤點（`scripts/article-lint-all.mjs`）一跑，7 篇 A 級文章 **100% 在這條 FAIL**——而它們的描述其實都寫得很好（問句開頭＋關鍵字＋品牌口吻），落在 59-73 字。
+> 根因：`descLen` 數的是**中文字元**，但 Google 是按**像素寬度**截斷（桌機 ~920px）。中文字寬約拉丁字母 2 倍，**約 70-80 個中文字就填滿整條摘要**。把描述補到 120-160 個中文字反而會在 ~70-80 字處被截斷，後半永遠不顯示——SEO 更差。
+> 結論：①長度改 WARN（甜蜜區 60-90），唯「描述完全空」才 FAIL；②一道讓 100% A 級文章都 FAIL 的閘門是雜訊、不是把關。日後若拿到中文 SERP 實測截斷數據，再微調 60/90 這兩條線即可（改 `evaluate()` 的描述 WARN 與 SEO 計分項）。
 
 ## 6. 禁用詞 / 句型清單（會持續長大 → 做成可維護 config）
 
@@ -152,7 +158,7 @@ SEO 檢核 3/5 ｜ AEO 檢核 4/5
 - 誤判防護：含「最適合小小孩」→ 不命中 FAIL（「最佳」在 WARN 才算）
 - 句型 WARN：「不是貴，而是值得」→ 命中 warnPattern
 - 字數邊界：1499 → FAIL、1500 → pass、1999 → WARN
-- 描述邊界：119/120/160/161
+- 描述長度（CJK 尺度，WARN 不擋）：59 略短 WARN / 60 / 90 / 91 偏長 WARN；空描述才 FAIL
 - FAQ 偵測：有/無 H2「常見問題」
 - 評級計算：SEO 4/5 + AEO 3/5 → 高價值門檻
 
