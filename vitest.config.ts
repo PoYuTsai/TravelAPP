@@ -7,7 +7,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    exclude: ['**/node_modules/**', '**/e2e/**'],
+    // Only the real suite lives under src/. Scoping include here (rather than
+    // maintaining an ever-growing exclude blocklist) keeps git-ignored dirs out
+    // of the run for good: .worktrees/ (parallel-agent worktrees), browser
+    // profile data dirs, and Playwright's e2e/ (run separately via Playwright).
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['**/node_modules/**'],
   },
   resolve: {
     alias: {
