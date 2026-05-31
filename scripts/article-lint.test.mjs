@@ -44,7 +44,7 @@ function goodPost(overrides = {}) {
     excerpt: '一篇文章',
     mainImage: { asset: { _ref: 'image-abc' }, alt: '清邁封面' },
     seoTitle: '清邁親子包車完整攻略｜在地爸媽帶你玩',
-    seoDescription: '字'.repeat(140),
+    seoDescription: '字'.repeat(70), // CJK 甜蜜區：約 70 字填滿 Google 摘要寬度
     seoKeywords: ['清邁', '親子', '包車', '自由行', '導遊'],
     body,
     ...overrides,
@@ -170,25 +170,31 @@ describe('evaluate — 字數邊界', () => {
   })
 })
 
-describe('evaluate — SEO Description 邊界', () => {
+describe('evaluate — SEO Description 長度（CJK 尺度，WARN 不擋發布）', () => {
+  // 中文以「像素寬度」截斷：約 70-80 字即填滿 Google 摘要，120-160 是英文尺度。
+  // 故長度只給 WARN（甜蜜區 60-90），唯有「描述完全空」才 FAIL（見 fallback 區塊）。
   const mk = (len) => goodPost({ seoDescription: '字'.repeat(len) })
-  test('119 字 → FAIL', () => {
-    expect(evaluate(mk(119)).fails.some((f) => f.includes('描述'))).toBe(true)
+  test('59 字 → 略短 WARN，但不 FAIL', () => {
+    const r = evaluate(mk(59))
+    expect(r.warns.some((w) => w.includes('描述'))).toBe(true)
+    expect(r.fails.some((f) => f.includes('描述'))).toBe(false)
   })
-  test('120 字 → pass', () => {
-    expect(evaluate(mk(120)).fails.some((f) => f.includes('描述'))).toBe(false)
+  test('60 字 → 甜蜜區下緣，無描述 WARN', () => {
+    expect(evaluate(mk(60)).warns.some((w) => w.includes('描述'))).toBe(false)
   })
-  test('160 字 → pass', () => {
-    expect(evaluate(mk(160)).fails.some((f) => f.includes('描述'))).toBe(false)
+  test('90 字 → 甜蜜區上緣，無描述 WARN', () => {
+    expect(evaluate(mk(90)).warns.some((w) => w.includes('描述'))).toBe(false)
   })
-  test('161 字 → FAIL', () => {
-    expect(evaluate(mk(161)).fails.some((f) => f.includes('描述'))).toBe(true)
+  test('91 字 → 偏長 WARN，但不 FAIL', () => {
+    const r = evaluate(mk(91))
+    expect(r.warns.some((w) => w.includes('描述'))).toBe(true)
+    expect(r.fails.some((f) => f.includes('描述'))).toBe(false)
   })
 })
 
 describe('evaluate — fallback 與結構', () => {
   test('seoDescription 空時 fallback 用 excerpt', () => {
-    const post = goodPost({ seoDescription: undefined, excerpt: '字'.repeat(140) })
+    const post = goodPost({ seoDescription: undefined, excerpt: '字'.repeat(70) })
     expect(evaluate(post).fails.some((f) => f.includes('描述'))).toBe(false)
   })
   test('描述與 excerpt 都空 → FAIL', () => {

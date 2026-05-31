@@ -177,12 +177,15 @@ export function evaluate(post = {}) {
   if (!effTitle) fails.push('SEO 標題缺（seoTitle 與 title 都空）')
   else if (titleLen > 60) fails.push(`SEO 標題 ${titleLen} 字超過 60`)
   if (!effDesc) fails.push('SEO 描述缺（seoDescription 與 excerpt 都空）')
-  else if (descLen < 120 || descLen > 160) fails.push(`SEO 描述 ${descLen} 字不在 120-160`)
   if (keywords.length < 5) fails.push(`SEO 關鍵字只有 ${keywords.length} 個（至少 5）`)
   if (!cover) fails.push('封面圖 mainImage 缺')
   else if (!coverAlt) fails.push('封面圖缺 alt')
 
   // 🟡 WARN
+  // SEO 描述長度：中文按像素寬度截斷，約 70-80 字即填滿 Google 摘要（≠ 英文 120-160）。
+  // 故長度只 WARN、不擋發布；甜蜜區 60-90 字。
+  if (effDesc && descLen < 60) warns.push(`SEO 描述 ${descLen} 字略短（中文甜蜜區約 65-80，可再填滿摘要）`)
+  else if (effDesc && descLen > 90) warns.push(`SEO 描述 ${descLen} 字偏長（中文超過約 80 字 Google 可能截斷）`)
   if (wordCount >= 1500 && wordCount < 2000) warns.push(`字數 ${wordCount}（建議 2000+）`)
   if (questions >= 5 && questions < 8) warns.push(`問號 ${questions} 個（建議 8+）`)
   if (highlights < 3) warns.push(`螢光標記只有 ${highlights} 處（建議 ≥3）`)
@@ -196,7 +199,7 @@ export function evaluate(post = {}) {
   // SEO / AEO 各 5 項（達標得 1 分）
   const seo = [
     !!effTitle && titleLen <= 60,
-    !!effDesc && descLen >= 120 && descLen <= 160,
+    !!effDesc && descLen >= 60 && descLen <= 90,
     keywords.length >= 5,
     !!cover && !!coverAlt,
     wordCount >= 1500,
