@@ -13,6 +13,9 @@
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { OperatorCommand } from '../operator/operator-command'
 import type { CommandIntent } from './intent'
+import type { CaseStore } from '../storage/store'
+import { createInitialCase } from '../cases/case-state'
+import { caseReducer } from '../cases/case-reducer'
 
 // ---------------------------------------------------------------------------
 // Handler result type
@@ -46,13 +49,84 @@ export async function handleRespondToPartnerGroup(
 // Case creation handler — when an OA customer message arrives
 // ---------------------------------------------------------------------------
 
+/**
+ * Injectable seams for the case handler.  Defaults keep production
+ * collision-safe and deterministic while letting tests pin exact values.
+ */
+export interface CaseHandlerDeps {
+  /**
+   * Deterministic caseId generator.  Default is messageId-based — unique per
+   * LINE message and collision-safe, and only ever called on case CREATION
+   * (the first message), so the id stays stable for the case's lifetime.
+   * MUST NOT use listAll().length + 1 (races under concurrent invocations).
+   */
+  generateCaseId?: (event: NormalizedLineEvent) => string
+  /**
+   * Resolve the customer display name.  Default is a fallback derived from the
+   * lineUserId — we deliberately do NOT call the LINE profile API on the
+   * webhook path (a profile fetch must never block or fail the webhook).
+   * Enriching displayName via a profile fetch is a later follow-up.
+   */
+  resolveDisplayName?: (event: NormalizedLineEvent) => string
+}
+
+function defaultCaseId(event: NormalizedLineEvent): string {
+  return `CW-${event.messageId}`
+}
+
+function defaultDisplayName(event: NormalizedLineEvent): string {
+  // Fallback only — no profile API call. Short, stable, non-empty.
+  return `LINE-${event.lineUserId.slice(0, 8)}`
+}
+
+/**
+ * Load-or-create the case for an OA customer message, apply the reducer for the
+ * incoming message, persist the new state, and append the audit entry.
+ *
+ * This NEVER replies to the customer — the official OA is receive-only.  The
+ * result is purely internal case state.
+ */
 export async function handleCreateOrUpdateCase(
-  event: NormalizedLineEvent
+  event: NormalizedLineEvent,
+  store: CaseStore,
+  deps: CaseHandlerDeps = {}
 ): Promise<HandlerResult> {
+  const now = new Date(event.timestamp).toISOString()
+
+  const existing = await store.getByLineUserId(event.lineUserId)
+  const created = existing === null
+
+  const current =
+    existing ??
+    createInitialCase({
+      caseId: (deps.generateCaseId ?? defaultCaseId)(event),
+      lineUserId: event.lineUserId,
+      customerDisplayName: (deps.resolveDisplayName ?? defaultDisplayName)(event),
+      now,
+    })
+
+  const prevAudit = created ? [] : await store.getAudit(current.caseId)
+
+  // Reuse the canonical reducer — do not reimplement transitions here.
+  const { case: nextCase, audit } = caseReducer(
+    current,
+    { type: 'line_oa_message', lineUserId: event.lineUserId, text: event.text ?? '', now },
+    prevAudit
+  )
+
+  await store.put(nextCase)
+  await store.appendAudit(nextCase.caseId, audit[audit.length - 1])
+
   return {
     handler: 'handleCreateOrUpdateCase',
     status: 'stub_ok',
-    meta: { kind: event.kind, sourceChannel: event.sourceChannel },
+    meta: {
+      caseId: nextCase.caseId,
+      created,
+      status: nextCase.status,
+      kind: event.kind,
+      sourceChannel: event.sourceChannel,
+    },
   }
 }
 

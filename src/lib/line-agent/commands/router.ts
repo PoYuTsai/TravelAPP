@@ -34,8 +34,10 @@ import {
   handlePostToPartnerGroup,
   handleSilent,
   type HandlerResult,
+  type CaseHandlerDeps,
 } from './handlers'
 import type { AgentSourceChannel } from '../types'
+import type { CaseStore } from '../storage/store'
 
 // ---------------------------------------------------------------------------
 // Router input — either an event (LINE) or a command (DC/operator)
@@ -48,6 +50,13 @@ export interface RouterInput {
   command?: OperatorCommand
   /** Injected LLM classifier (stub in tests, real adapter in production). */
   llmClassifier: LlmIntentClassifier
+  /**
+   * Durable case store.  REQUIRED for OA customer events (they persist a case);
+   * unused for partner-group / operator-command paths.
+   */
+  store?: CaseStore
+  /** Injectable seams for the case handler (caseId / displayName). */
+  deps?: CaseHandlerDeps
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +113,7 @@ function sourceFromCommand(command: OperatorCommand): AgentSourceChannel {
  *  3. Permission layer is called AFTER intent resolution — it is the final gate.
  */
 export async function routeCommand(input: RouterInput): Promise<RouterDecision> {
-  const { event, command, llmClassifier } = input
+  const { event, command, llmClassifier, store, deps } = input
 
   // -------------------------------------------------------------------------
   // LINE event routing
@@ -121,10 +130,19 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
       // B3 gate — always deny auto-reply regardless of intent
       const oaPerm = canAutoReplyToOaCustomer(event)
       if (!oaPerm.allowed) {
-        // Create/update a case internally, but DO NOT reply to the customer
-        const handlerResult = await handleCreateOrUpdateCase(event)
+        // Create/update a case internally, but DO NOT reply to the customer.
+        // Persistence requires a store — fail loud rather than silently drop
+        // the case (the webhook always provides one).
+        if (!store) {
+          throw new Error(
+            '[router] OA customer event requires a store to persist the case. ' +
+              'Pass `store` in RouterInput.'
+          )
+        }
+        const handlerResult = await handleCreateOrUpdateCase(event, store, deps)
         return {
-          action: 'create_case',
+          // Distinguish first-contact (create) from a follow-up (update).
+          action: handlerResult.meta?.created ? 'create_case' : 'update_case',
           source,
           denied: false, // Not a denial — this IS the correct action
           handlerResult,

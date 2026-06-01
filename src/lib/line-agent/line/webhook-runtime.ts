@@ -43,8 +43,8 @@ export type NormalizedEventHandler = (
  * the safe default classifier (no API calls, no keys).  Handlers invoked by
  * the router stay stubs in M1 — this only proves the event reaches routing.
  */
-const defaultEventHandler: NormalizedEventHandler = async (event) => {
-  await routeCommand({ event, llmClassifier: safeDefaultLlmClassifier })
+const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
+  await routeCommand({ event, store, llmClassifier: safeDefaultLlmClassifier })
 }
 
 let _eventHandler: NormalizedEventHandler = defaultEventHandler

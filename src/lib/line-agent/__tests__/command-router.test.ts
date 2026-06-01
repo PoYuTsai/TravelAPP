@@ -19,6 +19,7 @@ import { routeCommand, type RouterInput, type RouterDecision } from '@/lib/line-
 import type { NormalizedLineEvent } from '@/lib/line-agent/line/event-normalizer'
 import type { OperatorCommand } from '@/lib/line-agent/operator/operator-command'
 import type { LlmIntentClassifier, CommandIntent } from '@/lib/line-agent/commands/intent'
+import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
 
 // ---------------------------------------------------------------------------
 // Stub LLM intent classifiers
@@ -152,6 +153,7 @@ describe('R3 — OA customer message → never auto-reply to customer', () => {
   it('does NOT produce a reply action for line_oa source', async () => {
     const input: RouterInput = {
       event: makeOaEvent(),
+      store: new MemoryStore(),
       llmClassifier: analyzeStub,
     }
     const decision = await routeCommand(input)
@@ -165,6 +167,7 @@ describe('R3 — OA customer message → never auto-reply to customer', () => {
   it('does NOT produce a reply action for an OA image event', async () => {
     const input: RouterInput = {
       event: makeOaEvent({ kind: 'image', text: undefined }),
+      store: new MemoryStore(),
       llmClassifier: analyzeStub,
     }
     const decision = await routeCommand(input)
