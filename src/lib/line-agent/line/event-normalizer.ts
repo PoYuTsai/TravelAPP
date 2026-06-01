@@ -85,7 +85,9 @@ export interface NormalizedLineEvent {
 // We deliberately type the raw input as `unknown` to keep a clear boundary
 // between "external attacker input" and "internally typed data".
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// `any` is intentional: this is untyped external webhook input that the
+// normalizer indexes into defensively before producing typed internal events.
+// (The project's ESLint preset does not enable @typescript-eslint/no-explicit-any.)
 type RawLineEvent = Record<string, any>
 
 // ---------------------------------------------------------------------------

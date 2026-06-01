@@ -127,7 +127,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const processEvents = async (): Promise<void> => {
     for (const rawEvent of rawEvents) {
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId)
         if (normalized === null) continue // skip non-message events
 

@@ -55,10 +55,8 @@ describe('verifyLineSignature', () => {
 
   it('returns false for a null/undefined signature (cast test)', () => {
     // Simulate attacker sending null — TypeScript caller may pass undefined/null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(verifyLineSignature(secret, body, null as any)).toBe(false)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(verifyLineSignature(secret, body, undefined as any)).toBe(false)
+    expect(verifyLineSignature(secret, body, null as unknown as string)).toBe(false)
+    expect(verifyLineSignature(secret, body, undefined as unknown as string)).toBe(false)
   })
 
   it('returns false for a non-base64 garbage header (must not throw)', () => {
