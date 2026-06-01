@@ -1,0 +1,225 @@
+/**
+ * router.ts
+ *
+ * Command router — routes a (source, event/command, intent) tuple to an
+ * action decision AFTER consulting the permission layer.
+ *
+ * Design rules:
+ * 1. Deterministic dispatch for KNOWN commands FIRST (a command table).
+ * 2. LLM intent classification ONLY as fallback via the injected seam.
+ * 3. The permission layer ALWAYS gates the final action — LLM can NEVER widen
+ *    permissions.
+ * 4. Every routing decision returns a typed RouterDecision with action, source,
+ *    and (on denial) a reason.
+ */
+
+import type { NormalizedLineEvent } from '../line/event-normalizer'
+import type { OperatorCommand } from '../operator/operator-command'
+import {
+  classifyIntent,
+  type LlmIntentClassifier,
+  type CommandIntent,
+} from './intent'
+import {
+  canRespondToPartnerGroupTag,
+  shouldIgnoreCasualPartnerGroupChat,
+  canAutoReplyToOaCustomer,
+  canPostToPartnerGroupFromDC,
+  canPartnerGroupTriggerDevAction,
+} from '../permissions'
+import {
+  handleRespondToPartnerGroup,
+  handleCreateOrUpdateCase,
+  handleDraft,
+  handlePostToPartnerGroup,
+  handleSilent,
+  type HandlerResult,
+} from './handlers'
+import type { AgentSourceChannel } from '../types'
+
+// ---------------------------------------------------------------------------
+// Router input — either an event (LINE) or a command (DC/operator)
+// ---------------------------------------------------------------------------
+
+export interface RouterInput {
+  /** Normalized LINE event — present for LINE-sourced inputs. */
+  event?: NormalizedLineEvent
+  /** Parsed operator command — present for DC/operator-sourced inputs. */
+  command?: OperatorCommand
+  /** Injected LLM classifier (stub in tests, real adapter in production). */
+  llmClassifier: LlmIntentClassifier
+}
+
+// ---------------------------------------------------------------------------
+// Router decision — the authoritative output of the router
+// ---------------------------------------------------------------------------
+
+export type RouterAction =
+  | 'respond'              // Respond in the partner group (B1 tagged msg)
+  | 'silent'               // Ignore / no-op (B2 casual chat, unknown)
+  | 'create_case'          // Create a new case from an OA event (B3)
+  | 'update_case'          // Update an existing case from an OA event
+  | 'internal_case_event'  // Internal case work — NOT a customer reply
+  | 'draft'                // Prepare a message draft (B4 no sendTarget)
+  | 'post_to_partner_group'// Send to LINE partner group (B4 + sendTarget)
+  | 'denied'               // Permission denied (B5 dev action from partner group)
+
+export interface RouterDecision {
+  /** The action the router decided on. */
+  action: RouterAction
+  /** The source channel of the input. */
+  source: AgentSourceChannel
+  /** true when the action was explicitly denied by the permission layer. */
+  denied?: boolean
+  /** Human-readable denial reason — present when denied is true. */
+  denialReason?: string
+  /** The handler result, if a handler was invoked. */
+  handlerResult?: HandlerResult
+  /** The resolved intent (for audit/debug). */
+  intent?: CommandIntent
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+function sourceFromEvent(event: NormalizedLineEvent): AgentSourceChannel {
+  return event.sourceChannel
+}
+
+function sourceFromCommand(command: OperatorCommand): AgentSourceChannel {
+  return command.sourceChannel
+}
+
+// ---------------------------------------------------------------------------
+// Main router
+// ---------------------------------------------------------------------------
+
+/**
+ * Route a command/event to an action decision, gated by the permission layer.
+ *
+ * Routing order:
+ *  1. If input is a LINE event, apply LINE routing logic.
+ *  2. If input is an operator command (DC), apply DC routing logic.
+ *  3. Permission layer is called AFTER intent resolution — it is the final gate.
+ */
+export async function routeCommand(input: RouterInput): Promise<RouterDecision> {
+  const { event, command, llmClassifier } = input
+
+  // -------------------------------------------------------------------------
+  // LINE event routing
+  // -------------------------------------------------------------------------
+
+  if (event) {
+    const source = sourceFromEvent(event)
+
+    // -----------------------------------------------------------------------
+    // LINE OA customer events — B3: NEVER auto-reply
+    // -----------------------------------------------------------------------
+
+    if (event.sourceChannel === 'line_oa') {
+      // B3 gate — always deny auto-reply regardless of intent
+      const oaPerm = canAutoReplyToOaCustomer(event)
+      if (!oaPerm.allowed) {
+        // Create/update a case internally, but DO NOT reply to the customer
+        const handlerResult = await handleCreateOrUpdateCase(event)
+        return {
+          action: 'create_case',
+          source,
+          denied: false, // Not a denial — this IS the correct action
+          handlerResult,
+        }
+      }
+      // (Non-OA sources handled below — should not reach here for OA events)
+    }
+
+    // -----------------------------------------------------------------------
+    // LINE partner group events — B2 / B1 / B5
+    // -----------------------------------------------------------------------
+
+    if (event.sourceChannel === 'line_partner_group') {
+      // B5 (+ B6 LLM widening prevention): ALWAYS check for dev actions FIRST,
+      // before the casual-chat gate.  A partner-group message that contains a
+      // dev command (deploy, code_edit, parser_change, schema_change) must be
+      // EXPLICITLY DENIED — not silently ignored — so the denial is auditable.
+      // This runs for ALL partner-group messages regardless of tagging.
+      const earlyIntent = await classifyIntent(event.text ?? '', llmClassifier)
+      const devPerm = canPartnerGroupTriggerDevAction(event, earlyIntent)
+      if (!devPerm.allowed) {
+        return {
+          action: 'denied',
+          source,
+          denied: true,
+          denialReason: devPerm.reason,
+          intent: earlyIntent,
+        }
+      }
+
+      // B2: After dev-action gate, is this casual chat that should be ignored?
+      if (shouldIgnoreCasualPartnerGroupChat(event)) {
+        const handlerResult = handleSilent()
+        return { action: 'silent', source, handlerResult }
+      }
+
+      // B1: Is the bot tagged? → intent already resolved above
+      const tagPerm = canRespondToPartnerGroupTag(event)
+      if (tagPerm.allowed) {
+        // Permission granted — respond in the group
+        const handlerResult = await handleRespondToPartnerGroup(event, earlyIntent)
+        return { action: 'respond', source, handlerResult, intent: earlyIntent }
+      }
+
+      // Not tagged and not casual (edge case) → silent
+      const handlerResult = handleSilent()
+      return { action: 'silent', source, handlerResult }
+    }
+
+    // Unknown event source — silent
+    const handlerResult = handleSilent()
+    return { action: 'silent', source, handlerResult }
+  }
+
+  // -------------------------------------------------------------------------
+  // Operator command routing (DC / internal_worker)
+  // -------------------------------------------------------------------------
+
+  if (command) {
+    const source = sourceFromCommand(command)
+
+    // B4: Can DC post to the partner group?
+    const postPerm = canPostToPartnerGroupFromDC(command)
+
+    if (postPerm.allowed) {
+      // Explicit sendTarget present — post to LINE partner group
+      const intent = await classifyIntent(command.commandText, llmClassifier)
+      const handlerResult = await handlePostToPartnerGroup(command, intent)
+      return { action: 'post_to_partner_group', source, handlerResult, intent }
+    }
+
+    // No sendTarget (or invalid source) — check if it is a draft
+    if (!command.sendTarget) {
+      // Draft-only mode
+      const intent = await classifyIntent(command.commandText, llmClassifier)
+      const handlerResult = await handleDraft(command, intent)
+      return { action: 'draft', source, handlerResult, intent }
+    }
+
+    // Invalid operator source or invalid sendTarget — denied
+    return {
+      action: 'denied',
+      source,
+      denied: true,
+      denialReason: postPerm.reason,
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Neither event nor command — silent
+  // -------------------------------------------------------------------------
+
+  return {
+    action: 'silent',
+    source: 'internal_worker',
+    handlerResult: handleSilent(),
+  }
+}
