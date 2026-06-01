@@ -5,12 +5,15 @@
  * typed internal `NormalizedLineEvent` objects.  The rest of the agent layer
  * depends ONLY on `NormalizedLineEvent`; it never touches the raw LINE shape.
  *
- * Normalization rules:
+ * Normalization rules (fail-closed — only the two allowed sources pass):
  * - source.type === 'user'  → official OA 1:1 customer event  (line_oa)
  * - source.type === 'group' AND groupId === partnerGroupId → partner-group
  *   event (line_partner_group)
  * - source.type === 'group' AND groupId !== partnerGroupId → null (the bot is
  *   in some non-partner group; that traffic is ignored)
+ * - source.type === 'room' (multi-person chat) → null (not an OA customer and
+ *   not the partner group; must never fall through to line_oa / create_case)
+ * - any other / missing source type → null (default-deny)
  *
  * Kind routing:
  *   message.type === 'text' + no quotedMessageId  → 'oa_text' | 'group_text'
@@ -114,11 +117,19 @@ export function normalizeLineEvent(
 
   const source = raw.source ?? {}
 
-  // Partner-group guard: the bot may be a member of groups other than the
-  // configured partner group.  A group event whose groupId does NOT match
-  // partnerGroupId is not actionable — return null so the handler ignores it
-  // (and it never becomes a line_partner_group event).
-  if (source.type === 'group' && source.groupId !== partnerGroupId) {
+  // Fail-closed source guard. Only two source shapes are actionable:
+  //   - 'user'  → OA 1:1 customer event (line_oa)
+  //   - 'group' whose groupId === partnerGroupId → partner-group event
+  // Everything else returns null so the handler ignores it and it never
+  // becomes a case/state:
+  //   - 'room'  → LINE multi-person chat; not the partner group, not an OA
+  //     customer. Must NOT fall through to line_oa / create_case.
+  //   - 'group' with a non-partner groupId → the bot is in some other group.
+  //   - any unrecognized / missing source type → default-deny.
+  if (
+    source.type !== 'user' &&
+    !(source.type === 'group' && source.groupId === partnerGroupId)
+  ) {
     return null
   }
 

@@ -212,4 +212,18 @@ describe('normalizeLineEvent', () => {
     const result = normalizeLineEvent(raw, PARTNER_GROUP_ID)
     expect(result).toBeNull()
   })
+
+  it('returns null for a room / multi-person chat source (fail-closed)', () => {
+    // LINE sources can also be 'room' (an ad-hoc multi-person chat). Rooms are
+    // not the partner group and not an OA 1:1 customer, so they must be ignored
+    // rather than silently treated as line_oa and routed to create_case.
+    const raw = {
+      type: 'message',
+      source: { type: 'room', roomId: 'R_some_room', userId: 'U_001' },
+      message: { type: 'text', id: 'msg_room_001', text: 'hello' },
+      timestamp: TS,
+    }
+
+    expect(normalizeLineEvent(raw, PARTNER_GROUP_ID)).toBeNull()
+  })
 })
