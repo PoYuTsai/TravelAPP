@@ -14,7 +14,8 @@
  *   audit:{caseId}                 → JSON array of AuditEntry (append as list)
  */
 
-import type { AgentCase, CaseStatus } from '../cases/case-state'
+import { Redis } from '@upstash/redis'
+import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { CaseStore } from './store'
 
@@ -54,6 +55,45 @@ export interface KvClient {
 }
 
 // ---------------------------------------------------------------------------
+// Real Upstash adapter
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap a real @upstash/redis client in the minimal KvClient contract the
+ * KvStore depends on — the SAME contract the test mock guarantees.
+ *
+ * `automaticDeserialization: false` is deliberate: with Upstash's default
+ * (true), `lrange` would JSON-parse each list element, so `getAudit`'s own
+ * `JSON.parse(string)` would receive an already-parsed object and throw.
+ * Turning it off makes Upstash return raw strings, and we own (de)serialization
+ * explicitly here — objects round-trip via JSON, list elements stay raw strings.
+ */
+function createUpstashKvClient(url: string, token: string): KvClient {
+  const redis = new Redis({ url, token, automaticDeserialization: false })
+  return {
+    async get<T = unknown>(key: string): Promise<T | null> {
+      const raw = (await redis.get(key)) as string | null
+      return raw == null ? null : (JSON.parse(raw) as T)
+    },
+    set(key: string, value: unknown): Promise<unknown> {
+      return redis.set(key, JSON.stringify(value))
+    },
+    del(...keys: string[]): Promise<unknown> {
+      return redis.del(...keys)
+    },
+    rpush(key: string, ...values: string[]): Promise<unknown> {
+      return redis.rpush(key, ...values)
+    },
+    async lrange(key: string, start: number, stop: number): Promise<string[]> {
+      return (await redis.lrange(key, start, stop)) as string[]
+    },
+    keys(pattern: string): Promise<string[]> {
+      return redis.keys(pattern)
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Key helpers
 // ---------------------------------------------------------------------------
 
@@ -90,16 +130,14 @@ export class KvStore implements CaseStore {
       this.client = client
       return
     }
-    // Guard: if no client and no env vars, mark as unconfigured.
-    const hasEnv =
-      typeof process !== 'undefined' &&
-      process.env.AGENT_KV_URL &&
-      process.env.AGENT_KV_TOKEN
-    this.client = hasEnv ? null : null  // real client would be created here
-    // NOTE: In production, replace the line above with:
-    //   const { Redis } = require('@upstash/redis')
-    //   this.client = new Redis({ url: process.env.AGENT_KV_URL, token: process.env.AGENT_KV_TOKEN })
-    // For now, defer to the injected-client pattern.
+    // No injected client: construct a real Upstash client only when BOTH env
+    // vars are present.  Otherwise stay unconfigured so every method throws
+    // KvNotConfiguredError (fail closed) instead of making surprise network
+    // calls during env-less test runs.  Importing @upstash/redis has no side
+    // effects; only constructing the client + calling methods hits the network.
+    const url = typeof process !== 'undefined' ? process.env.AGENT_KV_URL : undefined
+    const token = typeof process !== 'undefined' ? process.env.AGENT_KV_TOKEN : undefined
+    this.client = url && token ? createUpstashKvClient(url, token) : null
   }
 
   private ensureClient(): KvClient {
@@ -112,8 +150,16 @@ export class KvStore implements CaseStore {
   async put(agentCase: AgentCase): Promise<void> {
     const kv = this.ensureClient()
     await kv.set(caseKey(agentCase.caseId), agentCase)
-    // Keep the lineUser → activeCase index updated (overwrites on re-inquiry)
-    await kv.set(lineUserKey(agentCase.lineUserId), agentCase.caseId)
+    // Maintain the lineUser → activeCase index.  Terminal cases
+    // (converted/lost) must DROP OUT of the active index so getByLineUserId
+    // returns null for them — mirroring MemoryStore's read-time exclusion.
+    // The case record itself stays under case:{id} and is still retrievable
+    // by caseId; only the active pointer is cleared.
+    if (TERMINAL_STATUSES.has(agentCase.status)) {
+      await kv.del(lineUserKey(agentCase.lineUserId))
+    } else {
+      await kv.set(lineUserKey(agentCase.lineUserId), agentCase.caseId)
+    }
   }
 
   // ── get ───────────────────────────────────────────────────────────────────

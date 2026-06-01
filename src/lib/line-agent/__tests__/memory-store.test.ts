@@ -10,6 +10,11 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { MemoryStore } from '../storage/memory-store'
 import { createInitialCase } from '../cases/case-state'
 import type { AgentCase } from '../cases/case-state'
+import { runCaseStoreContract } from './case-store-contract'
+
+// Shared behavioural contract — the same suite runs against KvStore so the two
+// implementations cannot silently diverge.
+runCaseStoreContract('MemoryStore', () => new MemoryStore())
 
 // ---------------------------------------------------------------------------
 // Fixtures
