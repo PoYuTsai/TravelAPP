@@ -8,13 +8,17 @@
  *   2. Verify the `x-line-signature` header → 401 on failure; do nothing else.
  *   3. Parse events, normalize each one via event-normalizer.
  *   4. Route each normalized event through the routing seam (awaited so routing
- *      is guaranteed to run before the 200).
- *   5. Respond 200 after routing completes.  LINE requires a fast
- *      acknowledgement, so routing must stay cheap in M1.
+ *      is guaranteed to run before the response).  The default handler persists
+ *      OA customer cases through the reducer + durable store.
+ *   5. Respond 200 once every event is persisted.  LINE requires a fast
+ *      acknowledgement, so routing must stay cheap (no LLM/Notion/quote work).
  *
- * M1 scope: this endpoint only NORMALIZES and ROUTES events.  Case persistence
- * / durable queue / KvStore production wiring is a Task 7/9 follow-up — nothing
- * is persisted here yet.
+ * FAIL LOUD on persistence failure (M2 Hard Rule):
+ *   A case-persist failure must NOT be swallowed with a 200.  It returns 500 so
+ *   LINE re-delivers the event — LINE's at-least-once retry is our durable
+ *   buffer, which is why no queue is needed.  Benign, non-persistence event
+ *   errors (a malformed single event, an unsupported message) are distinguished
+ *   in code and still ack 200; they are not lumped into one catch-all.
  *
  * Design notes:
  * ─────────────
@@ -34,14 +38,16 @@
  * The injectable handler and store live in `@/lib/line-agent/line/webhook-runtime`
  * (a Next.js route file may only export HTTP-method handlers, so the
  * setters/getters cannot live here).  The default handler routes each event
- * through `routeCommand`; a test or future bootstrap may override it via
- * `setEventHandler(...)` without changing the call site below.
+ * through `routeCommand`, which persists OA cases via the reducer + store; a
+ * test or future bootstrap may override it via `setEventHandler(...)` /
+ * `setStore(...)` without changing the call site below.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyLineSignature } from '@/lib/line-agent/line/signature'
 import { normalizeLineEvent } from '@/lib/line-agent/line/event-normalizer'
 import { getEventHandler, getStore } from '@/lib/line-agent/line/webhook-runtime'
+import { CasePersistenceError } from '@/lib/line-agent/errors'
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -76,32 +82,49 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const rawEvents: unknown[] = Array.isArray(payload.events) ? payload.events : []
   const partnerGroupId = process.env.LINE_PARTNER_GROUP_ID ?? ''
 
-  // Snapshot the seam once per request (live module bindings via getters)
+  // Snapshot the seam once per request (live module bindings via getters).
+  // getStore() may throw StoreBootstrapError in a misconfigured production
+  // deployment (KV env missing) — that is fail-closed: do NOT ack, return 500.
   const eventHandler = getEventHandler()
-  const store = getStore()
+  let store
+  try {
+    store = getStore()
+  } catch {
+    return NextResponse.json({ error: 'store unavailable' }, { status: 500 })
+  }
 
-  // ── 4. Normalize + route each event.  Routing is AWAITED before the 200 so
-  //       no event is dropped if the process is torn down right after the ack
+  // ── 4. Normalize + route each event.  Routing is AWAITED before the response
+  //       so no event is dropped if the process is torn down right after the ack
   //       (the prior fire-and-forget pattern lost events on serverless tear-
-  //       down).  Per-event try/catch keeps one bad event from crashing the
-  //       batch or blocking the 200.  Routing must stay cheap so the ack is fast.
-  const processEvents = async (): Promise<void> => {
-    for (const rawEvent of rawEvents) {
-      try {
-        const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId)
-        if (normalized === null) continue // skip non-actionable / non-partner events
+  //       down).
+  //
+  //       Two error classes, DISTINGUISHED in code (M2 Hard Rule):
+  //        - CasePersistenceError → the case was NOT durably stored.  Stop and
+  //          return 500 so LINE re-delivers the whole batch (at-least-once).
+  //        - any other per-event error (malformed single event, benign no-op)
+  //          → swallow and keep the 200; one bad event must not block the ack.
+  let persistenceFailed = false
+  for (const rawEvent of rawEvents) {
+    try {
+      const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId)
+      if (normalized === null) continue // skip non-actionable / non-partner / room events
 
-        // Route to the handler seam (default handler calls routeCommand)
-        await eventHandler(normalized, store)
-      } catch {
-        // Individual event errors must not crash the handler or block 200
-        // Errors are intentionally swallowed here; the router should log internally
+      // Route to the handler seam (default handler persists via routeCommand)
+      await eventHandler(normalized, store)
+    } catch (err) {
+      if (err instanceof CasePersistenceError) {
+        // Durable persistence failed — fail loud so LINE retries.
+        persistenceFailed = true
+        break
       }
+      // Benign / non-persistence error — intentionally swallowed; the router
+      // logs internally and the ack proceeds.
     }
   }
 
-  await processEvents()
-
-  // ── 5. Respond 200 after routing completes
+  // ── 5. Persistence failure → 500 (no ack, LINE retries); otherwise ack 200.
+  if (persistenceFailed) {
+    return NextResponse.json({ error: 'case persistence failed' }, { status: 500 })
+  }
   return NextResponse.json({ ok: true }, { status: 200 })
 }

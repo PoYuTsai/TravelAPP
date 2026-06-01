@@ -16,6 +16,7 @@ import type { CommandIntent } from './intent'
 import type { CaseStore } from '../storage/store'
 import { createInitialCase } from '../cases/case-state'
 import { caseReducer } from '../cases/case-reducer'
+import { CasePersistenceError } from '../errors'
 
 // ---------------------------------------------------------------------------
 // Handler result type
@@ -93,7 +94,20 @@ export async function handleCreateOrUpdateCase(
 ): Promise<HandlerResult> {
   const now = new Date(event.timestamp).toISOString()
 
-  const existing = await store.getByLineUserId(event.lineUserId)
+  // Wrap ONLY store I/O so a persistence failure surfaces as a typed
+  // CasePersistenceError → webhook returns 500 → LINE retries.  The pure
+  // reducer below is intentionally NOT wrapped: a logic guard must not be
+  // misclassified as a transient persistence failure (it would retry forever).
+  const persist = async <T>(op: () => Promise<T>): Promise<T> => {
+    try {
+      return await op()
+    } catch (err) {
+      if (err instanceof CasePersistenceError) throw err
+      throw new CasePersistenceError(event.lineUserId, { cause: err })
+    }
+  }
+
+  const existing = await persist(() => store.getByLineUserId(event.lineUserId))
   const created = existing === null
 
   const current =
@@ -105,7 +119,7 @@ export async function handleCreateOrUpdateCase(
       now,
     })
 
-  const prevAudit = created ? [] : await store.getAudit(current.caseId)
+  const prevAudit = created ? [] : await persist(() => store.getAudit(current.caseId))
 
   // Reuse the canonical reducer — do not reimplement transitions here.
   const { case: nextCase, audit } = caseReducer(
@@ -114,8 +128,8 @@ export async function handleCreateOrUpdateCase(
     prevAudit
   )
 
-  await store.put(nextCase)
-  await store.appendAudit(nextCase.caseId, audit[audit.length - 1])
+  await persist(() => store.put(nextCase))
+  await persist(() => store.appendAudit(nextCase.caseId, audit[audit.length - 1]))
 
   return {
     handler: 'handleCreateOrUpdateCase',

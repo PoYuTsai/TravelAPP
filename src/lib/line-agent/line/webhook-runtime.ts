@@ -11,9 +11,9 @@
  * current handler/store via the getters at request time, while a test (or a
  * future bootstrap) injects an alternative implementation via the setters.
  *
- * M1 scope: the default handler normalizes and ROUTES events through
- * `routeCommand`.  Handlers remain stubs — case persistence / durable queue /
- * KvStore production wiring is a Task 7/9 follow-up.  No customer auto-reply.
+ * The default handler routes events through `routeCommand`, which durably
+ * persists OA customer cases via the reducer + the bootstrapped store
+ * (KvStore in production, MemoryStore locally).  No customer auto-reply.
  */
 
 import type { NormalizedLineEvent } from '@/lib/line-agent/line/event-normalizer'
@@ -40,8 +40,9 @@ export type NormalizedEventHandler = (
 
 /**
  * Default handler: route the normalized event through the command router using
- * the safe default classifier (no API calls, no keys).  Handlers invoked by
- * the router stay stubs in M1 — this only proves the event reaches routing.
+ * the safe default classifier (no API calls, no keys).  For OA customer events
+ * the router persists the case via the reducer + store; a persistence failure
+ * propagates as CasePersistenceError so the route can return 500.
  */
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   await routeCommand({ event, store, llmClassifier: safeDefaultLlmClassifier })

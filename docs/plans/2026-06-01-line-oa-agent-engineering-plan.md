@@ -570,4 +570,3 @@ Recommended split:
 6. After deployment, the bot creates bug packets for operational failures instead of quietly guessing.
 
 This two-agent workflow fits Harness Engineering: CC executes with constraints and tests; Codex acts as reviewer and second-order sanity check.
-
