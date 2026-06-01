@@ -20,6 +20,19 @@ import { caseReducer } from '../cases/case-reducer'
 import { CasePersistenceError } from '../errors'
 
 // ---------------------------------------------------------------------------
+// Idempotency tuning
+// ---------------------------------------------------------------------------
+
+/**
+ * Most recent LINE messageIds retained per case for redelivery de-duplication.
+ * The set exists only to absorb LINE's at-least-once redelivery window, so it
+ * is bounded FIFO — once a case exceeds this many distinct messages the oldest
+ * ids are evicted.  MVP value; revisit (TTL / event-store) only if real case
+ * volume ever outgrows it.
+ */
+const MAX_PROCESSED_MESSAGE_IDS = 200
+
+// ---------------------------------------------------------------------------
 // Handler result type
 // ---------------------------------------------------------------------------
 
@@ -154,13 +167,15 @@ export async function handleCreateOrUpdateCase(
 
   // Record the messageId so a later redelivery is recognised as a duplicate.
   // Only non-empty ids participate in the idempotency set (see gate above).
-  // The set is bounded in practice by case lifetime (a case reaches a terminal
-  // status after at most a few dozen customer messages); a hard retention cap
-  // is a deliberate follow-up if that ever proves insufficient.
+  // The set is capped FIFO at MAX_PROCESSED_MESSAGE_IDS so a long-lived case
+  // never grows an unbounded KV value; the oldest ids fall out of the window.
   const caseToPersist: AgentCase =
     messageId === ''
       ? nextCase
-      : { ...nextCase, processedMessageIds: [...seen, messageId] }
+      : {
+          ...nextCase,
+          processedMessageIds: [...seen, messageId].slice(-MAX_PROCESSED_MESSAGE_IDS),
+        }
 
   await persist(() => store.put(caseToPersist))
   await persist(() => store.appendAudit(caseToPersist.caseId, audit[audit.length - 1]))

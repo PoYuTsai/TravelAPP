@@ -232,6 +232,25 @@ describe('OA message persistence — idempotent redelivery', () => {
     const audit = await store.getAudit(persisted!.caseId)
     expect(audit).toHaveLength(2)
   })
+
+  it('caps processedMessageIds at the 200 most recent (FIFO evicts oldest)', async () => {
+    // Fold in 201 distinct messages from the same user — the dedup set must
+    // stay bounded so a long-lived case never grows an unbounded KV value.
+    for (let i = 0; i < 201; i++) {
+      await routeCommand({
+        event: makeOaEvent({ messageId: `msg_${i}`, timestamp: TS0 + i }),
+        store,
+        llmClassifier: analyzeStub,
+      })
+    }
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.processedMessageIds).toHaveLength(200)
+    // Oldest id (msg_0) is evicted FIFO; the most recent 200 are retained.
+    expect(persisted?.processedMessageIds).not.toContain('msg_0')
+    expect(persisted?.processedMessageIds[0]).toBe('msg_1')
+    expect(persisted?.processedMessageIds.at(-1)).toBe('msg_200')
+  })
 })
 
 // ---------------------------------------------------------------------------
