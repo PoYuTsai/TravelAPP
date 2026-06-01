@@ -83,6 +83,20 @@ export interface LlmIntentClassifier {
   classify(text: string): Promise<CommandIntent>
 }
 
+/**
+ * Safe default classifier used by the route/webhook wiring in M1.
+ *
+ * It performs NO API calls and requires NO keys: every fallback resolves to an
+ * `'unknown'` intent.  Known commands are still handled by the deterministic
+ * pass in `classifyIntent`; this stub only covers the cases the deterministic
+ * pass cannot classify.  The real model adapter replaces it post-M1.
+ */
+export const safeDefaultLlmClassifier: LlmIntentClassifier = {
+  async classify(): Promise<CommandIntent> {
+    return { action: 'unknown', confidence: 'low', source: 'llm' }
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Deterministic keyword patterns (source of truth for KNOWN commands)
 // ---------------------------------------------------------------------------

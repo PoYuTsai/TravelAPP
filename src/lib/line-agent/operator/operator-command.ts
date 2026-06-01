@@ -142,7 +142,7 @@ export function parseOperatorCommand(input: OperatorCommandInput): ParseCommandR
     return {
       ok: false,
       code: 'INVALID_COMMAND',
-      message: `sourceChannel must be one of: ${[...VALID_OPERATOR_SOURCE_CHANNELS].join(', ')}. Got: ${input.sourceChannel ?? '(missing)'}`,
+      message: `sourceChannel must be one of: ${Array.from(VALID_OPERATOR_SOURCE_CHANNELS).join(', ')}. Got: ${input.sourceChannel ?? '(missing)'}`,
     }
   }
 
@@ -169,7 +169,7 @@ export function parseOperatorCommand(input: OperatorCommandInput): ParseCommandR
       return {
         ok: false,
         code: 'INVALID_COMMAND',
-        message: `sendTarget.channel must be one of: ${[...VALID_SEND_TARGET_CHANNELS].join(', ')}. Got: ${channel ?? '(missing)'}`,
+        message: `sendTarget.channel must be one of: ${Array.from(VALID_SEND_TARGET_CHANNELS).join(', ')}. Got: ${channel ?? '(missing)'}`,
       }
     }
 

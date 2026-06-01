@@ -201,4 +201,15 @@ describe('normalizeLineEvent', () => {
     const e = normalizeLineEvent(raw, PARTNER_GROUP_ID) as NormalizedLineEvent
     expect(e.sourceChannel).toBe('line_oa')
   })
+
+  it('returns null for a group message from a non-partner group (wrong groupId is ignored)', () => {
+    // Bot may be in some other group; events from a group whose id does NOT
+    // match the configured partner group must be ignored — they must NOT
+    // become line_partner_group events.
+    const raw = makeGroupTextEvent({
+      source: { type: 'group', groupId: 'C_some_other_group_999', userId: 'U_stranger_001' },
+    })
+    const result = normalizeLineEvent(raw, PARTNER_GROUP_ID)
+    expect(result).toBeNull()
+  })
 })

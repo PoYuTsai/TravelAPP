@@ -7,7 +7,10 @@
  *
  * Normalization rules:
  * - source.type === 'user'  → official OA 1:1 customer event  (line_oa)
- * - source.type === 'group' → partner-group event              (line_partner_group)
+ * - source.type === 'group' AND groupId === partnerGroupId → partner-group
+ *   event (line_partner_group)
+ * - source.type === 'group' AND groupId !== partnerGroupId → null (the bot is
+ *   in some non-partner group; that traffic is ignored)
  *
  * Kind routing:
  *   message.type === 'text' + no quotedMessageId  → 'oa_text' | 'group_text'
@@ -110,6 +113,15 @@ export function normalizeLineEvent(
   if (raw.type !== 'message') return null
 
   const source = raw.source ?? {}
+
+  // Partner-group guard: the bot may be a member of groups other than the
+  // configured partner group.  A group event whose groupId does NOT match
+  // partnerGroupId is not actionable — return null so the handler ignores it
+  // (and it never becomes a line_partner_group event).
+  if (source.type === 'group' && source.groupId !== partnerGroupId) {
+    return null
+  }
+
   const message = raw.message ?? {}
   const timestamp: number = raw.timestamp ?? Date.now()
 

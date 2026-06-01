@@ -48,7 +48,7 @@ export class MemoryStore implements CaseStore {
     // we guard defensively by returning the most recently updated one.
     let best: AgentCase | null = null
 
-    for (const c of this.cases.values()) {
+    for (const c of Array.from(this.cases.values())) {
       if (c.lineUserId !== lineUserId) continue
       if (c.status === 'converted' || c.status === 'lost') continue
       if (

@@ -10,9 +10,14 @@
  *   - Returns 400 when the command body is malformed.
  *
  * What this endpoint does NOT do:
- *   - It does NOT post to LINE. Posting permission is enforced by the Task 6
- *     command router and permissions layer.
- *   - It returns an OperatorResponse that the caller (DC bot) prints to Discord.
+ *   - It does NOT post to LINE. Posting permission is enforced by the command
+ *     router and permissions layer; this route only returns the routing
+ *     decision for the DC bot to act on.
+ *   - It returns the RouterDecision the caller (DC bot) prints to Discord.
+ *
+ * M1 scope: this route NORMALIZES + ROUTES the command (draft vs.
+ * post_to_partner_group vs. denied).  Handlers behind the router are stubs;
+ * durable persistence is a Task 7/9 follow-up.  No customer auto-reply.
  *
  * NOTE: Native Discord interaction / slash-command route is deferred until
  * the internal HTTP bridge is verified working end-to-end. Do NOT add it here.
@@ -24,7 +29,8 @@ import {
   parseOperatorCommand,
   type OperatorCommandInput,
 } from '@/lib/line-agent/operator/operator-command'
-import { buildAcknowledgement, buildErrorResponse } from '@/lib/line-agent/operator/operator-response'
+import { routeCommand } from '@/lib/line-agent/commands/router'
+import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
 
 // The expected secret is read from env at request time so tests can inject it
 // via environment without module-level caching issues.
@@ -66,11 +72,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const command = parseResult.command
 
-  // ── 3. Build response ──────────────────────────────────────────────────────
-  // Produce a deterministic acknowledgement / draft response.
-  // The actual command execution (routing, LLM calls, LINE posting) is handled
-  // by the Task 6 command router.  For now we acknowledge and return.
-  const response = buildAcknowledgement(command)
+  // ── 3. Route the command ────────────────────────────────────────────────────
+  // Routing is gated by the permission layer.  With no sendTarget the router
+  // returns a 'draft' decision; with an explicit valid sendTarget it returns
+  // 'post_to_partner_group'.  The safe default classifier makes no API calls
+  // and needs no keys — the deterministic pass handles known commands, and the
+  // permission layer still gates the final action.  Handlers stay stubs in M1;
+  // this route never posts to LINE itself.
+  const decision = await routeCommand({
+    command,
+    llmClassifier: safeDefaultLlmClassifier,
+  })
 
-  return NextResponse.json(response, { status: 200 })
+  return NextResponse.json(decision, { status: 200 })
 }

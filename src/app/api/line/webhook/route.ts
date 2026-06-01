@@ -7,10 +7,14 @@
  *   1. Read the raw request body (needed for HMAC-SHA256 signature check).
  *   2. Verify the `x-line-signature` header → 401 on failure; do nothing else.
  *   3. Parse events, normalize each one via event-normalizer.
- *   4. Persist normalized events in the CaseStore.
- *   5. Hand off to the routing seam (see `handleNormalizedEvent` below).
- *   6. Respond 200 immediately.  LINE requires a fast acknowledgement.
- *      Heavy LLM/Notion/API work MUST NOT block this 200 response.
+ *   4. Route each normalized event through the routing seam (awaited so routing
+ *      is guaranteed to run before the 200).
+ *   5. Respond 200 after routing completes.  LINE requires a fast
+ *      acknowledgement, so routing must stay cheap in M1.
+ *
+ * M1 scope: this endpoint only NORMALIZES and ROUTES events.  Case persistence
+ * / durable queue / KvStore production wiring is a Task 7/9 follow-up — nothing
+ * is persisted here yet.
  *
  * Design notes:
  * ─────────────
@@ -27,67 +31,17 @@
  * in MVP.  Only Eric or the partner group may initiate messages to customers.
  *
  * ROUTING SEAM:
- * Task 6 will implement the full command/event router.  Until then,
- * `handleNormalizedEvent` is a stub exported from this file.  Task 6 MUST
- * replace it by injecting or importing the real router without changing the
- * call site in the POST handler.  Use the `setEventHandler` setter to wire
- * the router without requiring a direct import of a not-yet-existing module.
+ * The injectable handler and store live in `@/lib/line-agent/line/webhook-runtime`
+ * (a Next.js route file may only export HTTP-method handlers, so the
+ * setters/getters cannot live here).  The default handler routes each event
+ * through `routeCommand`; a test or future bootstrap may override it via
+ * `setEventHandler(...)` without changing the call site below.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyLineSignature } from '@/lib/line-agent/line/signature'
 import { normalizeLineEvent } from '@/lib/line-agent/line/event-normalizer'
-import type { NormalizedLineEvent } from '@/lib/line-agent/line/event-normalizer'
-import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
-import type { CaseStore } from '@/lib/line-agent/storage/store'
-
-// ---------------------------------------------------------------------------
-// Routing seam — injectable handler for Task 6
-// ---------------------------------------------------------------------------
-
-/**
- * The normalized-event handler.  Default is a no-op stub.
- *
- * Task 6 calls `setEventHandler(myRouter)` to wire the real command router
- * without modifying the POST handler below.
- *
- * The handler is intentionally fire-and-forget (not awaited before 200)
- * to keep the LINE acknowledgement fast.
- */
-type NormalizedEventHandler = (
-  event: NormalizedLineEvent,
-  store: CaseStore
-) => Promise<void>
-
-let _eventHandler: NormalizedEventHandler = async () => {
-  // Stub: Task 6 will replace this via setEventHandler()
-}
-
-/**
- * Register the real command router.  Called once at application startup by
- * Task 6.  The handler must be idempotent — it may be called multiple times
- * in test environments.
- */
-export function setEventHandler(handler: NormalizedEventHandler): void {
-  _eventHandler = handler
-}
-
-// ---------------------------------------------------------------------------
-// Store seam — injectable store for tests
-// ---------------------------------------------------------------------------
-
-/**
- * The shared CaseStore instance.  Defaults to MemoryStore (safe for tests
- * and local dev).  Production wires a KvStore via `setStore()`.
- */
-let _store: CaseStore = new MemoryStore()
-
-/**
- * Override the store (called by production bootstrap or in tests).
- */
-export function setStore(store: CaseStore): void {
-  _store = store
-}
+import { getEventHandler, getStore } from '@/lib/line-agent/line/webhook-runtime'
 
 // ---------------------------------------------------------------------------
 // POST handler
@@ -122,16 +76,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const rawEvents: unknown[] = Array.isArray(payload.events) ? payload.events : []
   const partnerGroupId = process.env.LINE_PARTNER_GROUP_ID ?? ''
 
-  // ── 4 & 5. Normalize + hand off to router (fire-and-forget — must not
-  //           delay the 200 response to LINE)
+  // Snapshot the seam once per request (live module bindings via getters)
+  const eventHandler = getEventHandler()
+  const store = getStore()
+
+  // ── 4. Normalize + route each event.  Routing is AWAITED before the 200 so
+  //       no event is dropped if the process is torn down right after the ack
+  //       (the prior fire-and-forget pattern lost events on serverless tear-
+  //       down).  Per-event try/catch keeps one bad event from crashing the
+  //       batch or blocking the 200.  Routing must stay cheap so the ack is fast.
   const processEvents = async (): Promise<void> => {
     for (const rawEvent of rawEvents) {
       try {
         const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId)
-        if (normalized === null) continue // skip non-message events
+        if (normalized === null) continue // skip non-actionable / non-partner events
 
-        // Route to the handler seam (Task 6 wires the real router)
-        await _eventHandler(normalized, _store)
+        // Route to the handler seam (default handler calls routeCommand)
+        await eventHandler(normalized, store)
       } catch {
         // Individual event errors must not crash the handler or block 200
         // Errors are intentionally swallowed here; the router should log internally
@@ -139,11 +100,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  // Kick off processing without awaiting — LINE needs the 200 fast
-  processEvents().catch(() => {
-    // Background errors must not surface to the response
-  })
+  await processEvents()
 
-  // ── 6. Respond 200 fast
+  // ── 5. Respond 200 after routing completes
   return NextResponse.json({ ok: true }, { status: 200 })
 }
