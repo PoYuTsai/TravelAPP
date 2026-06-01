@@ -30,6 +30,7 @@ export class MemoryStore implements CaseStore {
       missingFields: [...agentCase.missingFields],
       knownFacts: { ...agentCase.knownFacts },
       linkedGroupMessageIds: [...agentCase.linkedGroupMessageIds],
+      processedMessageIds: [...agentCase.processedMessageIds],
     })
   }
 

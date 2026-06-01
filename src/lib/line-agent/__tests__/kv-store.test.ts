@@ -112,6 +112,7 @@ describe('KvStore fail-closed when unconfigured', () => {
           missingFields: [],
           knownFacts: {},
           linkedGroupMessageIds: [],
+          processedMessageIds: [],
         })
       ).rejects.toBeInstanceOf(KvNotConfiguredError)
     } finally {

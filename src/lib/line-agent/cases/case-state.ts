@@ -101,6 +101,15 @@ export interface AgentCase {
    * Used to link quoted replies back to this case.
    */
   linkedGroupMessageIds: string[]
+
+  /**
+   * LINE messageIds already folded into this case — the idempotency key set
+   * for at-least-once webhook delivery.  LINE may redeliver the same event
+   * (e.g. after a 500), so the handler skips any messageId already present
+   * here.  Bounded to a recent window (a redelivery always arrives within
+   * minutes, never after hundreds of newer messages).
+   */
+  processedMessageIds: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -133,5 +142,6 @@ export function createInitialCase(params: CreateInitialCaseParams): AgentCase {
     missingFields: [],
     knownFacts: {},
     linkedGroupMessageIds: [],
+    processedMessageIds: [],
   }
 }

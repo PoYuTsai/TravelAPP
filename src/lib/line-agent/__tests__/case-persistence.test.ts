@@ -151,6 +151,90 @@ describe('OA message persistence — update existing', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Idempotent redelivery (LINE at-least-once delivery)
+// ---------------------------------------------------------------------------
+
+describe('OA message persistence — idempotent redelivery', () => {
+  let store: MemoryStore
+  beforeEach(() => {
+    store = new MemoryStore()
+  })
+
+  it('ignores a redelivered message with the same LINE messageId (no duplicate audit)', async () => {
+    // First delivery — creates the case and appends one audit entry.
+    await routeCommand({ event: makeOaEvent(), store, llmClassifier: analyzeStub })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    const auditAfterFirst = await store.getAudit(persisted!.caseId)
+    expect(auditAfterFirst).toHaveLength(1)
+
+    // LINE redelivers the EXACT same event (at-least-once) — must be a no-op.
+    const decision = await routeCommand({
+      event: makeOaEvent(),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    expect(decision.action).toBe('silent')
+
+    const auditAfterRedeliver = await store.getAudit(persisted!.caseId)
+    expect(auditAfterRedeliver).toHaveLength(1) // unchanged — no duplicate audit
+  })
+
+  it('keys dedup on messageId, not timestamp (a redelivery never bumps lastCustomerMessageAt)', async () => {
+    await routeCommand({
+      event: makeOaEvent({ timestamp: TS0 }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    // Same messageId, later timestamp — still a redelivery of the SAME message.
+    await routeCommand({
+      event: makeOaEvent({ timestamp: TS1 }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.lastCustomerMessageAt).toBe('2023-11-14T22:13:20.000Z') // TS0, not bumped
+  })
+
+  it('still processes a genuinely new messageId from the same user (not over-deduped)', async () => {
+    await routeCommand({ event: makeOaEvent(), store, llmClassifier: analyzeStub })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    await routeCommand({
+      event: makeOaEvent({ messageId: 'msg_distinct', timestamp: TS1, text: '想加一天' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const auditAfterSecond = await store.getAudit(persisted!.caseId)
+    expect(auditAfterSecond).toHaveLength(2) // a distinct message DOES append
+  })
+
+  it('does not dedup when messageId is empty (missing id must never collapse messages)', async () => {
+    await routeCommand({
+      event: makeOaEvent({ messageId: '' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+    const persisted = await store.getByLineUserId('U_customer_persist')
+
+    // A second id-less message must NOT be swallowed as a "duplicate empty id".
+    const decision = await routeCommand({
+      event: makeOaEvent({ messageId: '', timestamp: TS1 }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    expect(decision.action).toBe('update_case')
+    const audit = await store.getAudit(persisted!.caseId)
+    expect(audit).toHaveLength(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Never a customer-facing reply
 // ---------------------------------------------------------------------------
 

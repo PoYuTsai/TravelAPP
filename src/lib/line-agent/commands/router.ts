@@ -140,6 +140,11 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
           )
         }
         const handlerResult = await handleCreateOrUpdateCase(event, store, deps)
+        // A redelivered (already-processed) message is a true no-op: the
+        // handler deduped it, so nothing was created or updated.
+        if (handlerResult.meta?.deduped) {
+          return { action: 'silent', source, denied: false, handlerResult }
+        }
         return {
           // Distinguish first-contact (create) from a follow-up (update).
           action: handlerResult.meta?.created ? 'create_case' : 'update_case',

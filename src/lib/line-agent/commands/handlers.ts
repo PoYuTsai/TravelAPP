@@ -14,6 +14,7 @@ import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { OperatorCommand } from '../operator/operator-command'
 import type { CommandIntent } from './intent'
 import type { CaseStore } from '../storage/store'
+import type { AgentCase } from '../cases/case-state'
 import { createInitialCase } from '../cases/case-state'
 import { caseReducer } from '../cases/case-reducer'
 import { CasePersistenceError } from '../errors'
@@ -119,6 +120,29 @@ export async function handleCreateOrUpdateCase(
       now,
     })
 
+  // ── Idempotency gate (LINE at-least-once delivery) ───────────────────────
+  // LINE may redeliver the SAME event (e.g. after a 500 retry).  If this
+  // messageId was already folded into the case, skip the reducer/persist
+  // entirely so we never grow a duplicate audit entry or re-bump timestamps.
+  // Empty messageId (a message that arrived without an id) is NEVER deduped —
+  // collapsing all id-less messages into one would silently drop real ones.
+  const messageId = event.messageId
+  const seen = current.processedMessageIds ?? []
+  if (messageId !== '' && seen.includes(messageId)) {
+    return {
+      handler: 'handleCreateOrUpdateCase',
+      status: 'stub_skipped',
+      meta: {
+        caseId: current.caseId,
+        created: false,
+        deduped: true,
+        status: current.status,
+        kind: event.kind,
+        sourceChannel: event.sourceChannel,
+      },
+    }
+  }
+
   const prevAudit = created ? [] : await persist(() => store.getAudit(current.caseId))
 
   // Reuse the canonical reducer — do not reimplement transitions here.
@@ -128,16 +152,26 @@ export async function handleCreateOrUpdateCase(
     prevAudit
   )
 
-  await persist(() => store.put(nextCase))
-  await persist(() => store.appendAudit(nextCase.caseId, audit[audit.length - 1]))
+  // Record the messageId so a later redelivery is recognised as a duplicate.
+  // Only non-empty ids participate in the idempotency set (see gate above).
+  // The set is bounded in practice by case lifetime (a case reaches a terminal
+  // status after at most a few dozen customer messages); a hard retention cap
+  // is a deliberate follow-up if that ever proves insufficient.
+  const caseToPersist: AgentCase =
+    messageId === ''
+      ? nextCase
+      : { ...nextCase, processedMessageIds: [...seen, messageId] }
+
+  await persist(() => store.put(caseToPersist))
+  await persist(() => store.appendAudit(caseToPersist.caseId, audit[audit.length - 1]))
 
   return {
     handler: 'handleCreateOrUpdateCase',
     status: 'stub_ok',
     meta: {
-      caseId: nextCase.caseId,
+      caseId: caseToPersist.caseId,
       created,
-      status: nextCase.status,
+      status: caseToPersist.status,
       kind: event.kind,
       sourceChannel: event.sourceChannel,
     },
