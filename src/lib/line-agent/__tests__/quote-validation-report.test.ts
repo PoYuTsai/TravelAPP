@@ -169,6 +169,18 @@ describe('generateValidationReport — math error fixture', () => {
   })
 })
 
+describe('generateValidationReport — bracket ticket fixture', () => {
+  it('keeps math valid when ticket audience is written in parentheses', () => {
+    const text = loadNamedFixture('messy-quote-examples.txt', 'bracket-ticket')
+    const report = generateValidationReport(text, 2026)
+
+    expect(report.computedTotal).toBe(12900)
+    expect(report.statedTotal).toBe(12900)
+    expect(report.mathOk).toBe(true)
+    expect(report.severity).not.toBe('blocked')
+  })
+})
+
 // ---------------------------------------------------------------------------
 // Programmatically constructed math-inconsistent quote → 'blocked'
 // ---------------------------------------------------------------------------

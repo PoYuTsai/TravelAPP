@@ -235,3 +235,16 @@ describe('reviewQuotation — clean fixture', () => {
     expect(review.currencyAmbiguous).toBe(false)
   })
 })
+
+describe('reviewQuotation — bracket ticket fixture', () => {
+  it('extracts ticket items whose audience is written in parentheses', () => {
+    const text = loadNamedFixture('messy-quote-examples.txt', 'bracket-ticket')
+    const review = reviewQuotation(text, 2026)
+
+    const elephantTicket = review.ticketItems.find(item => item.description === '大象門票（大人）')
+    const nightSafariTicket = review.ticketItems.find(item => item.description === '夜間動物園門票（成人）')
+
+    expect(elephantTicket).toMatchObject({ unitPrice: 950, quantity: 4, unit: '' })
+    expect(nightSafariTicket).toMatchObject({ unitPrice: 1600, quantity: 2, unit: '人' })
+  })
+})

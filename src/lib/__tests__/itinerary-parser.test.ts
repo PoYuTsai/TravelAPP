@@ -255,6 +255,24 @@ describe('parseQuotationText', () => {
     expect(result.items[0].unit).toBe('天')
   })
 
+  it('解析括號客群且價格直接相連的門票乘數格式', () => {
+    const result = parseQuotationText('大象門票（大人）950*4', 2026)
+    expect(result.items.length).toBe(1)
+    expect(result.items[0].description).toBe('大象門票（大人）')
+    expect(result.items[0].unitPrice).toBe(950)
+    expect(result.items[0].quantity).toBe(4)
+    expect(result.items[0].unit).toBe('')
+  })
+
+  it('解析帶逗號金額、空白與乘號的門票乘數格式', () => {
+    const result = parseQuotationText('夜間動物園門票（成人） 1,600 × 2人', 2026)
+    expect(result.items.length).toBe(1)
+    expect(result.items[0].description).toBe('夜間動物園門票（成人）')
+    expect(result.items[0].unitPrice).toBe(1600)
+    expect(result.items[0].quantity).toBe(2)
+    expect(result.items[0].unit).toBe('人')
+  })
+
   it('解析簡單項目: 保險 500', () => {
     const result = parseQuotationText('保險 500', 2026)
     expect(result.items.length).toBe(1)

@@ -572,14 +572,14 @@ export function parseQuotationText(text: string, year?: number): ParsedQuotation
       continue
     }
 
-    // 格式: 導遊 2500*6天
+    // 格式: 導遊 2500*6天 / 大象門票（大人）950*4
     const itemWithMultiply = trimmed.match(
-      /^(?:(\d{1,2})[\/\-](\d{1,2})\s+)?(.+?)\s+(\d+)\s*[*×x]\s*(\d+)\s*(台|天|日|位|人)?$/i
+      /^(?:(\d{1,2})[\/\-](\d{1,2})\s+)?(.+?)\s*([\d,]+)\s*[*×x]\s*(\d+)\s*(台|天|日|位|人)?$/i
     )
     if (itemWithMultiply) {
       const item: ParsedQuotationItem = {
         description: itemWithMultiply[3].trim(),
-        unitPrice: parseInt(itemWithMultiply[4], 10),
+        unitPrice: parseInt(itemWithMultiply[4].replace(/,/g, ''), 10),
         quantity: parseInt(itemWithMultiply[5], 10),
         unit: itemWithMultiply[6] || '',
       }
