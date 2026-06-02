@@ -1,6 +1,6 @@
 # Phase C — Quote URL Automation (Dry-Run) Design
 
-- **Status:** design (brainstormed, awaiting implementation in a fresh session)
+- **Status:** design locked (all 3 micro-decisions confirmed by Eric 2026-06-02; awaiting TDD implementation in a fresh session)
 - **Date:** 2026-06-02
 - **Branch:** `codex/line-oa-agent-mvp`
 - **Engineering plan task:** Task 10 (`docs/plans/2026-06-01-line-oa-agent-engineering-plan.md:418`)
@@ -57,33 +57,33 @@ sourceChannel       ┘      2. parseQuotationText + reviewQuotation
                            4. severity gate:
                                 'blocked'           → return { status: 'blocked', report, draft: null, url: null }
                                 'ok'|'needs_human'  → build draft payload (projection onto itinerary schema)
-                                                    → quote-url.buildWouldBeUrl(...) (flagged not-official)
+                                                    → quote-url.buildWouldBeQuoteUrl({origin,caseId}) → /quote/DRAFT-<caseId>, isOfficial:false
                                                     → sanity-write stub: assertNotWritten() (no mutation)
                                                     → return { status, report, draft, wouldBeUrl }
                            5. audit-log append: 'quote.dryrun' entry (no write performed)
 ```
 
-## Micro-decisions (my recommendation — confirm or override)
+## Decisions (confirmed by Eric, 2026-06-02)
 
-1. **Would-be URL representation.** `quote-url.ts` stays pure: `generateSlug()` (random 8-char, deterministic-testable via injected RNG) + `buildQuoteUrl({ origin, slug })`. The *dry-run flagging* lives in `create-quote.ts`, which wraps the result as:
+1. **Would-be URL representation — CONFIRMED.** `quote-url.ts` stays pure: `buildWouldBeQuoteUrl({ origin, caseId })`. The dry-run flagging is the return shape itself:
    ```ts
    interface WouldBeQuoteUrl {
-     wouldBeUrl: string            // e.g. https://chiangway-travel.com/quote/<slug>
+     wouldBeUrl: string            // e.g. https://chiangway-travel.com/quote/DRAFT-<caseId>
      isOfficial: false             // always false this phase
      reason: 'no_sanity_document_written'
-     note: string                  // human-readable 繁中: 「尚未建檔，此為預覽用網址，非正式連結」
+     note: string                  // 繁中: 「尚未建檔，此為預覽用網址，非正式連結，不可傳給客戶」
    }
    ```
-   → Keeps `quote-url.ts` reusable for the future real path while making "not official" impossible to miss.
+   **Hard contract:** every consumer / display surface (command router, LINE/DC relay, logs) must treat this as **non-official preview only** — never render it as a sendable link. Encode this expectation in `create-quote.test.ts` and in the router-facing summary text.
 
-2. **Slug in dry-run.** Generate a **real-format** random 8-char slug (so the preview looks structurally identical to the eventual real URL) but never reserve/persist it. Rationale: lets Eric eyeball the exact URL shape; the `isOfficial: false` + `reason` fields carry the "not real" signal, not a deliberately-ugly slug. *(Alternative if you prefer maximum safety: use a fixed `DRAFT-<caseId>` placeholder so it can never be mistaken for a live link. Tell me which.)*
+2. **Slug in dry-run — CONFIRMED (Eric override → placeholder, NOT random).** Use a fixed `DRAFT-<caseId>` placeholder slug. **Do not** mint a real-format random 8-char slug this phase. Rationale (Eric): with no Sanity write, any real-looking `/quote/<8char>` URL risks Eric/partners accidentally treating it as a sendable public quote link; the `DRAFT-` prefix makes it structurally impossible to mistake for a live link. The random-slug generator belongs to the future real-write phase, not here.
 
-3. **`sanity-write.ts` stub shape.** Define the real interface now so the next phase only swaps the impl:
+3. **`sanity-write.ts` stub shape — CONFIRMED.** Define the real interface now so the next phase only swaps the impl:
    ```ts
    interface QuoteWriteResult { written: boolean; documentId?: string; publicSlug?: string }
    interface QuoteWriter { write(payload: ReadyToWriteQuoteDraft): Promise<QuoteWriteResult> }
    ```
-   Dry-run export: `dryRunQuoteWriter` whose `write()` returns `{ written: false }` and **never** calls a Sanity client. A throwing `liveQuoteWriter` placeholder documents where the future token-backed impl plugs in (kept inert / not exported into the flow this phase).
+   Dry-run export: `dryRunQuoteWriter` whose `write()` returns `{ written: false }` and **never** imports or calls a Sanity client. `liveQuoteWriter` may exist **only as an inert placeholder** — not wired into the flow, no Sanity client import, no mutation path this phase.
 
 ## Error handling
 
@@ -93,7 +93,7 @@ sourceChannel       ┘      2. parseQuotationText + reviewQuotation
 
 ## Testing (TDD, no parser re-test)
 
-- `quote-url.test.ts`: slug format/length, URL composition, RNG injection determinism, origin handling.
+- `quote-url.test.ts`: `DRAFT-<caseId>` slug composition, URL composition, origin handling, and an assertion that the slug **always** carries the `DRAFT-` prefix (no random 8-char slug path exists).
 - `create-quote.test.ts`:
   - `blocked` report → no draft, no URL, audit entry says no write.
   - `needs_human_check` → draft built + would-be URL flagged `isOfficial: false`.
@@ -115,5 +115,6 @@ sourceChannel       ┘      2. parseQuotationText + reviewQuotation
 
 1. Three source files + two test files created, all tests green, lint clean.
 2. No Sanity client imported anywhere in the Phase C files.
-3. Every emitted URL carries `isOfficial: false`.
-4. Commit on `codex/line-oa-agent-mvp` (branch stays as-is — no merge / no PR).
+3. Every emitted URL carries `isOfficial: false` and a `DRAFT-<caseId>` slug — no random real-format slug path.
+4. Do **not** touch `src/lib/itinerary/parser.ts` unless a test proves a new parser regression (Eric, 2026-06-02).
+5. Commit on `codex/line-oa-agent-mvp` (branch stays as-is — no merge / no PR).
