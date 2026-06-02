@@ -312,3 +312,27 @@ export interface NotionReadAuditSink {
 
 - 真實 2026 DB schema 導入後，補 `FIELD_ALIASES` 真實欄位 mapping。
 - write path（insert/update confirmed records）整個延到 Phase B2 / Phase D。
+
+---
+
+## 9. 實作完成記錄（2026-06-02，Codex 驗證）
+
+**status: implemented** · branch `codex/line-oa-agent-mvp` · tip `2de7e79`（finishing Option 3：保留 branch，不 merge / 不開 PR）
+
+5 顆 TDD task 全收，commit 鏈：
+
+| Task | 內容 | commit | tests |
+|---|---|---|---|
+| 1 | types + fixtures + smoke | `938aace` | 4 |
+| 2 | field-policy（alias map + audience masking） | `59df4c5` | 13 |
+| 3 | notion-mapper（page → CaseReferenceSummary） | `e85b724` | 7 |
+| 4 | similar-case search + `notion_read` audit | `97e2294` | 8 |
+| 5 | `.env.example` 收尾（read-only 註解） | `2de7e79` | — |
+
+新增檔：`src/lib/line-agent/notion/{types,field-policy,notion-mapper,team-collaboration}.ts`、`notion/__fixtures__/{team-2026-schema,pages}.ts`、`__tests__/{notion-fixtures.smoke,notion-field-policy,notion-mapper,notion-similar-search}.test.ts`。
+
+**驗證**：line-agent 285 + full suite 471 tests 綠、`npm run lint` clean、`next build` exit 0、`git diff main..HEAD` clean。
+
+**鐵律守住**：read-only（無 Notion writes）、白名單 field-policy（未知欄位 → private+never）、masking 在 policy 層完成（partner 永不見精準金額/cost/profit/姓名）、`notion_read` audit 走獨立 injected sink（caseId optional、不碰 CaseStore transition）、未動 `parser.ts` / quote URL / Sanity write / customer auto-reply。
+
+**下一步 = Phase C（quote URL Task 10）**：開乾淨 session，先 Eric 批准才動 parser；動 `src/lib/itinerary/parser.ts` 前必先補 golden fixture 鎖住括號門票 gap（例：`大象門票（大人）950*4`）。
