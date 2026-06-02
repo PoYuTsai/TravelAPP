@@ -1,6 +1,6 @@
 # Phase C — Quote URL Automation (Dry-Run) Design
 
-- **Status:** design locked (all 3 micro-decisions confirmed by Eric 2026-06-02; awaiting TDD implementation in a fresh session)
+- **Status:** ✅ implemented (TDD, 2026-06-02, commit `8067e18` on `codex/line-oa-agent-mvp`). 16 tests green (quote-url 8 + create-quote 8), lint clean, parser untouched, no Sanity client imported.
 - **Date:** 2026-06-02
 - **Branch:** `codex/line-oa-agent-mvp`
 - **Engineering plan task:** Task 10 (`docs/plans/2026-06-01-line-oa-agent-engineering-plan.md:418`)
