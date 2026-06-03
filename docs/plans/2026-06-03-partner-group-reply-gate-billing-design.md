@@ -6,6 +6,8 @@
 - Depends on:
   - `2026-06-03-partner-group-mention-design.md`
   - `2026-06-03-partner-group-responder-model-adapter-design.md`
+- Related:
+  - `2026-06-03-payment-booking-risk-policy.md` (hard payment/booking boundaries the bot must enforce)
 
 ## 0. Decision
 
@@ -89,6 +91,7 @@ Still forbidden:
 - Formal quote write
 - Silent background web search
 - Any send without bot mention
+- Suggesting pay-on-behalf / book-on-behalf for hotels/B&B, or out-of-scope ticket booking (see `2026-06-03-payment-booking-risk-policy.md`)
 
 Trigger aliases: any partner group member may tag the bot to ask it a question. `mentionsBot` resolves true for any of the account aliases, e.g. `@清微旅行chiangway_travel`, `@清微旅行`, `@清微AI助理`.
 
