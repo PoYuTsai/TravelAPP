@@ -97,7 +97,21 @@ export interface ModelsConfig {
 | `mode === 'anthropic'` 且 `anthropicApiKey` 空 | **degraded stub responder**（見 §6.1） | warn：`mode=anthropic but ANTHROPIC_API_KEY missing` |
 | `mode === 'anthropic'` 且有 key | `new AnthropicPartnerGroupResponder({ transport, apiKey, defaultModel, researchModel })` | — |
 
-> 註：`loadAgentConfig` 本來就 `require` `ANTHROPIC_API_KEY`，缺 key 一般會在 config 階段先丟 `AgentConfigError`；§3 的「空 key → degraded stub」是 factory 層的雙保險，確保即使 key 為空字串也不硬炸 webhook。
+### 3.1 開放矛盾（Codex/Eric review 2026-06-03，實作前必先用測試釐清）
+
+`loadAgentConfig` 目前 `require('ANTHROPIC_API_KEY')`，缺 key 會在 **config 階段先丟 `AgentConfigError`**。因此 §3 的「`mode=anthropic` + 空 key → factory degraded stub」分支，**在正常 webhook flow（先過 `loadAgentConfig` 才到 factory）裡不可達**。這是真矛盾，不是雙保險。
+
+**拍板方向（Eric）**：`partnerResponderMode` 相關的 key 缺失應**降級 stub、不讓 webhook 500**；但**絕不可**為此放寬 `ANTHROPIC_API_KEY` 而打破其他「真的 require key」的既有測試。
+
+**待下一輪用紅燈測試釐清的兩問**：
+1. `mode=stub` + 缺 `ANTHROPIC_API_KEY`：partner responder **不應**成為 throw 來源（但 `loadAgentConfig` 若為其他既有用途仍 require key，可能本來就 throw——測試要先界定「是不是因 partner responder 而炸」）。
+2. `mode=anthropic` + 缺 key：選 (a) `loadAgentConfig` 照舊 throw（webhook 500，與 Eric 方向相左）或 (b) 讓 key 對 partner 路徑可降級。
+
+**候選解（擇一，下一輪定）**：
+- **解 A（最小、不動既有 require）**：`loadAgentConfig` 維持 require `ANTHROPIC_API_KEY` 不變；factory 的 empty-key degraded-stub 分支定位為**防禦性 + 單測隔離驗證**（直接餵帶空字串的 `ModelsConfig`），不承擔正常 flow 的 500-避免。正常 flow 缺 key 仍 500——接受。
+- **解 B（達成 Eric 方向，較大）**：把 partner 路徑要用的 key 改成「對 partner responder 而言 optional」——例如 webhook lazy resolver 不走 all-or-nothing 的 `loadAgentConfig`，改用只解析 models 區塊、且 `ANTHROPIC_API_KEY` 可空的窄 loader；空 key → factory degraded stub。**風險**：須確認沒有其他現役測試/路徑依賴「`loadAgentConfig` 缺 `ANTHROPIC_API_KEY` 必 throw」。
+
+**TDD 起手順序（下一輪）**：先寫 **config tests + factory tests 紅燈**界定上述行為，**再**寫 adapter。不要先寫 adapter。
 
 ---
 
