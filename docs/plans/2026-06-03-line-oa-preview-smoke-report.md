@@ -1,7 +1,7 @@
 # LINE OA Agent MVP — Preview / Real-Env-Shape Smoke Report
 
 - **Date:** 2026-06-03
-- **Branch / tip:** `codex/line-oa-agent-mvp` @ `9682c9b`
+- **Branch:** `codex/line-oa-agent-mvp`
 - **Goal:** Verify the MVP works in deployed-preview / real env shape *before* opening the Sanity write-token gate.
 - **Scope honored:** parser untouched, Sanity schema untouched, no write token added, no formal quote write implemented. Inspection + tests only.
 
@@ -9,16 +9,24 @@
 
 | # | Smoke item | Result | Evidence |
 |---|-----------|--------|----------|
-| 1 | Vercel preview build passes | ⛔ **BLOCKED** | Vercel CLI not authenticated in this session (`No existing credentials found`). Cannot trigger/inspect a preview deploy here. |
+| 1 | Vercel preview build passes | ✅ **PASS (live)** | Preview deploy succeeded: `https://travel-camxoix6t-poyutsais-projects.vercel.app`. |
 | 2 | Required env vars documented/checked | ✅ **PASS** | Cross-checked code `process.env.*` usage against `.env.example` (table below). |
 | 3 | `/api/line/webhook` behavior | ✅ **PASS (contract)** | `line-webhook-route.test.ts` 8/8. |
-| 4 | `/api/agent/commands` dry-run + auth | ✅ **PASS (contract)** | `agent-commands-route.test.ts` 5/5, `create-quote.test.ts` 8/8, `quote-url.test.ts` 8/8. |
+| 4 | `/api/agent/commands` dry-run + auth | ✅ **PASS (contract + live)** | Contract tests pass; live `vercel curl` smoke returns `MISSING_SECRET` without auth and `action:"draft"` with `AI_AGENT_INTERNAL_SECRET`. |
 | 5 | No Sanity client import on dry-run path | ✅ **PASS** | grep + read of `quote/` (below). |
 | 6 | Smoke report produced | ✅ this file | — |
 
 **Test evidence (fresh, this session):** `npm run test:run` over the four targeted files → **29/29 passed** (`quote-url` 8, `create-quote` 8, `agent-commands-route` 5, `line-webhook-route` 8), duration 5.03s.
 
-> "Contract" = verified at the unit/integration-test layer against the real route handlers, not against a live deployed URL. The deployed-env smoke (live HTTP calls) is gated on item 1 (Vercel auth) — see Blockers.
+> "Contract" = verified at the unit/integration-test layer against the real route handlers. "Live" = verified against the protected Vercel Preview deployment using `vercel curl`, which handles Deployment Protection.
+
+**Live evidence (2026-06-03 update):**
+
+- Preview deployment: `https://travel-camxoix6t-poyutsais-projects.vercel.app`
+- First deploy attempt failed because `.next/` was uploaded and Vercel cloud build consumed stale webpack artifacts. Added `.vercelignore` to exclude `.next`, `node_modules`, local env files, and test/cache output.
+- `vercel --yes --force` then built successfully on Vercel.
+- `vercel curl /api/agent/commands` without `x-agent-secret` → `{"error":"Missing operator secret","code":"MISSING_SECRET"}`.
+- `vercel curl /api/agent/commands` with `AI_AGENT_INTERNAL_SECRET` → `{"action":"draft","source":"discord_private",...}`.
 
 ## Item 2 — Env var requirements
 
@@ -34,7 +42,10 @@ Derived from actual `process.env.*` reads in `src/lib/line-agent` + `src/app/api
 | `LINE_CHANNEL_ACCESS_TOKEN` | ❌ **not read anywhere** | — | **Not used yet** — there is no outbound LINE push path. Consistent with the no-customer-auto-reply boundary. Keep documented for a future reply phase. |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | ❌ not read in line-agent/api | — | **Not wired yet** — no model call on the current dry-run path. Not needed for this smoke. |
 
-Action for Vercel preview: set the five **Required** vars (`LINE_CHANNEL_SECRET`, `LINE_PARTNER_GROUP_ID`, `AI_AGENT_INTERNAL_SECRET`, `AGENT_KV_URL`, `AGENT_KV_TOKEN`, plus `NOTION_TEAM_2026_DATABASE_ID` if exercising the Notion read path) in the Vercel project env before live smoke.
+Current Vercel Preview state:
+
+- Present: `AI_AGENT_INTERNAL_SECRET`, `NOTION_TEAM_2026_DATABASE_ID`, existing `NOTION_TOKEN`, existing Sanity read envs.
+- Still needed before live LINE webhook smoke: `LINE_CHANNEL_SECRET`, `LINE_PARTNER_GROUP_ID`, `AGENT_KV_URL`, `AGENT_KV_TOKEN`.
 
 ## Item 3 — `/api/line/webhook` (contract verified)
 
@@ -56,17 +67,21 @@ Action for Vercel preview: set the five **Required** vars (`LINE_CHANNEL_SECRET`
   - dry-run writer **never** reports `written:true`. (`:164`, `:175`)
   - dependency throws → `status:'error'` with raw input preserved. (`:198`)
 
+Live Preview smoke:
+
+- Missing `x-agent-secret` reaches the route and returns `MISSING_SECRET`.
+- Valid `x-agent-secret` reaches the router and returns `action:"draft"`.
+- Preview protection was bypassed via `vercel curl`; direct browser/curl access may show Vercel Authentication.
+
 ## Item 5 — No Sanity client on dry-run path
 
 `grep` over `src/lib/line-agent/quote/` finds only: the string literal `'no_sanity_document_written'`, the local module name `sanity-write.ts`, and `create-quote.ts` importing from `./sanity-write` (the local stub). **No `@sanity/*`, `next-sanity`, or `createClient` import.** `sanity-write.ts` is contract-only: `dryRunQuoteWriter.write()` returns `{written:false}`; `liveQuoteWriter.write()` throws (inert placeholder, not wired).
 
-## Blockers (require Eric / next session)
+## Remaining blockers (require Eric / next session)
 
-1. **Vercel preview deploy + live HTTP smoke not run** — this session's Vercel CLI is unauthenticated. To finish item 1 and live items 3/4:
-   - Eric runs `vercel login` (interactive) in tmux, **or** check the Vercel dashboard — branch `9682c9b` is already pushed to `origin`, so the Git-integration preview for `travel-app` (project `prj_KyEb…`) may already be built.
-   - Then set the Required env vars (above) for the Preview scope and re-run live curl smoke against the preview URL.
-   - Local `next build` is **not** a valid substitute here — the OneDrive+WSL tree hits the known RSC-manifest prerender bug; the real build gate is Vercel.
+1. **Live LINE webhook smoke not run** — still needs `LINE_CHANNEL_SECRET`, `LINE_PARTNER_GROUP_ID`, `AGENT_KV_URL`, and `AGENT_KV_TOKEN` in Vercel Preview.
+2. **Formal quote write remains gated** — no `SANITY_QUOTE_WRITE_TOKEN` or live Sanity writer is configured. Do not open this gate without Eric's explicit approval.
 
 ## Bottom line
 
-Code-level contracts for the webhook, the command auth boundary, the dry-run quote flow, and the no-Sanity-import / no-auto-reply boundaries all **pass**. The only unverified piece is the **deployed preview build + live HTTP smoke**, blocked solely on Vercel auth. No code changes were made or needed; the write-token gate remains closed.
+Code-level contracts for the webhook, the command auth boundary, the dry-run quote flow, and the no-Sanity-import / no-auto-reply boundaries all **pass**. Vercel Preview build and live `/api/agent/commands` smoke now also **pass**. Remaining live coverage is the LINE webhook path after LINE + KV env vars are configured. The write-token gate remains closed.
