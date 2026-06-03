@@ -121,7 +121,10 @@ export function formatInboxCases(cases) {
         STATUS_LABELS[agentCase.status] ||
         agentCase.status
       const flag = formatReminderFlag(agentCase.reminder)
-      const headerParts = [`#${index + 1} ${formatCustomerLabel(agentCase, index)}`, category]
+      // Keep the caseId on every line so operators can name a specific case in a
+      // follow-up command and so logs are unambiguous when names collide (§6.4).
+      const label = `${formatCustomerLabel(agentCase, index)} · ${agentCase.caseId}`
+      const headerParts = [`#${index + 1} ${label}`, category]
       if (flag) headerParts.push(flag)
       lines.push(headerParts.join('｜'))
 

@@ -62,7 +62,8 @@ describe('agent-command CLI helpers', () => {
     expect(output).toContain('瀏覽中 / 靜置】(1)')
     // needs_eric pinned above need_reply
     expect(output.indexOf('需 Eric 介入')).toBeLessThan(output.indexOf('需回覆'))
-    expect(output).toContain('#1 Eunice 茜｜price_question｜⚠️未回提問 4.5hr')
+    expect(output).toContain('#1 Eunice 茜 · A｜price_question｜⚠️未回提問 4.5hr')
+    expect(output).toContain('· A') // caseId stays on the line (§6.4)
     expect(output).toContain('對帳1600報價來源') // suggestedAction as next step
     expect(output).toContain('⚠️')
   })
@@ -87,8 +88,8 @@ describe('agent-command CLI helpers', () => {
       },
     ])
 
-    // No eventCategory → falls back to the status label.
-    expect(output).toContain('#1 王小明｜新詢問')
+    // No eventCategory → falls back to the status label; caseId stays on the line.
+    expect(output).toContain('#1 王小明 · CW-616786419020464384｜新詢問')
     expect(output).toContain('「小孩一個5歲一個8歲，需要兒童座椅嗎？」')
     expect(output).toContain('下一步：請確認兒童座椅需求、航班或接送資訊、住宿或上車地點')
     expect(output).not.toContain('U4256d23')
@@ -114,7 +115,7 @@ describe('agent-command CLI helpers', () => {
       },
     ])
 
-    expect(output).toContain('#1 8/21 2大2小親子包車客｜新詢問')
+    expect(output).toContain('#1 8/21 2大2小親子包車客 · CW-616786419020464384｜新詢問')
     expect(output).not.toContain('LINE-U4256d23')
   })
 })

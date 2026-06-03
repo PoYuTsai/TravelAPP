@@ -148,16 +148,29 @@ function defaultDisplayName(event: NormalizedLineEvent): string {
   return `LINE-${event.lineUserId.slice(0, 8)}`
 }
 
-/** Map a normalized event kind to the classifier's message-type input. */
-function messageTypeFromKind(kind: NormalizedLineEvent['kind']): ClassifyMessageType {
+/**
+ * Map a normalized event kind to the classifier's message-type input.
+ *
+ * `unknown_group` covers everything the normalizer can't type (sticker, audio,
+ * video, location, …).  For an OA CUSTOMER such a message is very likely
+ * meaningful (a pinned location, a voice note, a video) and must NOT be silenced
+ * into non_actionable — we conservatively treat it as media that needs a human
+ * to look at.  Only group-side unknowns fall through to sticker/non_actionable.
+ * Once the normalizer distinguishes a genuine `sticker` type, real stickers can
+ * be muted again (review P1).
+ */
+function messageTypeFromKind(
+  kind: NormalizedLineEvent['kind'],
+  sourceChannel: NormalizedLineEvent['sourceChannel']
+): ClassifyMessageType {
   switch (kind) {
     case 'image':
       return 'image'
     case 'file':
       return 'file'
     case 'unknown_group':
-      // sticker / audio / video / location — no business text to read.
-      return 'sticker'
+      // OA customer unknown → needs human (media_or_ocr_needed); group → sticker.
+      return sourceChannel === 'line_oa' ? 'file' : 'sticker'
     default:
       // oa_text / group_text / group_quoted
       return 'text'
@@ -262,7 +275,7 @@ export async function handleCreateOrUpdateCase(
   const classifier = deps.classifier ?? safeDefaultCustomerClassifier
   const classification = await classifier.classify({
     text: event.text ?? '',
-    messageType: messageTypeFromKind(event.kind),
+    messageType: messageTypeFromKind(event.kind, event.sourceChannel),
     isPostback: false, // normalizer does not surface postback in M2 (Open Item)
     hasPriorMessages: (current.customerMessages?.length ?? 0) > 0,
     missingFields: caseToPersist.missingFields,
@@ -334,21 +347,18 @@ export async function handleListRecentCases(
   const nowMs = Date.parse(now)
 
   const all = await store.listAll()
-  const activeCases = all
+
+  // Enrich EVERY active case (zone/reminder/triage are cheap, no I/O) BEFORE
+  // limiting — otherwise an old-but-urgent case (needs_eric / overdue quote)
+  // outside the recency window would be sliced off before zoning ever runs
+  // (review P1).  Display-name resolution (the only I/O) is deferred to the
+  // final slice so we never make N profile calls.
+  const enriched = all
     .filter((c) => !TERMINAL_STATUSES.has(c.status))
-    .sort((a, b) => b.lastCustomerMessageAt.localeCompare(a.lastCustomerMessageAt))
-    .slice(0, limit)
-
-  const cases: CaseSummary[] = await Promise.all(
-    activeCases.map(async (c) => {
-      const messages = c.customerMessages ?? []
+    .map((c) => {
       const triage = buildCaseTriage(c)
-      const resolvedDisplayName =
-        (await resolveCustomerDisplayName?.(c).catch(() => null)) ?? c.customerDisplayName
-
-      // Read-time derivations (advisory presentation only — no writes, no send).
       const hasUnansweredQuestion = (triage.knownFacts.questions?.length ?? 0) > 0
-      const messageText = messages.map((m) => m.text).join('\n')
+      const messageText = (c.customerMessages ?? []).map((m) => m.text).join('\n')
       const isEscalation = ESCALATION_PATTERN.test(messageText)
       const newInquiryOverdue =
         c.status === 'new_inquiry' &&
@@ -371,6 +381,36 @@ export async function handleListRecentCases(
         now,
       })
 
+      return { agentCase: c, triage, zone, reminder }
+    })
+
+  // Order by zone (needs_eric pinned top), then within-zone urgency (§6.3),
+  // and ONLY THEN take the top `limit` — so urgency, not recency, decides what
+  // survives the cut.
+  const zoneRank = (z: InboxZone): number => INBOX_ZONE_ORDER.indexOf(z)
+  enriched.sort((a, b) => {
+    const byZone = zoneRank(a.zone) - zoneRank(b.zone)
+    if (byZone !== 0) return byZone
+    return compareWithinZone(
+      {
+        severity: a.reminder?.severity,
+        ageHours: a.reminder?.ageHours ?? 0,
+        lastCustomerMessageAt: a.agentCase.lastCustomerMessageAt,
+      },
+      {
+        severity: b.reminder?.severity,
+        ageHours: b.reminder?.ageHours ?? 0,
+        lastCustomerMessageAt: b.agentCase.lastCustomerMessageAt,
+      }
+    )
+  })
+
+  const cases: CaseSummary[] = await Promise.all(
+    enriched.slice(0, limit).map(async ({ agentCase: c, triage, zone, reminder }) => {
+      const messages = c.customerMessages ?? []
+      const resolvedDisplayName =
+        (await resolveCustomerDisplayName?.(c).catch(() => null)) ?? c.customerDisplayName
+
       return {
         caseId: c.caseId,
         status: c.status,
@@ -386,17 +426,6 @@ export async function handleListRecentCases(
       }
     })
   )
-
-  // Order by zone (needs_eric pinned top), then by within-zone urgency (§6.3).
-  const zoneRank = (z: InboxZone): number => INBOX_ZONE_ORDER.indexOf(z)
-  cases.sort((a, b) => {
-    const byZone = zoneRank(a.zone) - zoneRank(b.zone)
-    if (byZone !== 0) return byZone
-    return compareWithinZone(
-      { severity: a.reminder?.severity, ageHours: a.reminder?.ageHours ?? 0, lastCustomerMessageAt: a.lastCustomerMessageAt },
-      { severity: b.reminder?.severity, ageHours: b.reminder?.ageHours ?? 0, lastCustomerMessageAt: b.lastCustomerMessageAt }
-    )
-  })
 
   return {
     handler: 'handleListRecentCases',

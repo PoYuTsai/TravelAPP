@@ -317,6 +317,20 @@ describe('OA message persistence — customer-event classification (write-time)'
     expect(persisted?.latestEventCategory).toBe('media_or_ocr_needed')
   })
 
+  it('does NOT silence an OA customer unknown message (location/voice/video) — treats it as needs-human media', async () => {
+    // event-normalizer returns `unknown_group` for OA-side non-text/image/file
+    // (location, voice, video). It must reach a human, never browsing/idle.
+    await routeCommand({
+      event: makeOaEvent({ kind: 'unknown_group', text: undefined, messageId: 'loc_1' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.latestEventCategory).toBe('media_or_ocr_needed')
+    expect(persisted?.latestEventCategory).not.toBe('non_actionable')
+  })
+
   it('classification is advisory — it never changes routing away from the internal case action', async () => {
     const decision = await routeCommand({
       event: makeOaEvent({ text: '報價多少' }),

@@ -153,6 +153,47 @@ describe('handleListRecentCases — follow-up info is never silenced or misfiled
   })
 })
 
+describe('handleListRecentCases — urgency, not recency, survives the limit', () => {
+  let store: MemoryStore
+  beforeEach(() => {
+    store = new MemoryStore()
+  })
+
+  it('keeps an old needs_eric case even when newer ordinary cases fill the limit', async () => {
+    // 6 newer, ordinary cases.
+    for (let i = 0; i < 6; i++) {
+      const hh = String(10 + i).padStart(2, '0')
+      await seed(store, {
+        caseId: `CW-normal-${i}`,
+        lineUserId: `U-normal-${i}`,
+        status: 'new_inquiry',
+        latestEventCategory: 'new_inquiry',
+        customerMessages: [msg('想問清邁包車', `2026-06-03T${hh}:00:00.000Z`)],
+        lastCustomerMessageAt: `2026-06-03T${hh}:00:00.000Z`,
+      })
+    }
+    // 1 OLDER case that escalates (medical keyword → needs_eric).
+    await seed(store, {
+      caseId: 'CW-escalate',
+      lineUserId: 'U-escalate',
+      status: 'new_inquiry',
+      latestEventCategory: 'new_inquiry',
+      customerMessages: [msg('小孩會過敏，這樣可以去嗎', '2026-06-01T00:00:00.000Z')],
+      lastCustomerMessageAt: '2026-06-01T00:00:00.000Z',
+    })
+
+    const result = await handleListRecentCases(store, { limit: 5, now: NOW })
+    const cases = (result.meta as { cases: CaseSummary[] }).cases
+
+    expect(cases).toHaveLength(5)
+    const escalate = cases.find((c) => c.caseId === 'CW-escalate')
+    expect(escalate).toBeDefined() // not dropped despite being the oldest
+    expect(escalate?.zone).toBe('needs_eric')
+    // needs_eric pins to the very top.
+    expect(cases[0].caseId).toBe('CW-escalate')
+  })
+})
+
 describe('handleListRecentCases — browsing never nags', () => {
   let store: MemoryStore
   beforeEach(() => {
