@@ -407,6 +407,99 @@ MVP needs only a short acknowledgement, not a long discussion:
 - Eric uses natural-language tag-bot or quote-bot to capture.
 - If a partner asks the AI a question the AI is not sure about, it should answer "這題建議 Eric 或外部導遊確認" rather than guessing.
 
+## 5.5 Inbound Turn Aggregation
+
+Customers rarely send a single clean inquiry. They fire several short messages in a row — sometimes over 1–3 minutes, sometimes spread across hours or days — and the partner group must **not** receive one reminder per message. This section defines how consecutive inbound is aggregated into a single pending case before any partner-group reminder is considered.
+
+### Real scenario
+
+A new customer sends, within ~2 minutes:
+
+- 您好
+- 想包車，有 6 個人，日期 7/3–7/11，要去清邁 9 天
+- 想請您幫我報價
+- Toyota Hiace 10 人座 Van
+- 中文司機
+- 行李 6 件以上
+- 機場接送 + 每日包車
+
+Seven messages, **one** inquiry. Pushing seven reminder cards would be spam; reading only the latest line ("機場接送 + 每日包車") would drop the date range, head-count, vehicle, and luggage signal.
+
+### Core unit: the customer turn (not a fixed time window)
+
+The aggregation boundary is **primarily human-reply state, not time**. A 60–120s debounce is only the *initial* delay before the first reminder — it is **not** the context ceiling.
+
+- A **customer turn** opens when the customer sends free-text / actionable inbound.
+- The turn stays **open** until `human_replied` is detected (§5.2 signal).
+- While the turn is open, **any** later customer message — minutes, hours, or days later — merges into the **same** pending case summary. Do **not** open a new case card per message.
+- The `/inbox` summary for the case is updated **continuously** as new messages arrive; the case card is a living summary, not a per-message event log.
+- When `human_replied` is detected → **close** the current turn and move the case to `waiting_customer` (§5.2). No reminder (the customer-not-replying state is by default not a big deal — §5.3).
+- If the customer later sends another message → **start a new customer turn** and **reactivate** the case as `customer_followup_after_waiting` (§5.2), carrying the prior summary forward.
+
+> The 2-minute debounce decides *when the first reminder for an open turn may fire*. The customer turn decides *which messages belong to the same case*. They are different clocks — do not collapse them.
+
+### When to actually remind the partner group
+
+While a turn is open, send a partner-group reminder **only** when one of these holds, then respect a per-case cooldown:
+
+- **First actionable inbound after debounce** — the initial reminder once the 60–120s window settles (so the seven-message burst lands as one card).
+- **Important new info arrives** — e.g. a date, head-count, vehicle, or quote-intent signal that materially changes the case (not "ok" / "謝謝").
+- **Urgency / SLA threshold crossed** — the case has aged past the agreed unanswered-question threshold (maps to `unanswered_question_overdue`, §5.2).
+- **Customer explicitly asks for a quote / follow-up** — e.g. 報價 / 還在嗎 / 可以開始了嗎.
+- Otherwise → **no push**; respect cooldown by case. Aggregate silently into the summary.
+
+### Conservative default when reply-state is unknown
+
+If `human_replied` cannot be determined (read/reply state not yet scanned — §5.2 "least-disturbing" rule):
+
+- Keep new messages in the **same active case** (do not split into a new card).
+- Avoid duplicate group spam — prefer under-reminding to double-posting.
+
+### High-priority actionable classification (deterministic)
+
+If the aggregated turn content contains charter / quote signals — **報價, 包車, 日期, 人數, 接送, 車型, 行李, 導遊 / 司機** — classify the case as a **high-priority actionable inquiry**. Because quote intent is explicit, this case may earn **one** partner-group case card (subject to the reminder rules above). This classification is **deterministic keyword matching — no LLM** (see Billing below).
+
+### Partner-group case card contents
+
+When a card is posted, it summarises the whole turn (never a single line):
+
+- **客人名稱** (customer display name / anonymised handle).
+- **已知需求** (known requirements aggregated across the turn).
+- **缺少資訊** (still-missing fields).
+- **下一步建議** (suggested next step).
+- **特殊風險** (special risks) — e.g. high luggage count may need a larger van or a separate luggage vehicle; confirm vehicle/luggage capacity.
+
+### Example card (anonymised, text-only — no screenshots, no customer images)
+
+Based on the scenario above (real case anonymised as 客人 A):
+
+```
+【新詢價 — 高優先】客人 A
+已知需求：
+- 清邁 9 天包車，7/3–7/11
+- 6 人，已指定 Toyota Hiace 10 人座 Van
+- 中文司機
+- 行李 6 件以上
+- 機場接送 + 每日包車
+- 客人已明確要求報價
+缺少資訊：
+- 航班/抵達時間（影響機場接送）
+- 住宿地點（影響每日路線與接送點）
+- 是否含門票/餐食
+下一步建議：
+- 確認航班與住宿後即可進報價流程
+特殊風險：
+- 6 人 + 行李 6 件以上：10 人座 Van 行李空間需確認，
+  可能需要升級車型或加掛行李車
+```
+
+Privacy: never attach the original LINE screenshot or any customer image. The card is always a text summary derived from stored events.
+
+### Billing / no-LLM boundary
+
+- **First-layer extraction and reminder calculation must NOT call an LLM** — message aggregation, signal detection, and the high-priority classification are all **deterministic** first (consistent with §5.3 hard constraints).
+- An **LLM is permitted only** when a partner tags the bot in the group, or when a richer suggestion than deterministic extraction is explicitly requested (§1, §2, §3). It never fires automatically inside the inbound aggregation path.
+
 ## 6. Error Handling
 
 Model responder failure:
