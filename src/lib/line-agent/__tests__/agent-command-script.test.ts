@@ -21,42 +21,76 @@ describe('agent-command CLI helpers', () => {
     expect(readDotEnvValue(env, 'AGENT_KV_URL')).toBe('https://example.test')
   })
 
-  test('formats inbox cases as Traditional Chinese and omits raw line user ids', () => {
+  test('renders inbox as SLA zones, needs_eric on top, empty zones collapsed to (0)', () => {
+    const output = formatInboxCases([
+      {
+        caseId: 'A',
+        zone: 'need_reply',
+        eventCategory: 'price_question',
+        reminder: {
+          severity: 'urgent',
+          ageHours: 4.5,
+          reason: 'unanswered_question_overdue',
+          suggestedAction: '對帳1600報價來源',
+        },
+        customerDisplayName: 'Eunice 茜',
+        latestCustomerMessageText: '報價1600的是哪間？',
+        status: 'new_inquiry',
+        triage: { knownFacts: {} },
+        missingFields: [],
+        messageCount: 2,
+        lastCustomerMessageAt: '2026-06-03T00:00:00.000Z',
+      },
+      {
+        caseId: 'B',
+        zone: 'browsing_idle',
+        eventCategory: 'menu_browsing',
+        reminder: null,
+        customerDisplayName: '客人 #2',
+        latestCustomerMessageText: '（點選選單）',
+        status: 'idle',
+        triage: { knownFacts: {} },
+        missingFields: [],
+        messageCount: 1,
+        lastCustomerMessageAt: '2026-06-03T00:00:00.000Z',
+      },
+    ])
+
+    expect(output).toContain('LINE OA Inbox · 7 區 · 共 2 筆')
+    expect(output).toContain('需 Eric 介入】(0)') // empty zone still shown
+    expect(output).toContain('需回覆 / 需處理】(1)')
+    expect(output).toContain('瀏覽中 / 靜置】(1)')
+    // needs_eric pinned above need_reply
+    expect(output.indexOf('需 Eric 介入')).toBeLessThan(output.indexOf('需回覆'))
+    expect(output).toContain('#1 Eunice 茜｜price_question｜⚠️未回提問 4.5hr')
+    expect(output).toContain('對帳1600報價來源') // suggestedAction as next step
+    expect(output).toContain('⚠️')
+  })
+
+  test('falls back to status label + missing-field next step when no classification/reminder', () => {
     const output = formatInboxCases([
       {
         caseId: 'CW-616786419020464384',
+        zone: 'need_reply',
         status: 'new_inquiry',
         customerDisplayName: '王小明',
         lastCustomerMessageAt: '2026-06-03T06:40:46.853Z',
         latestCustomerMessageText: '小孩一個5歲一個8歲，需要兒童座椅嗎？',
         messageCount: 3,
-        missingFields: [
-          'childSeatNeeds',
-          'flightOrPickupInfo',
-          'hotelOrPickupLocation',
-        ],
+        reminder: null,
+        missingFields: ['childSeatNeeds', 'flightOrPickupInfo', 'hotelOrPickupLocation'],
         triage: {
           summaryText: '日期：8/21；人數：2大2小；小孩年齡：5歲、8歲；包車4天',
-          knownFacts: {
-            travelDate: '8/21',
-            adults: 2,
-            children: 2,
-          },
-          missingFields: [
-            'childSeatNeeds',
-            'flightOrPickupInfo',
-            'hotelOrPickupLocation',
-          ],
+          knownFacts: { travelDate: '8/21', adults: 2, children: 2 },
+          missingFields: ['childSeatNeeds', 'flightOrPickupInfo', 'hotelOrPickupLocation'],
         },
       },
     ])
 
-    expect(output).toContain('目前 1 筆未處理客人')
+    // No eventCategory → falls back to the status label.
     expect(output).toContain('#1 王小明｜新詢問')
-    expect(output).toContain('案件：CW-616786419020464384')
-    expect(output).toContain('摘要：日期：8/21；人數：2大2小')
-    expect(output).toContain('缺漏：兒童座椅需求、航班/接送資訊、住宿/上車地點')
-    expect(output).toContain('建議下一步：請確認兒童座椅需求、航班或接送資訊、住宿或上車地點')
+    expect(output).toContain('「小孩一個5歲一個8歲，需要兒童座椅嗎？」')
+    expect(output).toContain('下一步：請確認兒童座椅需求、航班或接送資訊、住宿或上車地點')
     expect(output).not.toContain('U4256d23')
     expect(output).not.toContain('secret-value')
   })
@@ -65,19 +99,16 @@ describe('agent-command CLI helpers', () => {
     const output = formatInboxCases([
       {
         caseId: 'CW-616786419020464384',
+        zone: 'need_reply',
         status: 'new_inquiry',
         customerDisplayName: 'LINE-U4256d23',
         latestCustomerMessageText: '想問8/21清邁親子包車',
         messageCount: 1,
+        reminder: null,
         missingFields: [],
         triage: {
           summaryText: '日期：8/21；人數：2大2小；包車4天；想去：大象、夜間動物園',
-          knownFacts: {
-            travelDate: '8/21',
-            adults: 2,
-            children: 2,
-            charterDays: 4,
-          },
+          knownFacts: { travelDate: '8/21', adults: 2, children: 2, charterDays: 4 },
           missingFields: [],
         },
       },

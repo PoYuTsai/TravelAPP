@@ -22,15 +22,6 @@ const STATUS_LABELS = {
   idle: '閒置',
 }
 
-const MISSING_FIELD_LABELS = {
-  childSeatNeeds: '兒童座椅需求',
-  flightOrPickupInfo: '航班/接送資訊',
-  hotelOrPickupLocation: '住宿/上車地點',
-  travelDates: '旅遊日期',
-  partySize: '人數',
-  childAges: '小孩年齡',
-}
-
 const NEXT_STEP_LABELS = {
   childSeatNeeds: '兒童座椅需求',
   flightOrPickupInfo: '航班或接送資訊',
@@ -39,6 +30,39 @@ const NEXT_STEP_LABELS = {
   partySize: '人數',
   childAges: '小孩年齡',
 }
+
+// SLA inbox zones — must mirror INBOX_ZONE_ORDER in
+// src/lib/line-agent/cases/inbox-zone.ts (needs_eric pinned top, browsing last).
+const ZONE_ORDER = [
+  'needs_eric',
+  'need_reply',
+  'awaiting_customer',
+  'ready_itinerary',
+  'quote_review',
+  'quoted_tracking',
+  'browsing_idle',
+]
+
+const ZONE_LABELS = {
+  needs_eric: '需 Eric 介入',
+  need_reply: '需回覆 / 需處理',
+  awaiting_customer: '等客人補資料',
+  ready_itinerary: '可排行程',
+  quote_review: '報價待檢查',
+  quoted_tracking: '已報價追蹤',
+  browsing_idle: '瀏覽中 / 靜置',
+}
+
+// reason → operator-facing flag label (icon falls back to severity).
+const REMINDER_FLAG_LABELS = {
+  unanswered_question_overdue: { icon: '⚠️', label: '未回提問' },
+  new_inquiry_unhandled: { icon: '⏰', label: '新詢問未處理' },
+  awaiting_customer_stale: { icon: '💤', label: '等補資料逾時' },
+  quote_review_pending: { icon: '⏰', label: '報價待檢查逾時' },
+  quoted_tracking_followup: { icon: '💤', label: '已報價待追蹤' },
+}
+
+const SEVERITY_ICONS = { urgent: '⚠️', attention: '⏰', info: '💤' }
 
 export function parseAgentCommandArgs(args) {
   const command = String(args[0] ?? '').trim()
@@ -74,27 +98,53 @@ export function formatInboxCases(cases) {
     return '目前沒有未處理客人。'
   }
 
-  const lines = [`目前 ${cases.length} 筆未處理客人`, '']
+  // Bucket by zone (server already enriched each case with a `zone`). An
+  // unknown/absent zone falls back to need_reply — conservative, stays visible.
+  const byZone = new Map(ZONE_ORDER.map((zone) => [zone, []]))
+  for (const agentCase of cases) {
+    const zone = byZone.has(agentCase.zone) ? agentCase.zone : 'need_reply'
+    byZone.get(zone).push(agentCase)
+  }
 
-  cases.forEach((agentCase, index) => {
-    const missingFields = normaliseMissingFields(agentCase)
-    const latestText = agentCase.latestCustomerMessageText || '（尚無文字訊息）'
-    const statusLabel = STATUS_LABELS[agentCase.status] ?? agentCase.status
+  const lines = [`LINE OA Inbox · 7 區 · 共 ${cases.length} 筆`, '']
 
-    lines.push(`#${index + 1} ${formatCustomerLabel(agentCase, index)}｜${statusLabel}`)
-    lines.push(`案件：${agentCase.caseId}`)
-    lines.push(`摘要：${agentCase.triage?.summaryText || '尚未取得可整理的客需重點'}`)
-    lines.push(`缺漏：${formatMissingFields(missingFields)}`)
-    lines.push(`最新訊息：${latestText}`)
-    lines.push(`訊息數：${agentCase.messageCount ?? 0}`)
-    lines.push(`建議下一步：${formatNextStep(missingFields)}`)
-    if (agentCase.lastCustomerMessageAt) {
-      lines.push(`更新時間：${formatTaipeiTime(agentCase.lastCustomerMessageAt)}`)
-    }
+  for (const zone of ZONE_ORDER) {
+    const zoneCases = byZone.get(zone)
+    // Always print the header, even for empty zones — collapsed `(0)` so the
+    // operator sees the full SLA picture without a wall of empty detail.
+    lines.push(`【${ZONE_LABELS[zone]}】(${zoneCases.length})`)
+
+    zoneCases.forEach((agentCase, index) => {
+      const missingFields = normaliseMissingFields(agentCase)
+      const category =
+        agentCase.eventCategory ||
+        STATUS_LABELS[agentCase.status] ||
+        agentCase.status
+      const flag = formatReminderFlag(agentCase.reminder)
+      const headerParts = [`#${index + 1} ${formatCustomerLabel(agentCase, index)}`, category]
+      if (flag) headerParts.push(flag)
+      lines.push(headerParts.join('｜'))
+
+      const latestText = agentCase.latestCustomerMessageText || '（尚無文字訊息）'
+      lines.push(`   「${latestText}」`)
+
+      const nextStep = agentCase.reminder?.suggestedAction || formatNextStep(missingFields)
+      lines.push(`   下一步：${nextStep}`)
+    })
+
     lines.push('')
-  })
+  }
 
   return lines.join('\n').trimEnd()
+}
+
+function formatReminderFlag(reminder) {
+  if (!reminder || typeof reminder !== 'object') return ''
+  const meta = REMINDER_FLAG_LABELS[reminder.reason]
+  const icon = meta?.icon ?? SEVERITY_ICONS[reminder.severity] ?? ''
+  const label = meta?.label ?? reminder.reason ?? ''
+  const age = typeof reminder.ageHours === 'number' ? ` ${reminder.ageHours.toFixed(1)}hr` : ''
+  return `${icon}${label}${age}`.trim()
 }
 
 export async function runAgentCommand(args, options = {}) {
@@ -191,28 +241,9 @@ function formatPlainLanguageCustomerLabel(agentCase, index) {
   return `客人 #${index + 1}`
 }
 
-function formatMissingFields(fields) {
-  if (!fields.length) return '目前沒有明顯缺漏'
-  return fields.map((field) => MISSING_FIELD_LABELS[field] ?? field).join('、')
-}
-
 function formatNextStep(fields) {
   if (!fields.length) return '可請夥伴開始判斷是否進入排行程'
   return `請確認${fields.map((field) => NEXT_STEP_LABELS[field] ?? field).join('、')}`
-}
-
-function formatTaipeiTime(value) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('zh-TW', {
-    timeZone: 'Asia/Taipei',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
 }
 
 function escapeRegExp(value) {
