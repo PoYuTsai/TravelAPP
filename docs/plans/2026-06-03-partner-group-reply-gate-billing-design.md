@@ -103,9 +103,9 @@ UX intent: this tag / quote-bot flow is the **primary way partners use the bot l
 
 ## 1.1 Rich Menu / Browsing Context Lifecycle
 
-A customer tapping the rich menu is **not** an active inquiry. Rich-menu taps and postbacks are low-intent browsing signals, not a request that needs a human.
+A customer tapping the rich menu is **not** an active inquiry. Rich-menu taps, postbacks, and keyword auto-replies are low-intent browsing signals, not a request that needs a human.
 
-Rules for rich-menu / postback events:
+Rules for rich-menu / postback / keyword auto-reply events:
 - Record them as **browsing context** only.
 - No reminder fires.
 - No LLM is called.
@@ -127,6 +127,11 @@ Strict labelling:
 
 Aging:
 - If the browsing context is older than **14 days**, list it as `old_context` with lower confidence (or drop it from the active summary), so stale taps do not skew the new inquiry.
+
+Future — browsing taxonomy (CUA):
+- A later step needs a **CUA driver** to inspect Eric's LINE rich menu, keyword rules, and auto-reply global settings, and to compile a **browsing taxonomy** (which menu item / keyword maps to which package / product / attraction).
+- Until that inventory exists, a rich-menu tap / postback / keyword hit may only be treated as a **hint**, never as a confirmed customer requirement.
+- This taxonomy is read-only inventory work; building it is out of scope for the current implementation and must not call an LLM or reply to customers.
 
 ## 2. Billing Model
 
@@ -240,34 +245,39 @@ Recommended reminder policy:
 
 This is the state model the deterministic scan layer (§5.1) uses to decide *when* a case earns a partner-group reminder and *where* it sits in `/inbox`. All of these states are computed from stored webhook events plus scheduled/operated scans — **never** from an LLM, and they **never** auto-reply the customer.
 
-The governing asymmetry:
+### Detection signals (deterministic inputs)
 
-- **We failed to reply the customer = a real problem → remind.**
-- **The customer did not reply us = by default not a problem → do not disturb.**
-- **They replied, we read it, we went silent = possibly stuck → help with a card, do not nag.**
+States are derived from these signals only — each is observed (webhook event) or inferred (scheduled / CUA / operator scan), never produced by an LLM:
 
-The bot's job is to guard against missed leads and to make hand-off easier — not to become a follow-up/nag machine, and not to push manual bookkeeping (`/done`, "已回", `caseId`) onto partners.
+- `customer_sent` — there is an inbound customer message.
+- `human_read_detected` — a human partner has opened/read the latest customer message (inferred via scan; may be unknown).
+- `no_human_reply_detected` — no outbound human reply has gone out since the latest customer message.
+- `human_replied` — an outbound human reply went out after the customer's last message.
+- `customer_read` — the customer has read our latest outbound message (LINE read receipt, when available).
+- `customer_no_reply` — the customer has not replied since our latest outbound message.
 
-| Status | Trigger condition | Priority | Partner-group action | LLM | `/inbox` placement |
+When a signal is unknown (e.g. read state not yet scanned), the state defaults to the **least-disturbing** interpretation.
+
+| Status | Condition (signals) | Priority | Partner-group action | LLM | `/inbox` placement |
 |---|---|---|---|---|---|
-| `customer_messaged_unread_by_us` | Customer sent message(s); we have not read/replied | **Highest** | Remind partner group; debounce multiple consecutive messages into one case card | No | Top / urgent |
-| `customer_replied_we_read_no_reply` (`needs_attention` / `possibly_stuck`) | Customer replied, we read it, but no reply went out | High | May post one card framing the stuck point (see below) | No | Needs-attention |
-| `waiting_customer_after_itinerary_or_quote` | We sent an itinerary/quote; customer read it but has not replied | Low | None by default | No | Low-priority "waiting customer" (passive watch) |
-| `we_replied_customer_no_reply` | We replied; customer has not replied / read-no-reply | Low | None by default | No | Low-priority "waiting customer" |
-| `browsing_only` | Rich-menu tap / keyword / auto-reply browsing only, no free text | None | None — record context only | No | Hidden or context-only (see §1.1) |
-| `customer_re_engaged` | Customer sends any new free-text message in an existing case | Re-activates to active case | Re-evaluate as a fresh actionable message | No | Active |
+| `customer_sent_no_human_reply` | `customer_sent` + `no_human_reply_detected` | **Highest** | Remind partner group; debounce consecutive messages into one case card | No | Top / urgent |
+| `possibly_stuck` / `needs_attention` | `customer_sent` + `human_read_detected` + `no_human_reply_detected` | High | May post one card framing the stuck point (see below) | No | Needs-attention |
+| `waiting_customer` | `human_replied` + `customer_no_reply` | Low | None by default | No | Low-priority "waiting customer" |
+| `waiting_customer_after_itinerary_or_quote` | `human_replied` + `customer_read` + `customer_no_reply` (most common) | Low | None by default | No | Low-priority "waiting customer" (passive watch) |
+| `customer_followup_after_waiting` | New `customer_sent` free text on a waiting case | Re-activates to active case | Re-evaluate as a fresh actionable message, carrying prior summary | No | Active |
+| `browsing_only` | Rich-menu / postback / keyword auto-reply only, no free text | None | None — record context only | No | Hidden or context-only (see §1.1) |
 
-### `customer_messaged_unread_by_us` — the one the bot must guard
+### `customer_sent_no_human_reply` — the one the bot must guard
 
-This is the highest-priority state and the core missed-lead risk the bot exists to catch.
+`customer_sent` + `no_human_reply_detected`. This is the highest-priority state and the core missed-lead risk the bot exists to catch.
 
 - Must remind the partner group.
 - Multiple messages sent in quick succession are **debounced/merged** into a single case card, not one card per message.
 - No LLM call. No customer reply.
 
-### `customer_replied_we_read_no_reply` — possibly stuck, help don't blame
+### `possibly_stuck` / `needs_attention` — help, don't blame
 
-The customer replied and we read it but stayed silent. This usually means the partner is busy, opened it by accident, is still thinking, or hit a tough question. Mark it `needs_attention` / `possibly_stuck`.
+`customer_sent` + `human_read_detected` + `no_human_reply_detected`: the customer replied, a human read it, but no reply went out. This usually means the partner is busy, opened it by accident, is still thinking, or hit a tough question.
 
 The bot may post one partner-group card that lists:
 
@@ -280,34 +290,39 @@ If the content touches **price, itinerary logic, safety, kids, elderly, luggage 
 
 The card's purpose is to let Eric see it and to make it easier for a partner to take over — **not** to blame the partner for going quiet.
 
+### `waiting_customer` — we replied, customer has not
+
+`human_replied` + `customer_no_reply` (read state unknown or not-yet-read). By default this fires **no** reminder. The customer may simply be comparing prices, not interested, blocked, or just not in the mood to reply right now. Do not let the bot turn into a follow-up/nag machine. Show it only in the `/inbox` low-priority "waiting customer" zone.
+
 ### `waiting_customer_after_itinerary_or_quote` — the most common state
 
-This is the most common situation: there has already been a conversation, the partner organised/sent an itinerary or a quote, and the customer has read it but not replied.
+`human_replied` + `customer_read` + `customer_no_reply`. This is the most common situation: there has already been a conversation, the partner organised/sent an itinerary or a quote, and the customer has read it but not replied.
 
 - Default: **no** partner-group push, **no** nudge, **no** disturbance.
 - Reason: the customer may be comparing prices, thinking it over, not interested, or may even have blocked us — all of that is fine.
 - Show it only in the `/inbox` low-priority "waiting customer" zone as a passive watch.
 - Future: only once the case enters a clearly high-intent stage (customer says they want to book, asks about payment, or adds Eric's LINE QR) do we consider low-frequency follow-up.
 
-### `we_replied_customer_no_reply` — do not become a nag machine
+### `customer_followup_after_waiting` — still willing to talk, don't give up the case
 
-We replied; the customer has not. By default this fires **no** reminder. The customer may simply be comparing prices, not interested, blocked, or just not in the mood to reply right now. Do not let the bot turn into a follow-up/nag machine. Show it only in the `/inbox` low-priority zone.
-
-### `browsing_only` — context only, pending taxonomy
-
-Rich-menu taps, keyword hits, and auto-reply browsing only record **context** — no reminder, no LLM, no partner-group push (this is the §1.1 lifecycle).
-
-- A separate later step needs a **CUA driver** to inspect Eric's LINE rich menu, keyword rules, and auto-reply global settings, and to compile a **browsing taxonomy**.
-- Until that inventory exists, a rich-menu tap / postback may only be treated as a **hint**, never as an explicit customer requirement.
-- If the customer later sends free text, promote to an active case and carry the prior browsing context into the summary as a hint.
-
-### `customer_re_engaged` — still willing to talk, don't give up the case
-
-As soon as the customer sends any free-text reply again — whether or not it is a question — the case becomes active again.
+As soon as the customer sends any free-text message again — **whether or not it is a question** — the case becomes active again.
 
 - Do not judge only by the latest single sentence; carry the prior conversation summary forward.
 - The core conversion logic is: show professionalism, build trust, demonstrate value, **then** deliver the itinerary/quote — that is what makes booking flow smoothly.
 - So as long as the customer still shows any willingness to communicate, do not give the case up lightly.
+
+### `browsing_only` — context only
+
+Rich-menu taps, keyword hits, and auto-reply browsing only record **context** — no reminder, no LLM, no partner-group push. The full lifecycle (promote on free text, hint-only labelling, 14-day aging, and the CUA browsing-taxonomy inventory) is defined in §1.1.
+
+## 5.3 Reminder Philosophy
+
+The reminder rules above all follow one philosophy:
+
+- **Failing to reply a customer = a big deal → remind.** This is the missed-lead risk the bot exists to guard.
+- **The customer not replying us = by default not a big deal → do not nag.** Comparing prices / thinking / not interested / blocked are all acceptable outcomes.
+- **Read-but-no-reply = possibly stuck → use a card to help organise the question**, not to blame the partner.
+- **As long as the customer still shows willingness to communicate, do not give the case up lightly.**
 
 ### Hard constraints (all states)
 
