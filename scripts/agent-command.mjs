@@ -79,9 +79,10 @@ export function formatInboxCases(cases) {
   cases.forEach((agentCase, index) => {
     const missingFields = normaliseMissingFields(agentCase)
     const latestText = agentCase.latestCustomerMessageText || '（尚無文字訊息）'
+    const statusLabel = STATUS_LABELS[agentCase.status] ?? agentCase.status
 
-    lines.push(`#${index + 1} ${agentCase.caseId}`)
-    lines.push(`狀態：${STATUS_LABELS[agentCase.status] ?? agentCase.status}`)
+    lines.push(`#${index + 1} ${formatCustomerLabel(agentCase, index)}｜${statusLabel}`)
+    lines.push(`案件：${agentCase.caseId}`)
     lines.push(`摘要：${agentCase.triage?.summaryText || '尚未取得可整理的客需重點'}`)
     lines.push(`缺漏：${formatMissingFields(missingFields)}`)
     lines.push(`最新訊息：${latestText}`)
@@ -145,6 +146,49 @@ function normaliseMissingFields(agentCase) {
       ...(agentCase.missingFields ?? []),
     ].filter(Boolean))
   )
+}
+
+function formatCustomerLabel(agentCase, index) {
+  const displayName = String(agentCase.customerDisplayName ?? '').trim()
+  if (displayName && !isOpaqueLineFallback(displayName)) {
+    return displayName
+  }
+
+  return formatPlainLanguageCustomerLabel(agentCase, index)
+}
+
+function isOpaqueLineFallback(displayName) {
+  return /^LINE-U/i.test(displayName)
+}
+
+function formatPlainLanguageCustomerLabel(agentCase, index) {
+  const knownFacts = agentCase.triage?.knownFacts ?? {}
+  const leadParts = []
+  const descriptorParts = []
+
+  if (knownFacts.travelDate) {
+    leadParts.push(String(knownFacts.travelDate))
+  }
+
+  if (knownFacts.adults !== undefined || knownFacts.children !== undefined) {
+    leadParts.push(`${knownFacts.adults ?? '?'}大${knownFacts.children ?? '?'}小`)
+  }
+
+  if ((knownFacts.children ?? 0) > 0) {
+    descriptorParts.push('親子')
+  }
+
+  if (knownFacts.charterDays) {
+    descriptorParts.push('包車')
+  } else if (knownFacts.interests?.length) {
+    descriptorParts.push('旅遊')
+  }
+
+  if (leadParts.length > 0 || descriptorParts.length > 0) {
+    return `${leadParts.join(' ')}${descriptorParts.join('')}客`
+  }
+
+  return `客人 #${index + 1}`
 }
 
 function formatMissingFields(fields) {

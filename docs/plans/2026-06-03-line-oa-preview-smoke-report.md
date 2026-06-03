@@ -39,7 +39,7 @@ Derived from actual `process.env.*` reads in `src/lib/line-agent` + `src/app/api
 | `AI_AGENT_INTERNAL_SECRET` | ✅ | `api/agent/commands/route.ts:38` (auth) | **Required** |
 | `AGENT_KV_URL` / `AGENT_KV_TOKEN` | ✅ | `storage/kv-store.ts`, `storage/select-store.ts` | **Required in prod** (prod fail-closed throws if missing) |
 | `NOTION_TEAM_2026_DATABASE_ID` | ✅ | `notion/team-collaboration.ts:238` | **Required** for Phase B Notion read path |
-| `LINE_CHANNEL_ACCESS_TOKEN` | ❌ **not read anywhere** | — | **Not used yet** — there is no outbound LINE push path. Consistent with the no-customer-auto-reply boundary. Keep documented for a future reply phase. |
+| `LINE_CHANNEL_ACCESS_TOKEN` | ✅ | `line/profile.ts` via private `/api/agent/commands` inbox reads | **Profile lookup only** — used to read customer `displayName`; still no LINE push/reply path and no customer auto-reply. |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` | ❌ not read in line-agent/api | — | **Not wired yet** — no model call on the current dry-run path. Not needed for this smoke. |
 
 Current Vercel Preview state:
@@ -76,7 +76,7 @@ Result: ✅ **PASS**
   - `triage.summaryText` — compact human-readable customer need summary.
   - `triage.knownFacts` — extracted facts such as travel date, adults/children, child ages, charter days, and interests.
   - `triage.missingFields` — obvious follow-up fields such as child seat need, flight/pickup info, and hotel/pickup location.
-- Boundaries still hold: no customer auto-reply, no LINE outbound token usage, no Sanity write token, and no formal quote write.
+- Boundaries still hold: no customer auto-reply, no LINE push/reply usage, no Sanity write token, and no formal quote write. `LINE_CHANNEL_ACCESS_TOKEN` is used only for private operator profile-name lookup in `/inbox`.
 
 ## Item 3 — `/api/line/webhook` (contract verified)
 
@@ -84,7 +84,7 @@ Result: ✅ **PASS**
 - Valid normalized OA event → routing handler invoked and **awaited before the 200 resolves** (no fire-and-forget). (`:120`)
 - Non-actionable `room` source → **200 skip**, no routing. (`:184`) Wrong/other group is rejected fail-closed by the normalizer (covered in normalize-layer tests; only the partner group + 1:1 user pass).
 - Persist failure → 500 so LINE retries (durable buffer); benign non-persistence error → still 200. (`:166`)
-- **No customer auto-reply:** structurally guaranteed — `LINE_CHANNEL_ACCESS_TOKEN` is never read; no outbound push/reply code path exists.
+- **No customer auto-reply:** structurally guaranteed — `LINE_CHANNEL_ACCESS_TOKEN` is used only by private operator inbox profile lookup; no outbound push/reply code path exists.
 - **Dedupe** (`processedMessageIds`, FIFO 200) is enforced at the router/reducer layer (separate tests), not the route handler.
 
 ## Item 4 — `/api/agent/commands` (contract verified)
@@ -116,7 +116,7 @@ Live Preview smoke:
    - Next attempt: choose a low-disruption time, temporarily point the OA webhook to Webhook.site, send one message in the intended test/partner group, copy `source.groupId`, then restore the webhook URL.
    - The OA was removed from the temporary test group after this pause.
 2. **Formal quote write remains gated** — no `SANITY_QUOTE_WRITE_TOKEN` or live Sanity writer is configured. Do not open this gate without Eric's explicit approval.
-3. **LINE outbound token hygiene** — `LINE_CHANNEL_ACCESS_TOKEN` appeared in a screenshot during setup. It is not used by the current code path, but before enabling outbound LINE push/reply, reissue the long-lived channel access token and set the fresh value only in deployment secrets.
+3. **LINE outbound token hygiene** — `LINE_CHANNEL_ACCESS_TOKEN` appeared in a screenshot during setup. Current code uses it only for profile display-name lookup, not for push/reply. Before enabling outbound LINE push/reply, reissue the long-lived channel access token and set the fresh value only in deployment secrets.
 
 ## Bottom line
 

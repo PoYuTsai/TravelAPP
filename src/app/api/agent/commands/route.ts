@@ -35,6 +35,7 @@ import {
   safeDefaultLlmClassifier,
 } from '@/lib/line-agent/commands/intent'
 import { getStore } from '@/lib/line-agent/line/webhook-runtime'
+import { createLineProfileDisplayNameResolver } from '@/lib/line-agent/line/profile'
 
 // The expected secret is read from env at request time so tests can inject it
 // via environment without module-level caching issues.
@@ -85,11 +86,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // this route never posts to LINE itself.
   const deterministicIntent = classifyDeterministic(command.commandText)
   const needsCaseStore = deterministicIntent?.action === 'list_cases'
+  const customerDisplayNameResolver = needsCaseStore
+    ? createLineProfileDisplayNameResolver({
+        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      })
+    : undefined
 
   const decision = await routeCommand({
     command,
     llmClassifier: safeDefaultLlmClassifier,
-    ...(needsCaseStore && { store: getStore() }),
+    ...(needsCaseStore && {
+      store: getStore(),
+      customerDisplayNameResolver,
+    }),
   })
 
   return NextResponse.json(decision, { status: 200 })

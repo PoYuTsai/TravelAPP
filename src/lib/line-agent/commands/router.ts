@@ -36,6 +36,7 @@ import {
   handleSilent,
   type HandlerResult,
   type CaseHandlerDeps,
+  type CustomerDisplayNameResolver,
 } from './handlers'
 import type { AgentSourceChannel } from '../types'
 import type { CaseStore } from '../storage/store'
@@ -91,6 +92,12 @@ export interface RouterInput {
    * command. Required when the resolved intent is `create_quote`.
    */
   quoteDryRun?: QuoteDryRunInput
+  /**
+   * Optional operator-only display-name enrichment for private inbox reads.
+   * This may call LINE's profile API outside the webhook path; the response
+   * still omits raw lineUserId.
+   */
+  customerDisplayNameResolver?: CustomerDisplayNameResolver
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +273,9 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
           '[router] list_cases command requires a `store` in RouterInput.'
         )
       }
-      const handlerResult = await handleListRecentCases(store)
+      const handlerResult = await handleListRecentCases(store, {
+        resolveCustomerDisplayName: input.customerDisplayNameResolver,
+      })
       return { action: 'list_cases', source, denied: false, handlerResult, intent }
     }
 

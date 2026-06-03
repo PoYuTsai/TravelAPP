@@ -58,6 +58,15 @@ export interface CaseSummary {
   triage: CaseTriageSummary
 }
 
+export type CustomerDisplayNameResolver = (
+  agentCase: AgentCase
+) => Promise<string | null>
+
+export interface ListRecentCasesOptions {
+  limit?: number
+  resolveCustomerDisplayName?: CustomerDisplayNameResolver
+}
+
 // ---------------------------------------------------------------------------
 // Respond handler — reply in the partner group after a tagged message
 // ---------------------------------------------------------------------------
@@ -233,20 +242,28 @@ export async function handleDraft(
 
 export async function handleListRecentCases(
   store: CaseStore,
-  limit = 5
+  options: number | ListRecentCasesOptions = 5
 ): Promise<HandlerResult> {
+  const limit = typeof options === 'number' ? options : options.limit ?? 5
+  const resolveCustomerDisplayName =
+    typeof options === 'number' ? undefined : options.resolveCustomerDisplayName
   const all = await store.listAll()
-  const cases: CaseSummary[] = all
+  const activeCases = all
     .filter((c) => !TERMINAL_STATUSES.has(c.status))
     .sort((a, b) => b.lastCustomerMessageAt.localeCompare(a.lastCustomerMessageAt))
     .slice(0, limit)
-    .map((c) => {
+
+  const cases: CaseSummary[] = await Promise.all(
+    activeCases.map(async (c) => {
       const messages = c.customerMessages ?? []
       const triage = buildCaseTriage(c)
+      const resolvedDisplayName =
+        (await resolveCustomerDisplayName?.(c).catch(() => null)) ?? c.customerDisplayName
+
       return {
         caseId: c.caseId,
         status: c.status,
-        customerDisplayName: c.customerDisplayName,
+        customerDisplayName: resolvedDisplayName,
         lastCustomerMessageAt: c.lastCustomerMessageAt,
         latestCustomerMessageText: messages.at(-1)?.text ?? '',
         messageCount: messages.length,
@@ -254,6 +271,7 @@ export async function handleListRecentCases(
         triage,
       }
     })
+  )
 
   return {
     handler: 'handleListRecentCases',

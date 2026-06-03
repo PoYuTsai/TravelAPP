@@ -14,7 +14,7 @@
  */
 
 import { NextRequest } from 'next/server'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { POST } from '@/app/api/agent/commands/route'
 import { createInitialCase } from '@/lib/line-agent/cases/case-state'
 import { setStore } from '@/lib/line-agent/line/webhook-runtime'
@@ -48,6 +48,11 @@ const BASE_COMMAND = {
 
 beforeEach(() => {
   process.env.AI_AGENT_INTERNAL_SECRET = SECRET
+  delete process.env.LINE_CHANNEL_ACCESS_TOKEN
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
 })
 
 // ---------------------------------------------------------------------------
@@ -132,5 +137,65 @@ describe('POST /api/agent/commands', () => {
       caseId: 'CW-msg-live-001',
       latestCustomerMessageText: '測試 webhook：2026/8/21',
     })
+  })
+
+  it('enriches private inbox cases with LINE profile display names without exposing lineUserId', async () => {
+    process.env.LINE_CHANNEL_ACCESS_TOKEN = 'line-profile-token'
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          userId: 'U_live_customer',
+          displayName: '王小明',
+        }),
+        { status: 200 }
+      )
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const store = new MemoryStore()
+    await store.put({
+      ...createInitialCase({
+        caseId: 'CW-msg-live-002',
+        lineUserId: 'U_live_customer',
+        customerDisplayName: 'LINE-U_live',
+        now: '2026-06-03T05:30:58.093Z',
+      }),
+      customerMessages: [
+        {
+          messageId: 'msg-live-002',
+          text: '我們8/21到清邁，2大2小，想包車4天',
+          receivedAt: '2026-06-03T05:30:58.093Z',
+          source: 'line_oa',
+        },
+      ],
+    })
+    setStore(store)
+
+    const res = await POST(
+      commandRequest(
+        {
+          actor: 'eric',
+          sourceChannel: 'discord_private',
+          commandText: 'inbox',
+        },
+        SECRET
+      )
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.line.me/v2/bot/profile/U_live_customer',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer line-profile-token',
+        }),
+      })
+    )
+    expect(body.handlerResult.meta.cases[0]).toMatchObject({
+      caseId: 'CW-msg-live-002',
+      customerDisplayName: '王小明',
+    })
+    expect(JSON.stringify(body)).not.toContain('U_live_customer')
   })
 })

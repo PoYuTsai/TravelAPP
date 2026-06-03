@@ -11,6 +11,7 @@ npm run agent:command -- inbox
 Rules:
 
 - Do not print `.env.local` or any secret.
-- Do not call LINE outbound APIs.
+- It may read LINE profile display names through the private operator endpoint.
+- Do not call LINE push/reply APIs.
 - Do not auto-reply to customers.
 - If the command fails, show the error briefly and mention the exact command that failed.

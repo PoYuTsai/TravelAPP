@@ -107,7 +107,8 @@ Avoid:
 ## Operator Shortcuts
 
 - `/inbox` runs the private LINE OA operator inbox. Claude Code should execute `npm run agent:command -- inbox`, read `AI_AGENT_INTERNAL_SECRET` from `.env.local`, call Production `/api/agent/commands`, and return the Traditional Chinese case summary only.
-- `/inbox` must not print secrets, call LINE outbound APIs, or auto-reply to customers.
+- `/inbox` should display customer-friendly labels first: LINE profile display name when available, otherwise a plain-language case label such as `8/21 2大2小親子包車客`. Keep `CW-...` as the internal case id, not the primary thing Eric has to recognize.
+- `/inbox` may use `LINE_CHANNEL_ACCESS_TOKEN` only to read LINE profile display names. It must not print secrets, call LINE push/reply APIs, or auto-reply to customers.
 
 ## Skill Policy
 

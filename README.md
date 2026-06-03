@@ -53,7 +53,7 @@
 
 將 LINE OA 從「純手動回覆」升級為「AI 輔助 + 人工決策」：
 
-- **目前**：Production webhook 可接收 LINE OA 新訊息，operator `inbox` 可列出 case、最新客訊、需求摘要與缺漏欄位
+- **目前**：Production webhook 可接收 LINE OA 新訊息，operator `/inbox` 可列出客人名稱/白話代稱、最新客訊、需求摘要與缺漏欄位
 - **原則**：AI / bot 只整理內部資訊，不自動回覆客人
 - **技術**：LINE Messaging API + Vercel + Upstash KV；模型、夥伴群推播、正式報價寫入仍在後續 gate
 - **分階段**：
