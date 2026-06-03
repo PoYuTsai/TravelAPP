@@ -553,15 +553,17 @@ git commit -m "docs(line-agent): mark M2 first batch implemented"
 
 ## 完成驗收（whole-plan checklist）
 
-- [ ] `npx vitest run src/lib/line-agent` 全綠（含既有測試無回歸）。
-- [ ] `npx tsc --noEmit` 無錯。
-- [ ] 8 類分類 contract 測試齊全，含 price>product、follow_up 升級、image/postback 優先序。
-- [ ] zone resolver 七規則 table 測試齊全 + 兜底 need_reply。
-- [ ] reminder 五 reason 觸發/未觸發邊界（注入 now）齊全。
-- [ ] `/inbox` 輸出依 zone 分組、needs_eric 置頂、空區 (0)。
-- [ ] 四條守門全綠：menu browsing 不提醒、客人文字零送出、low_context 不亂猜、send intent 不自動推群。
-- [ ] `autoReplyEnabled` 與所有 `mapping.enabled` 恆 `false`（型別 + runtime）。
-- [ ] 無 secrets / 金鑰進 repo；LLM seam 用 stub。
+> **第一批完成狀態（2026-06-03，branch tip `c5761f2`）：Tasks 1–8 全數實作 + 守門測試綠。**
+
+- [x] `npx vitest run src/lib/line-agent` 全綠（30 檔 / 385 測試，含既有測試無回歸）。
+- [~] `npx tsc --noEmit`：M2 新增/修改檔案全淨；branch 另有 24 個**既有、與 M2 無關**的型別錯（`select-store.test.ts` NODE_ENV、`quoteDisplay.test.ts` null、`activityTickets.test.ts` 重複 key），屬既有技術債，未在本批 scope。
+- [x] 8 類分類 contract 測試齊全，含 price>product、follow_up 升級、image/postback 優先序。
+- [x] zone resolver 七規則 table 測試齊全 + 兜底 need_reply。
+- [x] reminder 五 reason 觸發/未觸發邊界（注入 now）齊全。
+- [x] `/inbox` 輸出依 zone 分組、needs_eric 置頂、空區 (0)。
+- [x] 四條守門全綠（`__tests__/m2-guardrails.test.ts`，11 測試）：menu browsing 不提醒、客人文字零送出、low_context 不亂猜、send intent 不自動推群。
+- [x] `autoReplyEnabled` 與所有 `mapping.enabled` 恆 `false`（型別 `false` literal + runtime 測試）。
+- [x] 無 secrets / 金鑰進 repo；LLM seam 用 `safeDefaultCustomerClassifier`（無金鑰、無 I/O）。
 
 ---
 

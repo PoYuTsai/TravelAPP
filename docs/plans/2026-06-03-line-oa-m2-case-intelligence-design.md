@@ -2,7 +2,7 @@
 
 - 日期：2026-06-03
 - Branch：`codex/line-oa-agent-mvp`
-- 狀態：**規格定稿，尚未實作 code**
+- 狀態：**第一批已實作（classifier / auto-reply schema / inbox zone / reminder / inbox 分區 / 守門測試）**。未做（後續 milestone）：夥伴群回答 `PartnerGroupEvent`、postback normalizer 擴充（`menu_browsing` live 觸發）、quote gate 等級常數 / L1 解鎖。實作見 `src/lib/line-agent/cases/{customer-event,auto-reply,inbox-zone,reminder}.ts`、守門測試 `__tests__/m2-guardrails.test.ts`。
 - 相依：
   - `src/lib/line-agent/cases/case-state.ts`（`AgentCase`、12 status）
   - `src/lib/line-agent/commands/case-triage.ts`（deterministic known/missing field 抽取）

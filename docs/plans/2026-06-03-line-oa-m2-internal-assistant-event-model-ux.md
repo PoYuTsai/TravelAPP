@@ -2,7 +2,7 @@
 
 - 日期：2026-06-03
 - Branch：`codex/line-oa-agent-mvp`
-- 狀態：**規格定稿，尚未實作 code**
+- 狀態：**第一批已實作（客人事件分類 / inbox SLA 分區 / reminder 候選 / 守門測試）**。未做（後續 milestone）：夥伴群回答、postback normalizer、quote gate 等級常數。實作對應 `docs/plans/2026-06-03-line-oa-m2-implementation-plan.md`。
 - 關係文件（重疊細節引用，不重複）：
   - `docs/plans/2026-06-03-line-oa-m2-case-intelligence-design.md`（客人事件分類 / auto-reply schema / inbox zone resolver / reminder 機制細節）
   - `docs/plans/2026-06-01-line-oa-agent-m2-durable-persistence.md`（case store）
