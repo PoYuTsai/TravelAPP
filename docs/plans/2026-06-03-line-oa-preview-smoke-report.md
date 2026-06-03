@@ -9,7 +9,7 @@
 
 | # | Smoke item | Result | Evidence |
 |---|-----------|--------|----------|
-| 1 | Vercel preview build passes | ✅ **PASS (live)** | Preview deploy succeeded: `https://travel-rjkxqx2or-poyutsais-projects.vercel.app`. |
+| 1 | Vercel preview build passes | ✅ **PASS (live)** | Preview deploy succeeded: `https://travel-dojdluhr6-poyutsais-projects.vercel.app`. |
 | 2 | Required env vars documented/checked | ✅ **PASS** | Cross-checked code `process.env.*` usage against `.env.example` (table below). |
 | 3 | `/api/line/webhook` behavior | ✅ **PASS (contract + live OA)** | `line-webhook-route.test.ts` 8/8; LINE Developers Verify success; real OA private message persisted to Upstash. |
 | 4 | `/api/agent/commands` dry-run + auth | ✅ **PASS (contract + live)** | Contract tests pass; live `vercel curl` smoke returns `MISSING_SECRET` without auth and `action:"draft"` with `AI_AGENT_INTERNAL_SECRET`. |
@@ -22,7 +22,7 @@
 
 **Live evidence (2026-06-03 update):**
 
-- Preview deployment: `https://travel-rjkxqx2or-poyutsais-projects.vercel.app`
+- Preview deployment: `https://travel-dojdluhr6-poyutsais-projects.vercel.app`
 - First deploy attempt failed because `.next/` was uploaded and Vercel cloud build consumed stale webpack artifacts. Added `.vercelignore` to exclude `.next`, `node_modules`, local env files, and test/cache output.
 - `vercel --yes --force` then built successfully on Vercel.
 - `vercel curl /api/agent/commands` without `x-agent-secret` → `{"error":"Missing operator secret","code":"MISSING_SECRET"}`.
@@ -60,6 +60,7 @@ Result: ✅ **PASS**
   - status `new_inquiry`
   - one `line_oa_message` audit entry
 - Follow-up implementation now stores recent raw OA customer text in `AgentCase.customerMessages[]` and adds an operator-only `list_cases` command path. This closes the earlier "received but cannot summarize what the customer asked" gap at the storage layer.
+- Post-implementation smoke against the latest Preview returned `200 ok`, persisted one smoke case with `customerMessages[{ messageId, text, receivedAt, source }]`, then removed the smoke keys from Upstash.
 
 ## Item 3 — `/api/line/webhook` (contract verified)
 
