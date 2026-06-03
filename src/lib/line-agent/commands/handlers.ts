@@ -19,6 +19,7 @@ import { TERMINAL_STATUSES } from '../cases/case-state'
 import { createInitialCase } from '../cases/case-state'
 import { caseReducer } from '../cases/case-reducer'
 import { CasePersistenceError } from '../errors'
+import { buildCaseTriage, type CaseTriageSummary } from './case-triage'
 
 // ---------------------------------------------------------------------------
 // Idempotency tuning
@@ -54,6 +55,7 @@ export interface CaseSummary {
   latestCustomerMessageText: string
   messageCount: number
   missingFields: string[]
+  triage: CaseTriageSummary
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +242,7 @@ export async function handleListRecentCases(
     .slice(0, limit)
     .map((c) => {
       const messages = c.customerMessages ?? []
+      const triage = buildCaseTriage(c)
       return {
         caseId: c.caseId,
         status: c.status,
@@ -247,7 +250,8 @@ export async function handleListRecentCases(
         lastCustomerMessageAt: c.lastCustomerMessageAt,
         latestCustomerMessageText: messages.at(-1)?.text ?? '',
         messageCount: messages.length,
-        missingFields: [...c.missingFields],
+        missingFields: [...triage.missingFields],
+        triage,
       }
     })
 

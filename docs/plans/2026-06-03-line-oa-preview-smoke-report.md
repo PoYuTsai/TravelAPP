@@ -63,6 +63,21 @@ Result: ✅ **PASS**
 - Post-implementation smoke against the latest Preview returned `200 ok`, persisted one smoke case with `customerMessages[{ messageId, text, receivedAt, source }]`, then removed the smoke keys from Upstash.
 - `/api/agent/commands` now wires deterministic `list_cases` commands through the bootstrapped CaseStore, so CC/tmux can query recent active OA cases via the operator endpoint without touching LINE outbound or Sanity write paths.
 
+## Live Production OA smoke (2026-06-03 update)
+
+Result: ✅ **PASS**
+
+- Production env now includes the required LINE agent variables: `LINE_CHANNEL_SECRET`, `AGENT_KV_URL`, `AGENT_KV_TOKEN`, `AI_AGENT_INTERNAL_SECRET`, and `NOTION_TEAM_2026_DATABASE_ID`.
+- Production deploy succeeded and `https://chiangway-travel.com` was aliased to the latest deployment.
+- LINE Developers webhook can use the fixed Production URL: `https://chiangway-travel.com/api/line/webhook`.
+- Eric sent multiple real LINE OA private messages after switching to Production. The same LINE user stayed on one case and `messageCount` incremented from 1 → 2 → 3.
+- Operator `inbox` on Production returns active cases from Upstash through `/api/agent/commands` with `x-agent-secret`.
+- New deterministic inbox triage now adds:
+  - `triage.summaryText` — compact human-readable customer need summary.
+  - `triage.knownFacts` — extracted facts such as travel date, adults/children, child ages, charter days, and interests.
+  - `triage.missingFields` — obvious follow-up fields such as child seat need, flight/pickup info, and hotel/pickup location.
+- Boundaries still hold: no customer auto-reply, no LINE outbound token usage, no Sanity write token, and no formal quote write.
+
 ## Item 3 — `/api/line/webhook` (contract verified)
 
 - Invalid signature → **401**, no routing. (`line-webhook-route.test.ts:109`)

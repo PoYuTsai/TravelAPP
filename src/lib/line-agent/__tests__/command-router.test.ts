@@ -247,6 +247,69 @@ describe('R4b — DC command can list recent unprocessed OA cases', () => {
     ])
     expect(JSON.stringify(decision.handlerResult?.meta)).not.toContain('U_customer_')
   })
+
+  it('summarises customer needs and derives obvious missing fields for operator triage', async () => {
+    const store = new MemoryStore()
+
+    await routeCommand({
+      event: makeOaEvent({
+        lineUserId: 'U_family_case',
+        messageId: 'msg_family_1',
+        text: '你好，我們8/21到清邁，2大2小，想包車4天，想去大象跟夜間動物園',
+        timestamp: 1_700_000_000_000,
+      }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+    await routeCommand({
+      event: makeOaEvent({
+        lineUserId: 'U_family_case',
+        messageId: 'msg_family_2',
+        text: '小孩一個5歲一個8歲，需要兒童座椅嗎？',
+        timestamp: 1_700_000_600_000,
+      }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const decision = await routeCommand({
+      command: makeDcCommand({
+        commandText: 'inbox',
+        sendTarget: undefined,
+      }),
+      store,
+      llmClassifier: draftStub,
+    })
+
+    const cases = decision.handlerResult?.meta?.cases as Array<{
+      triage?: {
+        summaryText: string
+        knownFacts: Record<string, unknown>
+        missingFields: string[]
+      }
+      missingFields: string[]
+    }>
+    const familyCase = cases[0]
+
+    expect(familyCase.triage?.summaryText).toContain('8/21')
+    expect(familyCase.triage?.summaryText).toContain('2大2小')
+    expect(familyCase.triage?.summaryText).toContain('包車4天')
+    expect(familyCase.triage?.summaryText).toContain('大象、夜間動物園')
+    expect(familyCase.triage?.knownFacts).toMatchObject({
+      travelDate: '8/21',
+      adults: 2,
+      children: 2,
+      childAges: [5, 8],
+      charterDays: 4,
+      interests: ['大象', '夜間動物園'],
+    })
+    expect(familyCase.triage?.missingFields).toEqual([
+      'childSeatNeeds',
+      'flightOrPickupInfo',
+      'hotelOrPickupLocation',
+    ])
+    expect(familyCase.missingFields).toEqual(familyCase.triage?.missingFields)
+  })
 })
 
 // ---------------------------------------------------------------------------
