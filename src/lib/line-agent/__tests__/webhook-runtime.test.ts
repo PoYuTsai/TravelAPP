@@ -202,6 +202,31 @@ describe('webhook-runtime partner-group send gate', () => {
     expect(warnSpy).toHaveBeenCalled()
   })
 
+  it('does not invoke the real responder for a tagged event with no replyToken (no wasted model call)', async () => {
+    // An event with no live reply token can NEVER be answered on LINE, so the
+    // (potentially billed) responder must not run just to be discarded by the
+    // gate. The handler still routes + warns, but with the stub — not this fake.
+    let responderCalls = 0
+    setPartnerGroupResponder({
+      async respond() {
+        responderCalls += 1
+        return { text: 'SHOULD-NOT-RUN', meta: { responder: 'llm' as const } }
+      },
+    })
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ replyToken: undefined }),
+      new MemoryStore()
+    )
+
+    expect(responderCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+    expect(warnSpy).toHaveBeenCalled()
+  })
+
   it('suppresses a reply failure: no throw, keeps the webhook ack, logs a readable error', async () => {
     setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
     setReplyClient(async () => {

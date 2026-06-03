@@ -61,12 +61,37 @@ export type NormalizedEventHandler = (
  * events in the same batch.  The reply token's single-use semantics are the
  * primary duplicate-reply guard.
  */
+/**
+ * Cheap, event-only precondition for resolving the (possibly billed) responder:
+ * the necessary conditions for a reply that do NOT depend on the routing
+ * decision (source + tag + a live reply token).  It is intentionally a SUBSET of
+ * `shouldReplyToPartnerGroup` — the full gate still runs post-routing before any
+ * send.  Used only to avoid wasted model calls; it never authorises a send.
+ */
+function mayProducePartnerGroupReply(event: NormalizedLineEvent): boolean {
+  return (
+    event.sourceChannel === 'line_partner_group' &&
+    event.mentionsBot === true &&
+    typeof event.replyToken === 'string' &&
+    event.replyToken.trim() !== ''
+  )
+}
+
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
+  // Resolve the REAL (possibly billed) responder ONLY when this event could
+  // actually produce a LINE reply: a tagged partner-group message with a live
+  // reply token.  Otherwise (OA inbound, untagged chat, missing/expired reply
+  // token) the responder's text would be generated only to be discarded by the
+  // send gate — wasted model calls in anthropic mode.  In those cases we pass
+  // no responder and routeCommand falls back to its free stub, so routing and
+  // the missing-replyToken warning below still work without burning a model.
   const decision = await routeCommand({
     event,
     store,
     llmClassifier: safeDefaultLlmClassifier,
-    partnerGroupResponder: getPartnerGroupResponder(),
+    partnerGroupResponder: mayProducePartnerGroupReply(event)
+      ? getPartnerGroupResponder()
+      : undefined,
   })
 
   if (shouldReplyToPartnerGroup(event, decision)) {
