@@ -5,6 +5,9 @@
 - 範圍：把 `PartnerGroupResponder` seam 接上**真 Anthropic 模型**（注入式 raw fetch）+ **model routing 純函數** + **feature flag 預設 stub**。
 - 狀態：**design 定稿，未實作**（docs-only）。前置：[`2026-06-03-partner-group-mention-design.md`](2026-06-03-partner-group-mention-design.md)（§B seam 已釘）。
 - 接續關係：本設計只「換接」上一刀釘好的 `PartnerGroupResponder` seam；handler / router / permissions / route 四層**不動**。
+- Related / Depends on：
+  - [`2026-06-03-partner-group-reply-gate-billing-design.md`](2026-06-03-partner-group-reply-gate-billing-design.md)（reply gate / billing 邊界）
+  - [`2026-06-03-payment-booking-risk-policy.md`](2026-06-03-payment-booking-risk-policy.md)（**canonical 代付 / 代訂風險邊界**——system prompt 必須注入，見 §7）
 
 ---
 
@@ -261,6 +264,17 @@ meta?: {
 - **不得**給正式報價數字或對外正式承諾。
 - 需要正式結論時明講「需 Eric 拍板」。
 - 不確定就說不確定，不要編。
+
+**Payment / Booking 風險邊界（注入自 `2026-06-03-payment-booking-risk-policy.md`，canonical，不可放寬）：**
+
+- **不得**建議清微旅行代付 / 墊款 / 代訂飯店或民宿。
+- 住宿可**推薦 / 比較 / 建議**，但**不代訂、不代付**。
+- 門票代訂**僅限**夜間動物園、大象體驗 / 大象營、Eric trusted agent 白名單。
+- 其他門票 / 活動**預設**建議現場、官方管道、或由導遊協助，不代訂。
+- 不確定是否落在白名單或踩到代付/代訂邊界時，標記 `needs_eric` / `risk_policy_review`，不自行決定。
+
+> 此處只引用 policy 邊界，**不**寫入任何 Eric 銀行帳戶 / 收款事件細節；完整背景與例外見 `2026-06-03-payment-booking-risk-policy.md`。
+> 對應測試：`system-prompt.test.ts`（§8 第 2 項）應一併斷言上述代付 / 代訂 guardrail 字句存在，防 prompt 被悄悄改弱。
 
 ---
 

@@ -267,6 +267,21 @@ When a signal is unknown (e.g. read state not yet scanned), the state defaults t
 | `customer_followup_after_waiting` | New `customer_sent` free text on a waiting case | Re-activates to active case | Re-evaluate as a fresh actionable message, carrying prior summary | No | Active |
 | `browsing_only` | Rich-menu / postback / keyword auto-reply only, no free text | None | None — record context only | No | Hidden or context-only (see §1.1) |
 
+### Mapping to canonical `InboxZone` / `ReminderReason`
+
+The six names above are **operating-state vocabulary** — a human-readable way to talk about *why* a case earns (or does not earn) attention. They are **not** a second enum. The **canonical implementation enums remain the ones defined in `2026-06-03-line-oa-m2-case-intelligence-design.md`** (`InboxZone` §6.1, `ReminderReason` §5). Implementers must map to those — do not introduce a parallel enum from these labels.
+
+| §5.2 operating state | canonical `InboxZone` | canonical `ReminderReason` | notes |
+|---|---|---|---|
+| `customer_sent_no_human_reply` | `need_reply` | `unanswered_question_overdue` (has unanswered question) / `new_inquiry_unhandled` (fresh inquiry) | needs-attention / urgent-followup class; the core missed-lead guard |
+| `possibly_stuck` / `needs_attention` | `needs_eric` **if** content touches price / itinerary / safety / kids / elderly / luggage van / guide / accommodation / payment; otherwise `need_reply` | `unanswered_question_overdue` | escalate to `needs_eric` by content, else `need_reply` (= needs-attention) |
+| `waiting_customer` | `awaiting_customer` | none by default (optional `awaiting_customer_stale`, `info`, only when very stale) | low-priority awaiting-customer class — **do not proactively nag** |
+| `waiting_customer_after_itinerary_or_quote` | `quoted_tracking` (after a quote) / `awaiting_customer` (after itinerary only) | none by default (optional `quoted_tracking_followup`, `info`) | low-priority awaiting-customer class — passive watch, **no nudge** |
+| `customer_followup_after_waiting` | `need_reply` | `unanswered_question_overdue` / `new_inquiry_unhandled` | re-activates to active inquiry (= needs-attention), carrying prior summary |
+| `browsing_only` | `browsing_idle` | none | no reminder; browsing context only (see §1.1) |
+
+Both `waiting_customer` and `waiting_customer_after_itinerary_or_quote` fall in the **low-priority awaiting-customer class** and fire **no reminder by default** (§5.3). `customer_sent_no_human_reply` and `customer_followup_after_waiting` are the **needs-attention / urgent-followup** class. `possibly_stuck` resolves to `needs_eric` or `need_reply` by content. `browsing_only` produces **no reminder** — context only.
+
 ### `customer_sent_no_human_reply` — the one the bot must guard
 
 `customer_sent` + `no_human_reply_detected`. This is the highest-priority state and the core missed-lead risk the bot exists to catch.

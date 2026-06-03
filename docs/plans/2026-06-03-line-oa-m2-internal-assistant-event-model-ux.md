@@ -98,9 +98,13 @@ export type PartnerGroupEventType =
 
 ### 4.2 邊界
 
-- `bot_question` 回答**沿用既有權限**：可 analyze / web_search / ocr / draft，但**不能** code_edit / deploy / schema_change（`intent.ts` 已將 dev action 對夥伴群 deny）。
+- `bot_question` 回答**沿用既有權限**：邏輯上可 analyze / web_search / ocr / draft，但**不能** code_edit / deploy / schema_change（`intent.ts` 已將 dev action 對夥伴群 deny）。
 - `case_discussion` 的被動更新**只**寫內部註記（時間戳），不對群發話。
 - 任何 type 都**不會**觸發對客人回覆。
+
+> **目前階段（current phase）= 夥伴群 tagged reply = text-only model response。**
+> 上面列的 `web_search` / `ocr` / Notion RAG / 長行程或報價 review / 報價 `draft` 是**設計藍圖能力**，目前**全部 deferred behind 後續 explicit gate**（見 `2026-06-03-partner-group-reply-gate-billing-design.md` §2「Higher-cost LLM/tool use requires an explicit later gate」與 `2026-06-03-partner-group-responder-model-adapter-design.md` §0 非目標）。
+> **被夥伴 tag bot 不會自動跑任何外部工具**——當前 responder 只回傳純文字模型回覆。本節描述的是目標角色，不是已解鎖能力。
 
 ---
 
@@ -225,11 +229,13 @@ bot 在夥伴群＝**被 tag 才出現的 GPT 同事**。
 
 ### 10.2 能答什麼
 
-- ✅ 某案客需整理、缺什麼、下一步建議
-- ✅ 行程 / 景點 / 票務 / 時段查詢（走 web_search，附來源）
-- ✅ 圖片 OCR（機票、護照、訂單截圖）抽欄位
-- ✅ 報價/行程**草稿**（draft，人工決定用不用）
-- ✅ 類似案查詢（已確認的 Notion 案，權限內）
+> **能力分層（current phase vs deferred）：** 目前**已解鎖 = text-only model response**。下列只有純文字整理/建議是現階段能力；標 *(deferred gate)* 者皆需後續 explicit gate 才解鎖（見 reply-gate §2、responder-adapter §0），**被 tag 不會自動觸發外部工具**。
+
+- ✅ 某案客需整理、缺什麼、下一步建議（純文字，現階段）
+- 🔒 行程 / 景點 / 票務 / 時段查詢（走 web_search，附來源）*(deferred gate)*
+- 🔒 圖片 OCR（機票、護照、訂單截圖）抽欄位 *(deferred gate)*
+- 🔒 報價/行程**草稿**（draft，人工決定用不用）*(deferred gate)*
+- 🔒 類似案查詢（已確認的 Notion 案，權限內）*(deferred gate)*
 
 ### 10.3 絕不做
 
