@@ -3,7 +3,12 @@
 - 日期：2026-06-03
 - Branch：`codex/line-oa-agent-mvp`（M2 第二批 · 第一小刀）
 - 範圍：夥伴群被 tag → respond **stub** + 守門測試 + 釘 LLM adapter seam
-- 狀態：**design only**，待 Eric review 後再決定是否進實作
+- 狀態：**first cut implemented**（2026-06-03，commit `8d0f759`，Codex review passed）。
+  - 測試：`npx vitest run src/lib/line-agent` → **31 files / 421 tests passed**。
+  - latin `@`-alias word boundary 補修已含（`@bot`/`@AI`/`@cc` → true；`@botany`/`@AIGC`/`@ccc` → false）。
+  - env wiring 走 route 直讀 `LINE_BOT_USER_ID`（未走 `config.ts`，避免雙來源）。
+  - 未動 B3/B4/B5；group_quoted 無 mention → silent（行為變更）已落地。
+  - 下一步（未起手）：接真 LLM responder impl（換接 seam，邊界/測試不動）。
 
 ---
 
