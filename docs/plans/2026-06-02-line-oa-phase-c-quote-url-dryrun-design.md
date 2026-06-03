@@ -111,6 +111,35 @@ sourceChannel       ┘      2. parseQuotationText + reviewQuotation
 - `source = ai-agent` / `reviewStatus = needs_review` schema fields (Task 10 step 6/8 — defer, no schema churn).
 - Official, persisted `/quote/[slug]` URL.
 
+## Formal Write Gate
+
+This section freezes the boundary between the current dry-run line and any future formal-build line. It **records** the gate; it does **not** open it. Opening it requires Eric's explicit approval of a server-side Sanity write token (see preconditions below).
+
+### Current state (locked, this phase)
+
+- The quote flow is **dry-run only**. No official, persisted `/quote/[slug]` URL is ever produced.
+- Every emitted URL is a would-be URL: `wouldBeUrl` always carries `isOfficial: false`, and the slug is **always** `DRAFT-<caseId>` (no random real-format slug path exists — see Decision 2).
+- **No Sanity client is imported** anywhere in the Phase C files, and **no server-side write token / credential** is added.
+- Consequence: there is currently no code path — reachable or dormant — that can mutate Sanity. The gate is closed by construction, not by a runtime flag.
+
+### Trigger boundary (who may cause a formal build)
+
+- The **LINE bot must never self-create a formal quote document.** It is a LINE execution channel only.
+- A formal build may be triggered **only** by CC/tmux or by an explicit Eric command. This matches the project Operating Boundaries: quote creation is dry-run only until Eric approves a server-side Sanity write token, and file edits / writes / deploys are done by CC/tmux, not the LINE bot.
+
+### Preconditions before the token gate may be opened
+
+Before any server-side Sanity write token is provisioned or wired, the next-phase design must first define **all six** of the following. None may be left implicit:
+
+1. **Env var name** — the exact environment variable holding the token (e.g. `SANITY_QUOTE_WRITE_TOKEN`), documented and never committed (lives in `.env.local` / deployment secrets only).
+2. **Token scope** — the token must be minimally scoped: write access only to the specific `itinerary` / `quotation` documents the quote flow needs. No project-wide or dataset-wide write. No delete. No schema/CMS-config access.
+3. **Server API auth** — the live-write surface (`/api/agent/quote/create`) must authenticate the caller (CC/tmux / Eric-triggered) before any write. No unauthenticated path may reach the writer.
+4. **Audit log** — every formal write appends an audit entry (actor, caseId, document id, slug, timestamp, source channel) via `src/lib/line-agent/audit/audit-log.ts`. A write that cannot be audited must not proceed.
+5. **Fail-closed behavior** — on any uncertainty (missing/invalid token, auth failure, audit-write failure, validation `blocked`/`needs_human_check`, or any thrown error), the flow **does not write** and returns a structured non-written result. The default is always "no mutation."
+6. **Human confirmation point** — define explicitly *when* a human is in the loop relative to the formal build: before vs. after the official link is produced, and whether the result is reported to the partner LINE group or only to Eric. Posting to the partner group requires explicit send intent (project Operating Boundaries).
+
+Until all six are defined and Eric explicitly approves the token, the formal-build line stays closed and the flow remains dry-run only.
+
 ## Done criteria for the implementation session
 
 1. Three source files + two test files created, all tests green, lint clean.
