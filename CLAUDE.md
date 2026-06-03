@@ -27,6 +27,12 @@ Keep this file small. It is loaded into Claude Code sessions; detailed playbooks
 - If startup context is already yellow before work begins, first check `CLAUDE.md`, active `.claude/skills`, opened IDE files, and enabled plugins.
 - Run `powershell -ExecutionPolicy Bypass -File scripts/context-harness-audit.ps1` when auditing context bloat.
 
+## Language
+
+- Reply to Eric in Traditional Chinese by default.
+- Keep code identifiers, file paths, commands, env vars, and API names in their original form.
+- Status updates, smoke reports, `/round` summaries, and handoffs should be concise Traditional Chinese unless Eric explicitly asks for English.
+
 ## Operating Boundaries
 
 - CC/tmux is the operator. LINE bot is only a LINE execution channel that CC can call.

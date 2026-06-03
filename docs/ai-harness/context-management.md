@@ -54,6 +54,12 @@ When needed, summarize the archive first, then read only specific sections.
 - Discord/DC is optional legacy intake only: short task ticket, not full context dump.
 - Use tmux for `/clear`, interrupts, restarts, long-running commands, tests, commits, and pushes. The app UI can keep spinning after `/clear`; stop the app-side run manually and continue from tmux state.
 
+## Language Policy
+
+- Replies to Eric should be in concise Traditional Chinese by default.
+- Keep code identifiers, file paths, commands, env vars, and API names unchanged.
+- Smoke reports, `/round` summaries, and handoffs should use Traditional Chinese unless Eric asks otherwise.
+
 ## Operating Boundaries
 
 - Eric sends requests through RC / Claude Code app or tmux.
