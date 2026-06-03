@@ -38,8 +38,21 @@ export interface PartnerGroupRespondInput {
 export interface PartnerGroupRespondResult {
   /** The text the bot would say (the router decides whether to actually send). */
   text: string
-  /** Provenance for audit/debug. `model` is only set by a real LLM impl. */
-  meta?: { responder: 'stub' | 'llm'; model?: string; confidence?: string }
+  /**
+   * Provenance for audit/debug. `model` is only set by a real LLM impl.
+   *
+   * `degraded` + `error` mark a SAFE-DEFAULT fallback (design §6): a real-model
+   * path that hit a missing key / API failure / parse failure and fell back to
+   * stub text WITHOUT throwing.  This is observable, not silent — the error code
+   * plus a non-minified log let the failure be traced.
+   */
+  meta?: {
+    responder: 'stub' | 'llm'
+    model?: string
+    confidence?: string
+    degraded?: boolean
+    error?: string
+  }
 }
 
 export interface PartnerGroupResponder {
