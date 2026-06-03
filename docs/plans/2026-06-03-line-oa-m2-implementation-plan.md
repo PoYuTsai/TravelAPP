@@ -553,7 +553,7 @@ git commit -m "docs(line-agent): mark M2 first batch implemented"
 
 ## 完成驗收（whole-plan checklist）
 
-> **第一批完成狀態（2026-06-03，branch tip `c5761f2`）：Tasks 1–8 全數實作 + 守門測試綠。**
+> **第一批完成狀態（2026-06-03）：Tasks 1–8 全數實作 + 守門測試綠。** guardrail commit `c5761f2`；docs commit `27747dc`（= 本批 branch tip）。
 
 - [x] `npx vitest run src/lib/line-agent` 全綠（30 檔 / 385 測試，含既有測試無回歸）。
 - [~] `npx tsc --noEmit`：M2 新增/修改檔案全淨；branch 另有 24 個**既有、與 M2 無關**的型別錯（`select-store.test.ts` NODE_ENV、`quoteDisplay.test.ts` null、`activityTickets.test.ts` 重複 key），屬既有技術債，未在本批 scope。
