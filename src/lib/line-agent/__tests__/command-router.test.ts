@@ -194,6 +194,62 @@ describe('R4 — DC command without sendTarget → draft only', () => {
 })
 
 // ---------------------------------------------------------------------------
+// R4b: DC list cases command → operator-only case summary
+// ---------------------------------------------------------------------------
+
+describe('R4b — DC command can list recent unprocessed OA cases', () => {
+  it('returns recent active cases with the latest customer message text', async () => {
+    const store = new MemoryStore()
+
+    await routeCommand({
+      event: makeOaEvent({
+        lineUserId: 'U_customer_A',
+        messageId: 'msg_customer_A',
+        text: '測試 webhook：2026/8/21',
+        timestamp: 1_700_000_000_000,
+      }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+    await routeCommand({
+      event: makeOaEvent({
+        lineUserId: 'U_customer_B',
+        messageId: 'msg_customer_B',
+        text: '想問清邁親子包車 2大1小',
+        timestamp: 1_700_000_600_000,
+      }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const decision = await routeCommand({
+      command: makeDcCommand({
+        commandText: '列出最近未處理客人',
+        sendTarget: undefined,
+      }),
+      store,
+      llmClassifier: draftStub,
+    })
+
+    expect(decision.action).toBe('list_cases')
+    expect(decision.handlerResult?.handler).toBe('handleListRecentCases')
+    expect(decision.handlerResult?.meta?.cases).toEqual([
+      expect.objectContaining({
+        caseId: 'CW-msg_customer_B',
+        status: 'new_inquiry',
+        latestCustomerMessageText: '想問清邁親子包車 2大1小',
+      }),
+      expect.objectContaining({
+        caseId: 'CW-msg_customer_A',
+        status: 'new_inquiry',
+        latestCustomerMessageText: '測試 webhook：2026/8/21',
+      }),
+    ])
+    expect(JSON.stringify(decision.handlerResult?.meta)).not.toContain('U_customer_')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // R5: DC command WITH sendTarget → posting to partner group ALLOWED
 // ---------------------------------------------------------------------------
 

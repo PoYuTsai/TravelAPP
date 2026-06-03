@@ -15,6 +15,7 @@ import type { OperatorCommand } from '../operator/operator-command'
 import type { CommandIntent } from './intent'
 import type { CaseStore } from '../storage/store'
 import type { AgentCase } from '../cases/case-state'
+import { TERMINAL_STATUSES } from '../cases/case-state'
 import { createInitialCase } from '../cases/case-state'
 import { caseReducer } from '../cases/case-reducer'
 import { CasePersistenceError } from '../errors'
@@ -43,6 +44,16 @@ export interface HandlerResult {
   status: 'stub_ok' | 'stub_skipped' | 'error'
   /** Optional diagnostic data for testing or audit. */
   meta?: Record<string, unknown>
+}
+
+export interface CaseSummary {
+  caseId: string
+  status: AgentCase['status']
+  customerDisplayName: string
+  lastCustomerMessageAt: string
+  latestCustomerMessageText: string
+  messageCount: number
+  missingFields: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +172,13 @@ export async function handleCreateOrUpdateCase(
   // Reuse the canonical reducer — do not reimplement transitions here.
   const { case: nextCase, audit } = caseReducer(
     current,
-    { type: 'line_oa_message', lineUserId: event.lineUserId, text: event.text ?? '', now },
+    {
+      type: 'line_oa_message',
+      lineUserId: event.lineUserId,
+      messageId: event.messageId,
+      text: event.text ?? '',
+      now,
+    },
     prevAudit
   )
 
@@ -205,6 +222,39 @@ export async function handleDraft(
     handler: 'handleDraft',
     status: 'stub_ok',
     meta: { action: intent.action, actor: command.actor },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// List recent cases handler — private/operator read path
+// ---------------------------------------------------------------------------
+
+export async function handleListRecentCases(
+  store: CaseStore,
+  limit = 5
+): Promise<HandlerResult> {
+  const all = await store.listAll()
+  const cases: CaseSummary[] = all
+    .filter((c) => !TERMINAL_STATUSES.has(c.status))
+    .sort((a, b) => b.lastCustomerMessageAt.localeCompare(a.lastCustomerMessageAt))
+    .slice(0, limit)
+    .map((c) => {
+      const messages = c.customerMessages ?? []
+      return {
+        caseId: c.caseId,
+        status: c.status,
+        customerDisplayName: c.customerDisplayName,
+        lastCustomerMessageAt: c.lastCustomerMessageAt,
+        latestCustomerMessageText: messages.at(-1)?.text ?? '',
+        messageCount: messages.length,
+        missingFields: [...c.missingFields],
+      }
+    })
+
+  return {
+    handler: 'handleListRecentCases',
+    status: 'stub_ok',
+    meta: { cases, count: cases.length },
   }
 }
 

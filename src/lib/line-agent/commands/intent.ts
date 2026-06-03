@@ -39,6 +39,7 @@ export type IntentAction =
   | 'bug_packet'
   | 'respond'
   | 'send'
+  | 'list_cases'
   // Dev-plane actions (NOT allowed from partner group)
   | 'code_edit'
   | 'deploy'
@@ -121,6 +122,7 @@ const DETERMINISTIC_PATTERNS: PatternEntry[] = [
   { pattern: /\bocr\b/i, action: 'ocr' },
   { pattern: /\bweb[_\s-]?search\b|\bsearch\b/i, action: 'web_search' },
   { pattern: /\bparse\b/i, action: 'parse' },
+  { pattern: /\blist[_\s-]?cases\b|\binbox\b|列出.*客人|最近.*客人|未處理.*客人/i, action: 'list_cases' },
   { pattern: /\bdraft\b/i, action: 'draft' },
   { pattern: /\bbug[_\s-]?packet\b/i, action: 'bug_packet' },
   { pattern: /\banalyze\b|\banalyse\b/i, action: 'analyze' },

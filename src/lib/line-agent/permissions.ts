@@ -58,6 +58,8 @@ const DENIED_FROM_PARTNER_GROUP: ReadonlySet<IntentAction> = new Set<IntentActio
   // Building a quote (even dry-run) is a write-plane action — the partner group
   // may surface inputs but must never trigger the quote build itself.
   'create_quote',
+  // Listing raw OA customer inquiry text is an operator/private read action.
+  'list_cases',
 ])
 
 /**

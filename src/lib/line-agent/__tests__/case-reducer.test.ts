@@ -110,6 +110,30 @@ describe('caseReducer — line_oa_message event', () => {
     expect(audit[0].to).toBe('new_inquiry')
   })
 
+  it('records the customer message text for later triage', () => {
+    const c = makeCase()
+    const event: CaseEvent = {
+      type: 'line_oa_message',
+      lineUserId: 'Uaaa111',
+      text: '測試 webhook：2026/8/21',
+      now: T1,
+    }
+
+    const { case: next } = apply(c, event)
+    const messages = (next as {
+      customerMessages?: Array<{ text: string; receivedAt: string }>
+    }).customerMessages
+
+    expect(messages).toEqual([
+      {
+        messageId: '',
+        text: '測試 webhook：2026/8/21',
+        receivedAt: T1,
+        source: 'line_oa',
+      },
+    ])
+  })
+
   it('needs_info + line_oa_message → transitions to new_inquiry (customer replied)', () => {
     const c = makeCase({ status: 'needs_info' })
     const event: CaseEvent = {

@@ -69,6 +69,34 @@ describe('OA message persistence — create', () => {
     expect(persisted?.lastCustomerMessageAt).toBe('2023-11-14T22:13:20.000Z')
   })
 
+  it('persists the raw OA message text inside the case for later summary', async () => {
+    const input: RouterInput = {
+      event: makeOaEvent({ text: '測試 webhook：2026/8/21' }),
+      store,
+      llmClassifier: analyzeStub,
+    }
+    await routeCommand(input)
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    const messages = (persisted as {
+      customerMessages?: Array<{
+        messageId: string
+        text: string
+        receivedAt: string
+        source: string
+      }>
+    } | null)?.customerMessages
+
+    expect(messages).toEqual([
+      {
+        messageId: 'msg_aaa',
+        text: '測試 webhook：2026/8/21',
+        receivedAt: '2023-11-14T22:13:20.000Z',
+        source: 'line_oa',
+      },
+    ])
+  })
+
   it('appends an audit entry when a case is created', async () => {
     const input: RouterInput = { event: makeOaEvent(), store, llmClassifier: analyzeStub }
     await routeCommand(input)
@@ -179,6 +207,9 @@ describe('OA message persistence — idempotent redelivery', () => {
 
     const auditAfterRedeliver = await store.getAudit(persisted!.caseId)
     expect(auditAfterRedeliver).toHaveLength(1) // unchanged — no duplicate audit
+
+    const afterRedeliver = await store.getByLineUserId('U_customer_persist')
+    expect(afterRedeliver?.customerMessages).toHaveLength(1)
   })
 
   it('keys dedup on messageId, not timestamp (a redelivery never bumps lastCustomerMessageAt)', async () => {

@@ -31,6 +31,7 @@ import {
   handleRespondToPartnerGroup,
   handleCreateOrUpdateCase,
   handleDraft,
+  handleListRecentCases,
   handlePostToPartnerGroup,
   handleSilent,
   type HandlerResult,
@@ -104,6 +105,7 @@ export type RouterAction =
   | 'internal_case_event'  // Internal case work — NOT a customer reply
   | 'draft'                // Prepare a message draft (B4 no sendTarget)
   | 'post_to_partner_group'// Send to LINE partner group (B4 + sendTarget)
+  | 'list_cases'           // Private/operator read: recent active OA cases
   | 'create_quote_dryrun'  // Phase C: dry-run quote build (DC/operator only)
   | 'denied'               // Permission denied (B5 dev action from partner group)
 
@@ -256,6 +258,16 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
     // are denied by canPartnerGroupTriggerDevAction. This path is operator-only.
     if (intent.action === 'create_quote') {
       return routeCreateQuoteDryRun(command, intent, source, input.quoteDryRun)
+    }
+
+    if (intent.action === 'list_cases') {
+      if (!store) {
+        throw new Error(
+          '[router] list_cases command requires a `store` in RouterInput.'
+        )
+      }
+      const handlerResult = await handleListRecentCases(store)
+      return { action: 'list_cases', source, denied: false, handlerResult, intent }
     }
 
     // B4: Can DC post to the partner group?

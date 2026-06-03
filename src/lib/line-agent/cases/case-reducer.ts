@@ -13,6 +13,7 @@
 import {
   type AgentCase,
   type CaseStatus,
+  MAX_CUSTOMER_MESSAGES,
   TERMINAL_STATUSES,
 } from './case-state'
 import { type AuditEntry, makeAuditEntry } from '../audit/audit-log'
@@ -42,6 +43,8 @@ interface LineOAMessageEvent {
   type: 'line_oa_message'
   /** LINE user ID of the sender — MUST match case.lineUserId. */
   lineUserId: string
+  /** LINE message ID if available, used to trace/deduplicate stored text. */
+  messageId?: string
   text: string
   now: string
 }
@@ -190,7 +193,18 @@ export function caseReducer(
       // info arrival → reset to new_inquiry for partner review.
       nextStatus =
         current.status === 'needs_info' ? 'new_inquiry' : current.status
-      caseUpdates = { lastCustomerMessageAt: event.now }
+      caseUpdates = {
+        lastCustomerMessageAt: event.now,
+        customerMessages: [
+          ...(current.customerMessages ?? []),
+          {
+            messageId: event.messageId ?? '',
+            text: event.text,
+            receivedAt: event.now,
+            source: 'line_oa' as const,
+          },
+        ].slice(-MAX_CUSTOMER_MESSAGES),
+      }
       break
     }
 

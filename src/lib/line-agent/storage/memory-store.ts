@@ -27,6 +27,7 @@ export class MemoryStore implements CaseStore {
     // get their own copies too.
     this.cases.set(agentCase.caseId, {
       ...agentCase,
+      customerMessages: [...(agentCase.customerMessages ?? [])],
       missingFields: [...agentCase.missingFields],
       knownFacts: { ...agentCase.knownFacts },
       linkedGroupMessageIds: [...agentCase.linkedGroupMessageIds],

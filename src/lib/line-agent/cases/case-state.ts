@@ -52,6 +52,25 @@ export const TERMINAL_STATUSES: ReadonlySet<CaseStatus> = new Set<CaseStatus>([
   'lost',
 ])
 
+/**
+ * Keep only recent customer messages in the case record.  The full product
+ * will eventually have a richer event store; this bounded history is enough
+ * for MVP triage ("what did the customer just ask?") without unbounded KV
+ * growth.
+ */
+export const MAX_CUSTOMER_MESSAGES = 50
+
+export interface CustomerMessage {
+  /** LINE message ID if available; empty string when LINE omits it. */
+  messageId: string
+  /** Raw customer text, kept for internal triage and summary only. */
+  text: string
+  /** ISO-8601 timestamp when the message was received. */
+  receivedAt: string
+  /** Source channel that produced this customer message. */
+  source: 'line_oa'
+}
+
 // ---------------------------------------------------------------------------
 // AgentCase — the core case data record
 // ---------------------------------------------------------------------------
@@ -74,6 +93,12 @@ export interface AgentCase {
 
   /** ISO-8601 timestamp of the most recent customer message. */
   lastCustomerMessageAt: string
+
+  /**
+   * Recent raw OA customer messages, bounded by MAX_CUSTOMER_MESSAGES.
+   * This is the internal source material for "客人問了什麼" summaries.
+   */
+  customerMessages: CustomerMessage[]
 
   /** ISO-8601 timestamp of last partner group activity, if any. */
   lastGroupDiscussionAt?: string
@@ -139,6 +164,7 @@ export function createInitialCase(params: CreateInitialCaseParams): AgentCase {
     status: params.status ?? 'new_inquiry',
     createdAt: params.now,
     lastCustomerMessageAt: params.now,
+    customerMessages: [],
     missingFields: [],
     knownFacts: {},
     linkedGroupMessageIds: [],
