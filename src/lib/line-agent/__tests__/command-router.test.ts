@@ -254,6 +254,16 @@ describe('R4b — DC command can list recent unprocessed OA cases', () => {
     await routeCommand({
       event: makeOaEvent({
         lineUserId: 'U_family_case',
+        messageId: 'msg_family_smoke',
+        text: '正式站測試 2026/6/3',
+        timestamp: 1_699_999_000_000,
+      }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+    await routeCommand({
+      event: makeOaEvent({
+        lineUserId: 'U_family_case',
         messageId: 'msg_family_1',
         text: '你好，我們8/21到清邁，2大2小，想包車4天，想去大象跟夜間動物園',
         timestamp: 1_700_000_000_000,

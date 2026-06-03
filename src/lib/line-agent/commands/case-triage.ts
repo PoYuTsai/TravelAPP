@@ -57,8 +57,8 @@ export function buildCaseTriage(agentCase: AgentCase): CaseTriageSummary {
 function extractKnownFacts(text: string): CaseTriageKnownFacts {
   const knownFacts: CaseTriageKnownFacts = {}
 
-  const travelDate = text.match(/\b(?:20\d{2}[/.-])?\d{1,2}[/.-]\d{1,2}\b/)
-  if (travelDate) knownFacts.travelDate = travelDate[0]
+  const travelDate = chooseTravelDate(text)
+  if (travelDate) knownFacts.travelDate = travelDate
 
   const partySize = text.match(/(\d+)\s*大\s*(\d+)\s*小/)
   if (partySize) {
@@ -110,6 +110,26 @@ function deriveMissingFields(
   }
 
   return uniqueStrings(missing)
+}
+
+function chooseTravelDate(text: string): string | undefined {
+  const candidates = Array.from(text.matchAll(/\b(?:20\d{2}[/.-])?\d{1,2}[/.-]\d{1,2}\b/g))
+    .map((match) => {
+      const index = match.index ?? 0
+      const context = text.slice(Math.max(0, index - 12), index + match[0].length + 12)
+      let score = 0
+      if (/(到清邁|到清迈|抵達|抵达|出發|出发|日期|旅遊|旅游|包車|包车)/.test(context)) {
+        score += 3
+      }
+      if (/(測試|测试|webhook|正式站|smoke)/i.test(context)) {
+        score -= 5
+      }
+      return { value: match[0], score, index }
+    })
+
+  if (candidates.length === 0) return undefined
+  candidates.sort((a, b) => b.score - a.score || b.index - a.index)
+  return candidates[0].value
 }
 
 function hasExplicitChildSeatDecision(text: string): boolean {
