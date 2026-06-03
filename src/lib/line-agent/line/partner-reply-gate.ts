@@ -6,16 +6,21 @@
  * this and ONLY sends (via the reply client seam) when it returns true. Keeping
  * the decision pure makes the send boundary exhaustively testable without LINE.
  *
- * ALL SIX conditions must hold; any single false → no reply:
- *   1. decision.source === 'line_partner_group'
- *   2. event.mentionsBot === true            (this cut: tag only; quote-to-bot later)
- *   3. decision.action === 'respond'
- *   4. decision.denied !== true
- *   5. decision.handlerResult.outboundText is a non-empty (trimmed) string
- *   6. event.replyToken is a non-empty string
+ * ALL SEVEN conditions must hold; any single false → no reply:
+ *   1. event.sourceChannel === 'line_partner_group'
+ *   2. decision.source === 'line_partner_group'
+ *   3. event.mentionsBot === true            (this cut: tag only; quote-to-bot later)
+ *   4. decision.action === 'respond'
+ *   5. decision.denied !== true
+ *   6. decision.handlerResult.outboundText is a non-empty (trimmed) string
+ *   7. event.replyToken is a non-empty string
  *
- * Condition 2 is why an OA customer can never trigger a reply: the normalizer
- * forces mentionsBot:false on line_oa, so the gate is closed regardless of text.
+ * Conditions 1 + 2 BOTH pin the source to the partner group — defense in depth.
+ * This pure gate is the last line of defense before send, so it does NOT trust
+ * the normalizer alone: even if an upstream bug let an OA event arrive with
+ * mentionsBot:true, condition 1 keeps the gate closed so a customer can never be
+ * auto-replied. (Normally the normalizer also forces mentionsBot:false on
+ * line_oa — that is the first line of defense, not the only one.)
  */
 
 import type { NormalizedLineEvent } from './event-normalizer'
@@ -27,6 +32,7 @@ export function shouldReplyToPartnerGroup(
 ): boolean {
   const outboundText = decision.handlerResult?.outboundText
   return (
+    event.sourceChannel === 'line_partner_group' &&
     decision.source === 'line_partner_group' &&
     event.mentionsBot === true &&
     decision.action === 'respond' &&

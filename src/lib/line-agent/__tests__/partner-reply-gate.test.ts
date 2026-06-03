@@ -60,6 +60,19 @@ describe('shouldReplyToPartnerGroup', () => {
     ).toBe(false)
   })
 
+  it('returns false when event.sourceChannel is line_oa even if mentionsBot is wrongly true (defense in depth)', () => {
+    // Simulate an UPSTREAM bug: an OA event arrives with mentionsBot:true and a
+    // partner-group decision. The pure gate is the last send line of defense and
+    // must NOT rely on the normalizer alone — it independently checks the event
+    // source. This must never reach a customer.
+    expect(
+      shouldReplyToPartnerGroup(
+        passingEvent({ sourceChannel: 'line_oa', mentionsBot: true }),
+        passingDecision()
+      )
+    ).toBe(false)
+  })
+
   it('returns false when event.mentionsBot is false', () => {
     expect(
       shouldReplyToPartnerGroup(passingEvent({ mentionsBot: false }), passingDecision())
