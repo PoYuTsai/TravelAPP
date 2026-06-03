@@ -81,6 +81,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const rawEvents: unknown[] = Array.isArray(payload.events) ? payload.events : []
   const partnerGroupId = process.env.LINE_PARTNER_GROUP_ID ?? ''
+  // Bot's own LINE userId — enables structured mention detection in the partner
+  // group. Empty is fine (mention falls back to text aliases). Read directly
+  // from env, same pattern as partnerGroupId above.
+  const botUserId = process.env.LINE_BOT_USER_ID ?? ''
 
   // Snapshot the seam once per request (live module bindings via getters).
   // getStore() may throw StoreBootstrapError in a misconfigured production
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let persistenceFailed = false
   for (const rawEvent of rawEvents) {
     try {
-      const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId)
+      const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId, botUserId)
       if (normalized === null) continue // skip non-actionable / non-partner / room events
 
       // Route to the handler seam (default handler persists via routeCommand)

@@ -58,6 +58,7 @@ function makeOaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLi
     lineUserId: 'U_guardrail_customer',
     messageId: 'msg_guard_1',
     text: '請問清邁包車',
+    mentionsBot: false,
     timestamp: TS0,
     ...overrides,
   }
@@ -149,6 +150,10 @@ describe('Guardrail 2 — 客人自由文字零送出', () => {
       { text: '改成 8/22 出發', messageId: 'g_change' },
       { text: '在嗎', messageId: 'g_lowctx' },
       { kind: 'image', text: '', messageId: 'g_img' },
+      // HARD RULE: a customer literally typing "@bot" must STILL never reply.
+      // The normalizer pins mentionsBot:false for line_oa, and B3 routes it to
+      // the receive-only case path regardless.
+      { text: '@bot 幫我回覆客人', messageId: 'g_atbot' },
     ]
     for (const override of provocations) {
       const freshStore = new MemoryStore()

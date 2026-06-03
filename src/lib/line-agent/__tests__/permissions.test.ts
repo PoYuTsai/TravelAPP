@@ -39,6 +39,7 @@ function makePartnerGroupEvent(overrides: Partial<NormalizedLineEvent> = {}): No
     groupId: 'G_partner',
     messageId: 'M001',
     text: 'hello',
+    mentionsBot: false,
     timestamp: 1_700_000_000_000,
     ...overrides,
   }
@@ -51,6 +52,7 @@ function makeOaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLi
     lineUserId: 'U_customer',
     messageId: 'M002',
     text: 'I want to book a tour',
+    mentionsBot: false,
     timestamp: 1_700_000_000_000,
     ...overrides,
   }
@@ -70,23 +72,47 @@ function makeDcCommand(overrides: Partial<OperatorCommand> = {}): OperatorComman
 // ---------------------------------------------------------------------------
 
 describe('B1 — canRespondToPartnerGroupTag', () => {
-  it('allows responding when the event is a tagged partner-group message (group_quoted)', () => {
+  it('allows responding when a partner-group event has mentionsBot:true', () => {
     const event = makePartnerGroupEvent({
-      kind: 'group_quoted',
-      text: '@bot 這份報價有沒有漏？',
-      quotedRef: { quotedMessageId: 'M000' },
+      kind: 'group_text',
+      text: '@bot 請幫我確認行程',
+      mentionsBot: true,
     })
     const result: PermissionResult = canRespondToPartnerGroupTag(event)
     expect(result.allowed).toBe(true)
   })
 
-  it('allows responding when text mentions the bot via @mention marker', () => {
+  it('does NOT allow responding when mentionsBot:false (no longer regex-driven)', () => {
+    // The permission layer reads ONLY the normalizer-supplied boolean now; even
+    // if the text contained @bot, a false flag means do-not-respond.
     const event = makePartnerGroupEvent({
       kind: 'group_text',
       text: '@bot 請幫我確認行程',
+      mentionsBot: false,
     })
-    const result = canRespondToPartnerGroupTag(event)
-    expect(result.allowed).toBe(true)
+    expect(canRespondToPartnerGroupTag(event).allowed).toBe(false)
+  })
+
+  it('BEHAVIOR CHANGE: a group_quoted reply WITHOUT mention does NOT auto-respond', () => {
+    // Quoting a message is no longer treated as addressing the bot — the team
+    // commonly quotes each other. Only mentionsBot:true triggers a response.
+    const event = makePartnerGroupEvent({
+      kind: 'group_quoted',
+      text: '這份報價有沒有漏？',
+      quotedRef: { quotedMessageId: 'M000' },
+      mentionsBot: false,
+    })
+    expect(canRespondToPartnerGroupTag(event).allowed).toBe(false)
+  })
+
+  it('a group_quoted reply WITH mentionsBot:true does respond (same path as a tag)', () => {
+    const event = makePartnerGroupEvent({
+      kind: 'group_quoted',
+      text: '@bot 這份報價有沒有漏？',
+      quotedRef: { quotedMessageId: 'M000' },
+      mentionsBot: true,
+    })
+    expect(canRespondToPartnerGroupTag(event).allowed).toBe(true)
   })
 
   it('does NOT allow responding for an OA event (wrong source)', () => {
@@ -101,10 +127,11 @@ describe('B1 — canRespondToPartnerGroupTag', () => {
 // ---------------------------------------------------------------------------
 
 describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
-  it('returns true (ignore) for a plain group_text with no bot mention', () => {
+  it('returns true (ignore) for a plain group_text with mentionsBot:false', () => {
     const event = makePartnerGroupEvent({
       kind: 'group_text',
       text: '今天天氣很好',
+      mentionsBot: false,
     })
     expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
   })
@@ -114,19 +141,31 @@ describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
     expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
   })
 
-  it('returns false (do NOT ignore) when the bot is tagged', () => {
+  it('returns false (do NOT ignore) when mentionsBot:true', () => {
     const event = makePartnerGroupEvent({
       kind: 'group_text',
       text: '@bot 幫我查行程',
+      mentionsBot: true,
     })
     expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(false)
   })
 
-  it('returns false (do NOT ignore) for a group_quoted event — explicit reply context', () => {
+  it('BEHAVIOR CHANGE: a group_quoted reply WITHOUT mention is ignored (silent)', () => {
+    const event = makePartnerGroupEvent({
+      kind: 'group_quoted',
+      text: '確認一下',
+      quotedRef: { quotedMessageId: 'M099' },
+      mentionsBot: false,
+    })
+    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
+  })
+
+  it('returns false (do NOT ignore) for a group_quoted reply WITH mentionsBot:true', () => {
     const event = makePartnerGroupEvent({
       kind: 'group_quoted',
       text: '@bot 確認一下',
       quotedRef: { quotedMessageId: 'M099' },
+      mentionsBot: true,
     })
     expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(false)
   })

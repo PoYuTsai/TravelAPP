@@ -42,6 +42,7 @@ function makeOaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLi
     lineUserId: 'U_customer_persist',
     messageId: 'msg_aaa',
     text: '請問清邁包車',
+    mentionsBot: false,
     timestamp: TS0,
     ...overrides,
   }

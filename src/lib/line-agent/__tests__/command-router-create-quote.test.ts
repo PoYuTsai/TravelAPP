@@ -103,6 +103,7 @@ function makePartnerGroupEvent(
     groupId: 'G_partner',
     messageId: 'M001',
     text: '幫我建立報價',
+    mentionsBot: false,
     timestamp: 1_700_000_000_000,
     ...overrides,
   }

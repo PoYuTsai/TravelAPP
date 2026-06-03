@@ -227,3 +227,155 @@ describe('normalizeLineEvent', () => {
     expect(normalizeLineEvent(raw, PARTNER_GROUP_ID)).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// mentionsBot — partner-group bot-mention detection (design 2026-06-03 §A)
+//
+// The normalizer is the SINGLE source of truth for "is the bot being addressed".
+// permissions.ts only reads the resulting boolean; it never runs its own regex.
+//
+// Hard rules pinned here:
+//  - mentionsBot is ONLY ever true for sourceChannel === 'line_partner_group'.
+//  - line_oa customer events are ALWAYS mentionsBot:false, even if the text
+//    literally contains @bot / a wake word — they must never trigger a reply.
+//  - mentionsBot is a REQUIRED boolean — the normalizer always assigns it.
+// ---------------------------------------------------------------------------
+
+const BOT_USER_ID = 'U_chiangway_bot_999'
+
+/** Raw partner-group text event with an optional structured mention block. */
+function makeGroupMentionEvent(
+  text: string,
+  mentioneeUserIds?: string[]
+): Record<string, any> {
+  const message: Record<string, any> = {
+    type: 'text',
+    id: 'msg_mention',
+    text,
+  }
+  if (mentioneeUserIds) {
+    message.mention = {
+      mentionees: mentioneeUserIds.map((userId, i) => ({
+        index: i,
+        length: 3,
+        userId,
+        type: 'user',
+      })),
+    }
+  }
+  return {
+    type: 'message',
+    source: { type: 'group', groupId: PARTNER_GROUP_ID, userId: 'U_tsai_001' },
+    message,
+    timestamp: TS,
+    replyToken: 'reply_token_mention',
+  }
+}
+
+describe('normalizeLineEvent — mentionsBot detection', () => {
+  it('sets mentionsBot:true when a structured mentionee matches botUserId', () => {
+    const raw = makeGroupMentionEvent('幫我看一下', [BOT_USER_ID])
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(true)
+  })
+
+  it('sets mentionsBot:false when the structured mentionee is NOT the bot (and no text alias)', () => {
+    const raw = makeGroupMentionEvent('幫我看一下', ['U_someone_else'])
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it.each([
+    '@清微旅行chiangway_travel 幫我看',
+    '@清微旅行 這組缺什麼',
+    '@清微AI助理 確認一下',
+    '@清微AI 看看',
+    '@AI 幫忙',
+    '@bot 幫我查',
+    '@cc 看一下',
+    '清微AI 幫我看一下',
+    '清微助理 在嗎',
+    '幫我問 bot 一下',
+  ])('sets mentionsBot:true for alias text "%s" in the partner group', (text) => {
+    const raw = makeGroupMentionEvent(text)
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(true)
+  })
+
+  it('sets mentionsBot:false for casual partner-group chat with no wake word', () => {
+    const raw = makeGroupMentionEvent('今天天氣很好，明天出發')
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('falls back to text-only detection when botUserId is empty', () => {
+    // Structured mention present but botUserId unknown → cannot match structurally;
+    // alias text still triggers.
+    const structuredOnly = makeGroupMentionEvent('幫我看一下', [BOT_USER_ID])
+    expect(
+      (normalizeLineEvent(structuredOnly, PARTNER_GROUP_ID, '') as NormalizedLineEvent).mentionsBot
+    ).toBe(false)
+
+    const aliasText = makeGroupMentionEvent('@bot 幫我查')
+    expect(
+      (normalizeLineEvent(aliasText, PARTNER_GROUP_ID, '') as NormalizedLineEvent).mentionsBot
+    ).toBe(true)
+  })
+
+  it('treats a missing botUserId arg the same as empty (text fallback only)', () => {
+    const aliasText = makeGroupMentionEvent('清微AI 幫我看')
+    expect(
+      (normalizeLineEvent(aliasText, PARTNER_GROUP_ID) as NormalizedLineEvent).mentionsBot
+    ).toBe(true)
+  })
+
+  it('HARD RULE: a line_oa customer text containing @bot is ALWAYS mentionsBot:false', () => {
+    const raw = {
+      type: 'message',
+      source: { type: 'user', userId: LINE_USER_ID },
+      message: { type: 'text', id: 'msg_oa_atbot', text: '@bot 請問可以包車嗎' },
+      timestamp: TS,
+    }
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.sourceChannel).toBe('line_oa')
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('word-boundary: standalone "bot" triggers but "robot"/"chatbot" do not', () => {
+    expect(
+      (normalizeLineEvent(makeGroupMentionEvent('幫我問 bot'), PARTNER_GROUP_ID, '') as NormalizedLineEvent)
+        .mentionsBot
+    ).toBe(true)
+    expect(
+      (normalizeLineEvent(makeGroupMentionEvent('這是一個 robot 玩具'), PARTNER_GROUP_ID, '') as NormalizedLineEvent)
+        .mentionsBot
+    ).toBe(false)
+    expect(
+      (normalizeLineEvent(makeGroupMentionEvent('我用 chatbot 測試'), PARTNER_GROUP_ID, '') as NormalizedLineEvent)
+        .mentionsBot
+    ).toBe(false)
+  })
+
+  it('non-text partner-group events (image/unknown) are mentionsBot:false', () => {
+    const e = normalizeLineEvent(makeImageEvent('group'), PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  // Latin @-aliases are word-boundary guarded so a longer word that merely
+  // starts with the alias does NOT widen the trigger (design §A 誤觸防護).
+  it.each(['@botany 是植物學', '@AIGC 生成圖', '@ccc 三個c'])(
+    'does NOT trigger on a longer latin word "%s"',
+    (text) => {
+      const e = normalizeLineEvent(makeGroupMentionEvent(text), PARTNER_GROUP_ID, '') as NormalizedLineEvent
+      expect(e.mentionsBot).toBe(false)
+    }
+  )
+
+  it.each(['@bot 幫我查', '@AI 看看', '@cc 確認'])(
+    'still triggers on the exact latin alias "%s"',
+    (text) => {
+      const e = normalizeLineEvent(makeGroupMentionEvent(text), PARTNER_GROUP_ID, '') as NormalizedLineEvent
+      expect(e.mentionsBot).toBe(true)
+    }
+  )
+})

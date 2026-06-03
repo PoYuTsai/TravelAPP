@@ -41,6 +41,10 @@ import {
 import type { AgentSourceChannel } from '../types'
 import type { CaseStore } from '../storage/store'
 import { createQuote, type CreateQuoteResult } from '../quote/create-quote'
+import {
+  stubPartnerGroupResponder,
+  type PartnerGroupResponder,
+} from '../partner-group/responder'
 
 // ---------------------------------------------------------------------------
 // Phase C dry-run quote payload
@@ -98,6 +102,13 @@ export interface RouterInput {
    * still omits raw lineUserId.
    */
   customerDisplayNameResolver?: CustomerDisplayNameResolver
+  /**
+   * Injected partner-group responder (safe-default pattern, like the LLM
+   * classifier).  Defaults to the deterministic `stubPartnerGroupResponder`.
+   * A real LLM impl is swapped in here later WITHOUT touching the permission /
+   * send boundaries — the responder only produces text.
+   */
+  partnerGroupResponder?: PartnerGroupResponder
 }
 
 // ---------------------------------------------------------------------------
@@ -236,8 +247,13 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
       // B1: Is the bot tagged? → intent already resolved above
       const tagPerm = canRespondToPartnerGroupTag(event)
       if (tagPerm.allowed) {
-        // Permission granted — respond in the group
-        const handlerResult = await handleRespondToPartnerGroup(event, earlyIntent)
+        // Permission granted — respond in the group. The responder only
+        // produces text; it never sends (the router owns that decision).
+        const handlerResult = await handleRespondToPartnerGroup(
+          event,
+          earlyIntent,
+          input.partnerGroupResponder ?? stubPartnerGroupResponder
+        )
         return { action: 'respond', source, handlerResult, intent: earlyIntent }
       }
 

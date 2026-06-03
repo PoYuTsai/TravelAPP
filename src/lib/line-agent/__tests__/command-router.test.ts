@@ -64,6 +64,7 @@ function makePartnerGroupEvent(overrides: Partial<NormalizedLineEvent> = {}): No
     groupId: 'G_partner',
     messageId: 'M001',
     text: 'hello',
+    mentionsBot: false,
     timestamp: 1_700_000_000_000,
     ...overrides,
   }
@@ -76,6 +77,7 @@ function makeOaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLi
     lineUserId: 'U_customer',
     messageId: 'M002',
     text: 'I want to book a tour',
+    mentionsBot: false,
     timestamp: 1_700_000_000_000,
     ...overrides,
   }
@@ -94,13 +96,14 @@ function makeDcCommand(overrides: Partial<OperatorCommand> = {}): OperatorComman
 // R1: Tagged partner-group message → respond action
 // ---------------------------------------------------------------------------
 
-describe('R1 — tagged partner-group message → respond', () => {
-  it('routes a group_quoted (tagged) event to a respond action', async () => {
+describe('R1 — mentioned partner-group message → respond', () => {
+  it('routes a mentioned group_quoted event to a respond action', async () => {
     const input: RouterInput = {
       event: makePartnerGroupEvent({
         kind: 'group_quoted',
         text: '@bot 這份報價有沒有漏？',
         quotedRef: { quotedMessageId: 'M000' },
+        mentionsBot: true,
       }),
       llmClassifier: analyzeStub,
     }
@@ -110,14 +113,64 @@ describe('R1 — tagged partner-group message → respond', () => {
     expect(decision.denied).toBeFalsy()
   })
 
-  it('routes a @mention group_text event to a respond action', async () => {
+  it('routes a mentioned group_text event to a respond action', async () => {
     const input: RouterInput = {
-      event: makePartnerGroupEvent({ kind: 'group_text', text: '@bot 請幫我確認' }),
+      event: makePartnerGroupEvent({
+        kind: 'group_text',
+        text: '@bot 請幫我確認',
+        mentionsBot: true,
+      }),
       llmClassifier: analyzeStub,
     }
     const decision = await routeCommand(input)
     expect(decision.action).toBe('respond')
     expect(decision.denied).toBeFalsy()
+  })
+
+  it('BEHAVIOR CHANGE: a group_quoted reply WITHOUT mention is silent (not respond)', async () => {
+    const input: RouterInput = {
+      event: makePartnerGroupEvent({
+        kind: 'group_quoted',
+        text: '這份報價有沒有漏？',
+        quotedRef: { quotedMessageId: 'M000' },
+        mentionsBot: false,
+      }),
+      llmClassifier: analyzeStub,
+    }
+    const decision = await routeCommand(input)
+    expect(decision.action).toBe('silent')
+  })
+
+  it('a respond decision carries the safe stub outboundText by default', async () => {
+    const input: RouterInput = {
+      event: makePartnerGroupEvent({
+        kind: 'group_text',
+        text: '@bot 請幫我確認',
+        mentionsBot: true,
+      }),
+      llmClassifier: analyzeStub,
+    }
+    const decision = await routeCommand(input)
+    expect(decision.action).toBe('respond')
+    expect(decision.handlerResult?.outboundText).toContain('收到，我先記下來')
+  })
+
+  it('uses an injected partnerGroupResponder when provided', async () => {
+    const input: RouterInput = {
+      event: makePartnerGroupEvent({
+        kind: 'group_text',
+        text: '@bot 請幫我確認',
+        mentionsBot: true,
+      }),
+      llmClassifier: analyzeStub,
+      partnerGroupResponder: {
+        async respond() {
+          return { text: 'INJECTED-ROUTER-TEXT', meta: { responder: 'llm' as const } }
+        },
+      },
+    }
+    const decision = await routeCommand(input)
+    expect(decision.handlerResult?.outboundText).toBe('INJECTED-ROUTER-TEXT')
   })
 })
 

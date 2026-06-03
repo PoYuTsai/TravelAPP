@@ -13,6 +13,10 @@
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { OperatorCommand } from '../operator/operator-command'
 import type { CommandIntent } from './intent'
+import {
+  stubPartnerGroupResponder,
+  type PartnerGroupResponder,
+} from '../partner-group/responder'
 import type { CaseStore } from '../storage/store'
 import type { AgentCase } from '../cases/case-state'
 import { TERMINAL_STATUSES } from '../cases/case-state'
@@ -56,6 +60,14 @@ export interface HandlerResult {
   handler: string
   /** Placeholder status — real handlers will return richer structs. */
   status: 'stub_ok' | 'stub_skipped' | 'error'
+  /**
+   * The plain text to reply into the partner group, when this handler produced
+   * one (currently only handleRespondToPartnerGroup).  This is the FIXED field
+   * for "would-be reply" so impls don't each invent their own.  Carrying text
+   * here does NOT mean it was sent — the router + permission layer (B4
+   * sendTarget) still own the decision to actually post.
+   */
+  outboundText?: string
   /** Optional diagnostic data for testing or audit. */
   meta?: Record<string, unknown>
 }
@@ -98,12 +110,23 @@ export interface ListRecentCasesOptions {
 
 export async function handleRespondToPartnerGroup(
   event: NormalizedLineEvent,
-  intent: CommandIntent
+  intent: CommandIntent,
+  responder: PartnerGroupResponder = stubPartnerGroupResponder
 ): Promise<HandlerResult> {
+  // The responder ONLY produces text; it never sends. Whether outboundText
+  // actually reaches the group is decided by the router + permission layer.
+  const result = await responder.respond({
+    event,
+    intent,
+    text: event.text ?? '',
+    actor: { lineUserId: event.lineUserId },
+  })
+
   return {
     handler: 'handleRespondToPartnerGroup',
     status: 'stub_ok',
-    meta: { kind: event.kind, action: intent.action },
+    outboundText: result.text,
+    meta: { kind: event.kind, action: intent.action, responder: result.meta },
   }
 }
 

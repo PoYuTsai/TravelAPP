@@ -80,6 +80,18 @@ export interface NormalizedLineEvent {
   /** Quoted message reference — present for group_quoted events. */
   quotedRef?: QuotedRef
 
+  /**
+   * True when the bot is being addressed in the partner group (structured
+   * mention of the bot userId, or an alias/wake-word in the text).
+   *
+   * SINGLE SOURCE OF TRUTH: permissions.ts reads this boolean and never runs
+   * its own mention regex.  HARD RULE: this is ONLY ever true for
+   * `sourceChannel === 'line_partner_group'`.  A `line_oa` customer event is
+   * ALWAYS `false`, even if the text literally contains `@bot` — a customer can
+   * never trigger an automated reply.  Always assigned (required boolean).
+   */
+  mentionsBot: boolean
+
   /** LINE event timestamp (milliseconds since epoch). */
   timestamp: number
 }
@@ -97,6 +109,50 @@ export interface NormalizedLineEvent {
 type RawLineEvent = Record<string, any>
 
 // ---------------------------------------------------------------------------
+// Bot-mention detection (partner group only — design 2026-06-03 §A)
+// ---------------------------------------------------------------------------
+
+// @-prefixed CJK aliases (a partner formally tags the bot). The leading `@` is
+// required so the brand name (清微旅行) typed casually never counts as a tag.
+// CJK has no useful word boundary, so these are matched as literal substrings.
+const BOT_MENTION_AT_CJK = /@(?:清微旅行chiangway_travel|清微旅行|清微AI助理|清微AI)/i
+// @-prefixed latin aliases — word-boundary guarded (trailing `\b`) so `@bot`
+// fires but `@botany` / `@AIGC` / `@ccc` do NOT widen the trigger.
+const BOT_MENTION_AT_LATIN = /@(?:AI|bot|cc)\b/i
+// CJK wake words a partner may say without `@` (口語呼叫). Literal substrings.
+const BOT_WAKE_WORDS_CJK = /清微AI|清微助理/
+// Bare latin "bot" wake word — word-boundary guarded so it fires on a
+// standalone "bot" but NOT inside "robot" / "chatbot".
+const BOT_WAKE_WORD_BOT = /\bbot\b/i
+
+function textMentionsBot(text: string): boolean {
+  return (
+    BOT_MENTION_AT_CJK.test(text) ||
+    BOT_MENTION_AT_LATIN.test(text) ||
+    BOT_WAKE_WORDS_CJK.test(text) ||
+    BOT_WAKE_WORD_BOT.test(text)
+  )
+}
+
+/**
+ * Compute `mentionsBot` for a partner-group message.  Structured mention
+ * (LINE's `message.mention.mentionees`) is preferred when `botUserId` is known;
+ * the text alias/wake-word fallback covers the (common) case where botUserId is
+ * unset or LINE omits the structured block.
+ */
+function computeMentionsBot(message: Record<string, any>, botUserId: string): boolean {
+  const mentionees = message.mention?.mentionees
+  const structural =
+    botUserId !== '' &&
+    Array.isArray(mentionees) &&
+    mentionees.some((m) => m?.userId === botUserId)
+  if (structural) return true
+
+  const text = typeof message.text === 'string' ? message.text : ''
+  return textMentionsBot(text)
+}
+
+// ---------------------------------------------------------------------------
 // Normalizer
 // ---------------------------------------------------------------------------
 
@@ -105,11 +161,14 @@ type RawLineEvent = Record<string, any>
  *
  * @param raw             - The raw event object from the LINE webhook payload.
  * @param partnerGroupId  - The configured partner group ID (from env/config).
+ * @param botUserId       - The bot's own LINE userId (from LINE_BOT_USER_ID).
+ *                          Optional/empty → mention falls back to text aliases.
  * @returns A `NormalizedLineEvent`, or `null` if the event is not actionable.
  */
 export function normalizeLineEvent(
   raw: RawLineEvent,
-  partnerGroupId: string
+  partnerGroupId: string,
+  botUserId = ''
 ): NormalizedLineEvent | null {
   // Only handle 'message' type events.  Follow/join/leave/postback etc. are
   // not actionable in MVP; return null so the handler skips them.
@@ -147,6 +206,13 @@ export function normalizeLineEvent(
     ? 'line_partner_group'
     : 'line_oa'
 
+  // HARD RULE: mention detection is partner-group only.  line_oa is ALWAYS
+  // false so a customer can never trigger a reply, regardless of text content.
+  const mentionsBot =
+    sourceChannel === 'line_partner_group'
+      ? computeMentionsBot(message, botUserId)
+      : false
+
   // Build the normalized event based on message type
   if (messageType === 'text') {
     const text: string = message.text ?? ''
@@ -166,6 +232,7 @@ export function normalizeLineEvent(
         messageId,
         text,
         quotedRef,
+        mentionsBot,
         timestamp,
       }
     }
@@ -178,6 +245,7 @@ export function normalizeLineEvent(
       groupId,
       messageId,
       text,
+      mentionsBot,
       timestamp,
     }
   }
@@ -190,6 +258,7 @@ export function normalizeLineEvent(
       groupId,
       messageId,
       // text intentionally absent — caller fetches image via messageId
+      mentionsBot,
       timestamp,
     }
   }
@@ -202,6 +271,7 @@ export function normalizeLineEvent(
       groupId,
       messageId,
       // text intentionally absent — caller downloads file via messageId
+      mentionsBot,
       timestamp,
     }
   }
@@ -214,6 +284,7 @@ export function normalizeLineEvent(
     lineUserId,
     groupId,
     messageId,
+    mentionsBot,
     timestamp,
   }
 }

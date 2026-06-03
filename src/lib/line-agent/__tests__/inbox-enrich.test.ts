@@ -136,6 +136,7 @@ describe('handleListRecentCases — follow-up info is never silenced or misfiled
         lineUserId: 'U_mixed',
         messageId: 'mix_1',
         text: '8/21，2大2小，想去大象，夜間動物園排哪天',
+        mentionsBot: false,
         timestamp: Date.parse('2026-06-03T11:00:00.000Z'),
       },
       store,

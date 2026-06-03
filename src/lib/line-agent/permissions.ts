@@ -20,7 +20,7 @@
  *  B5  canPartnerGroupTriggerDevAction — partner group → DENY dev actions
  */
 
-import type { NormalizedLineEvent, NormalizedLineEventKind } from './line/event-normalizer'
+import type { NormalizedLineEvent } from './line/event-normalizer'
 import type { OperatorCommand } from './operator/operator-command'
 import type { CommandIntent, IntentAction } from './commands/intent'
 
@@ -39,15 +39,6 @@ export interface PermissionResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns true when the event text contains a bot mention (@bot or @cc).
- * Simple heuristic — deterministic, no model required.
- */
-function hasBotMention(text: string | undefined): boolean {
-  if (!text) return false
-  return /@bot\b|@cc\b/i.test(text)
-}
-
-/**
  * The set of dev actions that are NEVER allowed from the LINE partner group.
  */
 const DENIED_FROM_PARTNER_GROUP: ReadonlySet<IntentAction> = new Set<IntentAction>([
@@ -62,28 +53,25 @@ const DENIED_FROM_PARTNER_GROUP: ReadonlySet<IntentAction> = new Set<IntentActio
   'list_cases',
 ])
 
-/**
- * The set of NormalizedLineEventKind values that represent an active partner-group
- * request (tagged / quoted — the bot is being addressed).
- */
-const ACTIVE_PARTNER_GROUP_KINDS: ReadonlySet<NormalizedLineEventKind> = new Set<NormalizedLineEventKind>([
-  'group_quoted',
-])
-
 // ---------------------------------------------------------------------------
 // B1: canRespondToPartnerGroupTag
 //
-// A normalized partner-group event where the bot is tagged → permission allows
-// responding.  All other sources → denied (wrong channel).
+// A normalized partner-group event where the bot is mentioned → permission
+// allows responding.  All other sources → denied (wrong channel).
+//
+// SINGLE SOURCE OF TRUTH: the mention decision lives entirely in the normalizer
+// (`event.mentionsBot`).  This function NEVER runs its own regex — it only reads
+// the boolean.  `group_quoted` no longer implies an active request: quoting a
+// message is not the same as addressing the bot (the team quotes each other to
+// discuss).  Only `mentionsBot:true` triggers a response.
 // ---------------------------------------------------------------------------
 
 /**
- * B1 — Tagged partner-group messages MUST get a response.
+ * B1 — Mentioned partner-group messages MUST get a response.
  *
  * Returns allowed:true when:
  *  - the event source is line_partner_group, AND
- *  - the event is a group_quoted kind (explicit reply/tag), OR the text
- *    contains a @bot / @cc mention.
+ *  - event.mentionsBot is true.
  */
 export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): PermissionResult {
   if (event.sourceChannel !== 'line_partner_group') {
@@ -93,16 +81,13 @@ export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): Permiss
     }
   }
 
-  const isTagged =
-    ACTIVE_PARTNER_GROUP_KINDS.has(event.kind) || hasBotMention(event.text)
-
-  if (isTagged) {
+  if (event.mentionsBot) {
     return { allowed: true }
   }
 
   return {
     allowed: false,
-    reason: 'canRespondToPartnerGroupTag: event is not tagged / not a quoted reply',
+    reason: 'canRespondToPartnerGroupTag: the bot is not mentioned (event.mentionsBot is false)',
   }
 }
 
@@ -117,11 +102,12 @@ export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): Permiss
 /**
  * B2 — Casual partner-group chat is IGNORED.
  *
- * Returns true when the event should be silently ignored (no bot mention, not
- * a quoted reply, or an unknown_group kind).
+ * Returns true when the event should be silently ignored — i.e. the bot is not
+ * mentioned (`event.mentionsBot === false`).  This now INCLUDES a `group_quoted`
+ * reply that does not mention the bot: quoting a teammate's message is normal
+ * group discussion, not a request to the bot.
  *
- * Returns false when the event should be processed (bot is tagged or it is a
- * quoted reply).
+ * Returns false when the event should be processed (`event.mentionsBot` true).
  */
 export function shouldIgnoreCasualPartnerGroupChat(event: NormalizedLineEvent): boolean {
   if (event.sourceChannel !== 'line_partner_group') {
@@ -129,16 +115,9 @@ export function shouldIgnoreCasualPartnerGroupChat(event: NormalizedLineEvent): 
     return false
   }
 
-  // Quoted replies are never casual — the bot is being directly addressed
-  if (ACTIVE_PARTNER_GROUP_KINDS.has(event.kind)) return false
-
-  // unknown_group kinds (stickers, etc.) should always be ignored
-  if (event.kind === 'unknown_group') return true
-
-  // For group_text, ignore unless the bot is mentioned
-  if (hasBotMention(event.text)) return false
-
-  return true
+  // Single gate: addressed (mentionsBot) → process; otherwise ignore. This
+  // covers group_text, group_quoted and unknown_group uniformly.
+  return !event.mentionsBot
 }
 
 // ---------------------------------------------------------------------------
