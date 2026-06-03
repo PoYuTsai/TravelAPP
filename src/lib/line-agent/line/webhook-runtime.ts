@@ -24,6 +24,8 @@ import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
 import type { PartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
 import { createPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder-factory'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
+import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
+import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
 
 // ---------------------------------------------------------------------------
 // Routing seam — injectable handler
@@ -46,14 +48,54 @@ export type NormalizedEventHandler = (
  * the safe default classifier (no API calls, no keys).  For OA customer events
  * the router persists the case via the reducer + store; a persistence failure
  * propagates as CasePersistenceError so the route can return 500.
+ *
+ * Partner-group SEND GATE (tagged-reply plan §3/§5): the router only *decides*
+ * (it never sends).  Sending happens here and ONLY here, and ONLY when the pure
+ * gate `shouldReplyToPartnerGroup` is satisfied — a tagged partner-group message
+ * with non-empty responder text and a live reply token.  Customer OA events can
+ * never satisfy the gate (condition 1 pins the source to the partner group), so
+ * a customer is never auto-replied.
+ *
+ * A reply failure is suppressed (logged, not rethrown) so the webhook still acks
+ * 200 — LINE redelivery would otherwise re-bill the model and disturb the other
+ * events in the same batch.  The reply token's single-use semantics are the
+ * primary duplicate-reply guard.
  */
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
-  await routeCommand({
+  const decision = await routeCommand({
     event,
     store,
     llmClassifier: safeDefaultLlmClassifier,
     partnerGroupResponder: getPartnerGroupResponder(),
   })
+
+  if (shouldReplyToPartnerGroup(event, decision)) {
+    const outboundText = decision.handlerResult!.outboundText!
+    try {
+      await getReplyClient()(event.replyToken!, [{ type: 'text', text: outboundText }])
+    } catch (err) {
+      // §5: a reply failure must NOT propagate (no 500) and must NOT fall back
+      // to the customer plane or push.  Log a readable (non-minified) error and
+      // let the webhook ack 200.
+      console.error(
+        '[line-agent] partner-group reply failed; suppressed to keep webhook 200:',
+        err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      )
+    }
+    return
+  }
+
+  // Diagnostic: a respond-worthy partner-group decision blocked ONLY by a
+  // missing/expired reply token (the gate would pass with a token present).
+  // We cannot reply without a token; surface it but still ack 200.
+  if (
+    !event.replyToken &&
+    shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision)
+  ) {
+    console.warn(
+      '[line-agent] partner-group respond decision had no replyToken; skipping reply'
+    )
+  }
 }
 
 let _eventHandler: NormalizedEventHandler = defaultEventHandler
@@ -131,4 +173,39 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
     })
   }
   return _partnerGroupResponder
+}
+
+// ---------------------------------------------------------------------------
+// Reply client seam — the single LINE-send boundary for tagged replies
+// ---------------------------------------------------------------------------
+
+/**
+ * Sends a reply to a partner-group event using its reply token.  This is the
+ * ONLY place the tagged-reply path touches the LINE Messaging API; the router
+ * and responder stay pure.  A test injects a recording fake via setReplyClient.
+ */
+export type ReplyClient = (replyToken: string, messages: LineMessage[]) => Promise<void>
+
+/**
+ * The reply client.
+ *
+ * Resolved LAZILY so importing this module never reads env.  The default reads
+ * `LINE_CHANNEL_ACCESS_TOKEN` at CALL time (not seam-build time) and delegates
+ * to the real `replyMessage`; a missing token therefore surfaces as a
+ * LineApiError caught by the send gate (log + 200), never an import-time throw.
+ */
+let _replyClient: ReplyClient | null = null
+
+/** Override the reply client (called by a bootstrap or in tests). */
+export function setReplyClient(client: ReplyClient): void {
+  _replyClient = client
+}
+
+/** Read the current reply client (called by the send gate). */
+export function getReplyClient(): ReplyClient {
+  if (_replyClient === null) {
+    _replyClient = (replyToken, messages) =>
+      replyMessage(replyToken, messages, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '')
+  }
+  return _replyClient
 }
