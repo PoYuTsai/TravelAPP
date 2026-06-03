@@ -331,6 +331,67 @@ The reminder rules above all follow one philosophy:
 - Partners are **never** required to type `/done`, "已回", or a `caseId`.
 - An LLM is permitted **only** when a partner tags the bot, or quotes/replies to a bot-authored message, in the partner group (§1, §2, §3).
 
+## 5.4 Eric External Answer Capture
+
+Context: partners ask Eric tough questions. Eric may consult an external trusted source (J姊 / 郭姐 / a trusted guide) and then answer back in the partner group. These answers may be a single-case judgement, or reusable Chiang Mai travel domain knowledge. The bot needs to know these answers — but it must **not** auto-permanently-memorise every group message.
+
+This capture flow is an **LLM-permitted partner action**: it only ever fires when Eric explicitly tags the bot or quotes a bot-authored message (consistent with §1, §2, §3). It never reads from the customer OA plane.
+
+### Capture trigger
+
+A knowledge-capture candidate may be created only when one of these holds:
+
+- Eric tags the bot with natural language, e.g. `@清微AI 補充知識：...`.
+- Eric quotes/replies to a bot-authored case card or assistant reply and adds the answer.
+- Eric's message contains an explicit capture phrase, e.g.: 補充知識 / 記下來 / 以後記得 / 問郭姐確認 / 問J姊確認 / J姊說 / 郭姐說 / 這可以當規則 / 這案子的結論.
+
+### No auto-capture of all group messages
+
+- Normal partner-group chat is **not** captured.
+- If Eric did not tag the bot, did not quote a bot message, and used no capture phrase → it does **not** enter the knowledge candidate queue.
+- This avoids polluting the knowledge base with chit-chat, unconfirmed answers, or ad-hoc thoughts.
+
+### Case note vs reusable knowledge — two layers
+
+After capture, classify into two layers:
+
+- `case_internal_note`: a conclusion tied only to the current case.
+- `knowledge_candidate`: potentially reusable domain knowledge.
+
+Example — "蒙佔山 6/7 月通常是雨季，如果住 Phudoi homestay，那邊沒有梯田" should be tagged as:
+
+- `category`: `destination_seasonality` / `accommodation_context`
+- `location`: 蒙佔山 / Phudoi homestay
+- `source`: Eric external confirmation
+- `source_detail`: 郭姐 or J姊 (if mentioned)
+- `confidence`: `trusted_external`
+- `status`: `candidate_not_canonical`
+
+### Bot reply style
+
+MVP needs only a short acknowledgement, not a long discussion:
+
+- General capture: 「收到，已記為知識候選：蒙佔山 / 雨季 / Phudoi homestay / 梯田。之後遇到相關行程會提示。」
+- On a quote case card: 「收到，已補到此 case 的內部備註，並建立知識候選。」
+
+### Billing
+
+- Capturing a raw note / case note: **no LLM** by default.
+- Auto-classification may use **deterministic keyword classification** first.
+- LLM-assisted cleaning / categorising / merging of similar knowledge must be an **explicit Eric trigger or a batch job** — never an automatic token burn inside the normal inbound flow.
+
+### Not canonical until approved
+
+- Captured items go into the `knowledge_candidate` queue only.
+- They are promoted into the formal markdown / Notion knowledge base **only after Eric (or a future operator command) approves**.
+- This prevents a single-case answer from polluting permanent knowledge.
+
+### Partner UX
+
+- Partners are **not** required to type any command.
+- Eric uses natural-language tag-bot or quote-bot to capture.
+- If a partner asks the AI a question the AI is not sure about, it should answer "這題建議 Eric 或外部導遊確認" rather than guessing.
+
 ## 6. Error Handling
 
 Model responder failure:
