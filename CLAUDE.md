@@ -15,15 +15,25 @@ Keep this file small. It is loaded into Claude Code sessions; detailed playbooks
 - Work one project at a time. Start with TravelAPP; copy proven context-harness changes to VibeSync later.
 - Claude Code is the implementation runner: inspect files, edit, test, and report.
 - Codex is the architecture/review partner: plan review, diff review, context-harness maintenance.
-- Discord is for remote intake only. Keep DC prompts short and avoid pasting full diffs, logs, or plans unless explicitly needed.
+- Primary operator channel: RC / Claude Code app + tmux sharing the same session. Treat tmux as the source of truth.
+- Discord/DC is optional legacy intake. Keep remote prompts short and avoid pasting full diffs, logs, or plans unless explicitly needed.
+- Use tmux for control commands such as `/clear`, interrupts, restarts, long-running tests, and commits. If the app UI spins after `/clear`, stop it manually and trust tmux state.
 
 ## Context Budget Rules
 
 - Do not auto-read long docs, full diffs, terminal logs, or history files.
 - Prefer file paths plus short summaries. Read exact files only when the task requires them.
-- Use `/round` for concise status handoff: goal, changed files, verification, blocker, next action.
+- Use `/round` before `/clear` or handoff: goal, changed files, verification, blocker, next action.
 - If startup context is already yellow before work begins, first check `CLAUDE.md`, active `.claude/skills`, opened IDE files, and enabled plugins.
 - Run `powershell -ExecutionPolicy Bypass -File scripts/context-harness-audit.ps1` when auditing context bloat.
+
+## Operating Boundaries
+
+- CC/tmux is the operator. LINE bot is only a LINE execution channel that CC can call.
+- LINE OA customer messages must not be auto-replied to unless Eric explicitly changes this rule.
+- Posting to the partner LINE group requires explicit send intent.
+- Quote creation is dry-run only until Eric approves a server-side Sanity write token.
+- File edits, tests, commits, and deploys are done by CC/tmux, not by LINE bot.
 
 ## On-Demand References
 

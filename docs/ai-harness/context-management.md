@@ -1,10 +1,10 @@
 # AI Context Harness
 
-Last updated: 2026-06-02
+Last updated: 2026-06-03
 
 ## Goal
 
-Keep Claude Code and Codex useful across TravelAPP, VibeSync, and Discord workflows without starting every session in the yellow context zone.
+Keep Claude Code and Codex useful across TravelAPP, VibeSync, and remote-control workflows without starting every session in the yellow context zone.
 
 ## Principle
 
@@ -50,9 +50,21 @@ When needed, summarize the archive first, then read only specific sections.
 
 - Claude Code owns implementation: inspect, edit, test, report.
 - Codex owns architecture and review: plan review, diff review, harness maintenance.
-- Discord is intake: short task ticket, not full context dump.
+- RC / Claude Code app + tmux is the primary operator channel. Both views share the same Claude Code session; tmux is the source of truth.
+- Discord/DC is optional legacy intake only: short task ticket, not full context dump.
+- Use tmux for `/clear`, interrupts, restarts, long-running commands, tests, commits, and pushes. The app UI can keep spinning after `/clear`; stop the app-side run manually and continue from tmux state.
 
-Recommended DC ticket:
+## Operating Boundaries
+
+- Eric sends requests through RC / Claude Code app or tmux.
+- The shared CC/tmux session is the main operator: it reads files, edits code, runs tests, commits, pushes, and calls backend routes.
+- The LINE bot is an execution channel, not the autonomous decision-maker. It can post to LINE only after CC/tmux routes an explicit action.
+- LINE OA customer auto-reply remains disabled by default.
+- Partner-group posting requires explicit send intent; private thinking or draft work must not leak to LINE.
+- Formal quote creation and real `/quote/[slug]` writes remain blocked until Eric approves a server-side Sanity write token.
+- Current quote flow is dry-run only: `DRAFT-<caseId>` slug and `isOfficial:false`.
+
+Recommended remote-control ticket:
 
 ```md
 Task:
@@ -68,7 +80,7 @@ Need from other AI:
 
 ## Round Protocol
 
-`/round` should stay concise.
+`/round` should stay concise. Run it before `/clear`, before switching from app to tmux, or before handing work from Claude Code to Codex.
 
 Include:
 

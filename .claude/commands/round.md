@@ -8,6 +8,7 @@ Rules:
 - Do not auto-read large files.
 - Use file paths and short status notes.
 - Keep the result under one screen.
+- Mention whether tmux or app UI is the source of truth if the session was remote-controlled.
 
 Format:
 
