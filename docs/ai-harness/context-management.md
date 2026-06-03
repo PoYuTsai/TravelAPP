@@ -104,6 +104,11 @@ Avoid:
 - Full plans
 - More than one screen of prose
 
+## Operator Shortcuts
+
+- `/inbox` runs the private LINE OA operator inbox. Claude Code should execute `npm run agent:command -- inbox`, read `AI_AGENT_INTERNAL_SECRET` from `.env.local`, call Production `/api/agent/commands`, and return the Traditional Chinese case summary only.
+- `/inbox` must not print secrets, call LINE outbound APIs, or auto-reply to customers.
+
 ## Skill Policy
 
 Keep active project skills narrow and project-specific. Generic process skills are useful, but they are easy to over-trigger and should not live in every project by default.
