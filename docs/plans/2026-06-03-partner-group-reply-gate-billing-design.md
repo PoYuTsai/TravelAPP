@@ -233,6 +233,86 @@ Recommended reminder policy:
 - Rich menu/postback browsing: record only; no reminder unless later paired with free-text intent.
 - Cooldown by case, so repeated customer messages do not spam the group.
 
+## 5.2 Customer Conversation Status Matrix
+
+This is the state model the deterministic scan layer (§5.1) uses to decide *when* a case earns a partner-group reminder and *where* it sits in `/inbox`. All of these states are computed from stored webhook events plus scheduled/operated scans — **never** from an LLM, and they **never** auto-reply the customer.
+
+The governing asymmetry:
+
+- **We failed to reply the customer = a real problem → remind.**
+- **The customer did not reply us = by default not a problem → do not disturb.**
+- **They replied, we read it, we went silent = possibly stuck → help with a card, do not nag.**
+
+The bot's job is to guard against missed leads and to make hand-off easier — not to become a follow-up/nag machine, and not to push manual bookkeeping (`/done`, "已回", `caseId`) onto partners.
+
+| Status | Trigger condition | Priority | Partner-group action | LLM | `/inbox` placement |
+|---|---|---|---|---|---|
+| `customer_messaged_unread_by_us` | Customer sent message(s); we have not read/replied | **Highest** | Remind partner group; debounce multiple consecutive messages into one case card | No | Top / urgent |
+| `customer_replied_we_read_no_reply` (`needs_attention` / `possibly_stuck`) | Customer replied, we read it, but no reply went out | High | May post one card framing the stuck point (see below) | No | Needs-attention |
+| `waiting_customer_after_itinerary_or_quote` | We sent an itinerary/quote; customer read it but has not replied | Low | None by default | No | Low-priority "waiting customer" (passive watch) |
+| `we_replied_customer_no_reply` | We replied; customer has not replied / read-no-reply | Low | None by default | No | Low-priority "waiting customer" |
+| `browsing_only` | Rich-menu tap / keyword / auto-reply browsing only, no free text | None | None — record context only | No | Hidden or context-only (see §1.1) |
+| `customer_re_engaged` | Customer sends any new free-text message in an existing case | Re-activates to active case | Re-evaluate as a fresh actionable message | No | Active |
+
+### `customer_messaged_unread_by_us` — the one the bot must guard
+
+This is the highest-priority state and the core missed-lead risk the bot exists to catch.
+
+- Must remind the partner group.
+- Multiple messages sent in quick succession are **debounced/merged** into a single case card, not one card per message.
+- No LLM call. No customer reply.
+
+### `customer_replied_we_read_no_reply` — possibly stuck, help don't blame
+
+The customer replied and we read it but stayed silent. This usually means the partner is busy, opened it by accident, is still thinking, or hit a tough question. Mark it `needs_attention` / `possibly_stuck`.
+
+The bot may post one partner-group card that lists:
+
+- The customer's latest question.
+- Which information is still missing.
+- The likely point where things are stuck.
+- Whether this probably needs Eric's judgement.
+
+If the content touches **price, itinerary logic, safety, kids, elderly, luggage van, guide, accommodation, or payment**, escalate the card to `may_need_eric_or_ai_help`.
+
+The card's purpose is to let Eric see it and to make it easier for a partner to take over — **not** to blame the partner for going quiet.
+
+### `waiting_customer_after_itinerary_or_quote` — the most common state
+
+This is the most common situation: there has already been a conversation, the partner organised/sent an itinerary or a quote, and the customer has read it but not replied.
+
+- Default: **no** partner-group push, **no** nudge, **no** disturbance.
+- Reason: the customer may be comparing prices, thinking it over, not interested, or may even have blocked us — all of that is fine.
+- Show it only in the `/inbox` low-priority "waiting customer" zone as a passive watch.
+- Future: only once the case enters a clearly high-intent stage (customer says they want to book, asks about payment, or adds Eric's LINE QR) do we consider low-frequency follow-up.
+
+### `we_replied_customer_no_reply` — do not become a nag machine
+
+We replied; the customer has not. By default this fires **no** reminder. The customer may simply be comparing prices, not interested, blocked, or just not in the mood to reply right now. Do not let the bot turn into a follow-up/nag machine. Show it only in the `/inbox` low-priority zone.
+
+### `browsing_only` — context only, pending taxonomy
+
+Rich-menu taps, keyword hits, and auto-reply browsing only record **context** — no reminder, no LLM, no partner-group push (this is the §1.1 lifecycle).
+
+- A separate later step needs a **CUA driver** to inspect Eric's LINE rich menu, keyword rules, and auto-reply global settings, and to compile a **browsing taxonomy**.
+- Until that inventory exists, a rich-menu tap / postback may only be treated as a **hint**, never as an explicit customer requirement.
+- If the customer later sends free text, promote to an active case and carry the prior browsing context into the summary as a hint.
+
+### `customer_re_engaged` — still willing to talk, don't give up the case
+
+As soon as the customer sends any free-text reply again — whether or not it is a question — the case becomes active again.
+
+- Do not judge only by the latest single sentence; carry the prior conversation summary forward.
+- The core conversion logic is: show professionalism, build trust, demonstrate value, **then** deliver the itinerary/quote — that is what makes booking flow smoothly.
+- So as long as the customer still shows any willingness to communicate, do not give the case up lightly.
+
+### Hard constraints (all states)
+
+- Status and reminder calculation **must not** call an LLM.
+- Nothing here **auto-replies the customer**.
+- Partners are **never** required to type `/done`, "已回", or a `caseId`.
+- An LLM is permitted **only** when a partner tags the bot, or quotes/replies to a bot-authored message, in the partner group (§1, §2, §3).
+
 ## 6. Error Handling
 
 Model responder failure:
