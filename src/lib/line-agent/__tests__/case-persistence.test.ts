@@ -285,6 +285,51 @@ describe('OA message persistence — idempotent redelivery', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Customer-event classification stored at write-time (M2 Task 5A)
+// ---------------------------------------------------------------------------
+
+describe('OA message persistence — customer-event classification (write-time)', () => {
+  let store: MemoryStore
+  beforeEach(() => {
+    store = new MemoryStore()
+  })
+
+  it('classifies a travel-intent first message as new_inquiry', async () => {
+    await routeCommand({
+      event: makeOaEvent({ text: '想帶小孩去清邁玩，有包車嗎' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.latestEventCategory).toBe('new_inquiry')
+    expect(persisted?.latestClassifiedAt).toBe('2023-11-14T22:13:20.000Z')
+  })
+
+  it('classifies an image event as media_or_ocr_needed (no text needed)', async () => {
+    await routeCommand({
+      event: makeOaEvent({ kind: 'image', text: undefined, messageId: 'img_1' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.latestEventCategory).toBe('media_or_ocr_needed')
+  })
+
+  it('classification is advisory — it never changes routing away from the internal case action', async () => {
+    const decision = await routeCommand({
+      event: makeOaEvent({ text: '報價多少' }),
+      store,
+      llmClassifier: analyzeStub,
+    })
+    expect(['create_case', 'update_case']).toContain(decision.action)
+    const persisted = await store.getByLineUserId('U_customer_persist')
+    expect(persisted?.latestEventCategory).toBe('price_question')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Never a customer-facing reply
 // ---------------------------------------------------------------------------
 

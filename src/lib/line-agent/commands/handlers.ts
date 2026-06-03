@@ -20,6 +20,19 @@ import { createInitialCase } from '../cases/case-state'
 import { caseReducer } from '../cases/case-reducer'
 import { CasePersistenceError } from '../errors'
 import { buildCaseTriage, type CaseTriageSummary } from './case-triage'
+import {
+  safeDefaultCustomerClassifier,
+  type CustomerEventCategory,
+  type CustomerEventClassifier,
+  type ClassifyMessageType,
+} from '../cases/customer-event'
+import {
+  resolveInboxZone,
+  compareWithinZone,
+  INBOX_ZONE_ORDER,
+  type InboxZone,
+} from '../cases/inbox-zone'
+import { deriveReminderCandidate, type ReminderCandidate } from '../cases/reminder'
 
 // ---------------------------------------------------------------------------
 // Idempotency tuning
@@ -56,6 +69,12 @@ export interface CaseSummary {
   messageCount: number
   missingFields: string[]
   triage: CaseTriageSummary
+  /** Latest customer-event category (advisory), if classified. */
+  eventCategory?: CustomerEventCategory
+  /** SLA inbox zone derived at read-time (design §6). */
+  zone: InboxZone
+  /** Reminder candidate derived at read-time (design §5), or null. */
+  reminder: ReminderCandidate | null
 }
 
 export type CustomerDisplayNameResolver = (
@@ -65,6 +84,12 @@ export type CustomerDisplayNameResolver = (
 export interface ListRecentCasesOptions {
   limit?: number
   resolveCustomerDisplayName?: CustomerDisplayNameResolver
+  /**
+   * ISO-8601 "now", injected so zone/reminder age math stays deterministic.
+   * Defaults to the wall clock when omitted (the operator `/inbox` route does
+   * not pin a clock; only tests need determinism).
+   */
+  now?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +130,13 @@ export interface CaseHandlerDeps {
    * Enriching displayName via a profile fetch is a later follow-up.
    */
   resolveDisplayName?: (event: NormalizedLineEvent) => string
+  /**
+   * Customer-event classifier (advisory).  Default is the safe, key-less
+   * deterministic-first classifier; tests may inject a stub.  The result NEVER
+   * widens permissions and NEVER triggers a reply/push — it only annotates the
+   * case for `/inbox` zoning and reminders.
+   */
+  classifier?: CustomerEventClassifier
 }
 
 function defaultCaseId(event: NormalizedLineEvent): string {
@@ -114,6 +146,22 @@ function defaultCaseId(event: NormalizedLineEvent): string {
 function defaultDisplayName(event: NormalizedLineEvent): string {
   // Fallback only — no profile API call. Short, stable, non-empty.
   return `LINE-${event.lineUserId.slice(0, 8)}`
+}
+
+/** Map a normalized event kind to the classifier's message-type input. */
+function messageTypeFromKind(kind: NormalizedLineEvent['kind']): ClassifyMessageType {
+  switch (kind) {
+    case 'image':
+      return 'image'
+    case 'file':
+      return 'file'
+    case 'unknown_group':
+      // sticker / audio / video / location — no business text to read.
+      return 'sticker'
+    default:
+      // oa_text / group_text / group_quoted
+      return 'text'
+  }
 }
 
 /**
@@ -205,16 +253,39 @@ export async function handleCreateOrUpdateCase(
           processedMessageIds: [...seen, messageId].slice(-MAX_PROCESSED_MESSAGE_IDS),
         }
 
-  await persist(() => store.put(caseToPersist))
-  await persist(() => store.appendAudit(caseToPersist.caseId, audit[audit.length - 1]))
+  // ── Advisory customer-event classification (write-time, design §3) ───────
+  // Done here (not at read-time) because media/postback events cannot be
+  // reclassified from the stored text alone.  The classifier performs NO I/O
+  // by default and the result is purely advisory — it annotates the case for
+  // `/inbox` zoning/reminders and never triggers a reply, push or permission
+  // change.  `hasPriorMessages` reflects the case state BEFORE this message.
+  const classifier = deps.classifier ?? safeDefaultCustomerClassifier
+  const classification = await classifier.classify({
+    text: event.text ?? '',
+    messageType: messageTypeFromKind(event.kind),
+    isPostback: false, // normalizer does not surface postback in M2 (Open Item)
+    hasPriorMessages: (current.customerMessages?.length ?? 0) > 0,
+    missingFields: caseToPersist.missingFields,
+    now,
+  })
+
+  const classifiedCase: AgentCase = {
+    ...caseToPersist,
+    latestEventCategory: classification.category,
+    latestClassifiedAt: classification.classifiedAt,
+  }
+
+  await persist(() => store.put(classifiedCase))
+  await persist(() => store.appendAudit(classifiedCase.caseId, audit[audit.length - 1]))
 
   return {
     handler: 'handleCreateOrUpdateCase',
     status: 'stub_ok',
     meta: {
-      caseId: caseToPersist.caseId,
+      caseId: classifiedCase.caseId,
       created,
-      status: caseToPersist.status,
+      status: classifiedCase.status,
+      eventCategory: classifiedCase.latestEventCategory,
       kind: event.kind,
       sourceChannel: event.sourceChannel,
     },
@@ -240,6 +311,17 @@ export async function handleDraft(
 // List recent cases handler — private/operator read path
 // ---------------------------------------------------------------------------
 
+const HOUR_MS = 3_600_000
+const NEW_INQUIRY_SLA_HOURS = 4
+
+/**
+ * Escalation keywords (design §8) — medical/safety risk or competitor/price
+ * comparison.  First batch is keyword-only; spam/duplicate detection is a later
+ * milestone.  No match → not an escalation.
+ */
+const ESCALATION_PATTERN =
+  /過敏|生病|發燒|发烧|發炎|受傷|受伤|急診|急诊|醫院|医院|住院|出事|危險|危险|比價|比价|別家|别家|其他家|更便宜|kkday|klook/i
+
 export async function handleListRecentCases(
   store: CaseStore,
   options: number | ListRecentCasesOptions = 5
@@ -247,6 +329,10 @@ export async function handleListRecentCases(
   const limit = typeof options === 'number' ? options : options.limit ?? 5
   const resolveCustomerDisplayName =
     typeof options === 'number' ? undefined : options.resolveCustomerDisplayName
+  const now =
+    typeof options === 'number' ? new Date().toISOString() : options.now ?? new Date().toISOString()
+  const nowMs = Date.parse(now)
+
   const all = await store.listAll()
   const activeCases = all
     .filter((c) => !TERMINAL_STATUSES.has(c.status))
@@ -260,6 +346,31 @@ export async function handleListRecentCases(
       const resolvedDisplayName =
         (await resolveCustomerDisplayName?.(c).catch(() => null)) ?? c.customerDisplayName
 
+      // Read-time derivations (advisory presentation only — no writes, no send).
+      const hasUnansweredQuestion = (triage.knownFacts.questions?.length ?? 0) > 0
+      const messageText = messages.map((m) => m.text).join('\n')
+      const isEscalation = ESCALATION_PATTERN.test(messageText)
+      const newInquiryOverdue =
+        c.status === 'new_inquiry' &&
+        (nowMs - Date.parse(c.lastCustomerMessageAt)) / HOUR_MS > NEW_INQUIRY_SLA_HOURS
+
+      const zone = resolveInboxZone({
+        status: c.status,
+        latestEventCategory: c.latestEventCategory,
+        hasUnansweredQuestion,
+        isEscalation,
+        newInquiryOverdue,
+      })
+
+      const reminder = deriveReminderCandidate({
+        caseId: c.caseId,
+        status: c.status,
+        latestEventCategory: c.latestEventCategory,
+        hasUnansweredQuestion,
+        lastCustomerMessageAt: c.lastCustomerMessageAt,
+        now,
+      })
+
       return {
         caseId: c.caseId,
         status: c.status,
@@ -269,9 +380,23 @@ export async function handleListRecentCases(
         messageCount: messages.length,
         missingFields: [...triage.missingFields],
         triage,
+        eventCategory: c.latestEventCategory,
+        zone,
+        reminder,
       }
     })
   )
+
+  // Order by zone (needs_eric pinned top), then by within-zone urgency (§6.3).
+  const zoneRank = (z: InboxZone): number => INBOX_ZONE_ORDER.indexOf(z)
+  cases.sort((a, b) => {
+    const byZone = zoneRank(a.zone) - zoneRank(b.zone)
+    if (byZone !== 0) return byZone
+    return compareWithinZone(
+      { severity: a.reminder?.severity, ageHours: a.reminder?.ageHours ?? 0, lastCustomerMessageAt: a.lastCustomerMessageAt },
+      { severity: b.reminder?.severity, ageHours: b.reminder?.ageHours ?? 0, lastCustomerMessageAt: b.lastCustomerMessageAt }
+    )
+  })
 
   return {
     handler: 'handleListRecentCases',

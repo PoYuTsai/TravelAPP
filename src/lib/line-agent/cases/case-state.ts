@@ -6,6 +6,8 @@
  * CaseStatus from this module.
  */
 
+import type { CustomerEventCategory } from './customer-event'
+
 // ---------------------------------------------------------------------------
 // CaseStatus — EXACTLY these 12 values, no others
 // ---------------------------------------------------------------------------
@@ -135,6 +137,17 @@ export interface AgentCase {
    * minutes, never after hundreds of newer messages).
    */
   processedMessageIds: string[]
+
+  /**
+   * Event category of the most recent customer message (advisory — drives
+   * `/inbox` presentation, SLA zoning and reminder candidates only).  Computed
+   * at write-time because media/postback events cannot be reclassified from the
+   * stored text alone.  Optional for backward compatibility (design §7).
+   */
+  latestEventCategory?: CustomerEventCategory
+
+  /** ISO-8601 time the above classification was computed. */
+  latestClassifiedAt?: string
 }
 
 // ---------------------------------------------------------------------------

@@ -233,18 +233,25 @@ describe('R4b — DC command can list recent unprocessed OA cases', () => {
 
     expect(decision.action).toBe('list_cases')
     expect(decision.handlerResult?.handler).toBe('handleListRecentCases')
-    expect(decision.handlerResult?.meta?.cases).toEqual([
-      expect.objectContaining({
-        caseId: 'CW-msg_customer_B',
-        status: 'new_inquiry',
-        latestCustomerMessageText: '想問清邁親子包車 2大1小',
-      }),
-      expect.objectContaining({
-        caseId: 'CW-msg_customer_A',
-        status: 'new_inquiry',
-        latestCustomerMessageText: '測試 webhook：2026/8/21',
-      }),
-    ])
+    // Both active cases are listed (M2 orders within-zone by SLA urgency, not
+    // pure recency, so assert membership rather than a brittle exact order —
+    // ordering itself is covered by inbox-zone / inbox-enrich tests).
+    const listed = decision.handlerResult?.meta?.cases as Array<{ caseId: string }>
+    expect(listed).toHaveLength(2)
+    expect(listed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          caseId: 'CW-msg_customer_B',
+          status: 'new_inquiry',
+          latestCustomerMessageText: '想問清邁親子包車 2大1小',
+        }),
+        expect.objectContaining({
+          caseId: 'CW-msg_customer_A',
+          status: 'new_inquiry',
+          latestCustomerMessageText: '測試 webhook：2026/8/21',
+        }),
+      ])
+    )
     expect(JSON.stringify(decision.handlerResult?.meta)).not.toContain('U_customer_')
   })
 
