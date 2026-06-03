@@ -31,8 +31,18 @@ export interface AutoReplyMapping {
   id: string
   /** What inbound signal this mapping reacts to. */
   trigger: AutoReplyTrigger
-  /** The customer-event category this mapping represents. */
+  /**
+   * The customer-event category this mapping represents. Rich-menu postback
+   * triggers MUST map to `menu_browsing` — selecting a menu is browsing, not an
+   * actionable question (review P2 / design §4「瀏覽不催」). The underlying
+   * intent is preserved separately in `menuIntent`.
+   */
   mapsToCategory: CustomerEventCategory
+  /**
+   * Optional: the topical intent a menu section hints at, kept out of
+   * `mapsToCategory` so browsing is never mistaken for a real question.
+   */
+  menuIntent?: CustomerEventCategory
   /**
    * Operator-only draft suggestion. NEVER sent to the customer in M2 — shown
    * in the inbox so the operator can copy/adapt it manually.
@@ -70,14 +80,16 @@ export const DEFAULT_AUTO_REPLY_CONFIG: AutoReplyConfig = {
     {
       id: 'menu-itinerary',
       trigger: { type: 'rich_menu_postback', value: 'RICH_MENU_ITINERARY_PLACEHOLDER' },
-      mapsToCategory: 'product_or_itinerary_question',
+      mapsToCategory: 'menu_browsing',
+      menuIntent: 'product_or_itinerary_question',
       draftReplyTemplate: '我們可依親子節奏客製行程，想先了解您預計的天數與想去的景點嗎？',
       enabled: false,
     },
     {
       id: 'menu-quote',
       trigger: { type: 'rich_menu_postback', value: 'RICH_MENU_QUOTE_PLACEHOLDER' },
-      mapsToCategory: 'price_question',
+      mapsToCategory: 'menu_browsing',
+      menuIntent: 'price_question',
       draftReplyTemplate: '報價會依行程內容計算，提供日期、人數與想去的點後即可估算。',
       enabled: false,
     },

@@ -33,4 +33,13 @@ describe('auto-reply schema（dormant）', () => {
       expect(typeof m.draftReplyTemplate).toBe('string')
     }
   })
+
+  // P2：postback 一律 map menu_browsing，瀏覽不得混進 actionable category
+  test('rich_menu_postback 觸發一律 map 到 menu_browsing', () => {
+    for (const m of DEFAULT_AUTO_REPLY_CONFIG.mappings) {
+      if (m.trigger.type === 'rich_menu_postback') {
+        expect(m.mapsToCategory).toBe('menu_browsing')
+      }
+    }
+  })
 })

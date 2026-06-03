@@ -61,6 +61,42 @@ describe('classifyCustomerEventDeterministic', () => {
     const r = classifyCustomerEventDeterministic({ ...base, messageType: 'image', text: '報價多少' })
     expect(r?.category).toBe('media_or_ocr_needed')
   })
+
+  // P1：寒暄詞不得誤殺有商務內容的訊息
+  test('寒暄開頭但含行程意圖 → 不判 non_actionable', () => {
+    const r = classifyCustomerEventDeterministic({
+      ...base,
+      text: '好的，我想去清萊',
+      hasPriorMessages: true,
+    })
+    expect(r?.category).not.toBe('non_actionable')
+  })
+
+  test('寒暄開頭但補住宿 → follow_up_info（不靜音）', () => {
+    const r = classifyCustomerEventDeterministic({
+      ...base,
+      text: '收到，我們住尼曼',
+      hasPriorMessages: true,
+      missingFields: ['hotelOrPickupLocation'],
+    })
+    expect(r?.category).toBe('follow_up_info')
+  })
+
+  // P2：產品/行程問題不應依賴問號或「嗎」
+  test('product：無標點「大象營是哪間」', () => {
+    const r = classifyCustomerEventDeterministic({ ...base, text: '大象營是哪間' })
+    expect(r?.category).toBe('product_or_itinerary_question')
+  })
+
+  test('product：無標點「夜間動物園排哪天」', () => {
+    const r = classifyCustomerEventDeterministic({ ...base, text: '夜間動物園排哪天' })
+    expect(r?.category).toBe('product_or_itinerary_question')
+  })
+
+  test('product：無標點「這間有含午餐」', () => {
+    const r = classifyCustomerEventDeterministic({ ...base, text: '這間有含午餐' })
+    expect(r?.category).toBe('product_or_itinerary_question')
+  })
 })
 
 describe('safeDefaultCustomerClassifier（low_context 不亂猜）', () => {
