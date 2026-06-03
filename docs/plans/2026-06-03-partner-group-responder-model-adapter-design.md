@@ -62,7 +62,8 @@ await routeCommand({
 ```
 
 - **lazy resolver**：首次讀取時呼叫 factory，記憶化（module-singleton），比照 `getStore()` 的「deferred fail-closed」語義。
-- 預設 resolver：`createPartnerGroupResponder({ models: loadAgentConfig().models, transport: fetch })`。
+- 預設 resolver：`createPartnerGroupResponder({ models: getPartnerResponderConfig(), transport: fetch })`。
+  - **採解 B（見 §3.2）：用窄 selector，不走 all-or-nothing 的 `loadAgentConfig`** —— 否則缺任一無關 env（Notion/Storage…）也會讓夥伴群增強路徑 500。
 - 測試以 `setPartnerGroupResponder(fake)` 覆蓋，**完全不碰 env、不打真 fetch**。
 - 此模式與檔頭註解（route 讀 getter、test 用 setter 注入）一致，不引入新風格。
 
@@ -107,11 +108,46 @@ export interface ModelsConfig {
 1. `mode=stub` + 缺 `ANTHROPIC_API_KEY`：partner responder **不應**成為 throw 來源（但 `loadAgentConfig` 若為其他既有用途仍 require key，可能本來就 throw——測試要先界定「是不是因 partner responder 而炸」）。
 2. `mode=anthropic` + 缺 key：選 (a) `loadAgentConfig` 照舊 throw（webhook 500，與 Eric 方向相左）或 (b) 讓 key 對 partner 路徑可降級。
 
-**候選解（擇一，下一輪定）**：
-- **解 A（最小、不動既有 require）**：`loadAgentConfig` 維持 require `ANTHROPIC_API_KEY` 不變；factory 的 empty-key degraded-stub 分支定位為**防禦性 + 單測隔離驗證**（直接餵帶空字串的 `ModelsConfig`），不承擔正常 flow 的 500-避免。正常 flow 缺 key 仍 500——接受。
-- **解 B（達成 Eric 方向，較大）**：把 partner 路徑要用的 key 改成「對 partner responder 而言 optional」——例如 webhook lazy resolver 不走 all-or-nothing 的 `loadAgentConfig`，改用只解析 models 區塊、且 `ANTHROPIC_API_KEY` 可空的窄 loader；空 key → factory degraded stub。**風險**：須確認沒有其他現役測試/路徑依賴「`loadAgentConfig` 缺 `ANTHROPIC_API_KEY` 必 throw」。
+### 3.2 決定：解 B（Codex/Eric 拍板 2026-06-03）
 
-**TDD 起手順序（下一輪）**：先寫 **config tests + factory tests 紅燈**界定上述行為，**再**寫 adapter。不要先寫 adapter。
+partner responder 路徑**不走** all-or-nothing 的 `loadAgentConfig`（避免缺任一無關 env 也 500），改用**窄 selector**；`ANTHROPIC_API_KEY` 對此路徑**可空**。`loadAgentConfig` 既有行為**完全不動**（其他用途若 require key 仍 throw，既有測試不破壞）。
+
+**窄 selector 合約**（新檔，名稱 `getPartnerResponderConfig` 或 `loadPartnerResponderModelsFromEnv`，下一輪定）：
+
+```ts
+// 只解析 partner responder 需要的欄位；ANTHROPIC_API_KEY 可空。
+getPartnerResponderConfig(env = process.env): {
+  partnerResponderMode: 'stub' | 'anthropic'   // optional，預設 'stub'
+  anthropicApiKey: string                       // 可空字串（不 throw）
+  defaultModel: string                          // 缺 → 降級訊號（見下）
+  researchModel: string
+}
+```
+
+- 此 selector **不 throw**。缺 `ANTHROPIC_API_KEY`（或 mode=anthropic 但缺 model 名）→ 產出仍可建立，由 factory 判定降級。
+- **§2 的 webhook lazy resolver 改用此 selector**（不再 `loadAgentConfig().models`），transport 仍注入 `fetch`。
+- factory 只吃此 selector 產出的 `ModelsConfig`-like object + transport（仍不讀 `process.env`）。
+
+**降級規則對照**：
+
+| mode | key | 結果 |
+|---|---|---|
+| unset / `stub` | 缺 | `stubPartnerGroupResponder`，**不 throw** |
+| `anthropic` | 有 | `AnthropicPartnerGroupResponder` |
+| `anthropic` | 缺/空 | **degraded stub**，`meta.error='missing_anthropic_api_key'`，warn log，**不 throw / 不 500** |
+
+### 3.3 TDD 起手順序（下一輪，先紅燈再 adapter）
+
+1. **config / selector tests**：
+   - mode unset + 無 `ANTHROPIC_API_KEY` → 回 stub-capable config，**不 throw**
+   - mode=`stub` + 無 key → **不 throw**
+   - mode=`anthropic` + 無 key → config 可建立（供 factory 判降級）
+   - **既有 `loadAgentConfig` required 行為不被破壞**（回歸）
+2. **factory tests**：
+   - mode `stub` → stub identity
+   - mode `anthropic` + key → `AnthropicPartnerGroupResponder`
+   - mode `anthropic` + 空 key → degraded stub（`meta.error='missing_anthropic_api_key'`）
+3. **然後才寫 adapter**（§5）。
 
 ---
 
@@ -246,11 +282,12 @@ meta?: {
 - `src/lib/line-agent/partner-group/system-prompt.ts`
 - `src/lib/line-agent/partner-group/anthropic-responder.ts`
 - `src/lib/line-agent/partner-group/responder-factory.ts`
-- 對應 `__tests__/` 測試（§8）
+- `src/lib/line-agent/partner-group/responder-config.ts` — 窄 selector `getPartnerResponderConfig`（解 B，§3.2），`ANTHROPIC_API_KEY` 可空、不 throw
+- 對應 `__tests__/` 測試（§8 + §3.3 config/selector + factory 紅燈）
 
 修改：
 - `src/lib/line-agent/partner-group/responder.ts` — 擴充 `PartnerGroupRespondResult.meta`（§6.4）
-- `src/lib/line-agent/config.ts` — `ModelsConfig` 加 `partnerResponderMode`（§3）
+- `src/lib/line-agent/config.ts` — **解 B 下，`partnerResponderMode` 的權威來源改為窄 selector（§3.2），不要同時塞進 `loadAgentConfig` 的 `ModelsConfig` 造成雙來源**。`config.ts` 本批可不動；§3 早期片段把 mode 放進 `ModelsConfig` 的寫法以 §3.2 為準覆蓋。
 - `src/lib/line-agent/line/webhook-runtime.ts` — 新增 responder seam + lazy resolver（§2）
 
 不動：`router.ts` / `handlers.ts` / `permissions.ts` / `src/app/api/agent/commands/route.ts` / `intent.ts`（classifier 維持 stub）。
