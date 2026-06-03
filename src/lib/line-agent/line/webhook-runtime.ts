@@ -21,6 +21,9 @@ import type { CaseStore } from '@/lib/line-agent/storage/store'
 import { selectStore } from '@/lib/line-agent/storage/select-store'
 import { routeCommand } from '@/lib/line-agent/commands/router'
 import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
+import type { PartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
+import { createPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder-factory'
+import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 
 // ---------------------------------------------------------------------------
 // Routing seam — injectable handler
@@ -45,7 +48,12 @@ export type NormalizedEventHandler = (
  * propagates as CasePersistenceError so the route can return 500.
  */
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
-  await routeCommand({ event, store, llmClassifier: safeDefaultLlmClassifier })
+  await routeCommand({
+    event,
+    store,
+    llmClassifier: safeDefaultLlmClassifier,
+    partnerGroupResponder: getPartnerGroupResponder(),
+  })
 }
 
 let _eventHandler: NormalizedEventHandler = defaultEventHandler
@@ -91,4 +99,36 @@ export function getStore(): CaseStore {
     _store = selectStore()
   }
   return _store
+}
+
+// ---------------------------------------------------------------------------
+// Partner-group responder seam — injectable text producer
+// ---------------------------------------------------------------------------
+
+/**
+ * The partner-group responder (produces the TEXT the bot would say after a tag;
+ * it never sends — the webhook send gate owns that, added in a later task).
+ *
+ * Resolved LAZILY via the factory on first read so that:
+ *   - importing this module never reads env / builds an adapter;
+ *   - the default honours `AI_AGENT_PARTNER_RESPONDER_MODE` (defaults to the
+ *     safe stub — an Anthropic key alone never auto-enables a billed model);
+ *   - a test or bootstrap can inject an override via setPartnerGroupResponder().
+ */
+let _partnerGroupResponder: PartnerGroupResponder | null = null
+
+/** Override the partner-group responder (called by a bootstrap or in tests). */
+export function setPartnerGroupResponder(responder: PartnerGroupResponder): void {
+  _partnerGroupResponder = responder
+}
+
+/** Read the current partner-group responder (called per request by the handler). */
+export function getPartnerGroupResponder(): PartnerGroupResponder {
+  if (_partnerGroupResponder === null) {
+    _partnerGroupResponder = createPartnerGroupResponder({
+      models: getPartnerResponderConfig(),
+      transport: fetch,
+    })
+  }
+  return _partnerGroupResponder
 }
