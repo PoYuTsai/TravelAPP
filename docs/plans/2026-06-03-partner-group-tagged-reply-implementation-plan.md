@@ -290,6 +290,55 @@ if (shouldReplyToPartnerGroup(event, decision)) {
 
 ---
 
+## 9.5 Manual Smoke Before Task 5
+
+> Task 1–4 + P1 billing fix（`07e410d`）已落地、自動測試全綠（479/479）。進 Task 5（messageId send-once 次防線）**之前**，先在真實 LINE 平面跑一輪手動 smoke，確認 send gate + tag 流程在實機行為正確。**第一輪一律 stub mode，零 Anthropic billing。**
+
+### 1. 環境變數確認（部署前）
+
+| env | 期望 | 說明 |
+|---|---|---|
+| `LINE_CHANNEL_ACCESS_TOKEN` | 存在 | reply client default 綁定，呼叫 `replyMessage` 用 |
+| `LINE_BOT_USER_ID` | 存在 | normalizer 結構化 mention 比對（`mentionsBot`） |
+| `LINE_PARTNER_GROUP_ID` | 存在 | partner group 來源判定 |
+| `AI_AGENT_PARTNER_RESPONDER_MODE` | **`stub`**（第一輪） | 第一輪 smoke 一律 stub |
+| `ANTHROPIC_API_KEY` | 可有可無 | **即使存在也不會啟用**——除非顯式 `AI_AGENT_PARTNER_RESPONDER_MODE=anthropic` |
+
+### 2. 第一輪用 stub，不用 Anthropic
+
+- **目的**：驗證 LINE reply **send gate** 與 partner group **tag 流程**端到端打通（normalizer → router → gate → reply client → LINE）。
+- **不測**模型回覆品質——stub 回固定文字 `STUB_PARTNER_GROUP_REPLY`，足以證明送出路徑正確。
+- 模型品質 / anthropic mode 留待 stub 全 PASS 後另一輪。
+
+### 3. 手動測試步驟
+
+| # | 操作 | 預期 |
+|---|---|---|
+| 1 | 夥伴群 **tag** 官方 LINE bot 問一句正常問題 | bot 回固定 **stub** 文字（一則、reply 形式） |
+| 2 | 夥伴群**不 tag** bot 發一句閒聊 | **不回** |
+| 3 | OA 客人 1:1 傳含字面 `@bot` 的訊息 | **不回客人**、**不呼叫 responder** |
+| 4 | 夥伴群發 dev/deploy 類文字並 tag bot | **denied**、**不回** |
+| 5 | replyToken missing/expired 的 tagged 事件（如重送過期事件） | **不回**、log warning、**不呼叫 real responder** |
+
+### 4. 觀察項（Vercel logs / LINE 行為）
+
+- [ ] 是否出現 `partner-group reply failed`（reply send 失敗的非 minified log）？
+- [ ] 是否有任何 **customer OA reply** 發生？→ 應為 **0**。
+- [ ] 同一 tag 是否出現 **多次 duplicate reply**？→ 應為 **1**（reply token 單次語義；Task 5 加次防線）。
+- [ ] stub mode 下是否有任何 **Anthropic API call**？→ 應為 **0**。
+
+### 5. 通過標準（全部成立才進 Task 5）
+
+- ✅ 只有 **partner group tagged 正常問題**會收到**一則** reply。
+- ✅ **OA 客人永遠不收到** bot 自動回。
+- ✅ **untagged** group chat 不回。
+- ✅ **dev / quote / code** 類不回（denied）。
+- ✅ **stub mode 不產生任何 Anthropic billing**。
+
+> 任一項不成立 → 停下、開 bug packet（`chiangway-quote-automation-debug` 風格），不要硬進 Task 5。
+
+---
+
 ## 10. 下一階段（明標，不在本刀）
 
 1. **quote-to-bot message tracking**：bot-authored 訊息 id 持久化 + `quotedRef`-to-bot 命中也觸發 reply gate 第 2 條（reply-gate §5 末段）。
