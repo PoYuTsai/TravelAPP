@@ -22,7 +22,7 @@
 | Phase 6 | 記帳系統 + 知識庫 + 報價計算系統 | ✅ 完成 |
 | 品牌 2026-04 | 「爸媽開的」定位全面同步（官網 / Sanity / 評價 / bio）| ✅ 完成 |
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
-| **Phase 7** | **LINE OA AI 客服助理** | 📋 規格完善、待實作 |
+| **Phase 7** | **LINE OA AI 客服助理** | 🧪 MVP Preview smoke 中 |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。
 

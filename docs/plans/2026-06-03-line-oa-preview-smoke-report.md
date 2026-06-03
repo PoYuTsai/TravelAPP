@@ -9,9 +9,9 @@
 
 | # | Smoke item | Result | Evidence |
 |---|-----------|--------|----------|
-| 1 | Vercel preview build passes | ✅ **PASS (live)** | Preview deploy succeeded: `https://travel-camxoix6t-poyutsais-projects.vercel.app`. |
+| 1 | Vercel preview build passes | ✅ **PASS (live)** | Preview deploy succeeded: `https://travel-rjkxqx2or-poyutsais-projects.vercel.app`. |
 | 2 | Required env vars documented/checked | ✅ **PASS** | Cross-checked code `process.env.*` usage against `.env.example` (table below). |
-| 3 | `/api/line/webhook` behavior | ✅ **PASS (contract)** | `line-webhook-route.test.ts` 8/8. |
+| 3 | `/api/line/webhook` behavior | ✅ **PASS (contract + live OA)** | `line-webhook-route.test.ts` 8/8; LINE Developers Verify success; real OA private message persisted to Upstash. |
 | 4 | `/api/agent/commands` dry-run + auth | ✅ **PASS (contract + live)** | Contract tests pass; live `vercel curl` smoke returns `MISSING_SECRET` without auth and `action:"draft"` with `AI_AGENT_INTERNAL_SECRET`. |
 | 5 | No Sanity client import on dry-run path | ✅ **PASS** | grep + read of `quote/` (below). |
 | 6 | Smoke report produced | ✅ this file | — |
@@ -22,7 +22,7 @@
 
 **Live evidence (2026-06-03 update):**
 
-- Preview deployment: `https://travel-camxoix6t-poyutsais-projects.vercel.app`
+- Preview deployment: `https://travel-rjkxqx2or-poyutsais-projects.vercel.app`
 - First deploy attempt failed because `.next/` was uploaded and Vercel cloud build consumed stale webpack artifacts. Added `.vercelignore` to exclude `.next`, `node_modules`, local env files, and test/cache output.
 - `vercel --yes --force` then built successfully on Vercel.
 - `vercel curl /api/agent/commands` without `x-agent-secret` → `{"error":"Missing operator secret","code":"MISSING_SECRET"}`.
@@ -44,8 +44,22 @@ Derived from actual `process.env.*` reads in `src/lib/line-agent` + `src/app/api
 
 Current Vercel Preview state:
 
-- Present: `AI_AGENT_INTERNAL_SECRET`, `NOTION_TEAM_2026_DATABASE_ID`, existing `NOTION_TOKEN`, existing Sanity read envs.
-- Still needed before live LINE webhook smoke: `LINE_CHANNEL_SECRET`, `LINE_PARTNER_GROUP_ID`, `AGENT_KV_URL`, `AGENT_KV_TOKEN`.
+- Present: `AI_AGENT_INTERNAL_SECRET`, `NOTION_TEAM_2026_DATABASE_ID`, `AGENT_KV_URL`, `AGENT_KV_TOKEN`, `LINE_CHANNEL_SECRET`, existing `NOTION_TOKEN`, existing Sanity read envs.
+- `AGENT_KV_URL` / `AGENT_KV_TOKEN` were sourced from Upstash Redis REST credentials and verified locally with REST `PING` → `PONG`.
+- `LINE_PARTNER_GROUP_ID` is still not set. It is not needed for OA private-message smoke; it is required before partner-group routing tests.
+
+## Live LINE OA private-message smoke (2026-06-03 update)
+
+Result: ✅ **PASS**
+
+- LINE Developers `Use webhook` enabled and `Verify` succeeded against the protected Preview URL using Vercel Deployment Protection bypass.
+- Eric sent a real personal LINE message to the official OA: `測試 webhook：2026/8/21`.
+- Upstash contained one active case after delivery:
+  - `caseCount: 1`
+  - `activeLineUserIndexCount: 1`
+  - status `new_inquiry`
+  - one `line_oa_message` audit entry
+- Follow-up implementation now stores recent raw OA customer text in `AgentCase.customerMessages[]` and adds an operator-only `list_cases` command path. This closes the earlier "received but cannot summarize what the customer asked" gap at the storage layer.
 
 ## Item 3 — `/api/line/webhook` (contract verified)
 
@@ -79,9 +93,14 @@ Live Preview smoke:
 
 ## Remaining blockers (require Eric / next session)
 
-1. **Live LINE webhook smoke not run** — still needs `LINE_CHANNEL_SECRET`, `LINE_PARTNER_GROUP_ID`, `AGENT_KV_URL`, and `AGENT_KV_TOKEN` in Vercel Preview.
+1. **Partner-group live smoke not run** — still needs `LINE_PARTNER_GROUP_ID` in Vercel Preview.
+   - `LINE_PARTNER_GROUP_ID` should be captured from a LINE group webhook payload (`source.type === "group"`, `source.groupId`).
+   - Eric paused this step because the real OA has teammates with OA access; temporary webhook/group-id tests can create noisy OA notifications.
+   - Next attempt: choose a low-disruption time, temporarily point the OA webhook to Webhook.site, send one message in the intended test/partner group, copy `source.groupId`, then restore the webhook URL.
+   - The OA was removed from the temporary test group after this pause.
 2. **Formal quote write remains gated** — no `SANITY_QUOTE_WRITE_TOKEN` or live Sanity writer is configured. Do not open this gate without Eric's explicit approval.
+3. **LINE outbound token hygiene** — `LINE_CHANNEL_ACCESS_TOKEN` appeared in a screenshot during setup. It is not used by the current code path, but before enabling outbound LINE push/reply, reissue the long-lived channel access token and set the fresh value only in deployment secrets.
 
 ## Bottom line
 
-Code-level contracts for the webhook, the command auth boundary, the dry-run quote flow, and the no-Sanity-import / no-auto-reply boundaries all **pass**. Vercel Preview build and live `/api/agent/commands` smoke now also **pass**. Remaining live coverage is the LINE webhook path after LINE + KV env vars are configured. The write-token gate remains closed.
+Code-level contracts for the webhook, the command auth boundary, the dry-run quote flow, and the no-Sanity-import / no-auto-reply boundaries all **pass**. Vercel Preview build, live `/api/agent/commands` smoke, and real LINE OA private-message webhook smoke now also **pass**. Upstash KV is configured and PING-verified. Remaining live coverage is the partner-group route after `LINE_PARTNER_GROUP_ID` is captured and configured. The write-token gate remains closed.
