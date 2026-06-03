@@ -38,6 +38,34 @@ import {
 } from './handlers'
 import type { AgentSourceChannel } from '../types'
 import type { CaseStore } from '../storage/store'
+import { createQuote, type CreateQuoteResult } from '../quote/create-quote'
+
+// ---------------------------------------------------------------------------
+// Phase C dry-run quote payload
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw payload for an explicit DC create-quote command.
+ *
+ * Carries the raw itinerary/quote text plus deterministic seams (origin,
+ * timestamp) so the dry-run stays reproducible in tests.
+ *
+ * SAFETY: there is intentionally NO writer field here. The router ALWAYS lets
+ * createQuote default to the dry-run writer, so the live writer / any Sanity
+ * write token is structurally unreachable from this path.
+ */
+export interface QuoteDryRunInput {
+  /** Raw itinerary text (the day-by-day plan). */
+  itineraryText: string
+  /** Raw quotation text (the priced breakdown). */
+  quoteText: string
+  /** Site origin for URL composition, e.g. https://chiangway-travel.com */
+  origin: string
+  /** ISO-8601 timestamp — injected so the audit entry stays deterministic. */
+  timestamp: string
+  /** Optional year hint passed through to the parsers. */
+  year?: number
+}
 
 // ---------------------------------------------------------------------------
 // Router input — either an event (LINE) or a command (DC/operator)
@@ -57,6 +85,11 @@ export interface RouterInput {
   store?: CaseStore
   /** Injectable seams for the case handler (caseId / displayName). */
   deps?: CaseHandlerDeps
+  /**
+   * Phase C dry-run quote payload — present ONLY for an explicit DC create-quote
+   * command. Required when the resolved intent is `create_quote`.
+   */
+  quoteDryRun?: QuoteDryRunInput
 }
 
 // ---------------------------------------------------------------------------
@@ -71,6 +104,7 @@ export type RouterAction =
   | 'internal_case_event'  // Internal case work — NOT a customer reply
   | 'draft'                // Prepare a message draft (B4 no sendTarget)
   | 'post_to_partner_group'// Send to LINE partner group (B4 + sendTarget)
+  | 'create_quote_dryrun'  // Phase C: dry-run quote build (DC/operator only)
   | 'denied'               // Permission denied (B5 dev action from partner group)
 
 export interface RouterDecision {
@@ -86,6 +120,12 @@ export interface RouterDecision {
   handlerResult?: HandlerResult
   /** The resolved intent (for audit/debug). */
   intent?: CommandIntent
+  /**
+   * Phase C dry-run quote result — present only for a `create_quote_dryrun`
+   * action. Carries the validation report, the would-be (non-official) URL, and
+   * the dry-run draft. Never a written Sanity document.
+   */
+  quoteDryRunResult?: CreateQuoteResult
 }
 
 // ---------------------------------------------------------------------------
@@ -208,13 +248,21 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
 
   if (command) {
     const source = sourceFromCommand(command)
+    // Classify once — the resolved intent drives every operator-command branch.
+    const intent = await classifyIntent(command.commandText, llmClassifier)
+
+    // Phase C — explicit create-quote dry-run command (DC/operator plane only).
+    // Partner-group sources can never reach here: they take the event branch and
+    // are denied by canPartnerGroupTriggerDevAction. This path is operator-only.
+    if (intent.action === 'create_quote') {
+      return routeCreateQuoteDryRun(command, intent, source, input.quoteDryRun)
+    }
 
     // B4: Can DC post to the partner group?
     const postPerm = canPostToPartnerGroupFromDC(command)
 
     if (postPerm.allowed) {
       // Explicit sendTarget present — post to LINE partner group
-      const intent = await classifyIntent(command.commandText, llmClassifier)
       const handlerResult = await handlePostToPartnerGroup(command, intent)
       return { action: 'post_to_partner_group', source, handlerResult, intent }
     }
@@ -222,7 +270,6 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
     // No sendTarget (or invalid source) — check if it is a draft
     if (!command.sendTarget) {
       // Draft-only mode
-      const intent = await classifyIntent(command.commandText, llmClassifier)
       const handlerResult = await handleDraft(command, intent)
       return { action: 'draft', source, handlerResult, intent }
     }
@@ -244,5 +291,60 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
     action: 'silent',
     source: 'internal_worker',
     handlerResult: handleSilent(),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Phase C — create-quote dry-run routing
+// ---------------------------------------------------------------------------
+
+/**
+ * Route an explicit create-quote command to the dry-run createQuote flow.
+ *
+ * Dry-run ONLY:
+ *  - the writer arg is deliberately omitted, so createQuote uses the dry-run
+ *    writer (written:false). The live writer / any Sanity write token cannot be
+ *    reached from here.
+ *  - blocked severity yields a report with no draft / no would-be URL — that is
+ *    handled inside createQuote; the router just relays the result.
+ *
+ * Fails loud (throws) when the bridge omits the payload or caseId — silently
+ * emitting a `DRAFT-undefined` slug would be worse than a 500.
+ */
+async function routeCreateQuoteDryRun(
+  command: OperatorCommand,
+  intent: CommandIntent,
+  source: AgentSourceChannel,
+  payload: QuoteDryRunInput | undefined
+): Promise<RouterDecision> {
+  if (!payload) {
+    throw new Error(
+      '[router] create_quote command requires a `quoteDryRun` payload in RouterInput.'
+    )
+  }
+  if (!command.caseId) {
+    throw new Error(
+      '[router] create_quote command requires `command.caseId` (drives the DRAFT-<caseId> slug).'
+    )
+  }
+
+  const quoteDryRunResult = await createQuote({
+    itineraryText: payload.itineraryText,
+    quoteText: payload.quoteText,
+    caseId: command.caseId,
+    actor: command.actor,
+    sourceChannel: command.sourceChannel,
+    origin: payload.origin,
+    timestamp: payload.timestamp,
+    year: payload.year,
+    // writer intentionally omitted → dryRunQuoteWriter (no live writer/token).
+  })
+
+  return {
+    action: 'create_quote_dryrun',
+    source,
+    denied: false,
+    intent,
+    quoteDryRunResult,
   }
 }

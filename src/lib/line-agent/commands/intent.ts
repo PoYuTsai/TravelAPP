@@ -44,6 +44,9 @@ export type IntentAction =
   | 'deploy'
   | 'parser_change'
   | 'schema_change'
+  // Write-plane action — dry-run quote build (operator/DC plane only, never
+  // partner group). Treated like a dev action by the permission layer.
+  | 'create_quote'
   // Internal routing — not user-facing
   | 'create_case'
   | 'update_case'
@@ -112,6 +115,8 @@ const DETERMINISTIC_PATTERNS: PatternEntry[] = [
   { pattern: /\bcode[_\s-]?edit\b|\bedit\s+code\b|\bedit\s+the\s+code\b/i, action: 'code_edit' },
   { pattern: /\bparser[_\s-]?change\b|\bchange\s+parser\b|\bchange\s+parser\s+logic\b/i, action: 'parser_change' },
   { pattern: /\bschema[_\s-]?change\b|\bmodify\s+(sanity\s+)?schema\b/i, action: 'schema_change' },
+  // Write-plane action — explicit dry-run quote build request
+  { pattern: /\bcreate[_\s-]?quote\b|建立報價|產生報價|報價.*dry[_\s-]?run|dry[_\s-]?run.*報價/i, action: 'create_quote' },
   // Operational actions
   { pattern: /\bocr\b/i, action: 'ocr' },
   { pattern: /\bweb[_\s-]?search\b|\bsearch\b/i, action: 'web_search' },
