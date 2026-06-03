@@ -30,7 +30,11 @@ import {
   type OperatorCommandInput,
 } from '@/lib/line-agent/operator/operator-command'
 import { routeCommand } from '@/lib/line-agent/commands/router'
-import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
+import {
+  classifyDeterministic,
+  safeDefaultLlmClassifier,
+} from '@/lib/line-agent/commands/intent'
+import { getStore } from '@/lib/line-agent/line/webhook-runtime'
 
 // The expected secret is read from env at request time so tests can inject it
 // via environment without module-level caching issues.
@@ -79,9 +83,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // and needs no keys — the deterministic pass handles known commands, and the
   // permission layer still gates the final action.  Handlers stay stubs in M1;
   // this route never posts to LINE itself.
+  const deterministicIntent = classifyDeterministic(command.commandText)
+  const needsCaseStore = deterministicIntent?.action === 'list_cases'
+
   const decision = await routeCommand({
     command,
     llmClassifier: safeDefaultLlmClassifier,
+    ...(needsCaseStore && { store: getStore() }),
   })
 
   return NextResponse.json(decision, { status: 200 })

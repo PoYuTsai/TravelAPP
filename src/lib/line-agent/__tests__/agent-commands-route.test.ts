@@ -16,6 +16,9 @@
 import { NextRequest } from 'next/server'
 import { describe, it, expect, beforeEach } from 'vitest'
 import { POST } from '@/app/api/agent/commands/route'
+import { createInitialCase } from '@/lib/line-agent/cases/case-state'
+import { setStore } from '@/lib/line-agent/line/webhook-runtime'
+import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,5 +92,45 @@ describe('POST /api/agent/commands', () => {
     const body = await res.json()
     expect(body.action).toBe('post_to_partner_group')
     expect(body.source).toBe('discord_private')
+  })
+
+  it('routes list_cases through the bootstrapped store for CC/tmux testing', async () => {
+    const store = new MemoryStore()
+    await store.put({
+      ...createInitialCase({
+        caseId: 'CW-msg-live-001',
+        lineUserId: 'U_live_customer',
+        customerDisplayName: 'LINE-U_live',
+        now: '2026-06-03T05:30:58.093Z',
+      }),
+      customerMessages: [
+        {
+          messageId: 'msg-live-001',
+          text: '測試 webhook：2026/8/21',
+          receivedAt: '2026-06-03T05:30:58.093Z',
+          source: 'line_oa',
+        },
+      ],
+    })
+    setStore(store)
+
+    const res = await POST(
+      commandRequest(
+        {
+          actor: 'eric',
+          sourceChannel: 'discord_private',
+          commandText: '列出最近未處理客人',
+        },
+        SECRET
+      )
+    )
+
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.action).toBe('list_cases')
+    expect(body.handlerResult.meta.cases[0]).toMatchObject({
+      caseId: 'CW-msg-live-001',
+      latestCustomerMessageText: '測試 webhook：2026/8/21',
+    })
   })
 })

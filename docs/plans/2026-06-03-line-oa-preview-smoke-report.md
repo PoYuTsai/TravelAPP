@@ -61,6 +61,7 @@ Result: ✅ **PASS**
   - one `line_oa_message` audit entry
 - Follow-up implementation now stores recent raw OA customer text in `AgentCase.customerMessages[]` and adds an operator-only `list_cases` command path. This closes the earlier "received but cannot summarize what the customer asked" gap at the storage layer.
 - Post-implementation smoke against the latest Preview returned `200 ok`, persisted one smoke case with `customerMessages[{ messageId, text, receivedAt, source }]`, then removed the smoke keys from Upstash.
+- `/api/agent/commands` now wires deterministic `list_cases` commands through the bootstrapped CaseStore, so CC/tmux can query recent active OA cases via the operator endpoint without touching LINE outbound or Sanity write paths.
 
 ## Item 3 — `/api/line/webhook` (contract verified)
 
