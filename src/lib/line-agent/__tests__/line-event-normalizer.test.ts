@@ -379,3 +379,42 @@ describe('normalizeLineEvent — mentionsBot detection', () => {
     }
   )
 })
+
+// ---------------------------------------------------------------------------
+// replyToken capture (tagged-reply plan Task 1)
+//
+// The reply send gate (a later task) needs the LINE reply token to call
+// replyMessage(). The normalizer must surface raw.replyToken on the normalized
+// event for BOTH planes, but capturing it must NOT change mentionsBot — an OA
+// customer event stays mentionsBot:false even though its replyToken is captured,
+// so a captured token can never become a customer auto-reply on its own.
+// ---------------------------------------------------------------------------
+
+describe('normalizeLineEvent — replyToken capture', () => {
+  it('captures replyToken on a partner group text event without changing mentionsBot', () => {
+    const raw = makeGroupTextEvent() // replyToken: 'reply_token_def', text tags the bot
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.replyToken).toBe('reply_token_def')
+    expect(e.mentionsBot).toBe(true)
+  })
+
+  it('captures replyToken on an OA text event but keeps mentionsBot:false', () => {
+    const raw = makeOaTextEvent() // replyToken: 'reply_token_abc'
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.replyToken).toBe('reply_token_abc')
+    expect(e.sourceChannel).toBe('line_oa')
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('captures replyToken on a partner group image event', () => {
+    const raw = makeImageEvent('group') // replyToken: 'reply_token_img'
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.replyToken).toBe('reply_token_img')
+  })
+
+  it('leaves replyToken undefined when the raw event omits it', () => {
+    const raw = makeGroupTextEvent({ replyToken: undefined })
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.replyToken).toBeUndefined()
+  })
+})

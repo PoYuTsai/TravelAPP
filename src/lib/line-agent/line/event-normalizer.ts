@@ -74,6 +74,15 @@ export interface NormalizedLineEvent {
   /** LINE message ID (used to fetch image/file content, or as a case link key). */
   messageId: string
 
+  /**
+   * LINE reply token for this event, when present.  Single-use, expires in
+   * ~30s.  Captured for BOTH planes, but capturing it never changes
+   * `mentionsBot` — an OA customer event stays `mentionsBot:false`, so a
+   * captured token can never become a customer auto-reply on its own.  The
+   * reply send gate (webhook runtime) is the only place this is consumed.
+   */
+  replyToken?: string
+
   /** Text content — present for text events, undefined for image/file. */
   text?: string
 
@@ -198,6 +207,11 @@ export function normalizeLineEvent(
   const lineUserId: string = source.userId ?? ''
   const messageId: string = message.id ?? ''
   const messageType: string = message.type ?? ''
+  // Reply token is event-level (not on message). Undefined when LINE omits it
+  // (e.g. some redelivered or non-replyable events) — the send gate treats a
+  // missing token as "cannot reply" rather than erroring.
+  const replyToken: string | undefined =
+    typeof raw.replyToken === 'string' ? raw.replyToken : undefined
 
   // Determine the source channel
   const isGroupEvent = source.type === 'group'
@@ -234,6 +248,7 @@ export function normalizeLineEvent(
         quotedRef,
         mentionsBot,
         timestamp,
+        replyToken,
       }
     }
 
@@ -247,6 +262,7 @@ export function normalizeLineEvent(
       text,
       mentionsBot,
       timestamp,
+      replyToken,
     }
   }
 
@@ -260,6 +276,7 @@ export function normalizeLineEvent(
       // text intentionally absent — caller fetches image via messageId
       mentionsBot,
       timestamp,
+      replyToken,
     }
   }
 
@@ -273,6 +290,7 @@ export function normalizeLineEvent(
       // text intentionally absent — caller downloads file via messageId
       mentionsBot,
       timestamp,
+      replyToken,
     }
   }
 
@@ -286,5 +304,6 @@ export function normalizeLineEvent(
     messageId,
     mentionsBot,
     timestamp,
+    replyToken,
   }
 }
