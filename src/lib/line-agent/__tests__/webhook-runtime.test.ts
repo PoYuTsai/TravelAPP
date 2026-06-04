@@ -83,6 +83,7 @@ function recordingReplyClient(): {
   const calls: Array<{ replyToken: string; messages: LineMessage[] }> = []
   const client: ReplyClient = async (replyToken, messages) => {
     calls.push({ replyToken, messages })
+    return []
   }
   return { client, calls }
 }
