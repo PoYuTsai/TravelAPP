@@ -110,13 +110,17 @@ export async function pushMessage(
  * @param messages    - One or more message objects to send.
  * @param accessToken - Channel access token.
  * @param fetchFn     - Injectable fetch function (defaults to global `fetch`).
+ * @returns The bot-authored message ids from `sentMessages[].id` (quote-to-bot
+ *          plan §4).  Returns `[]` when the body cannot be parsed — the reply
+ *          already succeeded, so a tracking miss is non-fatal (never throws for
+ *          a parse miss; non-2xx still throws LineApiError).
  */
 export async function replyMessage(
   replyToken: string,
   messages: LineMessage[],
   accessToken: string,
   fetchFn: typeof fetch = fetch
-): Promise<void> {
+): Promise<string[]> {
   const url = `${LINE_API_BASE}/message/reply`
   const body = JSON.stringify({ replyToken, messages })
 
@@ -145,5 +149,20 @@ export async function replyMessage(
       text,
       `replyMessage failed with status ${response.status}: ${text}`
     )
+  }
+
+  // Parse sentMessages[].id — the only reliable source of bot-authored message
+  // ids (LINE never webhook-echoes the bot's own messages).  A parse miss is NOT
+  // an error: the reply already succeeded; failing to track it only means a
+  // future quote to this message would need a re-tag (quote-to-bot plan §4).
+  try {
+    const data = (await response.json()) as {
+      sentMessages?: Array<{ id?: string }>
+    }
+    return (data.sentMessages ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => typeof id === 'string' && id !== '')
+  } catch {
+    return []
   }
 }

@@ -224,7 +224,10 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
  * ONLY place the tagged-reply path touches the LINE Messaging API; the router
  * and responder stay pure.  A test injects a recording fake via setReplyClient.
  */
-export type ReplyClient = (replyToken: string, messages: LineMessage[]) => Promise<void>
+export type ReplyClient = (
+  replyToken: string,
+  messages: LineMessage[]
+) => Promise<string[]>
 
 /**
  * The reply client.
