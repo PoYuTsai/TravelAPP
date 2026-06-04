@@ -75,15 +75,23 @@ function oaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLineEv
   }
 }
 
-/** A reply client that records every call instead of hitting LINE. */
-function recordingReplyClient(): {
+/**
+ * A reply client that records every call instead of hitting LINE.
+ *
+ * `returnIds` is what the fake LINE reply resolves to — the bot-authored message
+ * ids the real `replyMessage` would parse from `sentMessages[].id`. The handler
+ * records these via `putBotAuthoredPartnerMsg`, so a test passes the ids it wants
+ * to assert get tracked (quote-to-bot plan §4). Defaults to `[]` (Task 3/4
+ * callers asserted only that a send happened, not the returned ids).
+ */
+function recordingReplyClient(returnIds: string[] = []): {
   client: ReplyClient
   calls: Array<{ replyToken: string; messages: LineMessage[] }>
 } {
   const calls: Array<{ replyToken: string; messages: LineMessage[] }> = []
   const client: ReplyClient = async (replyToken, messages) => {
     calls.push({ replyToken, messages })
-    return []
+    return returnIds
   }
   return { client, calls }
 }
@@ -93,6 +101,19 @@ function fixedResponder(text: string): PartnerGroupResponder {
   return {
     async respond() {
       return { text, meta: { responder: 'llm' as const } }
+    },
+  }
+}
+
+/**
+ * A responder that calls `spy` on each invocation — used to assert the (billed)
+ * responder is NOT reached on a quote-to-human / no-replyToken path.
+ */
+function spyResponder(spy: () => void): PartnerGroupResponder {
+  return {
+    async respond() {
+      spy()
+      return { text: 'SPY-RESPONDER-TEXT', meta: { responder: 'llm' as const } }
     },
   }
 }
@@ -309,6 +330,108 @@ describe('webhook-runtime partner-group reply dedupe (messageId send-once)', () 
     // Mirrors the OA rule (handlers.ts:246): collapsing all id-less messages
     // into one claim would silently drop real replies.
     expect(calls).toHaveLength(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 5 — quote-to-bot runtime control flow (botDirected wired end-to-end)
+// ---------------------------------------------------------------------------
+
+describe('quote-to-bot runtime control flow', () => {
+  function quoteEvent(o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
+    return {
+      kind: 'group_quoted',
+      sourceChannel: 'line_partner_group',
+      lineUserId: 'U_min',
+      groupId: 'G_partner',
+      messageId: 'M_q1',
+      text: '這個行程可以嗎',
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt_q1',
+      quotedRef: { quotedMessageId: 'M_botPrev' },
+      ...o,
+    }
+  }
+
+  it('quote-to-bot (store hit, no mention): responds once and records the new sent id', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['M_botNew']) // returns new sent id
+    setReplyClient(client)
+    setPartnerGroupResponder(fixedResponder('好的，這個行程沒問題'))
+
+    await getEventHandler()(quoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    // The chain continues: a future quote to THIS reply is itself botDirected.
+    expect(await store.isBotAuthoredPartnerMsg('M_botNew')).toBe(true)
+  })
+
+  it('quote-to-human (store miss, no mention): no responder, no reply', async () => {
+    const store = new MemoryStore()
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+
+    await getEventHandler()(quoteEvent(), store) // M_botPrev not in store
+
+    expect(calls).toHaveLength(0)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('store read throws: fail-safe → no reply, webhook does not throw', async () => {
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      throw new Error('KV down')
+    }
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await expect(getEventHandler()(quoteEvent(), store)).resolves.toBeUndefined()
+    expect(calls).toHaveLength(0)
+  })
+
+  it('quote-to-bot + dev command: denied → no reply', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['x'])
+    setReplyClient(client)
+
+    await getEventHandler()(quoteEvent({ text: '幫我 deploy 上線' }), store)
+
+    expect(calls).toHaveLength(0)
+  })
+
+  it('quote-to-bot redelivery (same messageId): replies exactly once', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+    setPartnerGroupResponder(fixedResponder('ok'))
+
+    const ev = quoteEvent()
+    await getEventHandler()(ev, store)
+    await getEventHandler()(ev, store) // redelivery of the identical event
+
+    expect(calls).toHaveLength(1)
+  })
+
+  it('quote-to-bot without replyToken: no reply, warns, responder not called', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await getEventHandler()(quoteEvent({ replyToken: undefined }), store)
+
+    expect(calls).toHaveLength(0)
+    expect(spy).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
   })
 })
 

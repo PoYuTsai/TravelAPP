@@ -82,7 +82,8 @@ export type NormalizedEventHandler = (
  * reply or a billed model call.
  *
  * This NEVER mutates the normalizer's raw `event.mentionsBot`; it derives a
- * separate signal.  It is NOT wired into the handler yet (Task 5 does that).
+ * separate signal.  `defaultEventHandler` calls it first, then threads the
+ * result through the precondition, router (B1/B2), and the send gate.
  */
 export async function deriveBotDirected(
   event: NormalizedLineEvent,
@@ -107,51 +108,83 @@ export async function deriveBotDirected(
   return false
 }
 
-function mayProducePartnerGroupReply(event: NormalizedLineEvent): boolean {
+function mayProducePartnerGroupReply(
+  event: NormalizedLineEvent,
+  botDirected: boolean
+): boolean {
   return (
     event.sourceChannel === 'line_partner_group' &&
-    event.mentionsBot === true &&
+    botDirected === true &&
     typeof event.replyToken === 'string' &&
     event.replyToken.trim() !== ''
   )
 }
 
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
-  const replyCandidate = mayProducePartnerGroupReply(event)
+  // 1. Derive the runtime bot-addressed signal: mentionsBot OR a quote-reply to
+  //    a bot-authored partner-group message (quote-to-bot plan §3).  Fail-safe
+  //    inside (store read failure → false); the customer OA plane is always
+  //    false, so a customer can never be auto-replied.
+  const botDirected = await deriveBotDirected(event, store)
 
-  // Send-once secondary guard (tagged-reply plan §4).  Atomically claim the
-  // right to reply to THIS partner-group message BEFORE the (possibly billed)
-  // responder runs.  LINE delivers at-least-once and concurrent serverless
-  // instances may pick up the same event; the first caller claims and proceeds,
-  // every later caller loses the claim and returns immediately — no re-billed
-  // model call, no duplicate reply.  The reply token's single-use semantics
-  // remain the PRIMARY guard; this is the cross-instance backstop.
+  // 2. Cheap precondition (a SUBSET of the full send gate): could this event
+  //    even produce a reply? — partner group, addressed, live reply token.
+  const replyCandidate = mayProducePartnerGroupReply(event, botDirected)
+
+  // 3. Send-once secondary guard (tagged-reply plan §4).  Atomically claim the
+  //    right to reply to THIS partner-group message BEFORE the (possibly billed)
+  //    responder runs.  LINE delivers at-least-once and concurrent serverless
+  //    instances may pick up the same event; the first caller claims and
+  //    proceeds, every later caller loses the claim and returns immediately —
+  //    no re-billed model call, no duplicate reply.  The reply token's
+  //    single-use semantics remain the PRIMARY guard; this is the cross-instance
+  //    backstop.
   //
-  // Empty messageId is NEVER deduped (mirrors the OA rule, handlers.ts:246):
-  // collapsing all id-less messages into one claim would silently drop replies.
+  //    Empty messageId is NEVER deduped (mirrors the OA rule, handlers.ts:246):
+  //    collapsing all id-less messages into one claim would silently drop
+  //    replies.
   if (replyCandidate && event.messageId !== '') {
     const claimed = await store.claimPartnerReply(event.messageId)
     if (!claimed) return
   }
 
-  // Resolve the REAL (possibly billed) responder ONLY when this event could
-  // actually produce a LINE reply: a tagged partner-group message with a live
-  // reply token.  Otherwise (OA inbound, untagged chat, missing/expired reply
-  // token) the responder's text would be generated only to be discarded by the
-  // send gate — wasted model calls in anthropic mode.  In those cases we pass
-  // no responder and routeCommand falls back to its free stub, so routing and
-  // the missing-replyToken warning below still work without burning a model.
+  // 4. Resolve the REAL (possibly billed) responder ONLY when this event could
+  //    actually produce a LINE reply.  Otherwise (OA inbound, not addressed,
+  //    missing/expired reply token) the responder's text would be generated only
+  //    to be discarded by the send gate — wasted model calls in anthropic mode.
+  //    In those cases we pass no responder and routeCommand falls back to its
+  //    free stub, so routing and the missing-replyToken warning below still work
+  //    without burning a model.  `botDirected` is threaded so B1/B2 reach
+  //    `respond` for a quote-to-bot message without a re-tag.
   const decision = await routeCommand({
     event,
     store,
     llmClassifier: safeDefaultLlmClassifier,
+    botDirected,
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
   })
 
-  if (shouldReplyToPartnerGroup(event, decision, event.mentionsBot === true)) {
+  // 5. Full send gate (post-routing) — the only place a reply is authorised.
+  if (shouldReplyToPartnerGroup(event, decision, botDirected)) {
     const outboundText = decision.handlerResult!.outboundText!
     try {
-      await getReplyClient()(event.replyToken!, [{ type: 'text', text: outboundText }])
+      const sentIds = await getReplyClient()(event.replyToken!, [
+        { type: 'text', text: outboundText },
+      ])
+      // 6. Record the bot-authored ids so a future quote-reply to THIS message
+      //    is itself botDirected (quote-to-bot plan §4).  Best-effort: a store
+      //    write failure must NOT disturb the already-sent reply, so each write
+      //    is guarded — the worst case is the partner has to re-tag next time.
+      for (const id of sentIds) {
+        try {
+          await store.putBotAuthoredPartnerMsg(id)
+        } catch (err) {
+          console.error(
+            '[line-agent] failed to record bot-authored partner msg id; reply already sent:',
+            err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+          )
+        }
+      }
     } catch (err) {
       // §5: a reply failure must NOT propagate (no 500) and must NOT fall back
       // to the customer plane or push.  Log a readable (non-minified) error and
@@ -169,7 +202,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   // We cannot reply without a token; surface it but still ack 200.
   if (
     !event.replyToken &&
-    shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision, event.mentionsBot === true)
+    shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision, botDirected)
   ) {
     console.warn(
       '[line-agent] partner-group respond decision had no replyToken; skipping reply'
