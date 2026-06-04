@@ -375,4 +375,4 @@ if (shouldReplyToPartnerGroup(event, decision)) {
 
 **Step 3 commit 判定**：測試檔零微調 → 依 Task 6 規格不需 test commit。本紀錄為 docs 收尾。
 
-> Vercel preview 實機手動 smoke（§9.5 表格）仍 **pending**（CLI 未登入，待 Eric `vercel login`）——contract 級回歸已全綠，實機行為待人工那一輪確認。
+> Vercel preview 實機手動 smoke **已完成**（2026-06-04）：env 已補齊 `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_BOT_USER_ID` / `LINE_PARTNER_GROUP_ID` / `AI_AGENT_PARTNER_RESPONDER_MODE=stub`，並重新部署到 `https://travel-o33et42ql-poyutsais-projects.vercel.app`。Eric 實機確認：私人 partner group tag bot → 收到一則 stub reply；partner group 不 tag → 無 reply；OA 後台人類管理員手動回客人 → bot 未插手；客人 plane 依 code guard（`line_oa` `mentionsBot=false` + reply gate source pin）不會觸發 AI reply。Vercel logs 無 `partner-group reply failed` / Anthropic 相關 log，stub mode 維持零 Anthropic billing。Task 5 後新版 Preview 也已 smoke：tag bot → 一則 stub reply，logs 無錯。
