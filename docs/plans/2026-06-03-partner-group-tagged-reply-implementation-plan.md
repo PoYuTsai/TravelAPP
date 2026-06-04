@@ -354,3 +354,25 @@ if (shouldReplyToPartnerGroup(event, decision)) {
 - ✅ 貼夥伴群/對外 push 仍需明確 send intent（本刀只做 reply，不碰 push）。
 - ✅ 報價 dry-run only，本刀**不**新增 Sanity 寫入。
 - ✅ 無 secrets 進 repo；LLM 預設 stub、測試零真 key。
+
+---
+
+## 12. Task 6 執行紀錄（守門回歸 · 2026-06-04）
+
+**指令**：`npx vitest run src/lib/line-agent` → **38 test files / 488 tests 全 PASS**（branch `codex/line-oa-agent-mvp`，tip `5b08916`，工作樹 clean）。
+
+範圍鎖定：只跑回歸、不開 anthropic mode、不碰 quote-to-bot、不碰 reminder push、零新增邏輯。
+
+五條守門對應的綠燈實證（fake transport / fake client，零真 key、零真 API）：
+
+| 守門 | 證據測試 |
+|---|---|
+| OA 客人不自動回 | `webhook-runtime`「never replies to an OA customer event, even one containing a literal "@bot"」；`m2-guardrails`「a customer OA message routes to create/update only — never a send action」；`auto-reply-mapping`「全域總開關恆為 false」「每個 mapping enabled 皆為 false」 |
+| partner group tag 才回 | `webhook-runtime`「replies exactly once to a partner-group tagged event」；`partner-reply-gate`「returns true when all six conditions are satisfied」 |
+| untagged 不回 | `webhook-runtime`「does not reply to a partner-group message that does not mention the bot」；`partner-reply-gate`「returns false when event.mentionsBot is false」 |
+| dev/code/deploy/quote denied 不回 | `webhook-runtime`「does not reply to a denied dev command from the partner group」；`partner-reply-gate`「returns false when decision.denied is true / action is not respond」 |
+| messageId 重送 dedup | `webhook-runtime`「replies only once when the same partner-group messageId is redelivered」「does not re-invoke the responder on a redelivered messageId (no re-bill)」「never dedupes an empty messageId」 |
+
+**Step 3 commit 判定**：測試檔零微調 → 依 Task 6 規格不需 test commit。本紀錄為 docs 收尾。
+
+> Vercel preview 實機手動 smoke（§9.5 表格）仍 **pending**（CLI 未登入，待 Eric `vercel login`）——contract 級回歸已全綠，實機行為待人工那一輪確認。
