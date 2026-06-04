@@ -248,3 +248,63 @@ describe('webhook-runtime partner-group send gate', () => {
     expect(logged).toContain('429')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Task 5 — messageId send-once secondary guard
+// ---------------------------------------------------------------------------
+
+describe('webhook-runtime partner-group reply dedupe (messageId send-once)', () => {
+  it('replies only once when the same partner-group messageId is redelivered', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    // The SAME store must back both deliveries — the claim is store-backed so
+    // it survives across the at-least-once redelivery (and, on KV, across
+    // serverless instances).
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: 'M-dupe' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store) // LINE redelivers the identical event
+
+    expect(calls).toHaveLength(1)
+  })
+
+  it('does not re-invoke the responder on a redelivered messageId (no re-bill)', async () => {
+    let responderCalls = 0
+    setPartnerGroupResponder({
+      async respond() {
+        responderCalls += 1
+        return { text: 'FAKE-REPLY', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(recordingReplyClient().client)
+
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: 'M-dupe-2' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store)
+
+    // The claim is taken BEFORE the (billed) responder runs, so the second
+    // delivery never reaches the model.
+    expect(responderCalls).toBe(1)
+  })
+
+  it('never dedupes an empty messageId (each delivery is sent)', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: '' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store)
+
+    // Mirrors the OA rule (handlers.ts:246): collapsing all id-less messages
+    // into one claim would silently drop real replies.
+    expect(calls).toHaveLength(2)
+  })
+})

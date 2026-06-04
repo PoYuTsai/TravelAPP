@@ -19,6 +19,12 @@ export class MemoryStore implements CaseStore {
   /** Audit log map: caseId → AuditEntry[] (append-only) */
   private readonly audits = new Map<string, AuditEntry[]>()
 
+  /**
+   * Send-once markers for partner-group tagged replies (NOT case state).
+   * A messageId present here means a reply was already claimed for it.
+   */
+  private readonly claimedPartnerReplies = new Set<string>()
+
   // ── put ───────────────────────────────────────────────────────────────────
 
   async put(agentCase: AgentCase): Promise<void> {
@@ -94,5 +100,14 @@ export class MemoryStore implements CaseStore {
 
   async getAudit(caseId: string): Promise<AuditEntry[]> {
     return this.audits.get(caseId) ?? []
+  }
+
+  // ── claimPartnerReply ───────────────────────────────────────────────────────
+
+  async claimPartnerReply(messageId: string): Promise<boolean> {
+    // Single-threaded Node: this check-then-add pair is effectively atomic.
+    if (this.claimedPartnerReplies.has(messageId)) return false
+    this.claimedPartnerReplies.add(messageId)
+    return true
   }
 }

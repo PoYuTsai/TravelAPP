@@ -45,6 +45,12 @@ export class KvNotConfiguredError extends Error {
 export interface KvClient {
   get<T = unknown>(key: string): Promise<T | null>
   set(key: string, value: unknown): Promise<unknown>
+  /**
+   * SET key value NX — set only when the key is absent.
+   * Resolves `true` when this call created the key, `false` when it already
+   * existed.  This is the atomic primitive behind the partner-reply claim.
+   */
+  setIfAbsent(key: string, value: unknown): Promise<boolean>
   del(...keys: string[]): Promise<unknown>
   /** RPUSH — append values to a Redis list */
   rpush(key: string, ...values: string[]): Promise<unknown>
@@ -78,6 +84,13 @@ function createUpstashKvClient(url: string, token: string): KvClient {
     set(key: string, value: unknown): Promise<unknown> {
       return redis.set(key, JSON.stringify(value))
     },
+    async setIfAbsent(key: string, value: unknown): Promise<boolean> {
+      // Upstash `SET … NX` returns "OK" when the key was created, null when it
+      // already existed.  (`automaticDeserialization: false` keeps it a raw
+      // string, so the strict "OK" compare is reliable.)
+      const res = await redis.set(key, JSON.stringify(value), { nx: true })
+      return res === 'OK'
+    },
     del(...keys: string[]): Promise<unknown> {
       return redis.del(...keys)
     },
@@ -100,9 +113,16 @@ function createUpstashKvClient(url: string, token: string): KvClient {
 const CASE_PREFIX = 'case:'
 const LINE_USER_PREFIX = 'lineUser:'
 const AUDIT_PREFIX = 'audit:'
+// Dedicated namespace for partner-reply send-once markers.  Deliberately
+// distinct from CASE_PREFIX so these markers never match `case:*` in listAll().
+const PARTNER_REPLY_PREFIX = 'line-agent:partner-reply:'
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
+}
+
+function partnerReplyKey(messageId: string): string {
+  return `${PARTNER_REPLY_PREFIX}${messageId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -222,5 +242,14 @@ export class KvStore implements CaseStore {
     const kv = this.ensureClient()
     const raw = await kv.lrange(auditKey(caseId), 0, -1)
     return raw.map((s) => JSON.parse(s) as AuditEntry)
+  }
+
+  // ── claimPartnerReply ───────────────────────────────────────────────────────
+
+  async claimPartnerReply(messageId: string): Promise<boolean> {
+    const kv = this.ensureClient()
+    // Atomic SET NX: the first instance to claim this messageId wins, even
+    // under concurrent invocations across serverless instances.
+    return kv.setIfAbsent(partnerReplyKey(messageId), 1)
   }
 }

@@ -36,6 +36,12 @@ function makeMockKvClient(): KvClient {
       kv.set(key, JSON.stringify(value))
       return 'OK'
     },
+    async setIfAbsent(key: string, value: unknown): Promise<boolean> {
+      // Mirrors Redis `SET key value NX`: only the first write for a key wins.
+      if (kv.has(key)) return false
+      kv.set(key, JSON.stringify(value))
+      return true
+    },
     async del(...keys: string[]): Promise<unknown> {
       let removed = 0
       for (const k of keys) {

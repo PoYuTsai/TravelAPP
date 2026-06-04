@@ -78,6 +78,23 @@ function mayProducePartnerGroupReply(event: NormalizedLineEvent): boolean {
 }
 
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
+  const replyCandidate = mayProducePartnerGroupReply(event)
+
+  // Send-once secondary guard (tagged-reply plan §4).  Atomically claim the
+  // right to reply to THIS partner-group message BEFORE the (possibly billed)
+  // responder runs.  LINE delivers at-least-once and concurrent serverless
+  // instances may pick up the same event; the first caller claims and proceeds,
+  // every later caller loses the claim and returns immediately — no re-billed
+  // model call, no duplicate reply.  The reply token's single-use semantics
+  // remain the PRIMARY guard; this is the cross-instance backstop.
+  //
+  // Empty messageId is NEVER deduped (mirrors the OA rule, handlers.ts:246):
+  // collapsing all id-less messages into one claim would silently drop replies.
+  if (replyCandidate && event.messageId !== '') {
+    const claimed = await store.claimPartnerReply(event.messageId)
+    if (!claimed) return
+  }
+
   // Resolve the REAL (possibly billed) responder ONLY when this event could
   // actually produce a LINE reply: a tagged partner-group message with a live
   // reply token.  Otherwise (OA inbound, untagged chat, missing/expired reply
@@ -89,9 +106,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     event,
     store,
     llmClassifier: safeDefaultLlmClassifier,
-    partnerGroupResponder: mayProducePartnerGroupReply(event)
-      ? getPartnerGroupResponder()
-      : undefined,
+    partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
   })
 
   if (shouldReplyToPartnerGroup(event, decision)) {

@@ -198,6 +198,33 @@ export function runCaseStoreContract(
       expect(await store.getAudit('CW-no-audit')).toHaveLength(0)
     })
 
+    // ── partner-reply send-once claim (tagged-reply plan §4) ──────────────────
+    // A cross-instance, store-backed "send-once" marker — NOT case state.
+    // Partner-group tagged messages are never persisted as cases, so the
+    // dedupe guard lives in its own namespace.  claimPartnerReply is atomic:
+    // the FIRST caller for a messageId wins (true) and every later caller for
+    // the same id loses (false), so a LINE redelivery (or a concurrent
+    // serverless instance) can never re-bill the responder or send twice.
+
+    it('claimPartnerReply returns true the first time and false on redelivery', async () => {
+      expect(await store.claimPartnerReply('M-partner-001')).toBe(true)
+      expect(await store.claimPartnerReply('M-partner-001')).toBe(false)
+      expect(await store.claimPartnerReply('M-partner-001')).toBe(false)
+    })
+
+    it('claimPartnerReply is independent per messageId', async () => {
+      expect(await store.claimPartnerReply('M-a')).toBe(true)
+      expect(await store.claimPartnerReply('M-b')).toBe(true)
+      expect(await store.claimPartnerReply('M-a')).toBe(false)
+      expect(await store.claimPartnerReply('M-b')).toBe(false)
+    })
+
+    it('partner-reply claims never appear in case space (no listAll/get pollution)', async () => {
+      await store.claimPartnerReply('M-partner-xyz')
+      expect(await store.listAll()).toHaveLength(0)
+      expect(await store.get('M-partner-xyz')).toBeNull()
+    })
+
     it('appendAudit does not cross-contaminate between cases', async () => {
       const alice = makeAlice()
       const bob = makeBob()
