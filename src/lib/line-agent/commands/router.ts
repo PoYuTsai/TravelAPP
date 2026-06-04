@@ -109,6 +109,14 @@ export interface RouterInput {
    * send boundaries — the responder only produces text.
    */
   partnerGroupResponder?: PartnerGroupResponder
+  /**
+   * Runtime-derived "bot is addressed" signal (quote-to-bot plan §3):
+   * mentionsBot OR a quote-reply to a bot-authored message. Threaded into B1/B2
+   * so a quote-to-bot message reaches `respond` without a re-tag. Defaults to
+   * `event?.mentionsBot === true` to preserve the tag-only behavior when a caller
+   * does not provide it.
+   */
+  botDirected?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +229,11 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
     // -----------------------------------------------------------------------
 
     if (event.sourceChannel === 'line_partner_group') {
+      // Runtime-derived bot-addressed signal (quote-to-bot plan §3). Until the
+      // webhook supplies it (Task 5), this falls back to mentionsBot so B1/B2
+      // behavior is unchanged.
+      const botDirected = input.botDirected ?? (event.mentionsBot === true)
+
       // B5 (+ B6 LLM widening prevention): ALWAYS check for dev actions FIRST,
       // before the casual-chat gate.  A partner-group message that contains a
       // dev command (deploy, code_edit, parser_change, schema_change) must be
@@ -239,13 +252,13 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
       }
 
       // B2: After dev-action gate, is this casual chat that should be ignored?
-      if (shouldIgnoreCasualPartnerGroupChat(event)) {
+      if (shouldIgnoreCasualPartnerGroupChat(event, botDirected)) {
         const handlerResult = handleSilent()
         return { action: 'silent', source, handlerResult }
       }
 
-      // B1: Is the bot tagged? → intent already resolved above
-      const tagPerm = canRespondToPartnerGroupTag(event)
+      // B1: Is the bot addressed (tag or quote-to-bot)? → intent already resolved
+      const tagPerm = canRespondToPartnerGroupTag(event, botDirected)
       if (tagPerm.allowed) {
         // Permission granted — respond in the group. The responder only
         // produces text; it never sends (the router owns that decision).

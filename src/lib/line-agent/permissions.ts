@@ -67,13 +67,20 @@ const DENIED_FROM_PARTNER_GROUP: ReadonlySet<IntentAction> = new Set<IntentActio
 // ---------------------------------------------------------------------------
 
 /**
- * B1 — Mentioned partner-group messages MUST get a response.
+ * B1 — Bot-directed partner-group messages MUST get a response.
  *
  * Returns allowed:true when:
  *  - the event source is line_partner_group, AND
- *  - event.mentionsBot is true.
+ *  - botDirected is true.
+ *
+ * `botDirected` is the runtime-derived "bot is addressed" signal (quote-to-bot
+ * plan §3): mentionsBot OR a quote-reply to a bot-authored message. This layer
+ * reads ONLY that boolean — it never inspects mentionsBot or runs its own regex.
  */
-export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): PermissionResult {
+export function canRespondToPartnerGroupTag(
+  event: NormalizedLineEvent,
+  botDirected: boolean
+): PermissionResult {
   if (event.sourceChannel !== 'line_partner_group') {
     return {
       allowed: false,
@@ -81,13 +88,13 @@ export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): Permiss
     }
   }
 
-  if (event.mentionsBot) {
+  if (botDirected) {
     return { allowed: true }
   }
 
   return {
     allowed: false,
-    reason: 'canRespondToPartnerGroupTag: the bot is not mentioned (event.mentionsBot is false)',
+    reason: 'canRespondToPartnerGroupTag: bot is not addressed (botDirected is false)',
   }
 }
 
@@ -103,21 +110,24 @@ export function canRespondToPartnerGroupTag(event: NormalizedLineEvent): Permiss
  * B2 — Casual partner-group chat is IGNORED.
  *
  * Returns true when the event should be silently ignored — i.e. the bot is not
- * mentioned (`event.mentionsBot === false`).  This now INCLUDES a `group_quoted`
- * reply that does not mention the bot: quoting a teammate's message is normal
- * group discussion, not a request to the bot.
+ * addressed (`botDirected === false`).  A `group_quoted` reply that quotes a
+ * teammate (not a bot-authored message) is normal group discussion → ignored;
+ * a quote-reply to a bot message is botDirected → processed.
  *
- * Returns false when the event should be processed (`event.mentionsBot` true).
+ * Returns false when the event should be processed (`botDirected` true).
  */
-export function shouldIgnoreCasualPartnerGroupChat(event: NormalizedLineEvent): boolean {
+export function shouldIgnoreCasualPartnerGroupChat(
+  event: NormalizedLineEvent,
+  botDirected: boolean
+): boolean {
   if (event.sourceChannel !== 'line_partner_group') {
     // Only partner-group messages are checked here; other sources are not "casual chat"
     return false
   }
 
-  // Single gate: addressed (mentionsBot) → process; otherwise ignore. This
+  // Single gate: addressed (botDirected) → process; otherwise ignore. This
   // covers group_text, group_quoted and unknown_group uniformly.
-  return !event.mentionsBot
+  return !botDirected
 }
 
 // ---------------------------------------------------------------------------

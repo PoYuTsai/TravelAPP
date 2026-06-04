@@ -78,7 +78,7 @@ describe('B1 — canRespondToPartnerGroupTag', () => {
       text: '@bot 請幫我確認行程',
       mentionsBot: true,
     })
-    const result: PermissionResult = canRespondToPartnerGroupTag(event)
+    const result: PermissionResult = canRespondToPartnerGroupTag(event, true)
     expect(result.allowed).toBe(true)
   })
 
@@ -90,7 +90,7 @@ describe('B1 — canRespondToPartnerGroupTag', () => {
       text: '@bot 請幫我確認行程',
       mentionsBot: false,
     })
-    expect(canRespondToPartnerGroupTag(event).allowed).toBe(false)
+    expect(canRespondToPartnerGroupTag(event, false).allowed).toBe(false)
   })
 
   it('BEHAVIOR CHANGE: a group_quoted reply WITHOUT mention does NOT auto-respond', () => {
@@ -102,7 +102,7 @@ describe('B1 — canRespondToPartnerGroupTag', () => {
       quotedRef: { quotedMessageId: 'M000' },
       mentionsBot: false,
     })
-    expect(canRespondToPartnerGroupTag(event).allowed).toBe(false)
+    expect(canRespondToPartnerGroupTag(event, false).allowed).toBe(false)
   })
 
   it('a group_quoted reply WITH mentionsBot:true does respond (same path as a tag)', () => {
@@ -112,12 +112,12 @@ describe('B1 — canRespondToPartnerGroupTag', () => {
       quotedRef: { quotedMessageId: 'M000' },
       mentionsBot: true,
     })
-    expect(canRespondToPartnerGroupTag(event).allowed).toBe(true)
+    expect(canRespondToPartnerGroupTag(event, true).allowed).toBe(true)
   })
 
   it('does NOT allow responding for an OA event (wrong source)', () => {
     const event = makeOaEvent()
-    const result = canRespondToPartnerGroupTag(event)
+    const result = canRespondToPartnerGroupTag(event, false)
     expect(result.allowed).toBe(false)
   })
 })
@@ -133,12 +133,12 @@ describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
       text: '今天天氣很好',
       mentionsBot: false,
     })
-    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
+    expect(shouldIgnoreCasualPartnerGroupChat(event, false)).toBe(true)
   })
 
   it('returns true (ignore) for unknown_group kind', () => {
     const event = makePartnerGroupEvent({ kind: 'unknown_group', text: undefined })
-    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
+    expect(shouldIgnoreCasualPartnerGroupChat(event, false)).toBe(true)
   })
 
   it('returns false (do NOT ignore) when mentionsBot:true', () => {
@@ -147,7 +147,7 @@ describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
       text: '@bot 幫我查行程',
       mentionsBot: true,
     })
-    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(false)
+    expect(shouldIgnoreCasualPartnerGroupChat(event, true)).toBe(false)
   })
 
   it('BEHAVIOR CHANGE: a group_quoted reply WITHOUT mention is ignored (silent)', () => {
@@ -157,7 +157,7 @@ describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
       quotedRef: { quotedMessageId: 'M099' },
       mentionsBot: false,
     })
-    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(true)
+    expect(shouldIgnoreCasualPartnerGroupChat(event, false)).toBe(true)
   })
 
   it('returns false (do NOT ignore) for a group_quoted reply WITH mentionsBot:true', () => {
@@ -167,7 +167,42 @@ describe('B2 — shouldIgnoreCasualPartnerGroupChat', () => {
       quotedRef: { quotedMessageId: 'M099' },
       mentionsBot: true,
     })
-    expect(shouldIgnoreCasualPartnerGroupChat(event)).toBe(false)
+    expect(shouldIgnoreCasualPartnerGroupChat(event, true)).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// B1/B2 read botDirected (quote-to-bot plan §3 / Task 4)
+//
+// B1/B2 no longer read event.mentionsBot directly — they read the runtime-
+// derived botDirected (mentionsBot OR a quote-reply to a bot-authored message).
+// These cases prove a quote-to-bot event (mentionsBot:false) reaches respond
+// purely via botDirected=true, with no re-tag.
+// ---------------------------------------------------------------------------
+
+describe('B1/B2 read botDirected (quote-to-bot)', () => {
+  const pg = (o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent => ({
+    kind: 'group_quoted',
+    sourceChannel: 'line_partner_group',
+    lineUserId: 'U',
+    groupId: 'G',
+    messageId: 'M',
+    mentionsBot: false,
+    timestamp: 1,
+    ...o,
+  })
+
+  it('B1 allows when botDirected=true even though mentionsBot=false', () => {
+    expect(canRespondToPartnerGroupTag(pg(), true).allowed).toBe(true)
+  })
+  it('B1 denies when botDirected=false', () => {
+    expect(canRespondToPartnerGroupTag(pg(), false).allowed).toBe(false)
+  })
+  it('B2 ignores when botDirected=false', () => {
+    expect(shouldIgnoreCasualPartnerGroupChat(pg(), false)).toBe(true)
+  })
+  it('B2 processes (not ignore) when botDirected=true', () => {
+    expect(shouldIgnoreCasualPartnerGroupChat(pg(), true)).toBe(false)
   })
 })
 

@@ -9,7 +9,7 @@
  * ALL SEVEN conditions must hold; any single false → no reply:
  *   1. event.sourceChannel === 'line_partner_group'
  *   2. decision.source === 'line_partner_group'
- *   3. event.mentionsBot === true            (this cut: tag only; quote-to-bot later)
+ *   3. botDirected === true (tag OR quote-to-bot)
  *   4. decision.action === 'respond'
  *   5. decision.denied !== true
  *   6. decision.handlerResult.outboundText is a non-empty (trimmed) string
@@ -28,13 +28,14 @@ import type { RouterDecision } from '../commands/router'
 
 export function shouldReplyToPartnerGroup(
   event: NormalizedLineEvent,
-  decision: RouterDecision
+  decision: RouterDecision,
+  botDirected: boolean
 ): boolean {
   const outboundText = decision.handlerResult?.outboundText
   return (
     event.sourceChannel === 'line_partner_group' &&
     decision.source === 'line_partner_group' &&
-    event.mentionsBot === true &&
+    botDirected === true && // ← was event.mentionsBot === true
     decision.action === 'respond' &&
     decision.denied !== true &&
     typeof outboundText === 'string' &&

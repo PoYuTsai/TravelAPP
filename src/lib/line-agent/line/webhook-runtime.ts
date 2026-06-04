@@ -148,7 +148,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
   })
 
-  if (shouldReplyToPartnerGroup(event, decision)) {
+  if (shouldReplyToPartnerGroup(event, decision, event.mentionsBot === true)) {
     const outboundText = decision.handlerResult!.outboundText!
     try {
       await getReplyClient()(event.replyToken!, [{ type: 'text', text: outboundText }])
@@ -169,7 +169,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   // We cannot reply without a token; surface it but still ack 200.
   if (
     !event.replyToken &&
-    shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision)
+    shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision, event.mentionsBot === true)
   ) {
     console.warn(
       '[line-agent] partner-group respond decision had no replyToken; skipping reply'

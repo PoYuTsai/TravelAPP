@@ -1,10 +1,12 @@
 /**
  * Tests for the partner-group reply gate predicate (tagged-reply plan §3).
  *
- * `shouldReplyToPartnerGroup(event, decision)` is a PURE boolean — no I/O. All
- * six conditions must be true to send; flipping any single one to false yields
- * `false`. These tests pin that truth table so the send gate (webhook runtime)
- * can rely on the predicate as the single authority for "may reply".
+ * `shouldReplyToPartnerGroup(event, decision, botDirected)` is a PURE boolean —
+ * no I/O. All seven conditions must be true to send; flipping any single one to
+ * false yields `false`. Condition 3 now reads the runtime-derived `botDirected`
+ * (tag OR quote-to-bot), not `event.mentionsBot`. These tests pin that truth
+ * table so the send gate (webhook runtime) can rely on the predicate as the
+ * single authority for "may reply".
  */
 
 import { describe, it, expect } from 'vitest'
@@ -50,13 +52,22 @@ function passingDecision(overrides?: Partial<RouterDecision>): RouterDecision {
 // ---------------------------------------------------------------------------
 
 describe('shouldReplyToPartnerGroup', () => {
-  it('returns true when all six conditions are satisfied', () => {
-    expect(shouldReplyToPartnerGroup(passingEvent(), passingDecision())).toBe(true)
+  it('returns true when all seven conditions are satisfied', () => {
+    expect(shouldReplyToPartnerGroup(passingEvent(), passingDecision(), true)).toBe(true)
+  })
+
+  it('condition 3 now reads botDirected, not mentionsBot', () => {
+    // mentionsBot:false but botDirected=true (quote-to-bot) → reply; the same
+    // event with botDirected=false → no reply. The gate no longer consults
+    // event.mentionsBot for condition 3.
+    const ev = passingEvent({ mentionsBot: false })
+    expect(shouldReplyToPartnerGroup(ev, passingDecision(), true)).toBe(true)
+    expect(shouldReplyToPartnerGroup(ev, passingDecision(), false)).toBe(false)
   })
 
   it('returns false when decision.source is not line_partner_group', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ source: 'line_oa' }))
+      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ source: 'line_oa' }), true)
     ).toBe(false)
   })
 
@@ -68,20 +79,21 @@ describe('shouldReplyToPartnerGroup', () => {
     expect(
       shouldReplyToPartnerGroup(
         passingEvent({ sourceChannel: 'line_oa', mentionsBot: true }),
-        passingDecision()
+        passingDecision(),
+        true
       )
     ).toBe(false)
   })
 
-  it('returns false when event.mentionsBot is false', () => {
+  it('returns false when botDirected is false', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent({ mentionsBot: false }), passingDecision())
+      shouldReplyToPartnerGroup(passingEvent(), passingDecision(), false)
     ).toBe(false)
   })
 
   it('returns false when decision.action is not respond', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ action: 'silent' }))
+      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ action: 'silent' }), true)
     ).toBe(false)
   })
 
@@ -89,7 +101,8 @@ describe('shouldReplyToPartnerGroup', () => {
     expect(
       shouldReplyToPartnerGroup(
         passingEvent(),
-        passingDecision({ action: 'denied', denied: true })
+        passingDecision({ action: 'denied', denied: true }),
+        true
       )
     ).toBe(false)
   })
@@ -100,7 +113,8 @@ describe('shouldReplyToPartnerGroup', () => {
         passingEvent(),
         passingDecision({
           handlerResult: { handler: 'h', status: 'stub_ok' },
-        })
+        }),
+        true
       )
     ).toBe(false)
   })
@@ -111,26 +125,27 @@ describe('shouldReplyToPartnerGroup', () => {
         passingEvent(),
         passingDecision({
           handlerResult: { handler: 'h', status: 'stub_ok', outboundText: '   ' },
-        })
+        }),
+        true
       )
     ).toBe(false)
   })
 
   it('returns false when handlerResult is absent', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ handlerResult: undefined }))
+      shouldReplyToPartnerGroup(passingEvent(), passingDecision({ handlerResult: undefined }), true)
     ).toBe(false)
   })
 
   it('returns false when event.replyToken is missing', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent({ replyToken: undefined }), passingDecision())
+      shouldReplyToPartnerGroup(passingEvent({ replyToken: undefined }), passingDecision(), true)
     ).toBe(false)
   })
 
   it('returns false when event.replyToken is an empty string', () => {
     expect(
-      shouldReplyToPartnerGroup(passingEvent({ replyToken: '' }), passingDecision())
+      shouldReplyToPartnerGroup(passingEvent({ replyToken: '' }), passingDecision(), true)
     ).toBe(false)
   })
 })
