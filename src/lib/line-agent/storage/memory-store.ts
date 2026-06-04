@@ -25,6 +25,13 @@ export class MemoryStore implements CaseStore {
    */
   private readonly claimedPartnerReplies = new Set<string>()
 
+  /**
+   * Bot-authored partner-group message ids (NOT case state).  A messageId here
+   * means THIS bot sent it in the partner group, so a later quote-reply to it
+   * counts as addressing the bot (quote-to-bot plan §2).
+   */
+  private readonly botAuthoredPartnerMsgs = new Set<string>()
+
   // ── put ───────────────────────────────────────────────────────────────────
 
   async put(agentCase: AgentCase): Promise<void> {
@@ -109,5 +116,19 @@ export class MemoryStore implements CaseStore {
     if (this.claimedPartnerReplies.has(messageId)) return false
     this.claimedPartnerReplies.add(messageId)
     return true
+  }
+
+  // ── putBotAuthoredPartnerMsg ─────────────────────────────────────────────────
+
+  async putBotAuthoredPartnerMsg(messageId: string): Promise<void> {
+    if (messageId === '') return
+    this.botAuthoredPartnerMsgs.add(messageId)
+  }
+
+  // ── isBotAuthoredPartnerMsg ──────────────────────────────────────────────────
+
+  async isBotAuthoredPartnerMsg(messageId: string): Promise<boolean> {
+    if (messageId === '') return false
+    return this.botAuthoredPartnerMsgs.has(messageId)
   }
 }

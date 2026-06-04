@@ -36,6 +36,12 @@ function makeMockKvClient(): KvClient {
       kv.set(key, JSON.stringify(value))
       return 'OK'
     },
+    async setWithTtl(key: string, value: unknown): Promise<unknown> {
+      // TTL is not enforced in this in-memory mock; round-trip the value so
+      // contract reads behave like a real SET … EX.
+      kv.set(key, JSON.stringify(value))
+      return 'OK'
+    },
     async setIfAbsent(key: string, value: unknown): Promise<boolean> {
       // Mirrors Redis `SET key value NX`: only the first write for a key wins.
       if (kv.has(key)) return false
@@ -78,6 +84,64 @@ function makeMockKvClient(): KvClient {
 // ---------------------------------------------------------------------------
 
 runCaseStoreContract('KvStore (mock client)', () => new KvStore(makeMockKvClient()))
+
+// ---------------------------------------------------------------------------
+// Bot-authored partner-group message store (quote-to-bot plan §2 / Task 1)
+// ---------------------------------------------------------------------------
+
+describe('bot-authored partner message store', () => {
+  it('putBotAuthoredPartnerMsg writes with 7-day TTL; isBotAuthoredPartnerMsg reads it back', async () => {
+    const calls: Array<{ key: string; value: unknown; ttl: number }> = []
+    const seen = new Set<string>()
+    // Inline recording client: only the methods these two store methods touch.
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async setWithTtl(key, value, ttl) {
+        calls.push({ key, value, ttl })
+        seen.add(key)
+        return 'OK'
+      },
+      async get<T = unknown>(key: string): Promise<T | null> {
+        return (seen.has(key) ? ('1' as unknown as T) : null)
+      },
+    }
+    const store = new KvStore(client)
+
+    await store.putBotAuthoredPartnerMsg('Mbot123')
+    expect(calls).toHaveLength(1)
+    expect(calls[0].key).toBe('line-agent:partner-bot-msg:Mbot123')
+    expect(calls[0].ttl).toBe(604800) // 7 days in seconds
+
+    expect(await store.isBotAuthoredPartnerMsg('Mbot123')).toBe(true)
+    expect(await store.isBotAuthoredPartnerMsg('Munknown')).toBe(false)
+  })
+
+  it('putBotAuthoredPartnerMsg is a no-op for empty id (no KV write)', async () => {
+    const calls: unknown[] = []
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async setWithTtl(...args) {
+        calls.push(args)
+        return 'OK'
+      },
+    }
+    await new KvStore(client).putBotAuthoredPartnerMsg('')
+    expect(calls).toHaveLength(0)
+  })
+
+  it('isBotAuthoredPartnerMsg returns false for empty id without touching KV', async () => {
+    let getCalls = 0
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async get() {
+        getCalls++
+        return null
+      },
+    }
+    expect(await new KvStore(client).isBotAuthoredPartnerMsg('')).toBe(false)
+    expect(getCalls).toBe(0)
+  })
+})
 
 // ---------------------------------------------------------------------------
 // Fail-closed: no injected client AND no env → every method throws.

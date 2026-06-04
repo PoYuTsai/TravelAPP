@@ -75,4 +75,20 @@ export interface CaseStore {
    * / `get()` / the customer OA plane.
    */
   claimPartnerReply(messageId: string): Promise<boolean>
+
+  // ── Bot-authored partner-group message tracking ─────────────────────────────
+
+  /**
+   * Record that `messageId` is a message THIS bot sent in the partner group, so
+   * a later quote-reply to it counts as addressing the bot (quote-to-bot plan
+   * §2).  TTL 7 days.  Empty id is a no-op.  Lives in its own key namespace —
+   * it is never case state and never appears in the customer OA plane.
+   */
+  putBotAuthoredPartnerMsg(messageId: string): Promise<void>
+
+  /**
+   * True when `messageId` was recorded by putBotAuthoredPartnerMsg and has not
+   * expired.  Empty id returns false without I/O.
+   */
+  isBotAuthoredPartnerMsg(messageId: string): Promise<boolean>
 }

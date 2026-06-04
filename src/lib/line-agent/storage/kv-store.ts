@@ -45,6 +45,8 @@ export class KvNotConfiguredError extends Error {
 export interface KvClient {
   get<T = unknown>(key: string): Promise<T | null>
   set(key: string, value: unknown): Promise<unknown>
+  /** SET key value EX ttlSeconds — set with an expiry (seconds). */
+  setWithTtl(key: string, value: unknown, ttlSeconds: number): Promise<unknown>
   /**
    * SET key value NX — set only when the key is absent.
    * Resolves `true` when this call created the key, `false` when it already
@@ -84,6 +86,9 @@ function createUpstashKvClient(url: string, token: string): KvClient {
     set(key: string, value: unknown): Promise<unknown> {
       return redis.set(key, JSON.stringify(value))
     },
+    setWithTtl(key: string, value: unknown, ttlSeconds: number): Promise<unknown> {
+      return redis.set(key, JSON.stringify(value), { ex: ttlSeconds })
+    },
     async setIfAbsent(key: string, value: unknown): Promise<boolean> {
       // Upstash `SET … NX` returns "OK" when the key was created, null when it
       // already existed.  (`automaticDeserialization: false` keeps it a raw
@@ -116,6 +121,11 @@ const AUDIT_PREFIX = 'audit:'
 // Dedicated namespace for partner-reply send-once markers.  Deliberately
 // distinct from CASE_PREFIX so these markers never match `case:*` in listAll().
 const PARTNER_REPLY_PREFIX = 'line-agent:partner-reply:'
+// Dedicated namespace for bot-authored partner-group message ids (quote-to-bot
+// plan §2).  Written ONLY by the webhook send gate's partner-group path; the
+// customer OA plane never writes here, so an OA quotedMessageId can never hit.
+const PARTNER_BOT_MSG_PREFIX = 'line-agent:partner-bot-msg:'
+const BOT_AUTHORED_TTL_SECONDS = 604800 // 7 days
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -123,6 +133,10 @@ function caseKey(caseId: string): string {
 
 function partnerReplyKey(messageId: string): string {
   return `${PARTNER_REPLY_PREFIX}${messageId}`
+}
+
+function partnerBotMsgKey(messageId: string): string {
+  return `${PARTNER_BOT_MSG_PREFIX}${messageId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -251,5 +265,21 @@ export class KvStore implements CaseStore {
     // Atomic SET NX: the first instance to claim this messageId wins, even
     // under concurrent invocations across serverless instances.
     return kv.setIfAbsent(partnerReplyKey(messageId), 1)
+  }
+
+  // ── putBotAuthoredPartnerMsg ─────────────────────────────────────────────────
+
+  async putBotAuthoredPartnerMsg(messageId: string): Promise<void> {
+    if (messageId === '') return
+    const kv = this.ensureClient()
+    await kv.setWithTtl(partnerBotMsgKey(messageId), '1', BOT_AUTHORED_TTL_SECONDS)
+  }
+
+  // ── isBotAuthoredPartnerMsg ──────────────────────────────────────────────────
+
+  async isBotAuthoredPartnerMsg(messageId: string): Promise<boolean> {
+    if (messageId === '') return false
+    const kv = this.ensureClient()
+    return (await kv.get(partnerBotMsgKey(messageId))) !== null
   }
 }

@@ -268,3 +268,22 @@ describe('MemoryStore', () => {
     expect(bobAudit).toHaveLength(0)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Bot-authored partner-group message tracking (quote-to-bot plan §2 / Task 1)
+// ---------------------------------------------------------------------------
+
+describe('bot-authored partner message tracking', () => {
+  it('round-trips put → is', async () => {
+    const store = new MemoryStore()
+    expect(await store.isBotAuthoredPartnerMsg('Mb1')).toBe(false)
+    await store.putBotAuthoredPartnerMsg('Mb1')
+    expect(await store.isBotAuthoredPartnerMsg('Mb1')).toBe(true)
+  })
+
+  it('empty id: put is no-op, is returns false', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('')
+    expect(await store.isBotAuthoredPartnerMsg('')).toBe(false)
+  })
+})
