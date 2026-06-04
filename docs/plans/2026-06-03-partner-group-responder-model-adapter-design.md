@@ -315,3 +315,5 @@ meta?: {
 | `AI_AGENT_PARTNER_RESPONDER_MODE` | 否（optional） | `stub` | `stub`\|`anthropic`；有 key 也不自動啟用，必須顯式設 `anthropic` |
 
 > `ANTHROPIC_API_KEY` / `AI_AGENT_DEFAULT_MODEL` / `AI_AGENT_RESEARCH_MODEL` 為既有 required env，不在本批新增。
+
+> 部署建議：`AI_AGENT_PARTNER_RESPONDER_MODE=anthropic` **僅建議先設 Vercel Preview** 驗證真模型路徑，確認無誤前**不要先設 Production**。`.env.example` 同步保留 `AI_AGENT_PARTNER_RESPONDER_MODE=stub` 作為預設樣板。
