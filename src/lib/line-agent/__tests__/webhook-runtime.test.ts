@@ -551,11 +551,13 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
     expect(calls).toHaveLength(0)
   })
 
-  // §6.6 — the responder seam is PURE: the handler never hands it a store, token,
-  // or LINE reply client. Proven structurally — the input it receives carries
-  // only the documented PartnerGroupRespondInput keys, so a token/store is not
-  // even reachable from inside respond().
-  it('§6.6 responder purity: respond() input carries only documented keys (no store/token/client)', async () => {
+  // §6.6 — the responder seam cannot SEND: the handler never hands it a channel
+  // access token, a LINE reply client, or the store. `event.replyToken` may well
+  // exist — it rides inside the allowed `event` key — but the responder has no
+  // transport to act on it; sending stays the handler's job. Proven structurally:
+  // the input carries only the documented PartnerGroupRespondInput keys, so no
+  // top-level token/client/store is reachable from inside respond().
+  it('§6.6 responder purity: respond() input carries only documented keys (no channel token / client / store)', async () => {
     let capturedKeys: string[] = []
     setPartnerGroupResponder({
       async respond(input) {
@@ -568,7 +570,11 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
     await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
 
     // The full allowed surface of PartnerGroupRespondInput — nothing else may
-    // leak in (no `store`, `token`, `accessToken`, `replyClient`, `replyToken`).
+    // leak in. There is no top-level `store`, channel `accessToken`, or
+    // `replyClient`, and no top-level `replyToken`: a reply token only ever
+    // reaches respond() nested inside `event`, where it cannot be sent — the
+    // handler keeps the channel token / LINE client / store, so the responder
+    // has no way to send even when `event.replyToken` is present.
     const allowed = new Set(['event', 'intent', 'text', 'actor', 'caseId', 'context'])
     expect(capturedKeys.length).toBeGreaterThan(0)
     for (const key of capturedKeys) {

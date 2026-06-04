@@ -2,6 +2,19 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
+## 實作狀態（2026-06-04）
+
+- ✅ **Task 1** — bot-authored id store contract（`putBotAuthoredPartnerMsg` / `isBotAuthoredPartnerMsg` + KV `setWithTtl`，TTL 7 天）— completed
+- ✅ **Task 2** — `replyMessage` 回傳 `sentMessages[].id`（型別放寬，純加法）— completed
+- ✅ **Task 3** — `deriveBotDirected` 純 helper（KV 讀失敗 fail-safe=false）— completed
+- ✅ **Task 4** — permissions B1/B2 / router / gate 改讀 `botDirected`（行為保留）— completed
+- ✅ **Task 5** — webhook 控制流接真 `botDirected` + 送後寫 store（行為正式改變）— completed
+- ✅ **Task 6** — quote-to-bot 不變量回歸帶（design §6 OA-never / responder purity）— completed
+
+**測試結果：** `npx vitest run src/lib/line-agent/` → **516 passed (516)**，39 test files 全綠（2026-06-04 跑）。
+
+**待辦（不在本刀範圍）：** 真機 quote-to-bot 三項（引用 bot 免重 tag、引用真人不回、redelivery 不重燒）需 Vercel preview 實機 smoke，待 `vercel login` 後執行；contract 級已全 fake 驗證通過。
+
 **Goal:** 讓夥伴在 partner group 內「引用/回覆 bot 先前發出的訊息」時，即使不再 tag bot，也視為對 bot 說話並產生恰一則 LINE reply；引用真人訊息維持不回，其餘平面（客人 OA、dev、quote formal write）行為完全不變。
 
 **Architecture:** 把 bot-directed 判定由「只認 `event.mentionsBot`」放寬為 runtime derived `botDirected = mentionsBot || isBotAuthoredQuote`。`isBotAuthoredQuote` 只在 partner group 的 `group_quoted` 路徑、靠新的 KV bot-authored id store 計算（KV 讀失敗 fail-safe=false）。`botDirected` 貫穿 runtime precondition → dedup claim → router/permissions → 純函數 gate。bot 送出 reply 後，把 `replyMessage` 回傳的 `sentMessages[].id` 寫回 store（TTL 7 天），下次被引用即命中。
