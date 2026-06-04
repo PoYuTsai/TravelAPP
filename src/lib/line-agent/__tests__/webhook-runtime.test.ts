@@ -505,3 +505,90 @@ describe('deriveBotDirected', () => {
     expect(await deriveBotDirected(ev, new MemoryStore())).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Task 6 — quote-to-bot invariants regression band (design §6)
+//
+// No production code: these LOCK the design §6 invariants as explicit
+// regression tests. The two genuinely-new gaps (§6.1 OA+quotedRef end-to-end,
+// §6.6 responder purity) are asserted here; §6.2–§6.5 / §6.7 are already proven
+// by named tests above and are referenced (not duplicated) to keep DRY. If any
+// of these go red, it is a Task 5 defect to fix at the source — not here.
+// ---------------------------------------------------------------------------
+
+describe('quote-to-bot invariants (design §6 regression band)', () => {
+  // §6.1 — a customer OA event is NEVER botDirected, even with a quotedRef whose
+  // id IS in the bot-authored store. The OA plane short-circuits in
+  // deriveBotDirected BEFORE any store read, so no responder + no reply.
+  it('§6.1 OA inbound with a quotedRef: store never consulted, responder 0, reply 0', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('whatever') // even if it WERE bot-authored…
+    let storeReads = 0
+    store.isBotAuthoredPartnerMsg = async (id) => {
+      storeReads++
+      return id === 'whatever'
+    }
+    const { client, calls } = recordingReplyClient(['x'])
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+
+    const oa: NormalizedLineEvent = {
+      kind: 'group_quoted',
+      sourceChannel: 'line_oa',
+      lineUserId: 'U_cust',
+      messageId: 'M_oa',
+      text: 'hi',
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt',
+      quotedRef: { quotedMessageId: 'whatever' },
+    }
+    await getEventHandler()(oa, store)
+
+    expect(storeReads).toBe(0) // OA plane short-circuits before any store read
+    expect(spy).not.toHaveBeenCalled()
+    expect(calls).toHaveLength(0)
+  })
+
+  // §6.6 — the responder seam is PURE: the handler never hands it a store, token,
+  // or LINE reply client. Proven structurally — the input it receives carries
+  // only the documented PartnerGroupRespondInput keys, so a token/store is not
+  // even reachable from inside respond().
+  it('§6.6 responder purity: respond() input carries only documented keys (no store/token/client)', async () => {
+    let capturedKeys: string[] = []
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedKeys = Object.keys(input)
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(recordingReplyClient(['M_new']).client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    // The full allowed surface of PartnerGroupRespondInput — nothing else may
+    // leak in (no `store`, `token`, `accessToken`, `replyClient`, `replyToken`).
+    const allowed = new Set(['event', 'intent', 'text', 'actor', 'caseId', 'context'])
+    expect(capturedKeys.length).toBeGreaterThan(0)
+    for (const key of capturedKeys) {
+      expect(allowed.has(key)).toBe(true)
+    }
+  })
+
+  // §6.2–§6.5 / §6.7 are already asserted by named tests above — referenced here
+  // (DRY), NOT duplicated:
+  //   §6.2 引用真人不回      → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-human (store miss, no mention): no responder, no reply'
+  //   §6.3 引用 bot 免重 tag → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-bot (store hit, no mention): responds once and records the new sent id'
+  //        既有 tag 路徑不破  → 'webhook-runtime partner-group send gate' ›
+  //        'replies exactly once to a partner-group tagged event with the responder text'
+  //   §6.4 denied 不回       → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-bot + dev command: denied → no reply'
+  //   §6.5 redelivery 不重燒 → 'webhook-runtime partner-group reply dedupe (messageId send-once)' ›
+  //        'does not re-invoke the responder on a redelivered messageId (no re-bill)'  +
+  //        'quote-to-bot runtime control flow' › 'quote-to-bot redelivery (same messageId): replies exactly once'
+  //   §6.7 stub 預設         → 'webhook-runtime partner-group responder seam' ›
+  //        'lazily defaults to the safe stub responder when none is injected'
+})
