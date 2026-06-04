@@ -13,7 +13,13 @@
 
 **測試結果：** `npx vitest run src/lib/line-agent/` → **516 passed (516)**，39 test files 全綠（2026-06-04 跑）。
 
-**待辦（不在本刀範圍）：** 真機 quote-to-bot 三項（引用 bot 免重 tag、引用真人不回、redelivery 不重燒）需 Vercel preview 實機 smoke，待 `vercel login` 後執行；contract 級已全 fake 驗證通過。
+**Preview 實機 smoke（2026-06-04）：** PASS。Eric 已在私人 partner group 確認：
+- tag bot → bot 回一則 stub reply。
+- 引用 bot 剛剛回的訊息、不 tag → bot 會回。
+- 引用真人訊息、不 tag → bot 不回。
+- 客人 OA 平面測試 → bot 不自動回客人。
+
+Contract 級 fake tests 與 Preview 實機 smoke 皆通過；quote-to-bot 第一版可視為落地。
 
 **Goal:** 讓夥伴在 partner group 內「引用/回覆 bot 先前發出的訊息」時，即使不再 tag bot，也視為對 bot 說話並產生恰一則 LINE reply；引用真人訊息維持不回，其餘平面（客人 OA、dev、quote formal write）行為完全不變。
 
@@ -904,9 +910,9 @@ git commit -m "test(line-agent): quote-to-bot invariants regression band (OA-nev
 
 ## 完成後（不在本刀自動執行）
 
-- 文件更新 commit（依 CLAUDE.md「feature commit first, then docs」）：更新 `docs/plans/2026-06-04-quote-to-bot-message-tracking-design.md` 標記「implemented」，並在 `project_line_oa_agent_m1` memory 補一行。
+- 文件更新 commit（依 CLAUDE.md「feature commit first, then docs」）：更新 `docs/plans/2026-06-04-quote-to-bot-message-tracking-design.md` 標記「implemented」。
 - Push（CLAUDE.md：commit 後立即 push；但本 branch 既有規範為「保留 as-is、不 merge/PR」——push 前先向 Eric 確認是否照常 push 到 `codex/line-oa-agent-mvp`）。
-- 實機 smoke（design §7 contract 級已可全 fake 驗；真機 quote-to-bot 三項需 Vercel preview，待 `vercel login`）。
+- 實機 smoke：已完成並通過（2026-06-04），見本檔「Preview 實機 smoke」。
 
 ## 邊界自檢（對照 CLAUDE.md Operating Boundaries — 每個 task 都要守住）
 

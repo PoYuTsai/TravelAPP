@@ -1,6 +1,6 @@
 # Quote-to-Bot Message Tracking — Design (第二刀)
 
-> **狀態：** design only。本文不含 code；實作另開 implementation plan（superpowers:writing-plans），再走 executing-plans。
+> **狀態：** implemented + Preview smoke passed（2026-06-04）。實作記錄見 `docs/plans/2026-06-04-quote-to-bot-message-tracking-implementation.md`。
 > **前置：** Partner-Group Tagged Reply（第一刀，tip `7993173`）已上線、實機三項 smoke PASS（tag→reply / untagged→no reply / dev-denied→no reply）。
 
 **Goal:** 夥伴在 partner group 內**引用/回覆 bot 先前發出的訊息**時，即使**不再 tag** bot，也視為「對 bot 說話」並產生一則 LINE reply；引用**真人**訊息則維持不回。其餘平面（客人 OA、dev、quote formal write）行為完全不變。
