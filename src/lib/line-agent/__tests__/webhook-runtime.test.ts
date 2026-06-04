@@ -20,8 +20,10 @@ import {
   setPartnerGroupResponder,
   getReplyClient,
   setReplyClient,
+  deriveBotDirected,
   type ReplyClient,
 } from '../line/webhook-runtime'
+import type { CaseStore } from '@/lib/line-agent/storage/store'
 import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
 import { LineApiError, type LineMessage } from '../line/message-client'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
@@ -306,5 +308,76 @@ describe('webhook-runtime partner-group reply dedupe (messageId send-once)', () 
     // Mirrors the OA rule (handlers.ts:246): collapsing all id-less messages
     // into one claim would silently drop real replies.
     expect(calls).toHaveLength(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// deriveBotDirected (quote-to-bot plan §3 / Task 3) — pure helper, no wiring
+// ---------------------------------------------------------------------------
+
+describe('deriveBotDirected', () => {
+  const base = (o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent => ({
+    kind: 'group_text',
+    sourceChannel: 'line_partner_group',
+    lineUserId: 'U',
+    groupId: 'G',
+    messageId: 'M',
+    mentionsBot: false,
+    timestamp: 1,
+    ...o,
+  })
+
+  it('true when mentionsBot is true (store not consulted)', async () => {
+    let called = 0
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      called++
+      return false
+    }
+    expect(await deriveBotDirected(base({ mentionsBot: true }), store)).toBe(true)
+    expect(called).toBe(0) // short-circuit: no store read when already mentioned
+  })
+
+  it('true when group_quoted quotes a bot-authored id', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('Mbot')
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mbot' } })
+    expect(await deriveBotDirected(ev, store)).toBe(true)
+  })
+
+  it('false when group_quoted quotes a non-bot (human) id', async () => {
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mhuman' } })
+    expect(await deriveBotDirected(ev, new MemoryStore())).toBe(false)
+  })
+
+  it('false for OA even if a quotedRef somehow present (store never consulted)', async () => {
+    let called = 0
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      called++
+      return true
+    }
+    const ev = base({
+      sourceChannel: 'line_oa',
+      kind: 'group_quoted',
+      quotedRef: { quotedMessageId: 'X' },
+      mentionsBot: false,
+    })
+    expect(await deriveBotDirected(ev, store)).toBe(false)
+    expect(called).toBe(0)
+  })
+
+  it('fail-safe false when store read throws', async () => {
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      throw new Error('KV timeout')
+    }
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mbot' } })
+    expect(await deriveBotDirected(ev, store)).toBe(false)
+  })
+
+  it('false when group_quoted but quotedMessageId empty', async () => {
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: '' } })
+    expect(await deriveBotDirected(ev, new MemoryStore())).toBe(false)
   })
 })

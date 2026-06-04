@@ -68,6 +68,45 @@ export type NormalizedEventHandler = (
  * `shouldReplyToPartnerGroup` — the full gate still runs post-routing before any
  * send.  Used only to avoid wasted model calls; it never authorises a send.
  */
+/**
+ * Derive the runtime "is the bot being addressed?" signal (quote-to-bot plan §3):
+ *
+ *   botDirected = mentionsBot || isBotAuthoredQuote
+ *
+ * `isBotAuthoredQuote` is computed ONLY for a partner-group `group_quoted` event
+ * whose `quotedMessageId` hits the bot-authored store — i.e. the quoted message
+ * is one THIS bot previously sent in the group, so quoting it (even without a
+ * re-tag) counts as addressing the bot.  The customer OA plane is never consulted
+ * (it can never be botDirected).  A store read failure is FAIL-SAFE: treat as
+ * NOT bot-authored, so the worst case is the partner re-tags — never a spurious
+ * reply or a billed model call.
+ *
+ * This NEVER mutates the normalizer's raw `event.mentionsBot`; it derives a
+ * separate signal.  It is NOT wired into the handler yet (Task 5 does that).
+ */
+export async function deriveBotDirected(
+  event: NormalizedLineEvent,
+  store: CaseStore
+): Promise<boolean> {
+  if (event.mentionsBot === true) return true // short-circuit: no store read needed
+
+  const qid = event.quotedRef?.quotedMessageId
+  if (
+    event.sourceChannel === 'line_partner_group' &&
+    event.kind === 'group_quoted' &&
+    typeof qid === 'string' &&
+    qid !== ''
+  ) {
+    try {
+      return await store.isBotAuthoredPartnerMsg(qid)
+    } catch {
+      return false // fail-safe: cannot confirm bot-authored → not addressed
+    }
+  }
+
+  return false
+}
+
 function mayProducePartnerGroupReply(event: NormalizedLineEvent): boolean {
   return (
     event.sourceChannel === 'line_partner_group' &&
