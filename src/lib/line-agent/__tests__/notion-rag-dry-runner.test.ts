@@ -119,6 +119,24 @@ describe('loadNotionRagDryRunRuntime — real mode wiring', () => {
     expect(runtime).toEqual({ runDryRun: null, client: null })
   })
 
+  // DECISION D anchor — the default `importTraverse` is the not-wired piece.
+  // Inject a WORKING client but leave `importTraverse` at its production default:
+  // the runtime must still be not-wired, proving the default traverse factory
+  // attempts NO TypeScript import (no .ts dynamic import, no throw). If a future
+  // edit wires the default to import the TS traverse, `runDryRun` becomes truthy
+  // and this assertion flips — isolating the regression to importTraverse alone,
+  // which the combined "default factories" test above cannot distinguish.
+  test('real gate + default importTraverse + working client → not wired (no TS import)', async () => {
+    const createClient = spyFactory({ listPages: async () => [] })
+
+    const runtime = await loadNotionRagDryRunRuntime({
+      env: realEnv(),
+      createClient: createClient.fn,
+    })
+
+    expect(runtime).toEqual({ runDryRun: null, client: null })
+  })
+
   // 4) a factory throw (carrying secrets) → loader re-throws SANITIZED.
   test('factory throw with secrets → loader throws sanitized, no leak', async () => {
     const createClient = async () => {
