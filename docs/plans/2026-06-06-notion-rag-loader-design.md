@@ -315,11 +315,51 @@ Real-Notion wiring becomes the B-like step: pass a concrete `@notionhq/client`
 adapter as the `client` into the **already-proven** seam. The bridge contract
 proven here does not change.
 
+## Checkpoint — runtime loader (pluggable real-runner seam) · 2026-06-06
+
+Gave the command a runtime entry point for the real runner, still mock-first /
+TDD. No real token, no real Notion call, no package change.
+
+### Resolution order (locked)
+`runNotionRagDryRunCommand(options)`:
+1. **disabled gate** → `skipped`; nothing loaded or called.
+2. **injected** `runDryRun` + `client` → use them (tests / explicit wiring).
+3. **runtime loader** `loadRuntime({ env }) → { runDryRun, client }` — called
+   only when an explicit runner was not injected. Default = `scripts/
+   notion-rag-dry-runner.mjs` `loadNotionRagDryRunRuntime()`, **mock-first**
+   (returns `{ runDryRun: null, client: null }`).
+4. missing `runDryRun` OR `client` after loading → safe **`client_not_wired`**.
+
+Boundary: a **loader throw** OR a **runner throw** both collapse to a sanitized
+**`client_error`** — never propagate a raw, leak-prone message.
+
+### New file — `scripts/notion-rag-dry-runner.mjs`
+The single seam a future knife edits to wire the real `@notionhq/client` + the
+TS traverse (e.g. via a tsx/dist step). The command layer's resolution order
+does NOT change when that lands.
+
+### What shipped
+- `scripts/agent-command.mjs`: layered runner resolution + `loadRuntime` option;
+  loader/runner throws → `client_error`; `notWiredReport()` helper.
+- `scripts/notion-rag-dry-runner.mjs`: mock-first runtime loader stub.
+- `agent-command-notion-rag.test.ts`: +5 loader tests (disabled→not loaded,
+  enabled→uses loader, loader throw→client_error, empty runtime→client_not_wired,
+  default not-wired + no secret-shaped env leak).
+- Verification: targeted **15/15**; full line-agent suite **624/624 green**;
+  `tsc` clean on changed files. Offline command: disabled→`已略過`,
+  enabled+default→`client_not_wired` (through the new loader path).
+- Constraints honored: no `package.json`/`package-lock`/`.env*` change, no real
+  Notion API, no live path, no cache/scheduler.
+
+### Next knife (not started)
+Replace `loadNotionRagDryRunRuntime()`'s body to build the real
+`@notionhq/client` (already in `package.json`) + bridge the TS traverse, gated
+behind a real token. The command's resolution order is frozen.
+
 ## Deferred (still NOT done)
 
-- CLI invoking the bridge by **default** (the `agent:command` direct path still
-  passes no `runDryRun`, so it stays `skipped`/`client_not_wired`; the bridge is
-  proven via test injection, not yet the default CLI wiring).
+- Real runtime wiring inside `loadNotionRagDryRunRuntime()` (build the real
+  `@notionhq/client` + TS traverse; needs a token + a tsx/dist strategy).
 - Production SDK instantiation + env token wiring (real `@notionhq/client`).
 - Live request-path integration.
 - Traverse job scheduling / cache persistence.
