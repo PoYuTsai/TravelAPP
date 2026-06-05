@@ -1,6 +1,24 @@
 # Notion RAG Loader — Design (v1, fixture/fake-first)
 
-**Date**: 2026-06-06 · **Branch**: `codex/line-oa-agent-mvp` · **Status**: design approved, pre-TDD
+**Date**: 2026-06-06 · **Branch**: `codex/line-oa-agent-mvp` · **Status**: ✅ loader v1 implemented (commit `43bb7b5`)
+
+## Implementation status (v1)
+
+- **Implemented**: `buildNotionRagIndex` read orchestrator (config + injected port + per-source traversal + aggregate build), as specified below.
+- **Commit**: `43bb7b5` — `feat(line-agent): add Notion RAG read orchestrator (loader v1)`.
+- **Verification**: line-agent suite **589/589 green**.
+- **Still mock/fixture-first**: no real Notion API is touched; the orchestrator only takes an injected `NotionRagClient` fake.
+
+### Not yet done (deferred slices)
+
+- Real `@notionhq/client` adapter implementing `NotionRagClient` (cursor/pagination loop lives there).
+- Env → `NotionRagConfig` resolver (env keys → typed config; keeps the builder pure of `process.env`).
+- Operator traverse cron / job scheduling.
+- `markdown_template` corpus merge (first-layer corpus, merged later by the index builder).
+- Live request-path integration (wiring the built index into the running agent).
+- Production enablement (`AI_AGENT_NOTION_RAG_ENABLED` stays off; no auto-launch).
+
+> Next code slice: **env → `NotionRagConfig` resolver** — still mock-first, does **not** call the real Notion API.
 
 ## Goal
 
