@@ -32,7 +32,8 @@ function richText(...parts: string[]) {
 }
 
 // Realistic envelopes as the Notion SDK would return them. Note: 行程類型 is a
-// `select` (single value) so it lands in themeHints via the adapter's asHints.
+// `multi_select` (the real team schema shape) so it flattens to string[] and the
+// adapter's asHints keeps every value as themeHints — exercising the multi-value path.
 const familyEnvelope: NotionApiPage = {
   id: 'case-family-cm-5d',
   url: NOTION_LINK,
@@ -44,7 +45,7 @@ const familyEnvelope: NotionApiPage = {
     大人: { type: 'number', number: 2 },
     小孩: { type: 'number', number: 2 },
     城市區域: { type: 'select', select: { name: '清邁' } },
-    行程類型: { type: 'select', select: { name: '親子' } },
+    行程類型: { type: 'multi_select', multi_select: [{ name: '親子' }, { name: '叢林探險' }] },
     行程摘要: { type: 'rich_text', rich_text: richText('清邁親子 5 天，動物園 + 叢林飛索') },
     成本: { type: 'number', number: 22000 }, // private — privateContext only
     分潤: { type: 'number', number: 8000 }, // private — privateContext only
@@ -61,7 +62,7 @@ const coupleEnvelope: NotionApiPage = {
     天數: { type: 'number', number: 3 },
     大人: { type: 'number', number: 2 },
     城市區域: { type: 'select', select: { name: '清邁' } },
-    行程類型: { type: 'select', select: { name: '蜜月' } },
+    行程類型: { type: 'multi_select', multi_select: [{ name: '蜜月' }] },
     行程摘要: { type: 'rich_text', rich_text: richText('清邁蜜月 3 天') },
     成本: { type: 'number', number: 11000 },
   },
@@ -78,7 +79,7 @@ describe('Notion pipeline e2e — envelope → flatten → record → index → 
       adults: 2,
       children: 2,
       areaHints: ['清邁'],
-      themeHints: ['親子'],
+      themeHints: ['親子', '叢林探險'],
       itinerarySnippet: '清邁親子 5 天，動物園 + 叢林飛索',
     })
     expect(record.privateContext).toMatchObject({
@@ -113,7 +114,7 @@ describe('Notion pipeline e2e — envelope → flatten → record → index → 
     const serialized = JSON.stringify(view)
 
     // useful trip facts survive for the partner
-    expect(view.facts).toMatchObject({ areaHints: ['清邁'], themeHints: ['親子'] })
+    expect(view.facts).toMatchObject({ areaHints: ['清邁'], themeHints: ['親子', '叢林探險'] })
 
     // every private / PII / provenance signal is gone
     expect('privateContext' in view).toBe(false)
