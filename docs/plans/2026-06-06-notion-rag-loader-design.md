@@ -264,10 +264,62 @@ npm run agent:command -- notion-rag-dry-run
 
 Tests: 7 new (`agent-command-notion-rag.test.ts`); full line-agent suite 616/616.
 
+## Checkpoint — mjs ←→ TS traverse bridge strategy · 2026-06-06
+
+Convergence on how the plain-`.mjs` CLI reaches the TypeScript traverse without
+wiring a real `@notionhq/client`, touching `package.json`/`.env*`, or hitting a
+live path.
+
+### Options weighed
+- **A — dynamic import of compiled JS dist.** Needs a build output; unfit for dev. Rejected.
+- **B — run the command under `tsx`/a loader.** Adds a dependency / npm script →
+  touches `package.json`, currently mid-WIP for the Discord ai-room. Deferred.
+- **C — JS-compatible bridge via dependency injection.** Chosen, trimmed (below).
+- **D — defer; design note only** until the package WIP settles.
+
+### Decision: **C, trimmed** — two facts collapse most of the work
+1. **The injection seam already exists.** `runNotionRagDryRunCommand({ env,
+   client, runDryRun })` already accepts `runDryRun` by injection, and its shape
+   `(env, client) => Promise<report>` is *exactly* `runNotionRagTraverseDryRun`.
+   → No new bridge module (that part of C is YAGNI). The seam **is** the
+   `runDryRun` option.
+2. **The real traverse already sanitizes its own client errors** (traverse test
+   5: throwing client → `client_error`, zero leak). → It never throws raw.
+
+So the minimal valuable cut was:
+- **Proof (no new production module):** a TS test injects the **real**
+  `runNotionRagTraverseDryRun` + a mock client into the existing JS command and
+  asserts it runs offline and leak-free — proving type + runtime shape
+  compatibility in one go.
+- **One production hardening:** wrap the injected `runDryRun(env, client)` call
+  with try-catch. The CLI is the operator boundary; **any** injected runDryRun
+  that throws raw (a future bridge, a partial wiring) could carry a token / db
+  id / notion.so url in its message. Every throw now collapses to a safe
+  `client_error` projection.
+
+Neither pure D (real code + real proof shipped) nor textbook C (no new module).
+
+### What shipped (commit pending this checkpoint)
+- `scripts/agent-command.mjs`: try-catch around the injected `runDryRun`; throw →
+  sanitized `client_error` report.
+- `agent-command-notion-rag.test.ts`: +3 bridge tests — (1) injected runDryRun
+  called with `(env, client)` and formatted, (2) the **real**
+  `runNotionRagTraverseDryRun` bridges through the command offline + leak-free,
+  (3) throwing runDryRun → sanitized `client_error`, no leak.
+- Verification: targeted 10/10; full line-agent suite **619/619 green**.
+- Constraints honored: no real `@notionhq/client`, no `package.json`/`.env*`
+  change, no real API, no live path, operator command stays testable.
+
+### Next knife (not started)
+Real-Notion wiring becomes the B-like step: pass a concrete `@notionhq/client`
+adapter as the `client` into the **already-proven** seam. The bridge contract
+proven here does not change.
+
 ## Deferred (still NOT done)
 
-- mjs → TS traverse **bridge** (build / tsx strategy) so the CLI actually runs
-  `runNotionRagTraverseDryRun` and formats real `ok` / `error` reports.
+- CLI invoking the bridge by **default** (the `agent:command` direct path still
+  passes no `runDryRun`, so it stays `skipped`/`client_not_wired`; the bridge is
+  proven via test injection, not yet the default CLI wiring).
 - Production SDK instantiation + env token wiring (real `@notionhq/client`).
 - Live request-path integration.
 - Traverse job scheduling / cache persistence.
