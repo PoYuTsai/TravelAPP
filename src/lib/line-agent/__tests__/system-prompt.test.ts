@@ -61,4 +61,54 @@ describe('buildPartnerGroupSystemPrompt', () => {
   it('requires admitting uncertainty rather than fabricating', () => {
     expect(prompt).toContain('不確定就說不確定')
   })
+
+  // --- 清微旅行 domain 車型硬規則（2026-06-05）---
+  // 鎖住實務車型判斷，避免 responder 用泛用旅遊車型邏輯。
+
+  it('locks the 小轎車 capacity rule (4 seats, recommend ≤3, up to 4 with kids)', () => {
+    expect(prompt).toContain('小轎車')
+    expect(prompt).toContain('4 人座')
+    expect(prompt).toContain('最多 3 人')
+    expect(prompt).toContain('小朋友')
+    expect(prompt).toContain('坐到 4 位')
+  })
+
+  it('locks the Toyota Commuter rule (10-seat Van, excludes guide/front, ≤9 rear passengers)', () => {
+    expect(prompt).toContain('Toyota Commuter')
+    expect(prompt).toContain('10 人座')
+    expect(prompt).toContain('不含導遊')
+    expect(prompt).toContain('副駕')
+    expect(prompt).toContain('後座最多 9 位')
+  })
+
+  it('forbids volunteering generic vehicle names unless the user said them first', () => {
+    expect(prompt).toContain('7-9 人座')
+    expect(prompt).toContain('9 人座')
+    expect(prompt).toContain('一般廂型車')
+    expect(prompt).toContain('泛稱')
+    expect(prompt).toContain('使用者原文')
+  })
+
+  it('routes 6-person charters toward the Toyota Commuter 10-seat Van', () => {
+    expect(prompt).toContain('6 人包車')
+    expect(prompt).toContain('Toyota Commuter 10 人座 Van')
+  })
+
+  it('flags airport transfers with 6+ luggage to confirm size/count and consider a second vehicle', () => {
+    expect(prompt).toContain('機場接送')
+    expect(prompt).toContain('行李')
+    expect(prompt).toContain('6 件以上')
+    expect(prompt).toContain('第二台車')
+  })
+
+  it('does not demand a caseId; lists missing info in plain language instead', () => {
+    expect(prompt).toContain('不要要求')
+    expect(prompt).toContain('caseId')
+    expect(prompt).toContain('還缺哪些資訊')
+  })
+
+  it('does not over-escalate known hard rules to Eric (only unknown/special/quote/risk cases)', () => {
+    expect(prompt).toContain('不要每句都推給 Eric 拍板')
+    expect(prompt).toContain('牽涉報價')
+  })
 })
