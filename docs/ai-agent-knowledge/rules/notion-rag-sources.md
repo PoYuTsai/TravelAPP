@@ -34,6 +34,49 @@ Implication:
 - Do not let the same 2026 case appear twice in retrieved references.
 - The 2026 team table can remain useful for partner-safe summaries and collaboration context, but private 2026 is the fuller itinerary source.
 
+## Dedup Key Strategy
+
+第一版採 **hybrid**：explicit stable key 優先，**複合自然鍵 fingerprint** 作為 fallback。**第一輪不做 fuzzy matching**；模糊／近似比對留到第二輪，避免首刀變大。
+
+### Layer 1 — explicit stable key (highest priority, reserved)
+
+未來的內部 RAG/index record 預留以下 stable identity 欄位。當 Eric 願意在私人 2026 與 team 2026 都補一個共同欄位（例如「清微案例ID」）時，就用它當**最高優先** dedupe key：
+
+- `canonicalCaseId?` — 跨表共用的穩定案例 ID（對應未來的「清微案例ID」欄位）。存在時即為唯一 dedupe key，蓋過 fingerprint。
+- `sourceRecordIds[]` — 此 canonical case 對應到的各來源原始 record id（私人 2026 / team 2026 / 私人 2025）。
+- `sourceTables[]` — 來源表標記，取值 `private_2026` | `team_2026` | `private_2025`。
+
+Reserved schema（**contract only，尚未接線**；TS 型別待下一刀真接 Notion read adapter 時再落地）：
+
+```ts
+interface RagCaseIdentity {
+  canonicalCaseId?: string                                      // 對應未來「清微案例ID」共同欄位；存在則最高優先
+  sourceRecordIds: string[]                                     // 各來源原始 record id（不外洩 partner group）
+  sourceTables: Array<'private_2026' | 'team_2026' | 'private_2025'>
+}
+```
+
+### Layer 2 — composite natural-key fingerprint (v1 fallback)
+
+`canonicalCaseId` 不存在時，用以下欄位組成 **deterministic fingerprint** 當 dedupe key：
+
+- 旅遊日期 range（travel date range）
+- 天數 / 晚數（days / nights）
+- 旅遊人數摘要（party summary：大人 / 小孩 / 小孩年齡）
+- 航班 / 接送資訊（flight / transfer info）
+- 行程框架 normalized snippet（itinerary framework，先 normalize 再取片段）
+- area / theme hints
+
+Fingerprint 必須 deterministic（同輸入同輸出）：先 normalize（trim、全半形、日期格式統一）再 hash。**v1 僅做 exact-fingerprint 比對，不做 fuzzy / 近似比對。**
+
+## Source Priority
+
+Dedup 與 retrieval 的來源優先序：
+
+- **private_2026 > team_2026**：同一 2026 案例兩邊都出現時，private 2026 為 canonical（較完整、含行程與私人脈絡）；team 2026 視為 duplicate subset，dedupe 後不重複進 retrieval。
+- **private_2025**：獨立歷史 corpus（frozen / immutable）。它是過去真實案例，**不與 2026 強 dedupe**，自成一層歷史參考。
+- **markdown templates**：curated seed（`docs/ai-agent-knowledge/cases/itinerary-templates/`），**不與 Notion case 強 dedupe**；只能用 title / theme 類似度做 retrieval reference。
+
 ## Mutability Rules
 
 - 2025 私人資料表是 frozen / immutable. It can be indexed, cached, and used as stable historical reference after field mapping is confirmed.
@@ -106,3 +149,15 @@ When Notion RAG implementation begins, add config support for:
 - `NOTION_PRIVATE_2026_DATABASE_ID`
 
 Do this behind an explicit RAG/read gate. Do not enable private table traversal just because a Notion token exists.
+
+## How To Get A Notion Database ID (future gate only)
+
+僅在**下一刀真的要接 Notion read adapter / traverse job** 時，才請 Eric 提供三個 database id 放 env（`NOTION_PRIVATE_2025_DATABASE_ID`、`NOTION_PRIVATE_2026_DATABASE_ID`、`NOTION_TEAM_2026_DATABASE_ID`），**不寫進 repo**。取得方式：
+
+1. 打開該 Notion database 頁面。
+2. 點右上角 Share / Copy link。
+3. link 裡 `notion.so/.../<這段 32 字元 hex 或 dashed id>` 就是 database / page id。
+4. 如果 link 有 `?v=...`，只取 `?v=` 前面那段當 database id（`?v=` 後面是 view id，不要）。
+5. 確認 Notion integration 已被 invite 到該 database，否則 API 即使有 token 也讀不到。
+
+ID 一律只進 deployment secret / 本機 env，永不進 repo、log、生成行程文字或報價文字。

@@ -118,4 +118,25 @@ describe('AI itinerary template knowledge files', () => {
     expect(policy).toContain('不要把成本、分潤、私人備註、Notion page URL、database ID 輸出到 partner group')
     expect(policy).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
   })
+
+  it('Notion RAG policy records the hybrid dedup-key strategy and source priority', () => {
+    const policy = readProjectFile(NOTION_RAG_FILE)
+
+    // Layer 1 — reserved explicit stable key
+    expect(policy).toContain('canonicalCaseId')
+    expect(policy).toContain('sourceRecordIds')
+    expect(policy).toContain('sourceTables')
+    expect(policy).toContain('清微案例ID')
+
+    // Layer 2 — composite natural-key fingerprint fallback
+    expect(policy).toContain('複合自然鍵')
+    expect(policy).toContain('fingerprint')
+
+    // Fuzzy matching is explicitly deferred to round two
+    expect(policy).toContain('第一輪不做 fuzzy matching')
+
+    // Source priority ordering
+    expect(policy).toContain('private_2026 > team_2026')
+    expect(policy).toContain('markdown templates')
+  })
 })
