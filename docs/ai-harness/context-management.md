@@ -51,7 +51,8 @@ When needed, summarize the archive first, then read only specific sections.
 - Claude Code owns implementation: inspect, edit, test, report.
 - Codex owns architecture and review: plan review, diff review, harness maintenance.
 - RC / Claude Code app + tmux is the primary operator channel. Both views share the same Claude Code session; tmux is the source of truth.
-- Discord/DC is optional legacy intake only: short task ticket, not full context dump.
+- Private Discord AI room is focus-locked and writes only to the active `rc-*` tmux session. Existing `dc-*` channels/sessions remain legacy or partner-control surfaces and are read-only by default.
+- Discord/DC prompts should stay short: task ticket, status loop, or agent handoff, not full context dump.
 - Use tmux for `/clear`, interrupts, restarts, long-running commands, tests, commits, and pushes. The app UI can keep spinning after `/clear`; stop the app-side run manually and continue from tmux state.
 
 ## Language Policy

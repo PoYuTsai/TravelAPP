@@ -17,6 +17,7 @@ Keep this file small. It is loaded into Claude Code sessions; detailed playbooks
 - Codex is the architecture/review partner: plan review, diff review, context-harness maintenance.
 - Primary operator channel: RC / Claude Code app + tmux sharing the same session. Treat tmux as the source of truth.
 - Discord/DC is optional legacy intake. Keep remote prompts short and avoid pasting full diffs, logs, or plans unless explicitly needed.
+- Private Discord AI room is focus-locked: write only to active `rc-*`; treat `dc-*` as legacy read-only unless Eric explicitly unlocks. Design: `docs/plans/2026-06-05-discord-focus-locked-ai-engineering-room.md`.
 - Use tmux for control commands such as `/clear`, interrupts, restarts, long-running tests, and commits. If the app UI spins after `/clear`, stop it manually and trust tmux state.
 
 ## Context Budget Rules
