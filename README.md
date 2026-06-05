@@ -22,7 +22,7 @@
 | Phase 6 | 記帳系統 + 知識庫 + 報價計算系統 | ✅ 完成 |
 | 品牌 2026-04 | 「爸媽開的」定位全面同步（官網 / Sanity / 評價 / bio）| ✅ 完成 |
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
-| **Phase 7** | **LINE OA AI 客服助理** | 🧪 MVP Production OA smoke 中 |
+| **Phase 7** | **LINE OA AI 客服助理** | 🧪 Preview AI + 夥伴群協作 + RAG groundwork |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。
 
@@ -49,18 +49,18 @@
 - 44px 觸控目標、focus trap、鍵盤導航、aria 完整支援
 - Canonical URLs、Schema.org（Organization、WebSite、TouristTrip、FAQ、BreadcrumbList）
 
-## Phase 7：LINE OA AI 客服助理（MVP smoke 中）
+## Phase 7：LINE OA AI 客服助理（Preview AI + 夥伴群協作 + RAG groundwork）
 
-將 LINE OA 從「純手動回覆」升級為「AI 輔助 + 人工決策」：
+將 LINE OA 從「純手動回覆」升級為「AI 輔助 + 人工決策」，目前在 Preview 接上真模型、Production 仍 gated：
 
-- **目前**：Production webhook 可接收 LINE OA 新訊息，operator `/inbox` 可列出客人名稱/白話代稱、最新客訊、需求摘要與缺漏欄位
-- **原則**：AI / bot 只整理內部資訊，不自動回覆客人
-- **技術**：LINE Messaging API + Vercel + Upstash KV；模型、夥伴群推播、正式報價寫入仍在後續 gate
-- **分階段**：
-  - 7.1 Webhook + case persistence + operator inbox
-  - 7.2 需求摘要 / 缺漏欄位 / Notion 參考案例
-  - 7.3 夥伴群協作、報價 dry-run、正式報價 gate
-- **詳細規格**：`docs/plans/2026-03-22-phase7-line-oa-ai-assistant*.md`
+- **已完成**：OA webhook + case persistence + operator `/inbox`（客人代稱 / 最新客訊 / 需求摘要 / 缺漏欄位）+ 夥伴群 directed replies（群內 tag 機器人會回，報價情境免 tag 也回）
+- **安全邊界**：OA 客人訊息不自動回覆、群外不 tag 不回、正式報價寫入仍 gated（dry-run 為主）
+- **AI / RAG**：Anthropic Preview 真模型已接上、external tool 計費 gate 有 contract、行程模板 markdown 知識種子已落地、Notion RAG loader v1 純函式 pipeline groundwork 完成
+- **待做**：真 Notion API adapter、env config resolver、traverse job、web search provider、case reminder / turn aggregation、正式報價 write gate
+- **詳細規格**：
+  - `docs/plans/2026-03-22-phase7-line-oa-ai-assistant*.md`
+  - `docs/plans/2026-06-06-notion-rag-loader-design.md`
+  - `docs/ai-agent-knowledge/`
 
 ## 技術架構
 
