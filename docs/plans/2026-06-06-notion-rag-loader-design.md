@@ -442,6 +442,69 @@ piece a future knife needs; the wiring SHAPE is already proven by injected fakes
   private_2026, team_2026) — an un-invited integration returns empty/403 even
   with a valid token.
 
+## Decision — default `importTraverse` TS import strategy (DEFER · D) · 2026-06-06
+
+Scope of this checkpoint: **only** decide how the default `importTraverse`
+factory in `scripts/notion-rag-dry-runner.mjs` obtains `runNotionRagTraverseDryRun`
+at runtime — or explicitly decide not to, and record why. No real client, no
+token wiring, no live path.
+
+### The runtime constraint (re-confirmed by local evidence)
+- `package.json` is `"type": "commonjs"` and ships **no** `tsx` / `ts-node` /
+  register hook (`grep` clean).
+- `scripts/*.mjs` are run directly by `node`; Node ESM **cannot** import a `.ts`
+  source. So the default factory has no in-process way to reach the TS traverse
+  **without** adding a loader dependency or a build step.
+
+### Options weighed (for the *default factory*, not the injection seam)
+- **A — dynamic import of compiled JS** (`.next`/dist). Build output path is
+  unstable and not guaranteed to exist for an offline operator command. Rejected.
+- **B — run under `tsx` / a loader.** Cleanest real path, but requires a new
+  dependency + npm script ⇒ touches `package.json`/`package-lock`, which is
+  explicitly out of scope (Discord ai-room WIP also occupies that file). Deferred.
+- **C — shell out to existing test/build infra.** Couples the runtime to the test
+  harness; too heavy for a not-wired default. Rejected.
+- **D — leave the default not-wired; document the decision.** Chosen.
+- **E — extract the traverse pipeline into a JS-compatible `.mjs`.** Duplicates
+  TS logic with drift risk (two sources of truth). Rejected.
+
+### Decision: **D — default `importTraverse` stays not-wired**
+While `package.json`/`tsx` are out of scope, no in-process TS-import path is
+clean enough to ship. The default factory therefore keeps returning `null`
+(no `.ts` dynamic import, no API). This is a *deliberate* not-wired state, not an
+oversight.
+
+Crucially this costs nothing for the future real cut, because:
+- **The injection seam already supports it.** `loadNotionRagDryRunRuntime({ env,
+  importTraverse, createClient })` takes `importTraverse` by injection; the
+  default is just the production fallback. A real cut swaps the default body (or
+  injects a real factory) without changing the loader contract or the command's
+  resolution order.
+- **When the package gate opens, the real wire is one of:** (1) a `tsx` runner
+  step (B) whose factory does `await import('…/notion-rag-traverse.ts')`, or
+  (2) a build-time JS output (A) imported from a stable dist path. Either lands
+  in the default-factory body only.
+
+### Observable consequence (today)
+With no injection, the operator command still projects **`client_not_wired`**
+(via `{ runDryRun: null, client: null }`) even under a correct `real` gate +
+token — exactly as the operator runbook above states. The env is the only
+missing piece for a future cut; the wiring SHAPE is already proven by injected
+fakes.
+
+### What this checkpoint shipped
+- **Test-only** (commit `cbfc351`): a characterization test isolating the default
+  `importTraverse` — inject a working `createClient`, leave `importTraverse`
+  default ⇒ still not-wired. The pre-existing "default factories" test leaves both
+  unset and cannot distinguish *which* default forces not-wired; this one pins the
+  invariant to `importTraverse` and to "no TS import". Discrimination verified by
+  temporarily wiring the default (new test fails, combined test still passes).
+- **No production change.** `scripts/notion-rag-dry-runner.mjs` is unchanged;
+  the default factory body stays `return null`.
+- Verification: line-agent suite **633/633 green**.
+- Constraints honored: no `package.json`/`package-lock`/`.env*`/README change, no
+  real `@notionhq/client`, no real API, no live path, Discord ai-room WIP untouched.
+
 ## Deferred (still NOT done)
 
 - Real runtime wiring inside `loadNotionRagDryRunRuntime()` (build the real
