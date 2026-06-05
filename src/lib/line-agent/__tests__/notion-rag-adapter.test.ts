@@ -74,6 +74,31 @@ describe('notionPageToRagRecord — facts mapping', () => {
     expect(record.facts.days).toBe(5)
     expect(record.facts.nights).toBe(4)
   })
+
+  // -------------------------------------------------------------------------
+  // multi_select theme hints: a Notion multi_select 行程類型 flattens to string[]
+  // and the adapter must keep every value, not drop the array.
+  // -------------------------------------------------------------------------
+
+  it('maps a multi_select 行程類型 (string[]) into all themeHints', () => {
+    const page: NotionPageFixture = {
+      id: 'case-multi-theme',
+      databaseId: TEAM_2026_FIXTURE_DATABASE_ID,
+      properties: { 行程類型: ['family', 'chiangmai', 'elephant'] },
+    }
+    const record = notionPageToRagRecord(page, { sourceTable: 'team_2026' })
+    expect(record.facts.themeHints).toEqual(['family', 'chiangmai', 'elephant'])
+  })
+
+  it('trims and dedupes multi_select theme hints, dropping empty values', () => {
+    const page: NotionPageFixture = {
+      id: 'case-messy-theme',
+      databaseId: TEAM_2026_FIXTURE_DATABASE_ID,
+      properties: { 行程類型: ['  family ', 'family', '', '  ', 'elephant'] },
+    }
+    const record = notionPageToRagRecord(page, { sourceTable: 'team_2026' })
+    expect(record.facts.themeHints).toEqual(['family', 'elephant'])
+  })
 })
 
 // ---------------------------------------------------------------------------

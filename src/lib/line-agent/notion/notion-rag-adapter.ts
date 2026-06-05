@@ -67,10 +67,21 @@ function asNumberArray(v: unknown): number[] | undefined {
   return nums.length > 0 ? nums : undefined
 }
 
-/** One-element hint array from a single area / theme string (empty → undefined). */
+/**
+ * Hint array from a Notion property — accepts a single string (select / text)
+ * OR a string[] (multi_select). Trims, drops empties, dedupes while preserving
+ * first-seen order. Empty result → undefined (keeps facts free of empty slots).
+ */
 function asHints(v: unknown): string[] | undefined {
-  const s = asString(v)
-  return s ? [s] : undefined
+  const raw = Array.isArray(v) ? v : [v]
+  const hints: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (trimmed.length === 0 || hints.includes(trimmed)) continue
+    hints.push(trimmed)
+  }
+  return hints.length > 0 ? hints : undefined
 }
 
 /** Set a key only when the value is defined — keeps facts free of empty slots. */
