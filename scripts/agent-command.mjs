@@ -69,8 +69,11 @@ export function parseAgentCommandArgs(args) {
   if (command === 'inbox' || command === '/inbox') {
     return { commandText: 'inbox' }
   }
+  if (command === 'notion-rag-dry-run' || command === '/notion-rag-dry-run') {
+    return { commandText: 'notion-rag-dry-run' }
+  }
 
-  throw new Error('目前支援：inbox 或 /inbox')
+  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run')
 }
 
 export function readDotEnvValue(dotenvText, key) {
@@ -150,8 +153,135 @@ function formatReminderFlag(reminder) {
   return `${icon}${label}${age}`.trim()
 }
 
+// --- notion-rag-dry-run (operator-only, offline) ----------------------------
+// This command runs the Notion RAG traverse *dry-run* report from the operator
+// CLI. It never hits a real Notion API and never goes through the live HTTP
+// path. The report it formats is a PROJECTION: it may surface only status /
+// counts / issue codes — never a db id, token, notion.so url, customer PII,
+// cost, or profit. See src/lib/line-agent/notion/notion-rag-traverse.ts.
+
+// De-identified source-table labels (mirror notion-rag-config KNOWN_SOURCES).
+const NOTION_RAG_SOURCE_LABELS = {
+  private_2025: '私帳 2025',
+  private_2026: '私帳 2026',
+  team_2026: '團隊 2026',
+}
+
+const NOTION_RAG_SOURCE_STATUS_LABELS = {
+  loaded: '已載入',
+  skipped: '略過',
+  error: '失敗',
+}
+
+// Issue / error CODES are operator-safe by contract — surface them verbatim with
+// a Traditional Chinese gloss. `client_not_wired` is CLI-level (this cut wires no
+// real @notionhq/client yet); the rest come from the resolver / loader.
+const NOTION_RAG_CODE_LABELS = {
+  missing_database_id: '缺少資料庫 ID',
+  unknown_active_source: '未知來源設定',
+  client_error: 'Notion 連線失敗',
+  client_not_wired: '尚未接上真實 Notion client',
+}
+
+/**
+ * Disabled gate — mirrors resolveNotionRagConfig: AI_AGENT_NOTION_RAG_ENABLED
+ * must be exactly "true" (trimmed). notion-rag-config.ts is the source of truth.
+ */
+export function isNotionRagEnabled(env) {
+  return String(env?.AI_AGENT_NOTION_RAG_ENABLED ?? '').trim() === 'true'
+}
+
+/** Format a NotionRagTraverseReport into a Traditional Chinese operator summary. */
+export function formatNotionRagTraverseReport(report) {
+  const index = report?.index ?? {}
+  const totalRecords = index.totalRecords ?? 0
+  const issues = Array.isArray(report?.issues) ? report.issues : []
+
+  if (report?.status === 'skipped') {
+    return [
+      'Notion RAG Dry-run · 已略過',
+      '（AI_AGENT_NOTION_RAG_ENABLED 未開啟，未連線 Notion）',
+      `總筆數：${totalRecords}`,
+    ].join('\n')
+  }
+
+  if (report?.status === 'error') {
+    const lines = ['Notion RAG Dry-run · 失敗']
+    if (report.errorCode) {
+      lines.push(`錯誤碼：${report.errorCode}（${codeLabel(report.errorCode)}）`)
+    }
+    if (issues.length > 0) {
+      lines.push(`議題：${issues.map((code) => `${code}（${codeLabel(code)}）`).join('、')}`)
+    }
+    return lines.join('\n')
+  }
+
+  // ok
+  const lines = ['Notion RAG Dry-run · 完成', `總筆數：${totalRecords}`, '來源：']
+  for (const source of report?.sources ?? []) {
+    const label = NOTION_RAG_SOURCE_LABELS[source.sourceTable] ?? source.sourceTable
+    const statusLabel = NOTION_RAG_SOURCE_STATUS_LABELS[source.status] ?? source.status
+    lines.push(
+      `  · ${label}：頁 ${source.pageCount ?? 0} / 筆 ${source.recordCount ?? 0}（${statusLabel}）`
+    )
+  }
+  lines.push(`區域 token：${index.areaTokenCount ?? 0} · 主題 token：${index.themeTokenCount ?? 0}`)
+  if (issues.length > 0) {
+    lines.push(`議題：${issues.map((code) => `${code}（${codeLabel(code)}）`).join('、')}`)
+  }
+  return lines.join('\n')
+}
+
+function codeLabel(code) {
+  return NOTION_RAG_CODE_LABELS[code] ?? code
+}
+
+/** Zero-count index shape used by the skipped / not-wired projections. */
+function emptyNotionRagIndexSummary() {
+  return { totalRecords: 0, sourceCounts: {}, areaTokenCount: 0, themeTokenCount: 0 }
+}
+
+/**
+ * Run the notion-rag-dry-run command offline. The gate is checked first; a
+ * disabled gate short-circuits to a skipped report WITHOUT touching the client.
+ * When enabled, a real Notion client must be injected — this cut wires none, so
+ * the default path surfaces a safe `client_not_wired` error. `runDryRun` is
+ * injectable so the next cut can bridge the (TypeScript) traverse without this
+ * plain-JS CLI importing it directly.
+ */
+export async function runNotionRagDryRunCommand(options = {}) {
+  const env = options.env ?? process.env
+
+  if (!isNotionRagEnabled(env)) {
+    return formatNotionRagTraverseReport({
+      status: 'skipped',
+      sources: [],
+      index: emptyNotionRagIndexSummary(),
+      issues: [],
+    })
+  }
+
+  const client = options.client ?? null
+  const runDryRun = options.runDryRun ?? null
+  if (!client || !runDryRun) {
+    return formatNotionRagTraverseReport({
+      status: 'error',
+      sources: [],
+      index: emptyNotionRagIndexSummary(),
+      issues: ['client_not_wired'],
+      errorCode: 'client_not_wired',
+    })
+  }
+
+  const report = await runDryRun(env, client)
+  return formatNotionRagTraverseReport(report)
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText } = parseAgentCommandArgs(args)
+  if (commandText === 'notion-rag-dry-run') {
+    return runNotionRagDryRunCommand({ env: options.env ?? process.env })
+  }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
     options.secret ??
