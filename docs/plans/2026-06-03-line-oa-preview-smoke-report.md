@@ -121,3 +121,8 @@ Live Preview smoke:
 ## Bottom line
 
 Code-level contracts for the webhook, the command auth boundary, the dry-run quote flow, and the no-Sanity-import / no-auto-reply boundaries all **pass**. Vercel Preview build, live `/api/agent/commands` smoke, and real LINE OA private-message webhook smoke now also **pass**. Upstash KV is configured and PING-verified. Remaining live coverage is the partner-group route after `LINE_PARTNER_GROUP_ID` is captured and configured. The write-token gate remains closed.
+
+## 2026-06-05 — Anthropic responder + Chiangway vehicle hard-rule smoke
+
+- Preview Anthropic 實機回覆已通過清微旅行車型硬規則（小轎車/Toyota Commuter 10 人座 Van/6 人包車判斷/泛稱禁用/機場行李提醒）。**PASS**
+- 後續 prompt polish（車型名稱統一一律「Toyota Commuter 10 人座 Van」、不承諾 Hiace/Commuter 指定、Hiace 只解讀為想要廂型車；預算不預設每次問）已加 guardrail + tripwire 測試，`src/lib/line-agent` 525/525 綠。
