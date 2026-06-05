@@ -194,3 +194,50 @@ export async function buildNotionRagIndex(
 - `markdown_template` corpus merge.
 - Wiring `resolveNotionRagConfig` into the live request path (the resolver itself is done — see above).
 - Any production enablement / operator traverse job scheduling.
+
+## Dry-run traverse entry (DONE — commit `84c0a6f`)
+
+Operator-only glue that turns env + an injected client into one operator-safe
+summary. It owns NO new logic — it composes the two already-green units and
+projects their result.
+
+### Function
+```ts
+export async function runNotionRagTraverseDryRun(
+  env: Record<string, string | undefined>,
+  client: NotionRagClient,
+): Promise<NotionRagTraverseReport>
+```
+
+### Pipeline
+1. `resolveNotionRagConfig(env)` → `{ config, issues }`
+2. `buildNotionRagIndex(config, client)` → `NotionRagBuildResult`
+3. project into an operator-safe report (counts + enum source tables + codes)
+
+### Report — contains ONLY
+- `status`: `skipped` | `ok` | `error`
+- `sources[]` (source summaries): `sourceTable` / `status` / `pageCount` / `recordCount`
+- `index` (counts): `totalRecords` / `sourceCounts` (records per source table) /
+  `areaTokenCount` / `themeTokenCount`
+- `issues[]` + `errorCode`: config-resolution + build issue/error **codes** only
+
+### Report — NEVER contains
+- token
+- database id
+- notion.so URL
+- customer PII
+- cost / profit
+
+### Boundaries
+Writes nothing, caches nothing, schedules nothing, calls no real API, does not
+touch the live request path. The disabled gate and the missing-id gate both
+short-circuit before any client call (guaranteed by `buildNotionRagIndex`). Pure
+dry-run return object. Tests: 6/6 green; full line-agent suite 609/609.
+
+## Deferred (still NOT done)
+
+- `scripts/agent-command.mjs` operator command wiring.
+- `package.json` script entry for the dry-run traverse.
+- Production SDK instantiation + env token wiring (real `@notionhq/client`).
+- Live request-path integration.
+- Traverse job scheduling / cache persistence.
