@@ -275,3 +275,136 @@ export function toPartnerSafeView(record: RagIndexRecord): RagPartnerSafeView {
     sourceTables: record.identity.sourceTables,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Fixture-backed searchable index (v1)
+// ---------------------------------------------------------------------------
+//
+// buildRagIndex runs dedupe/merge once, then materializes lookup maps over the
+// surviving records. queryRagIndex applies deterministic, EXACT filters (no
+// fuzzy, no weighted scorer) and applies only the light ordering the spec
+// allows: source priority first, then "more matched dimensions first".
+//
+// byCaseKey values are arrays because an independent corpus twin (private_2025
+// / markdown_template) can share a fingerprint with a 2026 case yet must stay a
+// separate record — so one resolved key can legitimately hold two records.
+
+export interface RagIndex {
+  /** Deduped/merged records in dedupe output order. */
+  records: RagIndexRecord[]
+  byCaseKey: Map<string, RagIndexRecord[]>
+  bySourceTable: Map<RagSourceTable, RagIndexRecord[]>
+  /** Normalized area token → records. */
+  byArea: Map<string, RagIndexRecord[]>
+  /** Normalized theme token → records. */
+  byTheme: Map<string, RagIndexRecord[]>
+}
+
+export interface RagIndexQuery {
+  /** Descriptive: at least one of area / themes must hit when either is given. */
+  area?: string
+  themes?: string[]
+  /** Structural: exact equality required when given. */
+  days?: number
+  nights?: number
+  adults?: number
+  children?: number
+  sourceTable?: RagSourceTable
+}
+
+function pushRecord<K>(map: Map<K, RagIndexRecord[]>, key: K, record: RagIndexRecord): void {
+  const bucket = map.get(key)
+  if (bucket) bucket.push(record)
+  else map.set(key, [record])
+}
+
+/** Normalized, de-duplicated tokens for a hint array (empty tokens dropped). */
+function hintTokens(values: string[] | undefined): string[] {
+  if (!values) return []
+  return uniq(values.map(normalizeText).filter((t) => t.length > 0))
+}
+
+/**
+ * Build a searchable index from raw RagIndexRecord[]. Dedupe/merge is applied
+ * first; the maps then index the surviving records by stable key, source table,
+ * and normalized area / theme tokens.
+ */
+export function buildRagIndex(records: RagIndexRecord[]): RagIndex {
+  const deduped = dedupeCaseRecords(records)
+  const index: RagIndex = {
+    records: deduped,
+    byCaseKey: new Map(),
+    bySourceTable: new Map(),
+    byArea: new Map(),
+    byTheme: new Map(),
+  }
+
+  for (const record of deduped) {
+    pushRecord(index.byCaseKey, resolveCaseKey(record), record)
+    for (const table of uniq(record.identity.sourceTables)) {
+      pushRecord(index.bySourceTable, table, record)
+    }
+    for (const token of hintTokens(record.facts.areaHints)) {
+      pushRecord(index.byArea, token, record)
+    }
+    for (const token of hintTokens(record.facts.themeHints)) {
+      pushRecord(index.byTheme, token, record)
+    }
+  }
+
+  return index
+}
+
+function matchesStructural(record: RagIndexRecord, query: RagIndexQuery): boolean {
+  if (query.sourceTable && !record.identity.sourceTables.includes(query.sourceTable)) return false
+  if (query.days !== undefined && record.facts.days !== query.days) return false
+  if (query.nights !== undefined && record.facts.nights !== query.nights) return false
+  if (query.adults !== undefined && record.facts.adults !== query.adults) return false
+  if (query.children !== undefined && record.facts.children !== query.children) return false
+  return true
+}
+
+/** Stable, deterministic tiebreak so equal-rank/equal-match results never reorder. */
+function tiebreakKey(record: RagIndexRecord): string {
+  return [
+    resolveCaseKey(record),
+    record.fingerprint,
+    [...record.identity.sourceTables].sort().join('+'),
+  ].join('|')
+}
+
+/**
+ * Query the index with deterministic filters. Structural dimensions
+ * (sourceTable / days / nights / adults / children) must match exactly when
+ * given. Descriptive dimensions (area / themes) are a candidate gate: when
+ * either is provided a record must hit at least one. Results are ordered by
+ * source priority, then by number of matched descriptive dimensions, then by a
+ * stable key — never by a weighted score.
+ */
+export function queryRagIndex(index: RagIndex, query: RagIndexQuery): RagIndexRecord[] {
+  const queryArea = query.area ? normalizeText(query.area) : undefined
+  const queryThemes = hintTokens(query.themes)
+  const hasDescriptive = queryArea !== undefined || queryThemes.length > 0
+
+  const scored: Array<{ record: RagIndexRecord; matched: number }> = []
+  for (const record of index.records) {
+    if (!matchesStructural(record, query)) continue
+
+    const recAreas = new Set(hintTokens(record.facts.areaHints))
+    const recThemes = new Set(hintTokens(record.facts.themeHints))
+    const areaHit = queryArea !== undefined && recAreas.has(queryArea)
+    const themeHits = queryThemes.filter((t) => recThemes.has(t)).length
+
+    if (hasDescriptive && !areaHit && themeHits === 0) continue
+    scored.push({ record, matched: (areaHit ? 1 : 0) + themeHits })
+  }
+
+  scored.sort((a, b) => {
+    const rank = recordRank(b.record) - recordRank(a.record)
+    if (rank !== 0) return rank
+    if (b.matched !== a.matched) return b.matched - a.matched
+    return tiebreakKey(a.record) < tiebreakKey(b.record) ? -1 : 1
+  })
+
+  return scored.map((s) => s.record)
+}
