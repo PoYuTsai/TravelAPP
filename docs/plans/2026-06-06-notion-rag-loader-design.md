@@ -12,13 +12,40 @@
 ### Not yet done (deferred slices)
 
 - Real `@notionhq/client` adapter implementing `NotionRagClient` (cursor/pagination loop lives there).
-- Env → `NotionRagConfig` resolver (env keys → typed config; keeps the builder pure of `process.env`).
 - Operator traverse cron / job scheduling.
 - `markdown_template` corpus merge (first-layer corpus, merged later by the index builder).
 - Live request-path integration (wiring the built index into the running agent).
 - Production enablement (`AI_AGENT_NOTION_RAG_ENABLED` stays off; no auto-launch).
 
-> Next code slice: **env → `NotionRagConfig` resolver** — still mock-first, does **not** call the real Notion API.
+## Implementation status (env → NotionRagConfig resolver)
+
+- **Implemented**: `resolveNotionRagConfig(env)` — pure env-record → `NotionRagConfigResolution`
+  (`{ config, issues }`), keeping `buildNotionRagIndex` free of `process.env`.
+- **File**: `src/lib/line-agent/notion/notion-rag-config.ts` (+ `__tests__/notion-rag-config.test.ts`).
+- **Commit**: `e8ab186` — `feat(line-agent): add Notion RAG env config resolver`.
+- **Still mock-first**: does **not** call the real Notion API; only shapes typed config.
+
+### Resolver behaviour (locked)
+
+1. **Disabled gate short-circuits parsing.** `AI_AGENT_NOTION_RAG_ENABLED` must be exactly
+   `"true"`; anything else ⇒ disabled, empty `activeSources`/`databaseIds`, **no** db-id parsing.
+2. **Explicit active-source list.** `AI_AGENT_NOTION_RAG_ACTIVE_SOURCES` is parsed explicitly
+   (trim + dedupe, first-seen order). Never "has an id ⇒ auto-enable".
+3. **Unknown source is not silently dropped.** An unrecognised token ⇒ `unknown_active_source`
+   issue (kept out of `activeSources`, but surfaced, not swallowed).
+4. **Known source missing its id stays active.** A known source whose db-id env key is
+   empty is **kept** in `activeSources` and reported as a `missing_database_id` issue, so the
+   loader still returns its structured `missing_database_id` error rather than silently skipping.
+5. **Leak guard.** Issue messages carry the source label only — never a token, db id, or Notion url.
+
+### Resolver deferred (not in this slice)
+
+- `.env.example` `AI_AGENT_NOTION_RAG_ACTIVE_SOURCES` placeholder — left untouched while the
+  Discord ai-room WIP holds `.env.example`; update once that lands.
+- Real `@notionhq/client` adapter implementing `NotionRagClient`.
+- Live request-path wiring / operator traverse job.
+
+> Next code slice: **real `@notionhq/client` adapter** (cursor/pagination loop) — still gated off.
 
 ## Goal
 
@@ -132,5 +159,5 @@ export async function buildNotionRagIndex(
 
 - Real `@notionhq/client` adapter implementing `NotionRagClient` (cursor loop lives there).
 - `markdown_template` corpus merge.
-- Env → `NotionRagConfig` resolver wiring into the live request path.
+- Wiring `resolveNotionRagConfig` into the live request path (the resolver itself is done — see above).
 - Any production enablement / operator traverse job scheduling.
