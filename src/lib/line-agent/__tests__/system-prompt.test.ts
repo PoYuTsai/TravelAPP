@@ -111,4 +111,21 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('不要每句都推給 Eric 拍板')
     expect(prompt).toContain('牽涉報價')
   })
+
+  // --- 清微旅行 vehicle-naming + budget polish（2026-06-05）---
+  // Preview 實機已過車型硬規則；微調兩點：車型名稱統一、預算不要預設每次問。
+
+  it('unifies vehicle naming to Toyota Commuter and rejects Hiace equivalence/choice', () => {
+    expect(prompt).toContain('統一稱「Toyota Commuter 10 人座 Van」')
+    expect(prompt).toContain('Hiace 與 Commuter 同級')
+    expect(prompt).toContain('不要承諾')
+    expect(prompt).toContain('指定 Hiace')
+    expect(prompt).toContain('只解讀為「想要廂型車 / Van」')
+  })
+
+  it('does not ask for budget by default; only when user raises price or trade-offs are needed', () => {
+    expect(prompt).toContain('不要預設每次都問預算區間')
+    expect(prompt).toContain('主動提到價格')
+    expect(prompt).toContain('方案取捨')
+  })
 })
