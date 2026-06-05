@@ -234,10 +234,41 @@ touch the live request path. The disabled gate and the missing-id gate both
 short-circuit before any client call (guaranteed by `buildNotionRagIndex`). Pure
 dry-run return object. Tests: 6/6 green; full line-agent suite 609/609.
 
+## Checkpoint — Operator command wrapper (offline) · commit `1191043`
+
+`scripts/agent-command.mjs` now exposes a **`notion-rag-dry-run`** operator
+command. Run it through the existing operator CLI passthrough:
+
+```
+npm run agent:command -- notion-rag-dry-run
+```
+
+### Behavior
+- Operator-only, fully **offline**: no real Notion API, no live HTTP path.
+- Disabled gate (`AI_AGENT_NOTION_RAG_ENABLED !== "true"`) → **skipped** summary,
+  client never called (gate short-circuits first).
+- Enabled but a real client is **not wired** → safe `client_not_wired` error.
+- Formats a safe Traditional Chinese operator report; the formatter surfaces only
+  `status` / counts / source labels / issue + error **codes**.
+- NEVER prints a token, database id, notion.so URL, customer PII, cost, or profit.
+
+### Technical constraint (why the bridge is deferred)
+- `scripts/agent-command.mjs` is a **plain Node `.mjs`** run directly by `node`
+  (the `agent:command` npm script); there is no build / tsx step.
+- A plain `.mjs` **cannot runtime-import the TypeScript traverse**
+  (`runNotionRagTraverseDryRun`), so this cut does NOT call it. The command path
+  is dependency-injectable (`runDryRun` / `client` options) so the next cut can
+  bridge the traverse without this CLI importing TS directly.
+- Resolver/loader logic is NOT duplicated: the CLI only mirrors the one-line
+  enabled gate (source of truth stays `notion-rag-config.ts`).
+
+Tests: 7 new (`agent-command-notion-rag.test.ts`); full line-agent suite 616/616.
+
 ## Deferred (still NOT done)
 
-- `scripts/agent-command.mjs` operator command wiring.
-- `package.json` script entry for the dry-run traverse.
+- mjs → TS traverse **bridge** (build / tsx strategy) so the CLI actually runs
+  `runNotionRagTraverseDryRun` and formats real `ok` / `error` reports.
 - Production SDK instantiation + env token wiring (real `@notionhq/client`).
 - Live request-path integration.
 - Traverse job scheduling / cache persistence.
+- `markdown_template` merge.
