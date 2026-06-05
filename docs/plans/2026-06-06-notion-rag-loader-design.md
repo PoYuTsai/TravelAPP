@@ -404,6 +404,44 @@ of `runNotionRagTraverseDryRun` and a real `@notionhq/client` wrapped by
 CONTRACT and the command resolution order are both frozen; only the default
 factory bodies change.
 
+## Operator runbook — real-runtime env checklist (still not-wired) · 2026-06-06
+
+What an operator MUST set to attempt the `notion-rag-dry-run` real runtime, and
+why it currently still stops at `client_not_wired`. This is a checklist only —
+no real token / db id lives in the repo, and production default factories return
+`null`, so the command reports `client_not_wired` until the real factories land.
+
+### Required env (real runtime)
+| Env | Value / shape | Role |
+| --- | --- | --- |
+| `AI_AGENT_NOTION_RAG_ENABLED` | `true` (exact, trimmed) | Master gate; anything else → `skipped`. |
+| `AI_AGENT_NOTION_RAG_ACTIVE_SOURCES` | `private_2025,private_2026,team_2026` | Which corpora to traverse (comma list). |
+| `AI_AGENT_NOTION_RAG_RUNTIME` | `real` (exact, trimmed) | Runtime gate; non-`real` → loader stays not-wired, factories never called. |
+| `NOTION_TOKEN` | Notion integration secret | Required for real wiring; missing → safe not-wired (client factory NOT called). |
+| `NOTION_PRIVATE_2025_DATABASE_ID` | 32-hex db id | Source `private_2025`. |
+| `NOTION_PRIVATE_2026_DATABASE_ID` | 32-hex db id | Source `private_2026`. |
+| `NOTION_TEAM_2026_DATABASE_ID` | 32-hex db id | Source `team_2026`. |
+
+### Source semantics
+- `private_2025` — **frozen historical** corpus (read-only reference, no new writes).
+- `private_2026` — **active private** corpus (current bookings / cases).
+- `team_2026` — duplicate **subset** of the above; **lower source-priority** in
+  dedupe so it never shadows the private corpora.
+
+### Current state (why it still says `client_not_wired`)
+Even with every env above set correctly, the PRODUCTION default factories
+(`notWiredImportTraverse` / `notWiredCreateClient`) return `null`, so the loader
+yields `{ runDryRun: null, client: null }` and the command projects
+`client_not_wired`. This is by design for this cut — the env is the only missing
+piece a future knife needs; the wiring SHAPE is already proven by injected fakes.
+
+### Pre-flight before real wiring lands
+- **Never** commit a real `NOTION_TOKEN` or real database ids to the repo — set
+  them only in the operator's local/`.env.local` or the deploy env.
+- **Invite the Notion integration** to all three databases first (private_2025,
+  private_2026, team_2026) — an un-invited integration returns empty/403 even
+  with a valid token.
+
 ## Deferred (still NOT done)
 
 - Real runtime wiring inside `loadNotionRagDryRunRuntime()` (build the real
