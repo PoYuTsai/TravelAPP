@@ -19,6 +19,8 @@ import {
   parseAgentCommandArgs,
   runNotionRagDryRunCommand,
 } from '../../../../scripts/agent-command.mjs'
+import { runNotionRagTraverseDryRun } from '../notion/notion-rag-traverse'
+import type { NotionApiPage } from '../notion/page-flattener'
 
 // 32-hex Notion-database-id shape — must never echo back through the command.
 const DB_PRIVATE_2025 = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
@@ -144,5 +146,127 @@ describe('formatNotionRagTraverseReport', () => {
 
     expect(output).toContain('略過')
     expect(output).toContain('總筆數：0')
+  })
+})
+
+// --- bridge: JS command ←→ TS traverse --------------------------------------
+// The command's `runDryRun` option is the bridge seam: a plain-JS CLI cannot
+// import the TypeScript traverse directly, so it accepts the traverse function
+// shape `(env, client) => Promise<report>` by injection. These tests prove the
+// real `runNotionRagTraverseDryRun` plugs into that seam offline (mock client,
+// no real @notionhq/client, no live HTTP path) and that the command boundary
+// stays leak-proof even when an injected runDryRun throws raw.
+
+const CUSTOMER_NAME = '王先生'
+
+/** Spy whose listPages records db ids — mirrors the loader port. */
+function spyTraverseClient() {
+  const calls: string[] = []
+  return {
+    calls,
+    async listPages(databaseId: string): Promise<NotionApiPage[]> {
+      calls.push(databaseId)
+      return []
+    },
+  }
+}
+
+describe('runNotionRagDryRunCommand — injected runDryRun (bridge proof)', () => {
+  // 1) enabled + injected runDryRun → it is called with (env, client) and its
+  // report is formatted. Characterization of the existing injection seam.
+  test('enabled → calls injected runDryRun with env+client, formats its report', async () => {
+    const client = spyTraverseClient()
+    const seen: Array<{ env: unknown; client: unknown }> = []
+    const runDryRun = async (
+      env: Record<string, string | undefined>,
+      injectedClient: unknown
+    ) => {
+      seen.push({ env, client: injectedClient })
+      return {
+        status: 'ok' as const,
+        sources: [
+          { sourceTable: 'private_2025' as const, status: 'loaded' as const, pageCount: 2, recordCount: 5 },
+        ],
+        index: { totalRecords: 5, sourceCounts: { private_2025: 5 }, areaTokenCount: 3, themeTokenCount: 1 },
+        issues: [],
+      }
+    }
+
+    const output = await runNotionRagDryRunCommand({
+      env: enabledEnv(),
+      client,
+      runDryRun,
+    })
+
+    expect(seen).toHaveLength(1)
+    expect(seen[0].client).toBe(client)
+    expect(output).toContain('完成')
+    expect(output).toContain('總筆數：5')
+    expect(output).toContain('私帳 2025')
+  })
+
+  // 2) the REAL TypeScript traverse plugs into the JS command seam, offline.
+  test('real runNotionRagTraverseDryRun bridges through the command, leak-free', async () => {
+    const fakePage: NotionApiPage = {
+      id: 'p1',
+      url: NOTION_LINK,
+      parent: { type: 'database_id', database_id: DB_PRIVATE_2025 },
+      properties: {
+        客戶名稱: { type: 'title', title: [{ plain_text: CUSTOMER_NAME }] },
+        日期: { type: 'date', date: { start: '2026-04-12', end: '2026-04-16' } },
+        城市區域: { type: 'select', select: { name: '清邁' } },
+        行程類型: { type: 'multi_select', multi_select: [{ name: '親子' }] },
+        成本: { type: 'number', number: 22000 },
+        分潤: { type: 'number', number: 8000 },
+      },
+    }
+    const client = {
+      calls: [] as string[],
+      async listPages(databaseId: string): Promise<NotionApiPage[]> {
+        this.calls.push(databaseId)
+        return databaseId === DB_PRIVATE_2025 ? [fakePage] : []
+      },
+    }
+
+    const output = await runNotionRagDryRunCommand({
+      env: enabledEnv(),
+      client,
+      runDryRun: runNotionRagTraverseDryRun,
+    })
+
+    expect(client.calls).toEqual([DB_PRIVATE_2025])
+    expect(output).toContain('完成')
+    expect(output).toContain('私帳 2025')
+    // Boundary stays leak-proof — nothing private survives to the operator text.
+    expect(output).not.toContain(DB_PRIVATE_2025)
+    expect(output).not.toContain(SECRET_TOKEN)
+    expect(output).not.toContain(NOTION_LINK)
+    expect(output).not.toContain('notion.so')
+    expect(output).not.toContain(CUSTOMER_NAME)
+    expect(output).not.toContain('22000')
+    expect(output).not.toContain('8000')
+  })
+
+  // 3) injected runDryRun THROWS raw (with a secret in the message) → command
+  // returns a sanitized client_error report, never propagating the raw throw.
+  test('injected runDryRun throws → sanitized client_error, no leak', async () => {
+    const client = spyTraverseClient()
+    const runDryRun = async () => {
+      throw new Error(`boom at ${NOTION_LINK} token=${SECRET_TOKEN} db=${DB_PRIVATE_2025}`)
+    }
+
+    const output = await runNotionRagDryRunCommand({
+      env: enabledEnv(),
+      client,
+      runDryRun,
+    })
+
+    expect(output).toContain('失敗')
+    expect(output).toContain('client_error')
+    expect(output).not.toContain(SECRET_TOKEN)
+    expect(output).not.toContain(DB_PRIVATE_2025)
+    expect(output).not.toContain(NOTION_LINK)
+    expect(output).not.toContain('notion.so')
+    expect(output).not.toContain('boom')
   })
 })

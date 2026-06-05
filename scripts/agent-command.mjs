@@ -273,7 +273,23 @@ export async function runNotionRagDryRunCommand(options = {}) {
     })
   }
 
-  const report = await runDryRun(env, client)
+  // The injected runDryRun is the bridge to the (TypeScript) traverse. The real
+  // traverse sanitizes its own client errors, but this CLI is the operator
+  // boundary: any injected runDryRun that throws raw (a future bridge, a partial
+  // wiring) must NOT propagate its message — it may carry a token, db id, or
+  // notion.so url. Collapse every throw to a safe client_error projection.
+  let report
+  try {
+    report = await runDryRun(env, client)
+  } catch {
+    report = {
+      status: 'error',
+      sources: [],
+      index: emptyNotionRagIndexSummary(),
+      issues: ['client_error'],
+      errorCode: 'client_error',
+    }
+  }
   return formatNotionRagTraverseReport(report)
 }
 
