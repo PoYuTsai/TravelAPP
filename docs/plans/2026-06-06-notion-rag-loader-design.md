@@ -356,6 +356,54 @@ Replace `loadNotionRagDryRunRuntime()`'s body to build the real
 `@notionhq/client` (already in `package.json`) + bridge the TS traverse, gated
 behind a real token. The command's resolution order is frozen.
 
+## Checkpoint — runtime loader wiring proof (injectable factories) · 2026-06-06
+
+The loader graduated from a constant not-wired stub to a **wiring machine** that
+ASSEMBLES `{ runDryRun, client }` from injectable factories — still mock-first,
+still no real token / Notion call / package change. The command's resolution
+order (above) is unchanged; only the loader body grew.
+
+### New loader contract
+`loadNotionRagDryRunRuntime({ env, importTraverse, createClient })`:
+1. **off-gate** — `AI_AGENT_NOTION_RAG_RUNTIME !== 'real'` → `{ null, null }`;
+   factories are NEVER called.
+2. **real gate, missing `NOTION_TOKEN`** → `{ null, null }` (safe not-wired);
+   the client factory is NOT called.
+3. **real gate + token** → `runDryRun = await importTraverse({env})`,
+   `client = await createClient({env, token})`; both present → returned, else
+   `{ null, null }`.
+4. **factory throw** → caught and re-thrown as a fixed, secret-free
+   `NotionRagRuntimeWiringError` (loader-owned leak guard, mirrors
+   `notion-rag-client.ts`); the command collapses it to `client_error`.
+
+### Two-layer fail-safe (why production still can't hit the API)
+- **Gate layer**: non-`real` short-circuits before any factory.
+- **Default-factory layer**: PRODUCTION defaults (`notWiredImportTraverse` /
+  `notWiredCreateClient`) return `null`, so even a real gate + token with no
+  injected factories yields not-wired — no live import, no SDK, no API. Tests
+  inject fakes to prove the wiring SHAPE; the real path stays not-wired.
+
+### What shipped
+- `scripts/notion-rag-dry-runner.mjs`: gate + token guard + injectable
+  `importTraverse`/`createClient` (default not-wired) + sanitized
+  `NotionRagRuntimeWiringError`.
+- `src/lib/line-agent/__tests__/notion-rag-dry-runner.test.ts` (new): 8 tests —
+  default not-wired, off-gate factories-never-called, real-mode fake-factory
+  assembly, missing-token safe not-wired, real-gate default-factory not-wired,
+  sanitized factory throw (no token/db/url), command integration (ok report +
+  client_error projection).
+- Verification: targeted **8/8**; full line-agent suite **632/632 green**.
+- Constraints honored: no `package.json`/`package-lock`/`.env*`/README change,
+  no real `@notionhq/client`, no real API, no live path, no cache/scheduler,
+  Discord WIP untouched.
+
+### Next knife (not started)
+Replace the two `notWired*` default factories with real ones — a tsx/dist import
+of `runNotionRagTraverseDryRun` and a real `@notionhq/client` wrapped by
+`createNotionRagClient` — gated behind the same `real` env + token. The loader
+CONTRACT and the command resolution order are both frozen; only the default
+factory bodies change.
+
 ## Deferred (still NOT done)
 
 - Real runtime wiring inside `loadNotionRagDryRunRuntime()` (build the real
