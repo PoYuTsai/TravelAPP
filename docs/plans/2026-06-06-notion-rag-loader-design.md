@@ -40,12 +40,45 @@
 
 ### Resolver deferred (not in this slice)
 
-- `.env.example` `AI_AGENT_NOTION_RAG_ACTIVE_SOURCES` placeholder — left untouched while the
-  Discord ai-room WIP holds `.env.example`; update once that lands.
-- Real `@notionhq/client` adapter implementing `NotionRagClient`.
+- `.env.example` `AI_AGENT_NOTION_RAG_ACTIVE_SOURCES` placeholder — added after the
+  Discord ai-room WIP env block was merged into the same working copy.
 - Live request-path wiring / operator traverse job.
 
-> Next code slice: **real `@notionhq/client` adapter** (cursor/pagination loop) — still gated off.
+## Implementation status (real-shaped Notion SDK client adapter)
+
+- **Implemented**: `createNotionRagClient(sdk)` — wraps an **injected** Notion-like SDK
+  (`databases.query`) and implements the loader port
+  `NotionRagClient.listPages(databaseId): Promise<NotionApiPage[]>`.
+- **File**: `src/lib/line-agent/notion/notion-rag-client.ts`
+  (+ `__tests__/notion-rag-client.test.ts`).
+- **Commit**: `bd78574` — `feat(line-agent): add Notion SDK client adapter (cursor loop)`.
+- **Verification**: 6 TDD tests; full line-agent suite **603/603 green**.
+- **Still mock-first**: no real `@notionhq/client` import, no live API, no real db id.
+
+### Client adapter behaviour (locked)
+
+1. **Injected SDK only.** Wraps a Notion-like `{ databases: { query } }` port; the real
+   `@notionhq/client` `Client` is structurally compatible but is **never imported** here
+   (tests inject a trivial fake — no real API, no real db id).
+2. **Cursor loop lives in this layer.** Pages while `has_more` **AND** `next_cursor` are
+   present; `has_more` with a null `next_cursor` terminates (defensive). The orchestrator
+   never sees pagination.
+3. **Conservative result filtering.** Only page-like results (objects carrying a
+   `properties` record) flow on to `flattenNotionPage`; non-page results (incl. `null`,
+   strings, `{ object: 'data_source' }`) are dropped.
+4. **Sanitized errors.** Any SDK throw is re-surfaced as a fixed `NotionRagClientError`
+   (`code: 'notion_query_failed'`); the raw SDK error is swallowed.
+5. **Leak guard.** The thrown error's message/stack **never** carries a token, database
+   id, or `notion.so` url.
+
+### Client adapter deferred (not in this slice)
+
+- Real production SDK instantiation / env token wiring (`new Client({ auth })`).
+- Live request-path wiring (built index into the running agent).
+- Operator traverse cron / job scheduling.
+- `markdown_template` corpus merge (first-layer corpus, merged by the index builder).
+
+> Next code slice: **live request-path wiring** or **operator traverse job** — both still gated off.
 
 ## Goal
 
