@@ -270,3 +270,105 @@ describe('runNotionRagDryRunCommand — injected runDryRun (bridge proof)', () =
     expect(output).not.toContain('boom')
   })
 })
+
+// --- runtime loader: pluggable real-runner entry -----------------------------
+// When the command is enabled and NO runner is injected, it falls back to a
+// runtime loader: `loadRuntime({ env }) → { runDryRun, client }`. This is the
+// seam where a future knife wires the real @notionhq/client + TS traverse. For
+// now the default loader is mock-first (not wired). Disabled never loads; loader
+// throws collapse to a sanitized client_error; an empty/partial runtime stays a
+// safe client_not_wired. The loader boundary must leak no token/db id/url.
+
+const OK_REPORT = {
+  status: 'ok' as const,
+  sources: [
+    { sourceTable: 'private_2025' as const, status: 'loaded' as const, pageCount: 1, recordCount: 2 },
+  ],
+  index: { totalRecords: 2, sourceCounts: { private_2025: 2 }, areaTokenCount: 1, themeTokenCount: 1 },
+  issues: [],
+}
+
+/** Spy runtime loader: records each call's ctx; returns (or throws) `runtime`. */
+function spyRuntimeLoader(runtime: unknown | (() => unknown)) {
+  const calls: unknown[] = []
+  return {
+    calls,
+    async load(ctx: unknown) {
+      calls.push(ctx)
+      return typeof runtime === 'function' ? (runtime as () => unknown)() : runtime
+    },
+  }
+}
+
+describe('runNotionRagDryRunCommand — runtime loader', () => {
+  // 1) disabled gate short-circuits before any runtime load.
+  test('disabled gate → runtime loader not called', async () => {
+    const loader = spyRuntimeLoader({ runDryRun: async () => OK_REPORT, client: spyTraverseClient() })
+    const output = await runNotionRagDryRunCommand({
+      env: { AI_AGENT_NOTION_RAG_ENABLED: 'false' },
+      loadRuntime: loader.load,
+    })
+
+    expect(output).toContain('略過')
+    expect(loader.calls).toHaveLength(0)
+  })
+
+  // 3) enabled + no injection → loader is called and its runDryRun/client used.
+  test('enabled + no injection → uses runtime loader runDryRun + client', async () => {
+    const client = spyTraverseClient()
+    const seen: Array<{ env: unknown; client: unknown }> = []
+    const runDryRun = async (env: Record<string, string | undefined>, injectedClient: unknown) => {
+      seen.push({ env, client: injectedClient })
+      return OK_REPORT
+    }
+    const loader = spyRuntimeLoader({ runDryRun, client })
+
+    const output = await runNotionRagDryRunCommand({ env: enabledEnv(), loadRuntime: loader.load })
+
+    expect(loader.calls).toHaveLength(1)
+    expect(seen).toHaveLength(1)
+    expect(seen[0].client).toBe(client)
+    expect(output).toContain('完成')
+    expect(output).toContain('總筆數：2')
+  })
+
+  // 4) loader throws raw (secret in message) → sanitized client_error, no leak.
+  test('runtime loader throws → sanitized client_error, no leak', async () => {
+    const loader = spyRuntimeLoader(() => {
+      throw new Error(`load fail at ${NOTION_LINK} token=${SECRET_TOKEN} db=${DB_PRIVATE_2025}`)
+    })
+
+    const output = await runNotionRagDryRunCommand({ env: enabledEnv(), loadRuntime: loader.load })
+
+    expect(output).toContain('失敗')
+    expect(output).toContain('client_error')
+    expect(output).not.toContain(SECRET_TOKEN)
+    expect(output).not.toContain(DB_PRIVATE_2025)
+    expect(output).not.toContain(NOTION_LINK)
+    expect(output).not.toContain('notion.so')
+  })
+
+  // 5) loader returns empty / missing runDryRun → safe client_not_wired.
+  test('runtime loader returns missing runDryRun → client_not_wired, client untouched', async () => {
+    const client = spyTraverseClient()
+    const loader = spyRuntimeLoader({ runDryRun: null, client })
+
+    const output = await runNotionRagDryRunCommand({ env: enabledEnv(), loadRuntime: loader.load })
+
+    expect(loader.calls).toHaveLength(1)
+    expect(output).toContain('失敗')
+    expect(output).toContain('client_not_wired')
+    expect(client.calls).toHaveLength(0)
+  })
+
+  // 6) default runtime (not wired) → client_not_wired, no secret-shaped env leak.
+  test('default runtime not wired → client_not_wired, no secret-shaped env leak', async () => {
+    const output = await runNotionRagDryRunCommand({
+      env: enabledEnv({ AI_AGENT_INTERNAL_SECRET: SECRET_TOKEN }),
+    })
+
+    expect(output).toContain('client_not_wired')
+    expect(output).not.toContain(SECRET_TOKEN)
+    expect(output).not.toContain(DB_PRIVATE_2025)
+  })
+})

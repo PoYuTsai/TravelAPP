@@ -4,6 +4,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { loadNotionRagDryRunRuntime } from './notion-rag-dry-runner.mjs'
+
 const DEFAULT_ORIGIN = 'https://chiangway-travel.com'
 const DOTENV_PATH = '.env.local'
 
@@ -241,13 +243,31 @@ function emptyNotionRagIndexSummary() {
   return { totalRecords: 0, sourceCounts: {}, areaTokenCount: 0, themeTokenCount: 0 }
 }
 
+/** Build the safe `client_not_wired` / `client_error` error projection. */
+function notWiredReport(errorCode) {
+  return {
+    status: 'error',
+    sources: [],
+    index: emptyNotionRagIndexSummary(),
+    issues: [errorCode],
+    errorCode,
+  }
+}
+
 /**
- * Run the notion-rag-dry-run command offline. The gate is checked first; a
- * disabled gate short-circuits to a skipped report WITHOUT touching the client.
- * When enabled, a real Notion client must be injected — this cut wires none, so
- * the default path surfaces a safe `client_not_wired` error. `runDryRun` is
- * injectable so the next cut can bridge the (TypeScript) traverse without this
- * plain-JS CLI importing it directly.
+ * Run the notion-rag-dry-run command offline. Runner resolution is layered:
+ *
+ *   1. disabled gate → skipped report, NOTHING loaded or called.
+ *   2. injected `runDryRun` + `client` (tests / explicit wiring) → use them.
+ *   3. otherwise call the runtime loader `loadRuntime({ env }) → { runDryRun,
+ *      client }` — the pluggable seam where a future cut wires the real
+ *      @notionhq/client + the (TypeScript) traverse. The default loader is
+ *      mock-first (not wired).
+ *   4. a missing runDryRun OR client after loading → safe `client_not_wired`.
+ *
+ * This CLI is the operator boundary: a loader throw OR a runner throw may carry
+ * a token / db id / notion.so url, so both collapse to a sanitized `client_error`
+ * projection rather than propagating a raw message.
  */
 export async function runNotionRagDryRunCommand(options = {}) {
   const env = options.env ?? process.env
@@ -261,34 +281,33 @@ export async function runNotionRagDryRunCommand(options = {}) {
     })
   }
 
-  const client = options.client ?? null
-  const runDryRun = options.runDryRun ?? null
-  if (!client || !runDryRun) {
-    return formatNotionRagTraverseReport({
-      status: 'error',
-      sources: [],
-      index: emptyNotionRagIndexSummary(),
-      issues: ['client_not_wired'],
-      errorCode: 'client_not_wired',
-    })
+  let runDryRun = options.runDryRun ?? null
+  let client = options.client ?? null
+
+  // Only reach for the runtime loader when an explicit runner was not injected.
+  if (!runDryRun || !client) {
+    const loadRuntime = options.loadRuntime ?? loadNotionRagDryRunRuntime
+    let runtime
+    try {
+      runtime = await loadRuntime({ env })
+    } catch {
+      return formatNotionRagTraverseReport(notWiredReport('client_error'))
+    }
+    runDryRun = runDryRun ?? runtime?.runDryRun ?? null
+    client = client ?? runtime?.client ?? null
   }
 
-  // The injected runDryRun is the bridge to the (TypeScript) traverse. The real
-  // traverse sanitizes its own client errors, but this CLI is the operator
-  // boundary: any injected runDryRun that throws raw (a future bridge, a partial
-  // wiring) must NOT propagate its message — it may carry a token, db id, or
-  // notion.so url. Collapse every throw to a safe client_error projection.
+  if (!runDryRun || !client) {
+    return formatNotionRagTraverseReport(notWiredReport('client_not_wired'))
+  }
+
+  // Collapse any runner throw (the traverse self-sanitizes, but a future bridge
+  // might not) to a safe client_error — never propagate a raw, leak-prone message.
   let report
   try {
     report = await runDryRun(env, client)
   } catch {
-    report = {
-      status: 'error',
-      sources: [],
-      index: emptyNotionRagIndexSummary(),
-      issues: ['client_error'],
-      errorCode: 'client_error',
-    }
+    report = notWiredReport('client_error')
   }
   return formatNotionRagTraverseReport(report)
 }
