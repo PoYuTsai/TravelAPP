@@ -4,7 +4,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadNotionRagDryRunRuntime } from './notion-rag-dry-runner.mjs'
+import {
+  loadNotionRagDryRunRuntime,
+  loadNotionRagSearchRuntime,
+} from './notion-rag-dry-runner.mjs'
 
 const DEFAULT_ORIGIN = 'https://chiangway-travel.com'
 const DOTENV_PATH = '.env.local'
@@ -74,8 +77,13 @@ export function parseAgentCommandArgs(args) {
   if (command === 'notion-rag-dry-run' || command === '/notion-rag-dry-run') {
     return { commandText: 'notion-rag-dry-run' }
   }
+  if (command === 'notion-rag-search' || command === '/notion-rag-search') {
+    // The remaining args form the free-text query (operator may or may not quote it).
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'notion-rag-search', query }
+  }
 
-  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run')
+  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search')
 }
 
 export function readDotEnvValue(dotenvText, key) {
@@ -312,10 +320,150 @@ export async function runNotionRagDryRunCommand(options = {}) {
   return formatNotionRagTraverseReport(report)
 }
 
+// ---------------------------------------------------------------------------
+// notion-rag-search — operator-only retrieval PREVIEW (masked by contract)
+// ---------------------------------------------------------------------------
+
+/** Render an OperatorSafeCaseSummary line — reads ONLY whitelisted safe fields. */
+function formatSafeCaseLine(rank, c) {
+  const duration =
+    c?.days != null ? `${c.days}天${c?.nights != null ? c.nights + '夜' : ''}` : '天數-'
+  const area = Array.isArray(c?.areaHints) && c.areaHints.length > 0 ? c.areaHints.join('/') : '-'
+  const theme = Array.isArray(c?.themeHints) && c.themeHints.length > 0 ? c.themeHints.join('/') : '-'
+  const party = c?.partySize != null ? `${c.partySize}人` : '人數-'
+  const vehicle = c?.vehicleType ? c.vehicleType : '車型-'
+  const snippet = c?.itinerarySnippetPreview ? `行程：${c.itinerarySnippetPreview}` : '行程：-'
+  return `  ${rank}. ${duration} · 區域 ${area} · 主題 ${theme} · ${party} · ${vehicle} · ${snippet}`
+}
+
+/**
+ * Format a NotionRagSearchReport into a Traditional Chinese operator summary.
+ * The `results` are already operator-safe summaries (no privateContext / PII),
+ * so this renderer is masked by construction: it reads only whitelisted fields.
+ */
+export function formatNotionRagSearchReport(report) {
+  const pq = report?.parsedQuery ?? { areas: [], themes: [] }
+  const areas = Array.isArray(pq.areas) && pq.areas.length > 0 ? pq.areas.join(', ') : '-'
+  const themes = Array.isArray(pq.themes) && pq.themes.length > 0 ? pq.themes.join(', ') : '-'
+  const party = pq.partySize != null ? `${pq.partySize}` : '-'
+  const tokenLine = `查詢 token：區域 [${areas}] · 主題 [${themes}] · 人數 ${party}`
+  const issues = Array.isArray(report?.issues) ? report.issues : []
+
+  if (report?.status === 'skipped') {
+    return [
+      'RAG 檢索預覽 · 已略過',
+      '（AI_AGENT_NOTION_RAG_ENABLED 未開啟，未連線 Notion）',
+    ].join('\n')
+  }
+
+  if (report?.status === 'error') {
+    const lines = ['RAG 檢索預覽 · 失敗']
+    if (report.errorCode) {
+      lines.push(`錯誤碼：${report.errorCode}（${codeLabel(report.errorCode)}）`)
+    }
+    if (issues.length > 0) {
+      lines.push(`議題：${issues.map((code) => `${code}（${codeLabel(code)}）`).join('、')}`)
+    }
+    return lines.join('\n')
+  }
+
+  const resultCount = report?.resultCount ?? 0
+  const results = Array.isArray(report?.results) ? report.results : []
+
+  if (resultCount === 0) {
+    return [
+      'RAG 檢索預覽 · 低信心（無足夠訊號或無命中）',
+      tokenLine,
+      `索引總筆數：${report?.totalRecords ?? 0}`,
+      '命中：0',
+    ].join('\n')
+  }
+
+  const lines = [
+    'RAG 檢索預覽 · 完成',
+    tokenLine,
+    `索引總筆數：${report?.totalRecords ?? 0}`,
+    `命中：${resultCount}（顯示前 ${results.length}）`,
+  ]
+  results.forEach((c, i) => lines.push(formatSafeCaseLine(i + 1, c)))
+  if (issues.length > 0) {
+    lines.push(`議題：${issues.map((code) => `${code}（${codeLabel(code)}）`).join('、')}`)
+  }
+  return lines.join('\n')
+}
+
+/**
+ * Run the notion-rag-search command offline. Mirrors runNotionRagDryRunCommand:
+ *   1. disabled gate → skipped, NOTHING loaded or read.
+ *   2. injected runSearch + client (tests / explicit wiring) → use them.
+ *   3. otherwise call the runtime loader loadNotionRagSearchRuntime.
+ *   4. missing runSearch OR client → safe client_not_wired.
+ * A loader throw OR a runner throw may carry a token / db id / notion.so url, so
+ * both collapse to a sanitized client_error projection — never a raw message.
+ */
+export async function runNotionRagSearchCommand(options = {}) {
+  const env = options.env ?? process.env
+  const query = options.query ?? ''
+
+  if (!isNotionRagEnabled(env)) {
+    return formatNotionRagSearchReport({
+      status: 'skipped',
+      parsedQuery: { areas: [], themes: [] },
+      totalRecords: 0,
+      resultCount: 0,
+      results: [],
+      issues: [],
+    })
+  }
+
+  let runSearch = options.runSearch ?? null
+  let client = options.client ?? null
+
+  if (!runSearch || !client) {
+    const loadRuntime = options.loadRuntime ?? loadNotionRagSearchRuntime
+    let runtime
+    try {
+      runtime = await loadRuntime({ env })
+    } catch {
+      return formatNotionRagSearchReport(searchErrorReport('client_error'))
+    }
+    runSearch = runSearch ?? runtime?.runSearch ?? null
+    client = client ?? runtime?.client ?? null
+  }
+
+  if (!runSearch || !client) {
+    return formatNotionRagSearchReport(searchErrorReport('client_not_wired'))
+  }
+
+  let report
+  try {
+    report = await runSearch(env, client, query)
+  } catch {
+    report = searchErrorReport('client_error')
+  }
+  return formatNotionRagSearchReport(report)
+}
+
+/** Build the safe client_not_wired / client_error error projection for search. */
+function searchErrorReport(errorCode) {
+  return {
+    status: 'error',
+    parsedQuery: { areas: [], themes: [] },
+    totalRecords: 0,
+    resultCount: 0,
+    results: [],
+    issues: [errorCode],
+    errorCode,
+  }
+}
+
 export async function runAgentCommand(args, options = {}) {
-  const { commandText } = parseAgentCommandArgs(args)
+  const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'notion-rag-dry-run') {
     return runNotionRagDryRunCommand({ env: options.env ?? process.env })
+  }
+  if (commandText === 'notion-rag-search') {
+    return runNotionRagSearchCommand({ env: options.env ?? process.env, query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

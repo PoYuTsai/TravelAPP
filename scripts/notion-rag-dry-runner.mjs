@@ -87,6 +87,24 @@ export async function importTraverseDefault(ctx = {}) {
 }
 
 /**
+ * PRODUCTION default factory for `importSearch` — GUARDED dynamic import of the
+ * TS operator search runtime (`runNotionRagSearch`). Same guard semantics as
+ * importTraverseDefault: resolves under a TS runtime (tsx), swallowed → null
+ * under plain node. Loading it touches no Notion API.
+ */
+export async function importSearchDefault(ctx = {}) {
+  const {
+    importModule = () => import('../src/lib/line-agent/notion/notion-rag-search.ts'),
+  } = ctx
+  try {
+    const mod = await importModule()
+    return mod?.runNotionRagSearch ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * PRODUCTION default factory for `createClient` — assembles a REAL Notion client:
  *   1. dynamic-import `@notionhq/client` for its `Client` constructor;
  *   2. dynamic-import the TS adapter `notion-rag-client.ts` for
@@ -162,4 +180,40 @@ export async function loadNotionRagDryRunRuntime(ctx = {}) {
     return { runDryRun: null, client: null }
   }
   return { runDryRun, client }
+}
+
+/**
+ * Assemble the operator search runtime — same gates and leak guard as the
+ * dry-run loader, but resolves `runNotionRagSearch` instead of the traverse.
+ * Off-gate / missing-token short-circuit BEFORE any factory runs.
+ */
+export async function loadNotionRagSearchRuntime(ctx = {}) {
+  const {
+    env = {},
+    importSearch = importSearchDefault,
+    createClient = createClientDefault,
+  } = ctx
+
+  if (!isRealRuntimeMode(env)) {
+    return { runSearch: null, client: null }
+  }
+
+  const token = readNotionToken(env)
+  if (!token) {
+    return { runSearch: null, client: null }
+  }
+
+  let runSearch
+  let client
+  try {
+    runSearch = await importSearch({ env })
+    client = await createClient({ env, token })
+  } catch {
+    throw new NotionRagRuntimeWiringError()
+  }
+
+  if (!runSearch || !client) {
+    return { runSearch: null, client: null }
+  }
+  return { runSearch, client }
 }
