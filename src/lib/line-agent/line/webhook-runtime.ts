@@ -32,6 +32,7 @@ import {
   type NotionRagAnswerSourceDeps,
 } from '@/lib/line-agent/partner-group/notion-rag-answer-source'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
+import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ensure-partner-rag-installed'
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
 
@@ -312,7 +313,19 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
       // Late-bound thunk: always calls the CURRENTLY registered source, so a test
       // injecting a fake via setPartnerRagAnswerSource is honoured even though
       // this dispatcher singleton was built earlier.
-      answerSource: (input) => getPartnerRagAnswerSource()(input),
+      //
+      // M3.2 decision C (rag-call-site-wiring-design §3): lazily install the real
+      // cached Notion source on the FIRST rag-eligible request. This thunk runs
+      // ONLY when `shouldUsePartnerRagDraft` already held (partner + botDirected +
+      // explicit intent + both gates on), so the structural gate guards the
+      // install — no extra env check here, and gate-off / OA / untagged / no-intent
+      // never reach this line. `ensure` is idempotent + single-flight; a timeout or
+      // installer error throws (NOT cached) and is converted by the rag responder's
+      // try/catch into the unavailable reply — never a fabricated draft.
+      answerSource: async (input) => {
+        await ensurePartnerRagAnswerSourceInstalled()
+        return getPartnerRagAnswerSource()(input)
+      },
     })
   }
   return _partnerGroupResponder
