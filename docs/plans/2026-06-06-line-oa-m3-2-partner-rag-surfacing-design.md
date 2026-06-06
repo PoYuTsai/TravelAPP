@@ -262,3 +262,36 @@ Still NOT done (future runtime slice, per §6/§7): wire the dispatcher into
 `webhook-runtime.getPartnerGroupResponder()`, a real retrieval+`composeAnswer`
 `answerSource`, cache/index reuse, and the actual LINE group attachment. The OA
 auto-reply ban (router B3) and `sendTarget` (B4) remain untouched.
+
+## Implementation status (M3.2 webhook-runtime wiring — commit `852b095`)
+
+RED-first wiring of the dispatcher into the live responder seam landed in
+`line/webhook-runtime.ts`, plus a `botDirected` threading in
+`commands/handlers.ts` + `commands/router.ts`. BOTH env gates remain **default
+off**; no production behavior is enabled and no real Notion is read.
+
+- `getPartnerGroupResponder()` now returns `createPartnerGroupResponderWithRagDraft`
+  over the M2 stub/anthropic `base`. The gate is read **per-respond**, so
+  always-wrapping is safe — gate-off collapses to `base` (zero Notion read), and
+  the OA plane can never satisfy `shouldUsePartnerRagDraft`.
+- New `set/getPartnerRagAnswerSource` seam, late-bound via a thunk
+  (`(input) => getPartnerRagAnswerSource()(input)`) so a test injects a fake after
+  the singleton is built. **Production default is not wired to Notion**: it
+  throws → `createRagPartnerGroupResponder` fails closed to
+  `PARTNER_RAG_UNAVAILABLE_REPLY` (§5). Flipping both gates on before the
+  retrieval slice lands therefore yields the honest unavailable reply, never a
+  fabricated draft, never a Notion call.
+- `botDirected` (mentionsBot OR quote-to-bot) is threaded router →
+  `handleRespondToPartnerGroup` → respond input so quote-to-bot reaches the rag
+  path without a re-tag. **No change** to `sendTarget` / action / OA auto-reply
+  ban (B3) / send gate (B4).
+
+10 wiring tests (gates-off base + source 0; gates-on rag; no-intent base;
+quote-to-bot end-to-end; OA+keyword no-reply; untagged no-reply; source-throw
+fail-closed; default not-wired fail-closed; sendTarget exactly-once). Full
+`line-agent` suite **793/793** green.
+
+Still NOT done (next knife): a real retrieval+`composeAnswer` `answerSource`
+(replacing the not-wired default), the §6 cost guard (cached index / operator
+trigger / scheduled build) BEFORE live group traffic, and flipping the env gates
+on as a deliberate op action.
