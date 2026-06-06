@@ -8,11 +8,17 @@
  *
  * The projection is OPERATOR-SAFE, a different (looser) cut than the
  * partner-safe view: the operator may see structural + descriptive facts
- * (days / nights / area / theme / partySize / vehicleType / a short itinerary
- * preview), but NEVER private context (cost / revenue / profit / private notes /
- * Notion url / database id) and NEVER raw record ids or PII. Because the summary
- * is built from a whitelist of `facts` fields only, it structurally cannot carry
- * any of that — a downstream formatter renders an already-safe object.
+ * (days / nights / area / theme / partySize / vehicleType), but NEVER private
+ * context (cost / revenue / profit / private notes / Notion url / database id)
+ * and NEVER raw record ids or PII. Because the summary is built from a whitelist
+ * of `facts` fields only, it structurally cannot carry any of that — a downstream
+ * formatter renders an already-safe object.
+ *
+ * GAP-1 (2026-06-06): the raw `itinerarySnippet` is free 行程框架 text and on real
+ * records carries customer names / flight numbers / phone / URL / amounts. A
+ * truncated preview of it was NOT safe to surface, so it is dropped from the
+ * operator output entirely. Structured facts already convey the "what activities"
+ * signal; re-introducing a snippet would require a dedicated sanitizer + fixtures.
  */
 
 import { parseRagQuery, retrieveRagCases } from './rag-query'
@@ -28,8 +34,13 @@ export interface OperatorSafeCaseSummary {
   themeHints: string[]
   partySize?: number
   vehicleType?: string
-  /** Truncated 行程框架 preview — structure only, never customer text fields. */
-  itinerarySnippetPreview?: string
+  /**
+   * GAP-1: intentionally absent. The 行程框架 free text leaks PII (names / flights /
+   * phone / URL / amounts), so no itinerary preview is surfaced. Kept as an
+   * optional `never` so any code that still references it is a type error rather
+   * than a silent re-leak.
+   */
+  itinerarySnippetPreview?: never
 }
 
 export interface NotionRagSearchParsedQuery {
@@ -48,25 +59,14 @@ export interface NotionRagSearchResult {
 }
 
 const DEFAULT_TOP_N = 5
-const DEFAULT_SNIPPET_CHARS = 60
-
-/** Truncate a snippet to a preview length, marking elision with an ellipsis. */
-function previewSnippet(text: string | undefined, maxChars: number): string | undefined {
-  if (!text) return undefined
-  const trimmed = text.trim()
-  if (trimmed.length === 0) return undefined
-  return trimmed.length > maxChars ? `${trimmed.slice(0, maxChars)}…` : trimmed
-}
 
 /**
- * Project an index record to an operator-safe summary. Reads ONLY `facts` —
- * privateContext and identity (raw record ids) are never touched, so nothing
- * private or identifying can survive into the output.
+ * Project an index record to an operator-safe summary. Reads ONLY a whitelist of
+ * structured `facts` — privateContext and identity (raw record ids) are never
+ * touched, and the free-text `itinerarySnippet` is deliberately NOT read (GAP-1),
+ * so nothing private, identifying, or free-text can survive into the output.
  */
-export function toOperatorSafeCaseSummary(
-  record: RagIndexRecord,
-  opts: { snippetPreviewChars?: number } = {}
-): OperatorSafeCaseSummary {
+export function toOperatorSafeCaseSummary(record: RagIndexRecord): OperatorSafeCaseSummary {
   const f = record.facts
   const summary: OperatorSafeCaseSummary = {
     areaHints: f.areaHints ?? [],
@@ -76,8 +76,6 @@ export function toOperatorSafeCaseSummary(
   if (f.nights !== undefined) summary.nights = f.nights
   if (f.partySize !== undefined) summary.partySize = f.partySize
   if (f.vehicleType !== undefined) summary.vehicleType = f.vehicleType
-  const preview = previewSnippet(f.itinerarySnippet, opts.snippetPreviewChars ?? DEFAULT_SNIPPET_CHARS)
-  if (preview !== undefined) summary.itinerarySnippetPreview = preview
   return summary
 }
 
@@ -89,7 +87,7 @@ export function toOperatorSafeCaseSummary(
 export function searchRagIndex(
   index: RagIndex,
   query: string,
-  opts: { topN?: number; snippetPreviewChars?: number } = {}
+  opts: { topN?: number } = {}
 ): NotionRagSearchResult {
   const parsed = parseRagQuery(query)
   const parsedQuery: NotionRagSearchParsedQuery = {
@@ -100,9 +98,7 @@ export function searchRagIndex(
 
   const hits = retrieveRagCases(index, query)
   const topN = opts.topN ?? DEFAULT_TOP_N
-  const results = hits
-    .slice(0, topN)
-    .map((r) => toOperatorSafeCaseSummary(r, { snippetPreviewChars: opts.snippetPreviewChars }))
+  const results = hits.slice(0, topN).map((r) => toOperatorSafeCaseSummary(r))
 
   return {
     status: results.length > 0 ? 'ok' : 'low_confidence',
@@ -141,7 +137,7 @@ export async function runNotionRagSearch(
   env: Record<string, string | undefined>,
   client: NotionRagClient,
   query: string,
-  opts: { topN?: number; snippetPreviewChars?: number } = {}
+  opts: { topN?: number } = {}
 ): Promise<NotionRagSearchReport> {
   const { config, issues: configIssues } = resolveNotionRagConfig(env)
   const issues = configIssues.map((i) => i.code)

@@ -324,7 +324,11 @@ export async function runNotionRagDryRunCommand(options = {}) {
 // notion-rag-search — operator-only retrieval PREVIEW (masked by contract)
 // ---------------------------------------------------------------------------
 
-/** Render an OperatorSafeCaseSummary line — reads ONLY whitelisted safe fields. */
+/**
+ * Render an OperatorSafeCaseSummary line — reads ONLY whitelisted safe fields.
+ * GAP-1: the raw 行程框架 snippet is NOT rendered; it is free text that leaks
+ * customer names / flight numbers / phone / URL / amounts. Structured facts only.
+ */
 function formatSafeCaseLine(rank, c) {
   const duration =
     c?.days != null ? `${c.days}天${c?.nights != null ? c.nights + '夜' : ''}` : '天數-'
@@ -332,8 +336,7 @@ function formatSafeCaseLine(rank, c) {
   const theme = Array.isArray(c?.themeHints) && c.themeHints.length > 0 ? c.themeHints.join('/') : '-'
   const party = c?.partySize != null ? `${c.partySize}人` : '人數-'
   const vehicle = c?.vehicleType ? c.vehicleType : '車型-'
-  const snippet = c?.itinerarySnippetPreview ? `行程：${c.itinerarySnippetPreview}` : '行程：-'
-  return `  ${rank}. ${duration} · 區域 ${area} · 主題 ${theme} · ${party} · ${vehicle} · ${snippet}`
+  return `  ${rank}. ${duration} · 區域 ${area} · 主題 ${theme} · ${party} · ${vehicle}`
 }
 
 /**

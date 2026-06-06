@@ -107,6 +107,27 @@ const leakyRecord = rec(
 )
 const leakyIndex = buildRagIndex([leakyRecord])
 
+// GAP-1: a record whose itinerarySnippet (free 行程框架 text) carries the kind of
+// PII real records do — customer name, flight numbers, phone, URL, amount. The
+// operator-safe projection must NOT surface any of this raw free text.
+const PII_NAME = '王小明'
+const PII_FLIGHTS = ['BR257', 'TG130', 'FD243']
+const PII_PHONE = '0912345678'
+const PII_URL = 'https://example.com/itinerary/abc'
+const PII_AMOUNT = '42000'
+const piiSnippetRecord = rec('pii-1', {
+  days: 3,
+  nights: 2,
+  partySize: 4,
+  vehicleType: 'Commuter',
+  itinerarySnippet:
+    `Day 1｜機場接機 ${PII_NAME}一家 (長榮 ${PII_FLIGHTS[0]} / ${PII_FLIGHTS[1]} / ${PII_FLIGHTS[2]}) ` +
+    `電話 ${PII_PHONE} 詳見 ${PII_URL} 訂金 ${PII_AMOUNT} 泰銖`,
+  areaHints: ['chiangmai'],
+  themeHints: ['elephant'],
+})
+const piiIndex = buildRagIndex([piiSnippetRecord])
+
 // ---------------------------------------------------------------------------
 // 0. arg parsing — the command takes a free-text query
 // ---------------------------------------------------------------------------
@@ -191,7 +212,8 @@ describe('operator-safe projection — no private leak', () => {
     // but it keeps the operator-usable safe facts
     expect(summary.areaHints).toEqual(['chiangmai'])
     expect(summary.partySize).toBe(4)
-    expect(summary.itinerarySnippetPreview).toContain('清邁古城')
+    // GAP-1: raw itinerary free text is no longer surfaced (see dedicated block)
+    expect(summary.itinerarySnippetPreview).toBeUndefined()
   })
 
   it('the rendered report carries none of the private fields', () => {
@@ -210,6 +232,67 @@ describe('operator-safe projection — no private leak', () => {
     expect(out).not.toContain('88000')
     expect(out).not.toContain('profitShare')
     expect(out).not.toContain('王小明')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4b. GAP-1 — itinerary free text is dropped from the operator-safe output
+// ---------------------------------------------------------------------------
+
+describe('operator-safe projection — itinerary snippet dropped (GAP-1)', () => {
+  it('drops the customer name carried in the itinerary snippet', () => {
+    const summary = toOperatorSafeCaseSummary(piiSnippetRecord)
+    expect(JSON.stringify(summary)).not.toContain(PII_NAME)
+  })
+
+  it('drops flight numbers carried in the itinerary snippet', () => {
+    const serialized = JSON.stringify(toOperatorSafeCaseSummary(piiSnippetRecord))
+    for (const flight of PII_FLIGHTS) {
+      expect(serialized).not.toContain(flight)
+    }
+  })
+
+  it('drops phone number and URL carried in the itinerary snippet', () => {
+    const serialized = JSON.stringify(toOperatorSafeCaseSummary(piiSnippetRecord))
+    expect(serialized).not.toContain(PII_PHONE)
+    expect(serialized).not.toContain('example.com')
+  })
+
+  it('drops monetary amounts carried in the itinerary snippet', () => {
+    const serialized = JSON.stringify(toOperatorSafeCaseSummary(piiSnippetRecord))
+    expect(serialized).not.toContain(PII_AMOUNT)
+  })
+
+  it('keeps the structured facts that are operator-safe', () => {
+    const summary = toOperatorSafeCaseSummary(piiSnippetRecord)
+    expect(summary.areaHints).toEqual(['chiangmai'])
+    expect(summary.themeHints).toEqual(['elephant'])
+    expect(summary.partySize).toBe(4)
+    expect(summary.vehicleType).toBe('Commuter')
+    expect(summary.days).toBe(3)
+    expect(summary.nights).toBe(2)
+    expect(summary.itinerarySnippetPreview).toBeUndefined()
+  })
+
+  it('renders no raw itinerary free text in the report', () => {
+    const result = searchRagIndex(piiIndex, '清邁 大象')
+    const out = formatNotionRagSearchReport({
+      status: 'ok',
+      parsedQuery: result.parsedQuery,
+      totalRecords: result.totalRecords,
+      resultCount: result.resultCount,
+      results: result.results,
+      issues: [],
+    })
+    expect(out).not.toContain(PII_NAME)
+    expect(out).not.toContain('機場接機')
+    for (const flight of PII_FLIGHTS) expect(out).not.toContain(flight)
+    expect(out).not.toContain(PII_PHONE)
+    expect(out).not.toContain('example.com')
+    expect(out).not.toContain(PII_AMOUNT)
+    // structured facts still rendered
+    expect(out).toContain('chiangmai')
+    expect(out).toContain('elephant')
   })
 })
 
