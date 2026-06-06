@@ -53,37 +53,50 @@ resolves that **Blocker 1**.
   unparseable/leak-free message).
 - **line-agent suite: 643/643 green.**
 
-## Smoke — BLOCKED by Notion SDK v5 data-source migration
+## SDK v5 data-source migration — DONE (feature `14f2e5a`)
 
-`npm run agent:notion-rag-dry-run` currently returns:
+The first smoke was blocked because `@notionhq/client` v5 **removed
+`databases.query`** (confirmed by direct masked probing: `typeof
+notion.databases.query === 'undefined'`, `notion.dataSources` present) — Notion
+API 2025-09-03 moved rows under DATA SOURCES.
 
-```
-Notion RAG Dry-run · 失敗
-錯誤碼：client_error（Notion 連線失敗）
-```
-
-Root cause (confirmed by direct, masked probing — no values printed):
-
-- `@notionhq/client` v5 **removed `databases.query`** (`typeof
-  notion.databases.query === 'undefined'`) and moved to the Notion **2025-09-03
-  data-source model** (`notion.dataSources` is present).
-- Our adapter `notion-rag-client.ts` is still a **contract-tested
-  `databases.query` adapter**, so the real SDK call hits `undefined` → `TypeError`
-  → sanitized `client_error`.
-
-So: **real dry-run wiring landed; smoke blocked by the SDK v5 data-source
-migration.** Blocker 1 (URL db id) is resolved; Blocker 2 (SDK v5) is the wall.
-
-## Next knife (not started)
-
-**Notion SDK v5 data-source migration — TDD.** Update the
-`notion-rag-client.ts` contract to support the v5 flow:
+The adapter `notion-rag-client.ts` now runs the v5 flow, public port unchanged:
 
 ```
-databases.retrieve(database_id) → data_sources[].id → dataSources.query(data_source_id)
+databases.retrieve(database_id) → data_sources[] → dataSources.query(each, paged) → merge page-like
 ```
 
-Open design question to settle first: a database may expose multiple data
-sources — query the first, all, or merge? Decide before touching the adapter.
-Keep the loader-port `NotionRagClient.listPages(databaseId)` surface stable so
-the loader/traverse/command layers above do not change.
+Design decision (multiple data sources): **query every data source in the order
+retrieve returns them and merge the page-like results** (not first-only). A
+database with no data sources, or a malformed retrieve, is a structural failure
+→ sanitized `NotionRagClientError`. Pagination, conservative page-like filtering,
+and the leak guard are all preserved. `NotionLikeSdkClient` structural interface
+updated to `{ databases.retrieve, dataSources.query }`; the real v5 `Client`
+satisfies it.
+
+TDD specs: retrieve→query, pagination, multi-data-source merge-in-order,
+missing/malformed sources, retrieve/query throw sanitization, non-page-like
+filtering. **line-agent 647/647.**
+
+## Smoke — PASSED (masked)
+
+`npm run agent:notion-rag-dry-run` now completes with counts only (no token / db
+id / notion.so url / customer name / cost / profit):
+
+```
+Notion RAG Dry-run · 完成
+總筆數：<n>
+來源：
+  · 私帳 2026：頁 <n> / 筆 <n>（已載入）
+區域 token：<n> · 主題 token：<n>
+```
+
+## Follow-up (not started, out of this knife's scope)
+
+Observed in the live smoke: `區域/主題 token` came back at 0 and the merged
+record count was slightly below the loaded page count — i.e. the real 2026
+Notion column names don't fully line up with what `notion-mapper.ts` expects, so
+area/theme tokens aren't being extracted and some rows merge/drop. This is a
+field-mapping (data-quality) follow-up, NOT a wiring issue: `listPages` via the
+data-source flow is verified working. Next knife: reconcile the mapper field
+policy against the real `private_2026` schema.
