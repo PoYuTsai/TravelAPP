@@ -27,6 +27,12 @@ export interface PartnerGroupRespondInput {
   intent: CommandIntent
   /** The message text being responded to. */
   text: string
+  /**
+   * Whether the message is directed at the bot — `mentionsBot` OR quote-to-bot,
+   * resolved by the caller (mirrors the router's `botDirected ?? mentionsBot`).
+   * When absent, consumers fall back to `event.mentionsBot === true`.
+   */
+  botDirected?: boolean
   /** Optional actor info (who mentioned the bot). */
   actor?: { lineUserId?: string }
   /** Future group-quoted case linkage — unused in this batch. */

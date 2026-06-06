@@ -23,6 +23,11 @@ import {
 } from './responder'
 import { AnthropicPartnerGroupResponder } from './anthropic-responder'
 import type { PartnerResponderConfig } from './responder-config'
+import {
+  shouldUsePartnerRagDraft,
+  createRagPartnerGroupResponder,
+  type PartnerRagDraftSource,
+} from './rag-draft-surfacing'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -82,4 +87,52 @@ export function createPartnerGroupResponder(
     defaultModel: models.defaultModel,
     researchModel: models.researchModel,
   })
+}
+
+// ---------------------------------------------------------------------------
+// M3.2 — dispatching responder (per-message rag selection, gates default off)
+// ---------------------------------------------------------------------------
+
+export interface CreatePartnerGroupResponderWithRagDraftInput {
+  /** The existing responder (stub / anthropic) used for every non-rag message. */
+  base: PartnerGroupResponder
+  /**
+   * Injected rag draft producer (operator-safe body). This slice never reads
+   * Notion directly — a real retrieval+composeAnswer source is a later slice.
+   */
+  answerSource: PartnerRagDraftSource
+  /** Env record for the two gates (defaults to process.env). */
+  env?: Record<string, string | undefined>
+}
+
+/**
+ * Wraps `base` so that, PER MESSAGE, it routes to the rag responder ONLY when
+ * `shouldUsePartnerRagDraft` holds (partner group + botDirected + explicit
+ * intent + both gates on). Every other message — and every OA event — goes to
+ * `base` and the rag `answerSource` is never invoked (no Notion read).
+ *
+ * The dispatcher only produces TEXT; whether it is sent stays owned by the
+ * router `sendTarget` / webhook send gate. It does NOT touch the OA auto-reply
+ * ban (OA simply never satisfies the rag predicate).
+ */
+export function createPartnerGroupResponderWithRagDraft(
+  input: CreatePartnerGroupResponderWithRagDraftInput
+): PartnerGroupResponder {
+  const { base, answerSource, env } = input
+  const ragResponder = createRagPartnerGroupResponder({ source: answerSource })
+
+  return {
+    async respond(respondInput) {
+      const useRag = shouldUsePartnerRagDraft({
+        sourceChannel: respondInput.event.sourceChannel,
+        botDirected:
+          respondInput.botDirected ?? respondInput.event.mentionsBot === true,
+        text: respondInput.text,
+        env,
+      })
+      return useRag
+        ? ragResponder.respond(respondInput)
+        : base.respond(respondInput)
+    },
+  }
 }
