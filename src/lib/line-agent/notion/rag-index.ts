@@ -52,11 +52,15 @@ export interface RagCaseFacts {
   travelDateRange?: string
   nights?: number
   days?: number
+  /** Total head-count (真實「旅遊人數」). adults/children are a further, optional split. */
+  partySize?: number
   adults?: number
   children?: number
   childAges?: number[]
   flightInfo?: string
   pickupInfo?: string
+  /** Charter vehicle type (真實「包車車型」) — a first-class retrieval fact, not buried in text. */
+  vehicleType?: string
   /** Itinerary framework text; normalized before hashing (structure only, no invented facts). */
   itinerarySnippet?: string
   areaHints?: string[]
@@ -71,6 +75,8 @@ export interface RagPrivateContext {
   notionPageUrl?: string
   databaseId?: string
   cost?: number
+  /** 真實「總收入」— operator-only; partner-safe view MUST drop it. */
+  revenue?: number | string
   profitShare?: string
   privateNotes?: string
 }
@@ -137,11 +143,13 @@ export function computeNaturalFingerprint(facts: RagCaseFacts): string {
     `d:${normalizeText(facts.travelDateRange ?? '')}`,
     `n:${facts.nights ?? ''}`,
     `dy:${facts.days ?? ''}`,
+    `ps:${facts.partySize ?? ''}`,
     `a:${facts.adults ?? ''}`,
     `c:${facts.children ?? ''}`,
     `ca:${normalizeArray(facts.childAges)}`,
     `f:${normalizeText(facts.flightInfo ?? '')}`,
     `p:${normalizeText(facts.pickupInfo ?? '')}`,
+    `v:${normalizeText(facts.vehicleType ?? '')}`,
     `it:${normalizeText(facts.itinerarySnippet ?? '')}`,
     `ar:${normalizeArray(facts.areaHints)}`,
     `th:${normalizeArray(facts.themeHints)}`,
@@ -307,6 +315,7 @@ export interface RagIndexQuery {
   /** Structural: exact equality required when given. */
   days?: number
   nights?: number
+  partySize?: number
   adults?: number
   children?: number
   sourceTable?: RagSourceTable
@@ -359,6 +368,7 @@ function matchesStructural(record: RagIndexRecord, query: RagIndexQuery): boolea
   if (query.sourceTable && !record.identity.sourceTables.includes(query.sourceTable)) return false
   if (query.days !== undefined && record.facts.days !== query.days) return false
   if (query.nights !== undefined && record.facts.nights !== query.nights) return false
+  if (query.partySize !== undefined && record.facts.partySize !== query.partySize) return false
   if (query.adults !== undefined && record.facts.adults !== query.adults) return false
   if (query.children !== undefined && record.facts.children !== query.children) return false
   return true

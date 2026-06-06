@@ -30,20 +30,27 @@ import type {
 export type CanonicalField =
   | 'dates' | 'nights' | 'partySize' | 'adults' | 'children' | 'childAges'
   | 'cityArea' | 'tripType' | 'itinerarySummary' | 'highlights'
+  | 'flightInfo' | 'vehicleType'
   | 'carGuideSetup' | 'quoteTotal' | 'status' | 'specialNeeds'
-  | 'internalNotes' | 'internalTags' | 'cost' | 'profitShare'
+  | 'internalNotes' | 'internalTags' | 'cost' | 'revenue' | 'profitShare'
 
 // alias (raw Notion property name) → canonical. Extend when real schema lands.
+// The 真實 2026 private_2026 column names are folded in alongside the earlier
+// placeholder aliases (extend FIELD_ALIASES only — never the policy table below).
 export const FIELD_ALIASES: Record<string, CanonicalField> = {
   日期: 'dates', 出發日期: 'dates', 旅遊日期: 'dates',
-  天數: 'nights', 人數: 'partySize', 大人: 'adults',
-  小孩: 'children', 小孩年齡: 'childAges', 城市區域: 'cityArea',
-  行程類型: 'tripType', 行程摘要: 'itinerarySummary',
+  天數: 'nights', 人數: 'partySize', 旅遊人數: 'partySize',
+  大人: 'adults', 小孩: 'children', 小孩年齡: 'childAges',
+  城市區域: 'cityArea', 行程類型: 'tripType',
+  行程摘要: 'itinerarySummary', 行程框架: 'itinerarySummary',
+  飛行班次: 'flightInfo', 包車車型: 'vehicleType',
   景點餐廳: 'highlights', 車導配置: 'carGuideSetup',
   報價總額: 'quoteTotal', 狀態: 'status', 特殊需求: 'specialNeeds',
   內部備註: 'internalNotes',
   內部標籤: 'internalTags', 標籤: 'internalTags', Tags: 'internalTags',
-  成本: 'cost', 分潤: 'profitShare',
+  成本: 'cost', 總成本: 'cost',
+  總收入: 'revenue',
+  分潤: 'profitShare', 利潤: 'profitShare',
 }
 
 const CANONICAL_FIELDS = new Set<string>(Object.values(FIELD_ALIASES))
@@ -73,6 +80,8 @@ const POLICY: Record<CanonicalField, PolicyRow> = {
   tripType: READ_ONLY_SHAREABLE,
   itinerarySummary: READ_ONLY_SHAREABLE,
   highlights: READ_ONLY_SHAREABLE,
+  flightInfo: READ_ONLY_SHAREABLE,
+  vehicleType: READ_ONLY_SHAREABLE,
   carGuideSetup: READ_ONLY_SHAREABLE,
   status: READ_ONLY_SHAREABLE,
   specialNeeds: READ_ONLY_SHAREABLE,
@@ -83,6 +92,7 @@ const POLICY: Record<CanonicalField, PolicyRow> = {
   internalTags: { sensitivity: 'read_only', audience: 'operator_only' },
   // private: never to anyone
   cost: { sensitivity: 'private', audience: 'never', mask: 'omit' },
+  revenue: { sensitivity: 'private', audience: 'never', mask: 'omit' },
   profitShare: { sensitivity: 'private', audience: 'never', mask: 'omit' },
 }
 

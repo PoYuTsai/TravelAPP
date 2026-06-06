@@ -189,10 +189,19 @@ describe('notionPagesToRagRecords — end to end with buildRagIndex', () => {
     const index = buildRagIndex(records)
     const results = queryRagIndex(index, { area: '清邁', themes: ['親子'] })
     expect(results.length).toBeGreaterThan(0)
-    // the family case (most matched dimensions) ranks first
-    expect(results[0].identity.sourceRecordIds).toContain('case-family-cm-5d')
+    // Both 清邁+親子 family cases tie on source rank AND matched dimensions, so
+    // they rank above the couple/photo cases (which hit area only). Which of the
+    // two lands first is a deterministic-but-arbitrary fingerprint tiebreak, so
+    // assert the meaningful invariant: the top result is one of the family cases.
+    const topId = results[0].identity.sourceRecordIds[0]
+    expect(['case-family-cm-5d', 'case-family-cm-4d']).toContain(topId)
 
-    const view = toPartnerSafeView(results[0])
+    // Pin the leak check on the known-sensitive 5d case regardless of tie order.
+    const family5d = results.find((r) =>
+      r.identity.sourceRecordIds.includes('case-family-cm-5d')
+    )
+    expect(family5d).toBeDefined()
+    const view = toPartnerSafeView(family5d!)
     const serialized = JSON.stringify(view)
     expect('privateContext' in view).toBe(false)
     expect(serialized).not.toContain('22000') // cost

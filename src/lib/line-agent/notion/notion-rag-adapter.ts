@@ -89,6 +89,41 @@ function setIf<T extends object, K extends keyof T>(target: T, key: K, value: T[
   if (value !== undefined) target[key] = value
 }
 
+/**
+ * Parse Eric's real「旅遊人數」column into a total + optional adult/child split.
+ *
+ *   '成人2 小朋友2' → { partySize: 4, adults: 2, children: 2 }
+ *   '7大2小'        → { partySize: 9, adults: 7, children: 2 }
+ *   '成人9'         → { partySize: 9, adults: 9 }            (no children invented)
+ *   '9人' / 8       → { partySize: 9 }                       (no split invented)
+ *   '一家人'        → {}                                     (un-splittable → nothing)
+ *
+ * Rule (Eric, 2026-06-05/06): partySize is the closest real fact; adults/children
+ * are only filled when the text states them — NEVER auto-derived.
+ */
+function parsePartySize(value: unknown): { partySize?: number; adults?: number; children?: number } {
+  if (typeof value === 'number' && !Number.isNaN(value)) return { partySize: value }
+  if (typeof value !== 'string') return {}
+
+  const s = value.trim()
+  if (s.length === 0) return {}
+
+  const adultsMatch = s.match(/(?:成人|大人)\s*(\d+)/) ?? s.match(/(\d+)\s*大/)
+  const childrenMatch = s.match(/(?:小朋友|小孩)\s*(\d+)/) ?? s.match(/(\d+)\s*小/)
+  const adults = adultsMatch ? Number(adultsMatch[1]) : undefined
+  const children = childrenMatch ? Number(childrenMatch[1]) : undefined
+
+  if (adults !== undefined || children !== undefined) {
+    return { partySize: (adults ?? 0) + (children ?? 0), adults, children }
+  }
+
+  // No adult/child breakdown — accept a bare total like '9人' or '9'.
+  const totalMatch = s.match(/(\d+)\s*人/) ?? s.match(/^(\d+)$/)
+  if (totalMatch) return { partySize: Number(totalMatch[1]) }
+
+  return {}
+}
+
 // --- core ------------------------------------------------------------------
 
 interface ParsedPage {
@@ -122,6 +157,13 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
       case 'dates':
         setIf(facts, 'travelDateRange', asString(value))
         break
+      case 'partySize': {
+        const { partySize, adults, children } = parsePartySize(value)
+        setIf(facts, 'partySize', partySize)
+        setIf(facts, 'adults', adults)
+        setIf(facts, 'children', children)
+        break
+      }
       case 'adults':
         setIf(facts, 'adults', asNumber(value))
         break
@@ -137,11 +179,25 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
       case 'tripType':
         setIf(facts, 'themeHints', asHints(value))
         break
+      case 'flightInfo':
+        setIf(facts, 'flightInfo', asString(value))
+        break
+      case 'vehicleType':
+        setIf(facts, 'vehicleType', asString(value))
+        break
       case 'itinerarySummary':
         setIf(facts, 'itinerarySnippet', asString(value))
         break
       case 'cost':
         setIf(privateContext, 'cost', asNumber(value))
+        break
+      case 'revenue':
+        // number stays a number; a non-empty string is kept verbatim (type is number | string).
+        setIf(
+          privateContext,
+          'revenue',
+          asNumber(value) ?? (typeof value === 'string' && value.trim().length > 0 ? value : undefined)
+        )
         break
       case 'profitShare':
         // RagPrivateContext.profitShare is a string (split descriptor or amount).
