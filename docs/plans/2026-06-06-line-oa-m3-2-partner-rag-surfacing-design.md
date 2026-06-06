@@ -386,3 +386,41 @@ Still NOT done: production wiring of the real `@notionhq/client` adapter into
 `createClientDefault`), the §6 hardening (C = operator refresh, M3.3), a Vercel
 preview smoke, and flipping `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED` on as a deliberate
 op action.
+
+### Checkpoint — real `@notionhq/client` adapter wired into the installer (gate still off)
+
+The first item above landed. `line/install-default-partner-rag.ts` is the single
+COMPOSITION ROOT — the one place the real Notion SDK is imported and constructed —
+so the seam (`webhook-runtime`), the adapter (`notion-rag-client`), and the cached
+source (`notion-rag-answer-source`) all stay SDK-free and injectable.
+
+- `installDefaultPartnerRagAnswerSource({env?, ttlMs?, createSdkClient?})` — the
+  deliberate bootstrap. Reads `NOTION_TOKEN` → builds the SDK via the (injectable,
+  defaults to real `new Client({auth})`) factory → `createNotionRagClient` →
+  `installPartnerRagAnswerSource({client, env, ttlMs})`. Returns
+  `{installed, reason?}`.
+- **Side-effect free at import:** nothing runs at module load — no SDK constructed,
+  no env read, no Notion hit; the answer-source seam stays the fail-closed
+  not-wired default. Wiring happens ONLY on an explicit call.
+- **Fail-closed + leak-safe:** missing token ⇒ never constructs the SDK, installs
+  nothing, returns the fixed code `missing_notion_token` (never the absent token).
+  An SDK construction throw is swallowed → fixed code `notion_client_init_failed`
+  (the raw error, which could echo the token, is never returned/logged/installed).
+- **No gate flipped:** `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED` untouched. The
+  dispatcher's per-respond gate still governs reachability — proven: after install,
+  gate-off ⇒ `base` stub responder ⇒ **zero** `databases.retrieve` calls.
+- `DEFAULT_PARTNER_RAG_TTL_MS` = 10 min (§6 cost-guard window) when `ttlMs` omitted.
+
+11 new tests in `install-default-partner-rag.test.ts` (import side-effect free;
+missing-token fail-closed; valid env + fake factory installs; lazy index build;
+gate-off ⇒ source 0 Notion; both gates on ⇒ rag path runs the real installed
+source; Notion error ⇒ unavailable degraded reply; no token/db id/Notion url leak
+via reason codes or errors). Full `line-agent` suite **824/824** green. The real
+SDK structural compatibility (`databases.retrieve` + `dataSources.query`) is
+verified against `@notionhq/client@^5.7`; tests inject a fake so no live API is
+hit.
+
+Still NOT done: an actual bootstrap CALL site wiring this into the webhook route at
+deploy time (left to a deliberate op step), the §6 hardening (C = operator refresh,
+M3.3), a Vercel preview smoke, and flipping `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED` on
+as a deliberate op action.
