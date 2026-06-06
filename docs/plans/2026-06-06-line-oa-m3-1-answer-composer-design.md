@@ -201,8 +201,10 @@ adds no new dependency and no new env.
 
 ## Next slices (not now)
 
-- **M3.1b** — operator CLI preview `agent:notion-rag-answer -- "..."` (masked,
-  operator-only) once the composer contract is stable.
+- **M3.1b** — ✅ DONE (commit `4a7dad1`). operator CLI preview
+  `npm run agent:notion-rag-answer -- "..."` (masked, operator-only). 11 command
+  tests, line-agent 761/761, live masked smoke on real 90-record corpus. See
+  `docs/plans/2026-06-06-line-oa-m3-1b-cli-answer-preview-checkpoint.md`.
 - **M3.2** — partner-group RAG-assisted draft surfacing (explicit send intent;
   no auto-send).
 - **M3.3** — DK review / approval loop.
