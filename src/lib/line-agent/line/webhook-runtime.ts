@@ -22,7 +22,11 @@ import { selectStore } from '@/lib/line-agent/storage/select-store'
 import { routeCommand } from '@/lib/line-agent/commands/router'
 import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
 import type { PartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
-import { createPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder-factory'
+import {
+  createPartnerGroupResponder,
+  createPartnerGroupResponderWithRagDraft,
+} from '@/lib/line-agent/partner-group/responder-factory'
+import type { PartnerRagDraftSource } from '@/lib/line-agent/partner-group/rag-draft-surfacing'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
@@ -276,15 +280,73 @@ export function setPartnerGroupResponder(responder: PartnerGroupResponder): void
   _partnerGroupResponder = responder
 }
 
-/** Read the current partner-group responder (called per request by the handler). */
+/**
+ * Read the current partner-group responder (called per request by the handler).
+ *
+ * M3.2 wiring (design §6/§7): the default is the DISPATCHING responder — the M2
+ * stub/anthropic `base` wrapped by `createPartnerGroupResponderWithRagDraft`.
+ * Per message it routes to the rag path ONLY when `shouldUsePartnerRagDraft`
+ * holds (partner group + botDirected + explicit intent + BOTH env gates on); the
+ * gate is read per-respond, so wrapping is always safe — gate-off collapses to
+ * `base` with zero Notion read, and the OA plane can never satisfy the predicate.
+ *
+ * The rag `answerSource` is bound LATE via the seam getter (mirroring the reply
+ * client) so a test can inject a fake after this singleton is built. The
+ * production default source is NOT wired to Notion this slice — it fails closed,
+ * so flipping both gates on before the real retrieval lands yields the honest
+ * `PARTNER_RAG_UNAVAILABLE_REPLY`, never a fabricated draft and never a Notion
+ * read (design §5/§6).
+ */
 export function getPartnerGroupResponder(): PartnerGroupResponder {
   if (_partnerGroupResponder === null) {
-    _partnerGroupResponder = createPartnerGroupResponder({
+    const base = createPartnerGroupResponder({
       models: getPartnerResponderConfig(),
       transport: fetch,
     })
+    _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
+      base,
+      // Late-bound thunk: always calls the CURRENTLY registered source, so a test
+      // injecting a fake via setPartnerRagAnswerSource is honoured even though
+      // this dispatcher singleton was built earlier.
+      answerSource: (input) => getPartnerRagAnswerSource()(input),
+    })
   }
   return _partnerGroupResponder
+}
+
+// ---------------------------------------------------------------------------
+// Partner-group RAG answer-source seam — injectable draft producer
+// ---------------------------------------------------------------------------
+
+/**
+ * The rag draft producer (operator-safe body) consumed by the dispatching
+ * responder. It is reached ONLY when every surfacing precondition holds
+ * (partner group + botDirected + explicit intent + both gates on); on every
+ * other message — and every OA event — the dispatcher routes to `base` and this
+ * source is never invoked (no Notion read).
+ *
+ * The production default is intentionally NOT wired to Notion this slice: it
+ * THROWS, which `createRagPartnerGroupResponder`'s try/catch converts into the
+ * fail-closed `PARTNER_RAG_UNAVAILABLE_REPLY` (design §5). A real
+ * retrieval+composeAnswer source is the next knife. A test injects a fake.
+ */
+let _partnerRagAnswerSource: PartnerRagDraftSource | null = null
+
+/** Override the rag answer source (called by a bootstrap or in tests). */
+export function setPartnerRagAnswerSource(source: PartnerRagDraftSource): void {
+  _partnerRagAnswerSource = source
+}
+
+/** Read the current rag answer source (called late by the dispatcher thunk). */
+export function getPartnerRagAnswerSource(): PartnerRagDraftSource {
+  if (_partnerRagAnswerSource === null) {
+    _partnerRagAnswerSource = async () => {
+      // Not wired to Notion yet — fail closed (design §5/§6). Non-minified so the
+      // misconfiguration (gates flipped on before the retrieval slice) is traceable.
+      throw new Error('partner_rag_answer_source_not_wired')
+    }
+  }
+  return _partnerRagAnswerSource
 }
 
 // ---------------------------------------------------------------------------

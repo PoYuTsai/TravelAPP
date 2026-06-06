@@ -575,7 +575,18 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
     // reaches respond() nested inside `event`, where it cannot be sent — the
     // handler keeps the channel token / LINE client / store, so the responder
     // has no way to send even when `event.replyToken` is present.
-    const allowed = new Set(['event', 'intent', 'text', 'actor', 'caseId', 'context'])
+    // `botDirected` is a documented PartnerGroupRespondInput key (mentionsBot OR
+    // quote-to-bot), threaded by the router for the M3.2 dispatcher. It is a bare
+    // boolean signal — NOT a send capability — so it does not weaken §6.6.
+    const allowed = new Set([
+      'event',
+      'intent',
+      'text',
+      'actor',
+      'caseId',
+      'context',
+      'botDirected',
+    ])
     expect(capturedKeys.length).toBeGreaterThan(0)
     for (const key of capturedKeys) {
       expect(allowed.has(key)).toBe(true)

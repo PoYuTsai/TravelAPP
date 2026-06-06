@@ -265,7 +265,8 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
         const handlerResult = await handleRespondToPartnerGroup(
           event,
           earlyIntent,
-          input.partnerGroupResponder ?? stubPartnerGroupResponder
+          input.partnerGroupResponder ?? stubPartnerGroupResponder,
+          botDirected
         )
         return { action: 'respond', source, handlerResult, intent: earlyIntent }
       }

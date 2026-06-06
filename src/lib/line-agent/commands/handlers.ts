@@ -111,15 +111,23 @@ export interface ListRecentCasesOptions {
 export async function handleRespondToPartnerGroup(
   event: NormalizedLineEvent,
   intent: CommandIntent,
-  responder: PartnerGroupResponder = stubPartnerGroupResponder
+  responder: PartnerGroupResponder = stubPartnerGroupResponder,
+  botDirected?: boolean
 ): Promise<HandlerResult> {
   // The responder ONLY produces text; it never sends. Whether outboundText
   // actually reaches the group is decided by the router + permission layer.
+  //
+  // `botDirected` is threaded from the router (mentionsBot OR quote-to-bot) so a
+  // dispatching responder (M3.2 rag draft) can reach the rag path for a
+  // quote-to-bot message without a re-tag; absent, consumers fall back to
+  // `event.mentionsBot`.  It does NOT change the send decision — that stays the
+  // router's job.
   const result = await responder.respond({
     event,
     intent,
     text: event.text ?? '',
     actor: { lineUserId: event.lineUserId },
+    ...(botDirected !== undefined ? { botDirected } : {}),
   })
 
   return {
