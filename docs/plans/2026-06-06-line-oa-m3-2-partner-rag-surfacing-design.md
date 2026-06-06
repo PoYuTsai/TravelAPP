@@ -220,6 +220,27 @@ one env gate + the intent string check, all behind RED-first tests.
 ## Acceptance for THIS slice
 
 - [x] Design doc committed (docs-only).
-- [ ] No code changed. `line-agent` suite still 761/761 (unchanged — nothing
-      touched).
-- Next session: RED-first implementation slice per §7, gates default-off.
+
+## Implementation status (M3.2 seam — commit `75742de`)
+
+RED-first minimal seam landed in `partner-group/rag-draft-surfacing.ts` (+ a
+one-line `meta.responder` union widening in `responder.ts`). Both env gates ship
+**default off** — no production behavior is enabled.
+
+- `detectPartnerRagIntent(text)` — pure explicit-intent check (§2 lexicon).
+- `isPartnerRagDraftEnabled(env)` — two gates in series, BOTH exactly `"true"`
+  (§3); default off.
+- `shouldUsePartnerRagDraft({sourceChannel, botDirected, text, env})` — the §1+§2
+  surfacing decision. OA never qualifies; untagged never qualifies.
+- `createRagPartnerGroupResponder({source})` — injectable (no Notion/LLM here);
+  prepends the §4 banner (`夥伴內部草稿` / `不是正式報價`); source error → §5
+  fail-closed `PARTNER_RAG_UNAVAILABLE_REPLY` with `degraded`+`error` meta, never
+  a fabricated draft.
+
+15 contract tests (the design's Test 1–10 plus edge cases); full `line-agent`
+suite **776/776** green.
+
+Still NOT done (future runtime slice, per §6/§7): factory wiring, real
+retrieval+`composeAnswer` `source`, cache/index reuse, and the actual LINE group
+attachment. The OA auto-reply ban (router B3) and `sendTarget` (B4) remain
+untouched.
