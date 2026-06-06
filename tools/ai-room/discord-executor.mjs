@@ -1,6 +1,6 @@
 import { createDevLoop } from './dev-loop.mjs'
 import { dispatchCcRequest } from './cc-dispatch.mjs'
-import { createLiveAmbientReply } from './ai-responder.mjs'
+import { createLiveAmbientReply, createLiveBrainReply } from './ai-responder.mjs'
 import { clearDiscordChannelMessages } from './discord-channel-cleaner.mjs'
 import {
   formatDiscordActionResult,
@@ -54,7 +54,7 @@ export async function executeDiscordDecision(decision, options = {}) {
       case 'ambient_chat':
         return reply(await executeAmbientChat(decision, options))
       case 'two_agent_question':
-        return reply(formatTwoAgentQuestion(firstArg(decision)))
+        return reply(await executeTwoAgentQuestion(decision, options))
       case 'session_peek':
         return reply(await executeSessionPeek(options))
       default:
@@ -317,8 +317,48 @@ async function executeAmbientChat(decision, options) {
   return formatRoundtableChat({ state, body })
 }
 
+async function executeTwoAgentQuestion(decision, options) {
+  const state = await readState(options)
+  const body = firstArg(decision)
+  const liveReply = await createLiveBrainReply(
+    {
+      state,
+      body,
+      intent: decision.intent,
+      targetAgent: decision.targetAgent,
+    },
+    { env: options.env, fetch: options.fetch }
+  )
+  if (liveReply) return liveReply
+
+  return formatTwoAgentQuestion(body)
+}
+
 async function executeAgentIntent(decision, options) {
   const state = await readState(options)
+  const body = firstArg(decision)
+
+  if (decision.targetAgent === 'cc' && hasDispatchConfirmation(body)) {
+    const result = await dispatchCcRequest(
+      {
+        actor: decision.actor,
+        body: stripDispatchConfirmation(body),
+      },
+      options
+    )
+    return formatDispatchResult(result)
+  }
+
+  const liveReply = await createLiveBrainReply(
+    {
+      state,
+      body,
+      intent: decision.intent,
+      targetAgent: decision.targetAgent,
+    },
+    { env: options.env, fetch: options.fetch }
+  )
+  if (liveReply) return liveReply
 
   if (decision.targetAgent === 'codex') {
     return formatCodexIntent(decision, state)
@@ -329,17 +369,6 @@ async function executeAgentIntent(decision, options) {
   }
 
   if (decision.targetAgent === 'cc' || decision.requiresWrite) {
-    if (decision.targetAgent === 'cc' && hasDispatchConfirmation(firstArg(decision))) {
-      const result = await dispatchCcRequest(
-        {
-          actor: decision.actor,
-          body: stripDispatchConfirmation(firstArg(decision)),
-        },
-        options
-      )
-      return formatDispatchResult(result)
-    }
-
     const loop = createDevLoop({
       focus: state.focus,
       activeSession: state.activeSession,

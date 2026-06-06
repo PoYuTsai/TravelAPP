@@ -248,6 +248,78 @@ describe('Discord executor', () => {
     expect(calls).toEqual([])
   })
 
+  it('uses the live brain for two-agent open questions when enabled', async () => {
+    await writeCurrentState(createInitialState('travel', { chatMode: 'casual' }), {
+      stateDir,
+    })
+    const fetchCalls = []
+    const routed = routeDiscordMessage(
+      {
+        channelId: 'private-ai-room',
+        authorId: 'eric',
+        content: '@cc 跟@codex 你們怎麼分工比較好？',
+      },
+      ENV
+    )
+
+    const result = await executeDiscordDecision(routed, {
+      stateDir,
+      env: {
+        AI_ROOM_LIVE_AI_ENABLED: 'true',
+        OPENAI_API_KEY: 'secret-openai-key',
+      },
+      fetch: fakeFetch(fetchCalls, {
+        output_text: JSON.stringify({
+          room: '我先讓兩邊各自講判斷。',
+          codex: '我負責收斂需求和驗收。',
+          cc: '我負責實作、測試和回報。',
+        }),
+      }),
+    })
+
+    expect(result.content).toBe(
+      [
+        '[Room/roundtable] 我先讓兩邊各自講判斷。',
+        '[Codex] 我負責收斂需求和驗收。',
+        '[CC] 我負責實作、測試和回報。',
+      ].join('\n')
+    )
+    expect(fetchCalls).toHaveLength(1)
+    expect(JSON.parse(fetchCalls[0].body).input).toContain('intent=two_agent_question')
+  })
+
+  it('uses the live brain for Codex slash prompts when enabled', async () => {
+    await writeCurrentState(createInitialState('travel'), { stateDir })
+    const fetchCalls = []
+    const routed = routeDiscordMessage(
+      {
+        channelId: 'private-ai-room',
+        authorId: 'eric',
+        content: '/codex 這個功能怎麼切比較好？',
+      },
+      ENV
+    )
+
+    const result = await executeDiscordDecision(routed, {
+      stateDir,
+      env: {
+        AI_ROOM_LIVE_AI_ENABLED: 'true',
+        OPENAI_API_KEY: 'secret-openai-key',
+      },
+      fetch: fakeFetch(fetchCalls, {
+        output_text: JSON.stringify({
+          room: '',
+          codex: '我會先切使用者目標、資料流、風險，再定驗收。',
+          cc: '我等規格收斂後再動手。',
+        }),
+      }),
+    })
+
+    expect(result.content).toBe('[Codex] 我會先切使用者目標、資料流、風險，再定驗收。')
+    expect(fetchCalls).toHaveLength(1)
+    expect(JSON.parse(fetchCalls[0].body).input).toContain('targetAgent=codex')
+  })
+
   it('answers @codex role questions in Traditional Chinese without tmux writes', async () => {
     await writeCurrentState(createInitialState('travel'), { stateDir })
     const { adapter, calls } = fakeTmux()
@@ -564,5 +636,22 @@ function fakeTmux({ sessions = ['rc-travel'], cwdBySession = {}, paneBySession =
         calls.push({ method: 'interrupt', session })
       },
     },
+  }
+}
+
+function fakeFetch(calls, json = {}) {
+  return async (url, options) => {
+    calls.push({
+      url,
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+    })
+    return {
+      ok: true,
+      async json() {
+        return json
+      },
+    }
   }
 }

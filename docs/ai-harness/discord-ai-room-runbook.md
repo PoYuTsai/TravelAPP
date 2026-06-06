@@ -46,6 +46,18 @@ AI_ROOM_ROOM_AVATAR_URL=
 
 Use official-source icons only. Do not commit logo files into the repo.
 
+Optional live AI brain:
+
+```env
+AI_ROOM_LIVE_AI_ENABLED=false
+AI_ROOM_OPENAI_API_KEY=
+AI_ROOM_OPENAI_MODEL=gpt-5-mini
+```
+
+Keep `AI_ROOM_LIVE_AI_ENABLED=false` until Eric intentionally enables model
+calls. When enabled, natural-language chat, `/codex`, `/cc` dry-runs, and
+two-agent questions use the model first; local templates are only fallback.
+
 The bot needs `Manage Messages`, `Read Message History`, and `View Channel`
 permissions in the private AI Engineering Room if `/chat-clear` will be used.
 

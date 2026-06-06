@@ -32,7 +32,7 @@ Still guarded or not enabled:
 
 - Long autonomous Claude Code work still warns while desktop Claude Code bind is not confirmed.
 - `dc-*` writes remain blocked unless Eric explicitly unlocks them.
-- Optional live AI replies are off by default; ambient chat uses local templates unless `AI_ROOM_LIVE_AI_ENABLED=true`.
+- Optional live AI brain is off by default; natural-language chat uses local fallbacks unless `AI_ROOM_LIVE_AI_ENABLED=true`.
 
 ## Verification
 

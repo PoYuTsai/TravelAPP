@@ -3,6 +3,17 @@ const DEFAULT_OPENAI_MODEL = 'gpt-5-mini'
 const MAX_OUTPUT_TOKENS = 650
 
 export async function createLiveAmbientReply(input, options = {}) {
+  return createLiveBrainReply(
+    {
+      ...input,
+      intent: input.intent ?? 'ambient_chat',
+      targetAgent: input.targetAgent ?? 'ambient',
+    },
+    options
+  )
+}
+
+export async function createLiveBrainReply(input, options = {}) {
   const env = options.env ?? process.env
   if (!isEnabled(env.AI_ROOM_LIVE_AI_ENABLED)) return null
 
@@ -21,7 +32,7 @@ export async function createLiveAmbientReply(input, options = {}) {
   })
   if (!response) return null
 
-  return formatLiveReply(response)
+  return formatLiveReply(response, input)
 }
 
 function isEnabled(value) {
@@ -70,22 +81,29 @@ async function safeOpenAiResponse({ fetchImpl, apiKey, model, input }) {
 
 function buildSystemInstructions() {
   return [
-    'You are the live responder for Eric private Discord AI Engineering Room.',
+    'You are the real live brain for Eric private Discord AI Engineering Room.',
     'Return exactly one compact JSON object with keys: room, codex, cc.',
     'Use Traditional Chinese. Be warm, natural, and specific to Eric message.',
+    'Understand ordinary natural language. Do not rely on keyword templates.',
+    'Codex is the architecture, product, scope, review, edge-case, and decision partner.',
+    'Claude Code is the implementation, execution, testing, debugging, and concrete next-step partner.',
     'If the user is greeting, small-talking, tired, anxious, or asking for emotional support, set room to an empty string and let Codex and Claude Code reply like supportive teammates.',
     'If the user asks an open work question, set room to a short focus/context line, make Codex give the product/spec/architecture/review view, and make Claude Code give the implementation/testing/next-step view.',
-    'Do not claim to be the desktop Codex thread or the real Claude app. Do not say anything was written to tmux.',
+    'If targetAgent is codex, still return all keys but make codex the only necessary final voice.',
+    'If targetAgent is cc, still return all keys but make cc the only necessary final voice.',
+    'Do not claim to be the desktop Codex thread or the real Claude app. Do not say anything was written to tmux unless the provided context explicitly says a confirmed dispatch happened.',
     'Never instruct destructive actions. Keep each agent reply under 90 Traditional Chinese characters unless the user asks for depth.',
   ].join('\n')
 }
 
-function buildUserInput({ state, body }) {
+function buildUserInput({ state, body, intent, targetAgent }) {
   return [
     `focus=${state.focus}`,
     `project=${state.project}`,
     `activeSession=${state.activeSession}`,
     `sessionHealth=${state.sessionHealth}`,
+    `intent=${intent ?? ''}`,
+    `targetAgent=${targetAgent ?? ''}`,
     `message=${body}`,
   ].join('\n')
 }
@@ -126,7 +144,14 @@ function cleanText(value) {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
 
-function formatLiveReply(response) {
+function formatLiveReply(response, input = {}) {
+  if (input.targetAgent === 'codex') {
+    return `[Codex] ${response.codex}`
+  }
+  if (input.targetAgent === 'cc') {
+    return `[CC] ${response.cc}`
+  }
+
   const lines = []
   if (response.room) lines.push(`[Room/roundtable] ${response.room}`)
   lines.push(`[Codex] ${response.codex}`)
