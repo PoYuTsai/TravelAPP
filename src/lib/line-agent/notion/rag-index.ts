@@ -309,8 +309,10 @@ export interface RagIndex {
 }
 
 export interface RagIndexQuery {
-  /** Descriptive: at least one of area / themes must hit when either is given. */
+  /** Descriptive: at least one area / theme token must hit when any is given. */
   area?: string
+  /** Multiple areas are OR-gated; each hit counts as a matched dimension. */
+  areas?: string[]
   themes?: string[]
   /** Structural: exact equality required when given. */
   days?: number
@@ -392,9 +394,13 @@ function tiebreakKey(record: RagIndexRecord): string {
  * stable key — never by a weighted score.
  */
 export function queryRagIndex(index: RagIndex, query: RagIndexQuery): RagIndexRecord[] {
-  const queryArea = query.area ? normalizeText(query.area) : undefined
+  // Single `area` and multi `areas` collapse into one normalized token set so a
+  // multi-area query (清萊 + 芳縣) is OR-gated and each area hit ranks like a
+  // matched theme dimension.
+  const queryAreas = new Set<string>(hintTokens(query.areas))
+  if (query.area) queryAreas.add(normalizeText(query.area))
   const queryThemes = hintTokens(query.themes)
-  const hasDescriptive = queryArea !== undefined || queryThemes.length > 0
+  const hasDescriptive = queryAreas.size > 0 || queryThemes.length > 0
 
   const scored: Array<{ record: RagIndexRecord; matched: number }> = []
   for (const record of index.records) {
@@ -402,11 +408,11 @@ export function queryRagIndex(index: RagIndex, query: RagIndexQuery): RagIndexRe
 
     const recAreas = new Set(hintTokens(record.facts.areaHints))
     const recThemes = new Set(hintTokens(record.facts.themeHints))
-    const areaHit = queryArea !== undefined && recAreas.has(queryArea)
+    const areaHits = Array.from(queryAreas).filter((t) => recAreas.has(t)).length
     const themeHits = queryThemes.filter((t) => recThemes.has(t)).length
 
-    if (hasDescriptive && !areaHit && themeHits === 0) continue
-    scored.push({ record, matched: (areaHit ? 1 : 0) + themeHits })
+    if (hasDescriptive && areaHits === 0 && themeHits === 0) continue
+    scored.push({ record, matched: areaHits + themeHits })
   }
 
   scored.sort((a, b) => {
