@@ -15,6 +15,7 @@
 
 import { describe, expect, test } from 'vitest'
 import {
+  createClientDefault,
   importTraverseDefault,
   loadNotionRagDryRunRuntime,
 } from '../../../../scripts/notion-rag-dry-runner.mjs'
@@ -147,13 +148,17 @@ describe('loadNotionRagDryRunRuntime — real mode wiring', () => {
     expect(createClient.calls).toHaveLength(0)
   })
 
-  // Default importTraverse now LOADS the real traverse under a TS runtime, but
-  // the default createClient stays null → the production default path is STILL
-  // not-wired. The operator command therefore keeps projecting client_not_wired
-  // (createClient is the remaining unwired half, deferred to the next knife).
-  test('real gate + default factories → still not wired (client half unwired)', async () => {
+  // CLIENT HALF NOW WIRED — under a TS + SDK-capable runtime (vitest here, tsx
+  // later) the default factories assemble BOTH halves: importTraverse loads the
+  // real TS traverse, createClient constructs a real @notionhq/client wrapped by
+  // createNotionRagClient. Constructing the SDK touches NO network — the loader
+  // only hits Notion when runDryRun later calls client.listPages. So real gate +
+  // token + default factories now returns a real runDryRun + a real client.
+  test('real gate + token + default factories → fully wired under TS runtime', async () => {
     const runtime = await loadNotionRagDryRunRuntime({ env: realEnv() })
-    expect(runtime).toEqual({ runDryRun: null, client: null })
+    expect(typeof runtime.runDryRun).toBe('function')
+    expect(runtime.client).not.toBeNull()
+    expect(typeof runtime.client.listPages).toBe('function')
   })
 
   // DECISION A1 — the default importTraverse loads the real TS traverse when a
@@ -233,6 +238,61 @@ describe('loadNotionRagDryRunRuntime — real mode wiring', () => {
     } catch (err) {
       thrown = err
     }
+    const blob = `${thrown?.message ?? ''}\n${thrown?.stack ?? ''}`
+    expect(blob).not.toContain(SECRET_TOKEN)
+    expect(blob).not.toContain(DB_PRIVATE_2025)
+    expect(blob).not.toContain(NOTION_LINK)
+    expect(blob).not.toContain('notion.so')
+  })
+})
+
+describe('createClientDefault — real Notion client assembly', () => {
+  // Happy path: with injected fake SDK + fake rag factory, the default builds a
+  // `new Client({ auth: token })` and hands it to createNotionRagClient, then
+  // returns the wrapped NotionRagClient. Injectable imports keep this offline.
+  test('fake SDK + fake rag factory → wraps Client({auth:token}) into NotionRagClient', async () => {
+    let constructedAuth
+    let wrappedSdk
+    const ragClient = { listPages: async () => [] }
+    class FakeClient {
+      constructor(opts) {
+        constructedAuth = opts?.auth
+      }
+    }
+
+    const result = await createClientDefault({
+      token: SECRET_TOKEN,
+      importClientModule: async () => ({ Client: FakeClient }),
+      importRagClientModule: async () => ({
+        createNotionRagClient: (sdk) => {
+          wrappedSdk = sdk
+          return ragClient
+        },
+      }),
+    })
+
+    expect(result).toBe(ragClient)
+    expect(constructedAuth).toBe(SECRET_TOKEN)
+    expect(wrappedSdk).toBeInstanceOf(FakeClient)
+  })
+
+  // Leak guard (defense in depth, mirrors loader): a secret-bearing import/
+  // construction throw is re-thrown sanitized — no token / db id / notion.so url
+  // survives in message or stack, even when called directly (not via the loader).
+  test('secret-bearing import throw → sanitized, no leak', async () => {
+    let thrown
+    try {
+      await createClientDefault({
+        token: SECRET_TOKEN,
+        importClientModule: async () => {
+          throw new Error(`sdk load token=${SECRET_TOKEN} db=${DB_PRIVATE_2025} at ${NOTION_LINK}`)
+        },
+      })
+    } catch (err) {
+      thrown = err
+    }
+
+    expect(thrown).toBeTruthy()
     const blob = `${thrown?.message ?? ''}\n${thrown?.stack ?? ''}`
     expect(blob).not.toContain(SECRET_TOKEN)
     expect(blob).not.toContain(DB_PRIVATE_2025)

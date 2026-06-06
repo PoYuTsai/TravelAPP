@@ -14,15 +14,15 @@
  * injectable factories, gated by BOTH:
  *   1. an explicit env gate `AI_AGENT_NOTION_RAG_RUNTIME=real`, and
  *   2. a present `NOTION_TOKEN`.
- * The default `importTraverse` now GUARD-loads the TS traverse: under a TS
- * runtime it returns the real `runNotionRagTraverseDryRun`, under plain `node`
- * the `.ts` import throws and is swallowed → null. Either way it touches NO
- * Notion API (it only returns a pure function). The default `createClient` is
- * still not-wired (returns null), so a real gate + token with no injected client
- * still yields `{ client: null }` ⇒ the command projects `client_not_wired`.
- * The next knife replaces the createClient default with a real `@notionhq/client`
- * (+ a tsx operator runner so plain-node loads the traverse too); the command
- * layer's resolution order does NOT change.
+ * The default `importTraverse` GUARD-loads the TS traverse: under a TS runtime
+ * it returns the real `runNotionRagTraverseDryRun`, under plain `node` the `.ts`
+ * import throws and is swallowed → null. The default `createClient` is now WIRED:
+ * it dynamic-imports `@notionhq/client` + the TS adapter `notion-rag-client.ts`
+ * and returns `createNotionRagClient(new Client({ auth: token }))`. Construction
+ * touches NO Notion API — the API is first hit only when `runDryRun` later calls
+ * `client.listPages`. Because the adapter is `.ts`, both default factories need a
+ * TS-capable runtime; the operator runs this via `npm run agent:notion-rag-dry-run`
+ * (tsx). Under plain `node`, the `.ts` imports throw → sanitized ⇒ `client_error`.
  *
  * Leak guard (loader-owned, mirrors notion-rag-client.ts): a factory throw may
  * carry a token / db id / notion.so url, so it is caught and re-thrown as a
@@ -87,12 +87,42 @@ export async function importTraverseDefault(ctx = {}) {
 }
 
 /**
- * PRODUCTION default factory: not wired. A real cut replaces this with a real
- * `@notionhq/client` wrapped by createNotionRagClient. Returning null keeps real
- * mode safely not-wired until then — no real client, no API.
+ * PRODUCTION default factory for `createClient` — assembles a REAL Notion client:
+ *   1. dynamic-import `@notionhq/client` for its `Client` constructor;
+ *   2. dynamic-import the TS adapter `notion-rag-client.ts` for
+ *      `createNotionRagClient`;
+ *   3. `new Client({ auth: token })` (NO network — construction only stores
+ *      config; the API is first touched later when runDryRun calls listPages);
+ *   4. wrap the SDK as the loader-port `NotionRagClient` and return it.
+ *
+ * Both imports are injectable so the assembly is unit-testable fully offline.
+ * Under plain `node` the `.ts` adapter import throws (unknown extension); that —
+ * and any construction error — is caught and re-thrown SANITIZED, because a raw
+ * import / SDK error may carry a token / db id / notion.so url. The loader also
+ * sanitizes; this is defense in depth so a direct caller can never leak either.
  */
-async function notWiredCreateClient() {
-  return null
+export async function createClientDefault(ctx = {}) {
+  const {
+    token,
+    importClientModule = () => import('@notionhq/client'),
+    importRagClientModule = () => import('../src/lib/line-agent/notion/notion-rag-client.ts'),
+  } = ctx
+  try {
+    const clientMod = await importClientModule()
+    const Client = clientMod?.Client
+    const ragMod = await importRagClientModule()
+    const createNotionRagClient = ragMod?.createNotionRagClient
+    if (typeof Client !== 'function' || typeof createNotionRagClient !== 'function') {
+      // Malformed modules → stay safely not-wired (command projects not_wired).
+      return null
+    }
+    const notion = new Client({ auth: token })
+    return createNotionRagClient(notion)
+  } catch {
+    // A raw import / construction error may carry a token / db id / notion.so
+    // url — re-throw a fixed, secret-free error so nothing private survives.
+    throw new NotionRagRuntimeWiringError()
+  }
 }
 
 /**
@@ -104,7 +134,7 @@ export async function loadNotionRagDryRunRuntime(ctx = {}) {
   const {
     env = {},
     importTraverse = importTraverseDefault,
-    createClient = notWiredCreateClient,
+    createClient = createClientDefault,
   } = ctx
 
   if (!isRealRuntimeMode(env)) {

@@ -17,6 +17,7 @@
     "ai-room:bot": "node tools/ai-room/discord-bot.mjs",
     "ai-room:doctor": "node tools/ai-room/doctor-cli.mjs",
     "agent:command": "node scripts/agent-command.mjs",
+    "agent:notion-rag-dry-run": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-dry-run",
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -75,6 +76,7 @@
     "postcss": "^8.5.6",
     "sharp": "^0.34.5",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.22.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
   }
