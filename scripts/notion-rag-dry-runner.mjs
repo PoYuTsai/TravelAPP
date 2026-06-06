@@ -10,15 +10,19 @@
  * seam: when enabled and nothing is injected, it calls a runtime loader that
  * returns `{ runDryRun, client }`. This module IS that loader.
  *
- * WIRING PROOF, NOT A LIVE CONNECTION. The loader now knows how to ASSEMBLE the
- * runtime from injectable factories, but stays safely not-wired unless BOTH:
- *   1. an explicit env gate `AI_AGENT_NOTION_RAG_RUNTIME=real` is set, and
- *   2. a `NOTION_TOKEN` is present.
- * Even then it never touches a real Notion API here: the PRODUCTION default
- * factories are themselves not-wired (they return null), so a real gate + token
- * with no injected factories still yields `{ runDryRun: null, client: null }`.
- * A future knife replaces those defaults with a real tsx/dist import + a real
- * `@notionhq/client`; the command layer's resolution order does NOT change.
+ * WIRING PROOF, NOT A LIVE CONNECTION. The loader ASSEMBLES the runtime from
+ * injectable factories, gated by BOTH:
+ *   1. an explicit env gate `AI_AGENT_NOTION_RAG_RUNTIME=real`, and
+ *   2. a present `NOTION_TOKEN`.
+ * The default `importTraverse` now GUARD-loads the TS traverse: under a TS
+ * runtime it returns the real `runNotionRagTraverseDryRun`, under plain `node`
+ * the `.ts` import throws and is swallowed → null. Either way it touches NO
+ * Notion API (it only returns a pure function). The default `createClient` is
+ * still not-wired (returns null), so a real gate + token with no injected client
+ * still yields `{ client: null }` ⇒ the command projects `client_not_wired`.
+ * The next knife replaces the createClient default with a real `@notionhq/client`
+ * (+ a tsx operator runner so plain-node loads the traverse too); the command
+ * layer's resolution order does NOT change.
  *
  * Leak guard (loader-owned, mirrors notion-rag-client.ts): a factory throw may
  * carry a token / db id / notion.so url, so it is caught and re-thrown as a
@@ -56,12 +60,30 @@ class NotionRagRuntimeWiringError extends Error {
 }
 
 /**
- * PRODUCTION default factory: not wired. A real cut replaces this with a
- * tsx/dist import of runNotionRagTraverseDryRun. Returning null keeps real mode
- * safely not-wired until then — no live import, no API.
+ * PRODUCTION default factory for `importTraverse` — GUARDED dynamic import of
+ * the TS traverse (`runNotionRagTraverseDryRun`):
+ *   - under a TS-capable runtime (vitest now, a tsx operator runner later) the
+ *     import resolves and the real traverse function is returned;
+ *   - under plain `node` (today's operator CLI) importing a `.ts` source throws
+ *     (unknown extension); the throw is swallowed → null, so the loader stays
+ *     safely not-wired and the command projects `client_not_wired`.
+ * Loading the traverse alone does NOT touch the Notion API: it only returns a
+ * pure function the loader later runs against an injected client.
+ *
+ * `importModule` is injectable so the plain-node failure path is testable
+ * without depending on the host runtime. A swallowed import error can carry no
+ * secret because nothing propagates — the factory just resolves to null.
  */
-async function notWiredImportTraverse() {
-  return null
+export async function importTraverseDefault(ctx = {}) {
+  const {
+    importModule = () => import('../src/lib/line-agent/notion/notion-rag-traverse.ts'),
+  } = ctx
+  try {
+    const mod = await importModule()
+    return mod?.runNotionRagTraverseDryRun ?? null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -81,7 +103,7 @@ async function notWiredCreateClient() {
 export async function loadNotionRagDryRunRuntime(ctx = {}) {
   const {
     env = {},
-    importTraverse = notWiredImportTraverse,
+    importTraverse = importTraverseDefault,
     createClient = notWiredCreateClient,
   } = ctx
 

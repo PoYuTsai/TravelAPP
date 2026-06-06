@@ -14,7 +14,10 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { loadNotionRagDryRunRuntime } from '../../../../scripts/notion-rag-dry-runner.mjs'
+import {
+  importTraverseDefault,
+  loadNotionRagDryRunRuntime,
+} from '../../../../scripts/notion-rag-dry-runner.mjs'
 import {
   formatNotionRagTraverseReport,
   runNotionRagDryRunCommand,
@@ -23,6 +26,37 @@ import {
 const DB_PRIVATE_2025 = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
 const SECRET_TOKEN = 'secret_ntn_sk-DEADBEEF'
 const NOTION_LINK = 'https://www.notion.so/secret-page-deadbeef'
+
+/** One Notion-shaped page the real traverse can flatten into a record. */
+const FAKE_PAGE = {
+  id: 'p1',
+  url: NOTION_LINK,
+  parent: { type: 'database_id', database_id: DB_PRIVATE_2025 },
+  properties: {
+    客戶名稱: { type: 'title', title: [{ plain_text: '王小明' }] },
+    日期: { type: 'date', date: { start: '2026-04-12', end: '2026-04-16' } },
+    城市區域: { type: 'select', select: { name: '清邁' } },
+    行程類型: { type: 'multi_select', multi_select: [{ name: '親子' }] },
+    成本: { type: 'number', number: 22000 },
+    分潤: { type: 'number', number: 8000 },
+  },
+}
+
+/** Real env that ALSO satisfies the traverse: active source + its db id. */
+function realTraversableEnv(overrides = {}) {
+  return realEnv({ NOTION_PRIVATE_2025_DATABASE_ID: DB_PRIVATE_2025, ...overrides })
+}
+
+/** Loader-port client returning one fake page for the private_2025 db. */
+function fakeTraverseClient() {
+  return {
+    calls: [],
+    async listPages(databaseId) {
+      this.calls.push(databaseId)
+      return databaseId === DB_PRIVATE_2025 ? [FAKE_PAGE] : []
+    },
+  }
+}
 
 const OK_REPORT = {
   status: 'ok',
@@ -113,28 +147,66 @@ describe('loadNotionRagDryRunRuntime — real mode wiring', () => {
     expect(createClient.calls).toHaveLength(0)
   })
 
-  // production default factories stay not-wired even with a real gate + token.
-  test('real gate + default factories → still not wired (no live import)', async () => {
+  // Default importTraverse now LOADS the real traverse under a TS runtime, but
+  // the default createClient stays null → the production default path is STILL
+  // not-wired. The operator command therefore keeps projecting client_not_wired
+  // (createClient is the remaining unwired half, deferred to the next knife).
+  test('real gate + default factories → still not wired (client half unwired)', async () => {
     const runtime = await loadNotionRagDryRunRuntime({ env: realEnv() })
     expect(runtime).toEqual({ runDryRun: null, client: null })
   })
 
-  // DECISION D anchor — the default `importTraverse` is the not-wired piece.
-  // Inject a WORKING client but leave `importTraverse` at its production default:
-  // the runtime must still be not-wired, proving the default traverse factory
-  // attempts NO TypeScript import (no .ts dynamic import, no throw). If a future
-  // edit wires the default to import the TS traverse, `runDryRun` becomes truthy
-  // and this assertion flips — isolating the regression to importTraverse alone,
-  // which the combined "default factories" test above cannot distinguish.
-  test('real gate + default importTraverse + working client → not wired (no TS import)', async () => {
-    const createClient = spyFactory({ listPages: async () => [] })
+  // DECISION A1 — the default importTraverse loads the real TS traverse when a
+  // TS-capable runtime is present (vitest here, tsx later). Leave importTraverse
+  // at its default, inject only a working client: runtime gets a real runDryRun.
+  test('real gate + token + default importTraverse loads the real TS traverse', async () => {
+    const client = fakeTraverseClient()
 
     const runtime = await loadNotionRagDryRunRuntime({
-      env: realEnv(),
-      createClient: createClient.fn,
+      env: realTraversableEnv(),
+      createClient: async () => client,
     })
 
-    expect(runtime).toEqual({ runDryRun: null, client: null })
+    expect(typeof runtime.runDryRun).toBe('function')
+    expect(runtime.client).toBe(client)
+  })
+
+  // The default-loaded traverse composes end-to-end: command → ok report, and
+  // nothing private (token / db id / notion.so url) survives to the operator text.
+  test('default importTraverse + fake client → command ok report, leak-free', async () => {
+    const client = fakeTraverseClient()
+
+    const output = await runNotionRagDryRunCommand({
+      env: realTraversableEnv(),
+      loadRuntime: (ctx) =>
+        loadNotionRagDryRunRuntime({ ...ctx, createClient: async () => client }),
+    })
+
+    expect(output).toContain('完成')
+    expect(output).not.toContain(SECRET_TOKEN)
+    expect(output).not.toContain(DB_PRIVATE_2025)
+    expect(output).not.toContain(NOTION_LINK)
+    expect(output).not.toContain('notion.so')
+  })
+
+  // plain-node path: a `.ts` dynamic import throws (unknown extension / not
+  // found). The default factory swallows it → null (not-wired), never throws,
+  // and a secret-bearing import error cannot leak (nothing propagates).
+  test('importTraverseDefault swallows a secret-bearing import failure → null', async () => {
+    let thrown = null
+    let result
+    try {
+      result = await importTraverseDefault({
+        importModule: async () => {
+          throw new Error(`load fail token=${SECRET_TOKEN} db=${DB_PRIVATE_2025} at ${NOTION_LINK}`)
+        },
+      })
+    } catch (err) {
+      thrown = err
+    }
+
+    expect(thrown).toBeNull()
+    expect(result).toBeNull()
   })
 
   // 4) a factory throw (carrying secrets) → loader re-throws SANITIZED.
