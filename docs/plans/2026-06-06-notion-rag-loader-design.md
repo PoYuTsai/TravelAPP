@@ -505,10 +505,72 @@ fakes.
 - Constraints honored: no `package.json`/`package-lock`/`.env*`/README change, no
   real `@notionhq/client`, no real API, no live path, Discord ai-room WIP untouched.
 
+## Checkpoint — default `importTraverse` guard-loads the TS traverse (A1) · 2026-06-06
+
+Supersedes decision **D** above **for `importTraverse` only**. The Discord
+ai-room WIP that occupied `package.json` is merged, so the package gate is
+re-evaluated — but A1 still does **not** add `tsx` or touch `package.json`.
+
+### Why A1, not A2 (tsx now)
+Wiring `importTraverse` alone changes **no operator-visible output**: the default
+`createClient` still returns `null`, so the loader still returns `{ client: null }`
+⇒ the command still projects `client_not_wired`. A `tsx` operator runner only
+pays off once the **client** half is wired too (end-to-end real run). Adding
+`tsx` now = `package.json`/lock churn for zero observable effect ⇒ deferred to the
+client knife (YAGNI). Confirmed by evidence: traverse import graph is pure
+relative TS (`./notion-rag-config`, `./notion-rag-loader`, type-only
+`./rag-index`) — no `@/` alias, no `@notionhq/client` — so it resolves cleanly
+under any TS runtime with zero config.
+
+### What shipped (commit `05a197c`)
+- `scripts/notion-rag-dry-runner.mjs`: `notWiredImportTraverse` → exported
+  `importTraverseDefault(ctx)` doing a **guarded dynamic import** of
+  `runNotionRagTraverseDryRun`:
+  - **TS-capable runtime** (vitest now, a future tsx runner) → resolves, returns
+    the real traverse function;
+  - **plain `node`** (today's operator CLI) → `.ts` import throws (unknown
+    extension), swallowed → `null`, loader stays not-wired.
+  - `importModule` is injectable so the failure path is testable host-independently.
+- Loading the traverse touches **no Notion API** — it only returns a pure
+  function the loader runs against an injected client.
+- `createClient` default is **unchanged** (`null`) → operator path stays
+  `client_not_wired`.
+
+### Two-runtime behaviour (the wart, recorded honestly)
+The default behaves differently by host: under a TS runtime it loads, under plain
+`node` it returns null. This is intentional — plain `node` cannot import `.ts`,
+and the not-wired fallback is the safe one. The **operator-facing** statement in
+the runbook above stays true: a real operator run (plain `node`) still reports
+`client_not_wired`. The traverse-loading **code** is proven correct by the TS
+test runtime; the real operator runtime (tsx) lands with the client knife.
+(Plain `node` emits a benign ESM warning to **stderr** naming the `.ts` source
+path — no secret, stdout report stays clean.)
+
+### Tests (notion-rag-dry-runner.test.ts — reverses the `cbfc351` anchor)
+- default `importTraverse` (uninjected) + injected working client → runtime gets
+  a real `runDryRun` function.
+- default `importTraverse` + fake client → command renders an **ok report**,
+  leak-free (no token / db id / notion.so url).
+- `importTraverseDefault({ importModule: throws-with-secrets })` → `null`, no
+  throw, no leak (plain-node failure path).
+- real gate + both defaults → still `{ null, null }` (client half unwired).
+- Verification: targeted **11/11**; line-agent suite **635/635 green**; verified
+  under plain `node` (`.ts` import → null, loader `{null,null}`).
+- Constraints honored: no `package.json`/`package-lock`/`.env*`/README change, no
+  `tsx`, no real `@notionhq/client`, no real API, no live path, no cache/scheduler.
+
+### Next knife (not started)
+Wire the **client** half: a real `@notionhq/client` (already in `package.json`)
+wrapped by `createNotionRagClient`, gated behind the `real` env + token, **plus**
+a `tsx` operator runner (`agent:command` under tsx) so plain-node operator runs
+also load the traverse. Only then does the operator output change from
+`client_not_wired` to a real (still dry-run) report. Loader contract + command
+resolution order stay frozen.
+
 ## Deferred (still NOT done)
 
-- Real runtime wiring inside `loadNotionRagDryRunRuntime()` (build the real
-  `@notionhq/client` + TS traverse; needs a token + a tsx/dist strategy).
+- Client-half runtime wiring inside `loadNotionRagDryRunRuntime()` (real
+  `@notionhq/client` + `tsx` operator runner; needs a token).
 - Production SDK instantiation + env token wiring (real `@notionhq/client`).
 - Live request-path integration.
 - Traverse job scheduling / cache persistence.
