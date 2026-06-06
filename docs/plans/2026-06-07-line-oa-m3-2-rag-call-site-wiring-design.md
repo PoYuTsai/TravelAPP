@@ -193,8 +193,51 @@ No code rollback needed — the call site is gate-guarded and install is lazy:
 5. Timeout ⇒ unavailable reply, not cached, retried next call.
 6. Install log emits the code only (spy console; assert no token/id/url).
 
-## 6. NOT in this session
+## 6. NOT in this session (design slice)
 - No code. No call site added yet. No gate flipped. No deploy.
 - Deliverable is this design doc + its commit. Implementation (the `ensure` guard,
   the thunk hook, the timeout, the logs, the tests) is the next slice, pending
   Eric's go.
+
+## 7. Implementation checkpoint (2026-06-07, commit `0234a48`) — DONE, gate still off
+
+Decision C implemented exactly as designed. **No env gate flipped; no deploy.**
+
+- **New `src/lib/line-agent/line/ensure-partner-rag-installed.ts`** —
+  `ensurePartnerRagAnswerSourceInstalled(deps?)`:
+  - **Idempotent + single-flight.** Module singletons `_done` (terminal: installer
+    resolved, installed OR a definitive config not-installed) + `_inflight`
+    (shared in-flight attempt). Installer runs at most once per instance;
+    concurrent first calls share one attempt.
+  - **Timeout-bounded.** `Promise.race(installer, startTimeout(ms)→throw)`; on
+    overrun throws `NotionRagIndexUnavailableError('timeout')`. A timeout OR an
+    installer error is **NOT cached** (`_done` stays false) → next eligible
+    message retries; the throw propagates to `createRagPartnerGroupResponder`'s
+    try/catch → `PARTNER_RAG_UNAVAILABLE_REPLY`, never a fabricated draft.
+    `startTimeout` is the injectable "clock" (real unref'd `setTimeout` default,
+    fake in tests). Default budget `DEFAULT_PARTNER_RAG_INSTALL_TIMEOUT_MS = 8_000`.
+  - **SDK-free static graph.** Default installer does `await import('./install-default-partner-rag')`
+    so importing `webhook-runtime` never pulls `@notionhq/client` (design §2 option
+    A rejected — preserved). `setPartnerRagInstaller(fn)` overrides the no-deps
+    thunk path for tests/bootstrap.
+  - **Leak-safe logs.** `PartnerRagInstallLogCode` =
+    `partner_rag_install_start | _success | _failed | _timeout`. Codes only — no
+    token / db id / Notion url (asserted by a test).
+- **`webhook-runtime.ts` thunk** (was `(input) => getPartnerRagAnswerSource()(input)`)
+  now `async (input) => { await ensurePartnerRagAnswerSourceInstalled(); return getPartnerRagAnswerSource()(input) }`.
+  Reached ONLY on the gate-on rag path (`shouldUsePartnerRagDraft`), so the
+  structural gate IS the install gate — no extra env read.
+- **Tests (TDD, RED first).** `ensure-partner-rag-installed.test.ts` (8: once/idempotent/
+  single-flight/timeout-throw/timeout-not-cached/error-not-cached/installed:false-terminal/
+  code-only-logs) + `partner-rag-lazy-install-wiring.test.ts` (8: gate-off / no-intent /
+  OA / untagged ⇒ installer 0; success ⇒ installer once + installed source used;
+  idempotent re-fire; installer error ⇒ fail-closed; e2e send). Full line-agent
+  suite **840/840** (was 824). Pre-existing repo tsc errors only; new files 0.
+
+### Still NOT done (next, pending Eric)
+- §3.8 secondary timeout INSIDE the index build (`cached-rag-source` / loader). The
+  guard above bounds the *install attempt*; the current real installer is sync
+  (SDK ctor only) so the actual Notion read still happens in the source's first
+  call. Wrapping that build in a timeout closes the remaining hang window.
+- §6 C operator refresh (M3.3). Preview smoke (§3.5) + the gate flip sequence
+  (§3.4). Production partner group still requires Eric's explicit send intent.
