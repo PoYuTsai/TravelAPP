@@ -85,6 +85,84 @@ describe('parseItineraryHints — theme tokens', () => {
 })
 
 // ---------------------------------------------------------------------------
+// expanded theme vocabulary (Eric, 2026-06-06) — theme 詞庫 was too thin
+// (distinct theme tokens stuck at 2). Each row below is a NEW canonical theme.
+// ---------------------------------------------------------------------------
+
+describe('parseItineraryHints — expanded theme vocabulary', () => {
+  // zoo vs night_safari: longest-alias-first must keep the two distinct.
+  it('清邁動物園 → area chiangmai + theme zoo', () => {
+    const hints = parseItineraryHints('清邁動物園')
+    expect(hints.areaHints).toEqual(['chiangmai'])
+    expect(hints.themeHints).toEqual(['zoo'])
+  })
+
+  it('大象 + 夜間動物園 stays elephant + night_safari (never a stray zoo)', () => {
+    const hints = parseItineraryHints('大象 + 夜間動物園')
+    expect(hints.themeHints).toEqual(['elephant', 'night_safari'])
+    expect(hints.themeHints).not.toContain('zoo')
+  })
+
+  it('夜間動物園 + 清邁動物園 → night_safari AND a standalone zoo (distinct activities)', () => {
+    const hints = parseItineraryHints('夜間動物園 + 清邁動物園')
+    expect(hints.themeHints).toEqual(['night_safari', 'zoo'])
+  })
+
+  // zipline — generic 飛索 plus named operators, all collapse to one token.
+  it('飛索 / 叢林飛索 / Kingkong / Pongyang → zipline (deduped)', () => {
+    expect(parseItineraryHints('飛索 / 叢林飛索 / Kingkong / Pongyang').themeHints).toEqual([
+      'zipline',
+    ])
+  })
+
+  it('Jungle Flight → zipline', () => {
+    expect(parseItineraryHints('Jungle Flight').themeHints).toEqual(['zipline'])
+  })
+
+  // cafe — Chinese head noun + English token.
+  it('咖啡廳 / cafe → cafe (deduped)', () => {
+    expect(parseItineraryHints('咖啡廳 / cafe').themeHints).toEqual(['cafe'])
+  })
+
+  // market — generic 市集/夜市 head nouns + named market 瓦洛洛.
+  it('真心市集 / 椰林市集 / 夜市 / 瓦洛洛 → market (deduped)', () => {
+    expect(parseItineraryHints('真心市集 / 椰林市集 / 夜市 / 瓦洛洛').themeHints).toEqual(['market'])
+  })
+
+  it('massage: 按摩 → massage', () => {
+    expect(parseItineraryHints('按摩').themeHints).toEqual(['massage'])
+  })
+
+  // photo — 泰服 / 拍照 / 攝影 / 網美 all collapse to photo.
+  it('泰服拍照 / 攝影 → photo (deduped)', () => {
+    expect(parseItineraryHints('泰服拍照 / 攝影').themeHints).toEqual(['photo'])
+  })
+
+  // temple — generic 寺/廟 head nouns cover named temples.
+  it('藍廟 / 白廟 / 柴迪隆寺 / 帕辛寺 → temple (deduped)', () => {
+    expect(parseItineraryHints('藍廟 / 白廟 / 柴迪隆寺 / 帕辛寺').themeHints).toEqual(['temple'])
+  })
+
+  // shopping — Big C / 採買 / 伴手禮.
+  it('Big C 採買 / 伴手禮 → shopping (deduped)', () => {
+    expect(parseItineraryHints('Big C 採買 / 伴手禮').themeHints).toEqual(['shopping'])
+  })
+
+  // adventure — Phoenix Adventure / ATV / 越野 / 冒險.
+  it('Phoenix Adventure / ATV → adventure (deduped)', () => {
+    expect(parseItineraryHints('Phoenix Adventure / ATV').themeHints).toEqual(['adventure'])
+  })
+
+  it('越野冒險 → adventure', () => {
+    expect(parseItineraryHints('越野冒險').themeHints).toEqual(['adventure'])
+  })
+
+  it('still invents nothing for unrecognised activity text', () => {
+    expect(parseItineraryHints('完全沒聽過的活動 qwerty').themeHints).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 8: never invent tokens for unrecognised text
 // ---------------------------------------------------------------------------
 
@@ -116,9 +194,10 @@ describe('parsed hints feed RagIndex query/filter', () => {
     })
     const family = records.find((r) => r.identity.sourceRecordIds[0] === 'real-family-cm-5d')!
     // 行程框架: '清邁親子 5 天：動物園 + 叢林飛索 + 夜間動物園 + 大象保護營'
-    // order follows appearance: 夜間動物園 precedes 大象 in this text.
+    // expanded vocab now lifts all four activities, ordered by appearance;
+    // 動物園 (zoo) stays distinct from 夜間動物園 (night_safari).
     expect(family.facts.areaHints).toEqual(['chiangmai'])
-    expect(family.facts.themeHints).toEqual(['night_safari', 'elephant'])
+    expect(family.facts.themeHints).toEqual(['zoo', 'zipline', 'night_safari', 'elephant'])
   })
 
   it('queryRagIndex matches the derived area token', () => {

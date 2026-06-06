@@ -36,10 +36,48 @@ const AREA_ALIASES: Record<string, string> = {
   南奔: 'lamphun',
 }
 
-// Chinese activity token → canonical theme hint. Longest aliases win first.
+// Activity token → canonical theme hint. Longest aliases win first, so a
+// compound (夜間動物園) is consumed before its substring (動物園) can re-match.
+// English/named-operator aliases are matched case-sensitively as written — the
+// private_2026 行程框架 corpus uses these exact spellings.
 const THEME_ALIASES: Record<string, string> = {
+  // night safari MUST precede the bare 動物園 zoo alias (longest-first).
   夜間動物園: 'night_safari',
+  動物園: 'zoo',
   大象: 'elephant',
+  // zipline — generic 飛索 head + named operators
+  叢林飛索: 'zipline',
+  飛索: 'zipline',
+  'Jungle Flight': 'zipline',
+  Pongyang: 'zipline',
+  Kingkong: 'zipline',
+  // cafe
+  咖啡廳: 'cafe',
+  咖啡: 'cafe',
+  cafe: 'cafe',
+  // temple — generic 寺/廟 head nouns cover 藍廟/白廟/柴迪隆寺/帕辛寺
+  寺: 'temple',
+  廟: 'temple',
+  // market — generic 市集/夜市 head nouns + named market 瓦洛洛
+  市集: 'market',
+  夜市: 'market',
+  瓦洛洛: 'market',
+  // massage
+  按摩: 'massage',
+  // photo
+  泰服: 'photo',
+  拍照: 'photo',
+  攝影: 'photo',
+  網美: 'photo',
+  // shopping
+  'Big C': 'shopping',
+  採買: 'shopping',
+  伴手禮: 'shopping',
+  // adventure
+  'Phoenix Adventure': 'adventure',
+  冒險: 'adventure',
+  越野: 'adventure',
+  ATV: 'adventure',
 }
 
 /**
