@@ -2,7 +2,10 @@
 
 **Date:** 2026-06-06
 **Branch:** `codex/line-oa-agent-mvp` (tip `09d6241`)
-**Status:** Design converged via brainstorming. TDD-ready. No code written yet.
+**Status:** IMPLEMENTED (commit `2bd30ac`). TDD complete — 13 contract tests green,
+full line-agent suite 750/750. Single module `notion-rag-answer-composer.ts` holds
+both `composeAnswer` + `transportationAssessment` (helper co-located, not split into
+`transportation-assessment.ts` — kept one file per task scope).
 **Scope:** Pure deterministic composer that turns operator-safe retrieval results
 into a **partner-group draft answer**. No LLM, no CLI, no LINE live path, no
 Sanity, no Notion API, no scheduler/cache this slice.
@@ -207,7 +210,22 @@ adds no new dependency and no new env.
 
 ---
 
+## Implementation checkpoint (2026-06-06)
+
+- Files: `src/lib/line-agent/notion/notion-rag-answer-composer.ts` +
+  `src/lib/line-agent/__tests__/notion-rag-answer-composer.test.ts`.
+- `transportationAssessment` co-located in the composer module (not a separate
+  `transportation-assessment.ts`) — one module per task scope.
+- All 8 design contracts pinned by tests, plus guardrails (medium-confidence
+  partySize-only path, `partySize > 1` ≠ family, insufficient-data rule 7).
+- Confidence: `ok`+results & area/theme signal → `high`; `ok`+results but
+  partySize-only → `medium`; `low_confidence`/empty → `low`.
+- `refineHook` seam present, asserted never invoked (call count 0).
+- Verified: `vitest run src/lib/line-agent` → 58 files / 750 tests green;
+  `tsc --noEmit` clean for the new module.
+
 ## Not done (by design)
 
-- No code written this cut; design checkpoint only.
+- No CLI (`agent:notion-rag-answer` = M3.1b, later), no trigger wiring, no
+  partner-group send, no OA auto-reply, no LLM refine, no Sanity write.
 - Branch stays as-is (no merge/PR).
