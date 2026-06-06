@@ -240,7 +240,25 @@ one-line `meta.responder` union widening in `responder.ts`). Both env gates ship
 15 contract tests (the design's Test 1–10 plus edge cases); full `line-agent`
 suite **776/776** green.
 
-Still NOT done (future runtime slice, per §6/§7): factory wiring, real
-retrieval+`composeAnswer` `source`, cache/index reuse, and the actual LINE group
-attachment. The OA auto-reply ban (router B3) and `sendTarget` (B4) remain
-untouched.
+## Implementation status (M3.2 factory selection — commit `0bfe244`)
+
+RED-first dispatching factory landed in `partner-group/responder-factory.ts`
+(`createPartnerGroupResponderWithRagDraft`), plus an additive optional
+`botDirected?` on `PartnerGroupRespondInput`.
+
+- Wraps the existing (stub/anthropic) `base` responder; per message routes to the
+  rag responder ONLY when `shouldUsePartnerRagDraft` holds, else to `base`.
+- `botDirected` resolves as `input.botDirected ?? event.mentionsBot === true`
+  (mirrors the router; supports quote-to-bot).
+- Gate off / no intent / OA / untagged → `base` runs, injected `answerSource`
+  (fake this slice) is never invoked → zero Notion read.
+- `answerSource` throw → fail-closed degraded reply (no hallucinated draft).
+- Produces TEXT only — send stays owned by router `sendTarget`. Router / OA
+  auto-reply ban untouched (verified: full suite green, no router test changed).
+
+7 selection tests; full `line-agent` suite **783/783** green.
+
+Still NOT done (future runtime slice, per §6/§7): wire the dispatcher into
+`webhook-runtime.getPartnerGroupResponder()`, a real retrieval+`composeAnswer`
+`answerSource`, cache/index reuse, and the actual LINE group attachment. The OA
+auto-reply ban (router B3) and `sendTarget` (B4) remain untouched.
