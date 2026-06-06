@@ -343,3 +343,46 @@ Inject a real `loadIndex` (operator-safe retrieval over the corpus) + `answer`
 `setPartnerRagAnswerSource` — all BEHIND the still-off `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED`.
 Only after that lands does flipping the gate become a deliberate op action. C
 (operator refresh) remains the M3.3 hardening layer over this same cache seam.
+
+## Implementation status (M3.2 real cached answerSource — commit `0c993a6`)
+
+The "Next knife" landed. `partner-group/notion-rag-answer-source.ts` assembles the
+REAL `PartnerRagDraftSource` from the existing pieces, BEHIND the §6 cache, with
+**no env gate flipped** (`AI_AGENT_PARTNER_RAG_DRAFT_ENABLED` untouched):
+
+- `loadNotionRagIndex({env, client})` — `resolveNotionRagConfig` →
+  `buildNotionRagIndex(injected loader port)` → `RagIndex`. **Fail-closed:** a
+  non-`ok` build (disabled gate / `missing_database_id` / `client_error`) THROWS
+  `NotionRagIndexUnavailableError` (code-only message — never a token / db id /
+  Notion url), so the cache never stores a failure (next call retries) and the rag
+  responder converts the throw into `PARTNER_RAG_UNAVAILABLE_REPLY` (§5). An empty
+  silent index would mask a misconfiguration as "no internal references", so it is
+  deliberately NOT returned.
+- `composeRagAnswerFromIndex(index, input)` — `searchRagIndex` (operator-safe
+  whitelist projection) → `composeAnswer` → body text. privateContext (cost /
+  revenue / profit / Notion url / db id / private notes) and PII-bearing free text
+  (flight / pickup / itinerary snippet) structurally cannot enter — proven on the
+  HIT path (`內部過往案例傾向` branch) against a record carrying all of them.
+- `createNotionRagAnswerSource(deps)` — wraps both in `createCachedRagAnswerSource`
+  (TTL + single-flight). The `client` (loader port) is injected, so this module
+  imports no `@notionhq/client`, no LINE client, no LLM.
+- `webhook-runtime.installPartnerRagAnswerSource(deps)` — the deliberate opt-in
+  installer. **Nothing calls it at module load**, so the production default
+  (`getPartnerRagAnswerSource` throwing `partner_rag_answer_source_not_wired`)
+  stays in force until a bootstrap explicitly invokes it. It flips no env gate; the
+  per-respond `shouldUsePartnerRagDraft` gate still governs whether the installed
+  source is ever reached.
+
+11 new tests (loadIndex returns/throws on disabled+client-error+sanitized;
+compose no-leak on the hit path; build-once / reuse-within-TTL / failure-not-cached;
+banner+marker output; end-to-end fail-closed; installer opt-in vs not-wired
+default). Full `line-agent` suite **813/813** green. Points 6 (gate off ⇒ source 0)
+and 8 (no LINE send change) stay locked by `partner-rag-webhook-wiring.test.ts`
+(the real source sits behind the SAME gated dispatcher) — referenced, not
+duplicated.
+
+Still NOT done: production wiring of the real `@notionhq/client` adapter into
+`installPartnerRagAnswerSource` (the SDK construction, mirroring the dry-runner's
+`createClientDefault`), the §6 hardening (C = operator refresh, M3.3), a Vercel
+preview smoke, and flipping `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED` on as a deliberate
+op action.
