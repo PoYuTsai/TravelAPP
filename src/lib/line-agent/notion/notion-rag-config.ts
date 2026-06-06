@@ -55,6 +55,27 @@ function isKnownSource(token: string): token is NotionRagSourceTable {
   return (KNOWN_SOURCES as readonly string[]).includes(token)
 }
 
+/**
+ * Normalise a configured Notion database id into the bare 32-hex id the API
+ * accepts. Tolerates every form an operator might paste:
+ *   - bare 32-hex id                              → unchanged (lowercased)
+ *   - dashed UUID (8-4-4-4-12)                    → dashes stripped
+ *   - full Notion database URL (with a name slug) → trailing 32-hex extracted
+ *   - URL carrying a `?v=<viewId>` query          → query dropped first, so the
+ *     view id can never be mistaken for the database id
+ *
+ * Strategy: drop any query/fragment, keep only hex characters, and take the LAST
+ * 32 — the database id always trails the path (a name slug may contribute stray
+ * hex letters, but the real id sits at the very end). Fewer than 32 hex chars ⇒
+ * unparseable ⇒ '' (the caller reports it as `missing_database_id`). Returns no
+ * part of the raw input on failure, so a leak-prone URL never reaches an issue.
+ */
+function normaliseDatabaseId(raw: string): string {
+  const pathOnly = raw.split(/[?#]/, 1)[0]
+  const hex = pathOnly.replace(/[^0-9a-fA-F]/g, '')
+  return hex.length >= 32 ? hex.slice(-32).toLowerCase() : ''
+}
+
 export function resolveNotionRagConfig(
   env: Record<string, string | undefined> = process.env
 ): NotionRagConfigResolution {
@@ -93,7 +114,11 @@ export function resolveNotionRagConfig(
   // the source stays active, so buildNotionRagIndex returns missing_database_id.
   const databaseIds: Partial<Record<NotionRagSourceTable, string>> = {}
   for (const source of activeSources) {
-    const value = (env[DATABASE_ID_ENV_KEYS[source]] ?? '').trim()
+    const raw = (env[DATABASE_ID_ENV_KEYS[source]] ?? '').trim()
+    // An empty OR unparseable value (e.g. a URL with no extractable id) both
+    // collapse to '' → reported as missing, so the loader's structured error
+    // still fires. The issue message carries only the source label, never `raw`.
+    const value = normaliseDatabaseId(raw)
     if (value === '') {
       issues.push({
         code: 'missing_database_id',
