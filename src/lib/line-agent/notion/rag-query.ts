@@ -7,10 +7,12 @@
  * (parseItineraryHints). This guarantees query tokens and corpus hints line up.
  *
  * Discipline (locked):
- *   - Only in-vocab tokens survive. Out-of-vocab words (親子 / 5天 / 金三角 /
- *     包車 / 東京) contribute NOTHING — area/theme stay empty rather than being
- *     invented. "family/kids" is a STRUCTURAL fact (children / partySize), not a
- *     parsed theme; retrieval surfaces the family case via its activity themes.
+ *   - Only in-vocab tokens survive. Out-of-vocab words (5天 / 金三角 / 包車 /
+ *     東京) contribute NOTHING — area/theme stay empty rather than being invented.
+ *     As of GAP-2 "family/kids" (親子 / 小孩 / 小朋友 / 兒童 / family / kids) IS
+ *     in-vocab → it lifts the canonical `family` theme so a 親子 query and a 親子 /
+ *     小朋友 corpus record line up; children / partySize remain a further
+ *     structural fact on top, never invented from partySize alone.
  *   - partySize is a usable structural signal ('6人' → 6), but this layer never
  *     maps 包車 to a vehicleType and retrieval never commits to a vehicle/quote.
  *   - A query with zero usable signal (no area, no theme, no partySize) yields a

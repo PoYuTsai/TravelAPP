@@ -34,6 +34,8 @@ const AREA_ALIASES: Record<string, string> = {
   湄康蓬: 'mae_kampong',
   南邦: 'lampang',
   南奔: 'lamphun',
+  // English place name as written by some customer-style queries.
+  chiangmai: 'chiangmai',
 }
 
 // Activity token → canonical theme hint. Longest aliases win first, so a
@@ -41,6 +43,15 @@ const AREA_ALIASES: Record<string, string> = {
 // English/named-operator aliases are matched case-sensitively as written — the
 // private_2026 行程框架 corpus uses these exact spellings.
 const THEME_ALIASES: Record<string, string> = {
+  // family / kids — parent-friendly signal (GAP-2). A canonical theme so a 親子
+  // customer query and a 親子 / 小朋友 itinerary line resolve to the SAME token;
+  // 小朋友 (longest) is consumed before the 小孩 substring could re-match.
+  小朋友: 'family',
+  親子: 'family',
+  小孩: 'family',
+  兒童: 'family',
+  family: 'family',
+  kids: 'family',
   // night safari MUST precede the bare 動物園 zoo alias (longest-first).
   夜間動物園: 'night_safari',
   動物園: 'zoo',

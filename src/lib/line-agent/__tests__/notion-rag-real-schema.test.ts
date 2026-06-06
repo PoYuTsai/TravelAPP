@@ -168,10 +168,10 @@ describe('cost / revenue / profit are private only', () => {
 describe('area/theme derived from 行程框架 (deterministic parser)', () => {
   it('derives recognised area/theme tokens from the real-schema corpus', () => {
     // 行程框架: '清邁親子 5 天：動物園 + 叢林飛索 + 夜間動物園 + 大象保護營'
-    // expanded theme vocab lifts zoo/zipline too, ordered by appearance.
+    // 親子 → family leads (GAP-2); zoo/zipline lift too, ordered by appearance.
     const f = factsOf(familyPage.properties)
     expect(f.areaHints).toEqual(['chiangmai'])
-    expect(f.themeHints).toEqual(['zoo', 'zipline', 'night_safari', 'elephant'])
+    expect(f.themeHints).toEqual(['family', 'zoo', 'zipline', 'night_safari', 'elephant'])
   })
 
   it('still invents nothing for unrecognised itinerary text', () => {

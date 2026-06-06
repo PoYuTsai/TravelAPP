@@ -8,13 +8,13 @@
  * and ranks the right CASE TYPE — never a report, never a vehicle commitment.
  *
  * Design rules under test (locked):
- *   - The query parser only emits tokens that exist in the area/theme vocab
- *     (7 areas + 11 themes). Out-of-vocab words (親子 / 5天 / 金三角 / 包車 /
- *     東京 / 滑雪) contribute NOTHING — area/theme stay empty rather than being
- *     invented. "family/kids" is therefore a STRUCTURAL fact (children /
- *     partySize), never a parsed theme; retrieval surfaces the family case via
- *     its activity themes, and the bot layer (not retrieval) reasons about who
- *     it is for.
+ *   - The query parser only emits tokens that exist in the area/theme vocab.
+ *     Out-of-vocab words (5天 / 金三角 / 包車 / 東京 / 滑雪) contribute NOTHING —
+ *     area/theme stay empty rather than being invented. As of GAP-2,
+ *     "family/kids" (親子 / 小孩 / 小朋友 / 兒童 / family / kids) IS in the theme
+ *     vocab → it lifts the canonical `family` theme, so a 親子 query and a 親子 /
+ *     小朋友 corpus record line up on the same token (children / partySize stay a
+ *     further structural fact on top).
  *   - Multiple areas are OR-gated and each hit counts as a matched dimension, so
  *     a case covering more of the asked areas ranks above a partial match.
  *   - partySize is a usable structural retrieval signal, but retrieval NEVER
@@ -144,10 +144,11 @@ const idsOf = (records: RagIndexRecord[]) =>
 // ---------------------------------------------------------------------------
 
 describe('parseRagQuery — vocab-bounded, never invents', () => {
-  it('lifts only in-vocab area/theme tokens; 親子 / 5天 drop out', () => {
+  it('lifts only in-vocab area/theme tokens; 親子 → family theme, 5天 drops out', () => {
     const q = parseRagQuery('清邁 親子 5天 大象 夜間動物園')
     expect(q.areas).toEqual(['chiangmai'])
-    expect(q.themes).toEqual(['elephant', 'night_safari'])
+    // 親子 → family (GAP-2): family/kids is a canonical theme, not structural-only.
+    expect(q.themes).toEqual(['family', 'elephant', 'night_safari'])
     expect(q.partySize).toBeUndefined()
   })
 
@@ -185,7 +186,9 @@ describe('retrieveRagCases — scenario retrieval quality', () => {
   it('1. 清邁 親子 5天 大象 夜間動物園 → CM family elephant/night-safari first', () => {
     const out = retrieveRagCases(index, '清邁 親子 5天 大象 夜間動物園')
     expect(out[0].identity.sourceRecordIds[0]).toBe('cm-fam-elephant')
-    // family signal is structural, surfaced via activity themes — not a parsed theme
+    // these fixtures carry no `family` theme, so ranking here is decided purely by
+    // the activity-theme match; the family-theme retrieval contract lives in
+    // notion-rag-family-theme.test.ts. The matched case still IS a family one.
     expect(out[0].facts.children).toBeGreaterThan(0)
     // the big-party chiangmai case must not outrank the activity match
     expect(out[0].identity.sourceRecordIds[0]).not.toBe('cm-bigparty')

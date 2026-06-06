@@ -194,10 +194,10 @@ describe('parsed hints feed RagIndex query/filter', () => {
     })
     const family = records.find((r) => r.identity.sourceRecordIds[0] === 'real-family-cm-5d')!
     // 行程框架: '清邁親子 5 天：動物園 + 叢林飛索 + 夜間動物園 + 大象保護營'
-    // expanded vocab now lifts all four activities, ordered by appearance;
-    // 動物園 (zoo) stays distinct from 夜間動物園 (night_safari).
+    // expanded vocab lifts all activities, ordered by appearance; 親子 → family
+    // leads (GAP-2), and 動物園 (zoo) stays distinct from 夜間動物園 (night_safari).
     expect(family.facts.areaHints).toEqual(['chiangmai'])
-    expect(family.facts.themeHints).toEqual(['zoo', 'zipline', 'night_safari', 'elephant'])
+    expect(family.facts.themeHints).toEqual(['family', 'zoo', 'zipline', 'night_safari', 'elephant'])
   })
 
   it('queryRagIndex matches the derived area token', () => {

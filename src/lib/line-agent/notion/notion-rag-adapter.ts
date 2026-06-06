@@ -52,6 +52,25 @@ const CASE_ID_ALIASES = new Set(['案例ID', '清微案例ID', 'caseId', 'caseID
 // privateContext and is enforced at projection time, not here.
 const FACTS_AUDIENCE: AudienceScope = 'partner_group'
 
+// Canonical family/kids retrieval theme (GAP-2) + the words that signal it in
+// free text. partySize alone is NEVER one of them — only an explicit child count
+// or a family/child word qualifies, so an adults-only large party is not family.
+const FAMILY_THEME = 'family'
+const FAMILY_SIGNAL_WORDS = ['親子', '小朋友', '小孩', '兒童', 'family', 'kids']
+
+function containsFamilySignal(text: string | undefined): boolean {
+  if (!text) return false
+  const lower = text.toLowerCase()
+  return FAMILY_SIGNAL_WORDS.some((w) => lower.includes(w.toLowerCase()))
+}
+
+/** True when themeHints already carries family — raw (親子) or canonical (family). */
+function hasFamilyTheme(themeHints: string[] | undefined): boolean {
+  if (!themeHints) return false
+  const lower = FAMILY_SIGNAL_WORDS.map((w) => w.toLowerCase())
+  return themeHints.some((h) => lower.includes(h.trim().toLowerCase()))
+}
+
 // --- coercion helpers ------------------------------------------------------
 
 function asString(v: unknown): string | undefined {
@@ -137,6 +156,7 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
   const facts: RagCaseFacts = {}
   const privateContext: RagPrivateContext = {}
   let canonicalCaseId: string | undefined
+  let rawPartyText: string | undefined
 
   for (const [rawName, value] of Object.entries(properties)) {
     if (CASE_ID_ALIASES.has(rawName)) {
@@ -159,6 +179,7 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
         setIf(facts, 'travelDateRange', asString(value))
         break
       case 'partySize': {
+        rawPartyText = asString(value)
         const { partySize, adults, children } = parsePartySize(value)
         setIf(facts, 'partySize', partySize)
         setIf(facts, 'adults', adults)
@@ -224,6 +245,19 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
     if (facts.themeHints === undefined && derived.themeHints.length > 0) {
       facts.themeHints = derived.themeHints
     }
+  }
+
+  // Family/kids is a retrieval theme signal (GAP-2). Add canonical 'family' when
+  // an explicit child count (旅遊人數 split) OR a family/child word in the
+  // itinerary / party free-text says so — but only when themeHints does not
+  // already carry family (raw 親子 or canonical), to avoid a duplicate. partySize
+  // alone never triggers it, so an adults-only large party stays non-family.
+  const familySignal =
+    (facts.children !== undefined && facts.children > 0) ||
+    containsFamilySignal(facts.itinerarySnippet) ||
+    containsFamilySignal(rawPartyText)
+  if (familySignal && !hasFamilyTheme(facts.themeHints)) {
+    facts.themeHints = [...(facts.themeHints ?? []), FAMILY_THEME]
   }
 
   return { facts, privateContext, canonicalCaseId }
