@@ -295,3 +295,51 @@ Still NOT done (next knife): a real retrieval+`composeAnswer` `answerSource`
 (replacing the not-wired default), the §6 cost guard (cached index / operator
 trigger / scheduled build) BEFORE live group traffic, and flipping the env gates
 on as a deliberate op action.
+
+## Real answerSource — convergence on Option B (cost guard) + cache contract
+
+The §6 forward note (a tag burst must not fan out into N full-corpus reads) is the
+gating concern before any real Notion source is attached. Re-stating the fork:
+
+- **A — direct real source per request:** build index + search + compose on every
+  explicit-intent tag. Simplest, highest latency/cost, no burst protection.
+  **Rejected** for runtime.
+- **B — cached in-memory index source (CHOSEN, runtime v1):** cache the expensive
+  index build for a TTL; run cheap search+compose per request against the cached
+  index; collapse concurrent builds via single-flight. In-process only, no infra.
+- **C — operator-refresh + runtime read-only cache:** operator command refreshes
+  the index; group runtime only reads. Safest/cheapest but adds a refresh-state
+  layer. **Deferred to M3.3** — B is the smaller runtime-v1 step and C can layer
+  on top of the same cache seam later.
+
+### Implemented this slice (commit pending) — pure cache wrapper, NO real Notion
+
+`partner-group/cached-rag-source.ts` — `createCachedRagAnswerSource<TIndex>({
+loadIndex, answer, ttlMs, now })` returns a `PartnerRagDraftSource`:
+
+- **TTL:** within `ttlMs` of the last build the index is reused (zero corpus read);
+  a build at/after `ttlMs` is stale and rebuilds.
+- **Single-flight:** concurrent calls arriving during a build JOIN that one build —
+  a burst triggers **at most one** corpus read (the real §6 protection; TTL alone
+  cannot stop same-instant concurrency).
+- **Fail-closed:** a `loadIndex` error propagates (the rag responder → unavailable
+  reply) and is **never cached** — the next call retries, no stale failure.
+- **Transparent:** returns the `answer` body verbatim — adds no field, so it cannot
+  reintroduce leakage the upstream operator-safe projection removed.
+- Generic + pure: imports no Notion/LLM client; `loadIndex`/`answer`/clock are
+  injected. It is **not** wired into the webhook default this slice — the
+  production source stays not-wired + fail-closed and **no env gate is flipped**.
+
+9 tests (build-once; reuse-within-TTL; rebuild-after-TTL; single-flight burst;
+error-not-cached + end-to-end fail-closed; verbatim transparency; banner+marker
+output contract; no PII/price/token/URL/db-id leak). Full `line-agent` suite
+**802/802** green. Gate-off-⇒-source-0 and OA/untagged invariants are referenced
+(DRY) from the webhook-wiring suite, not duplicated.
+
+### Next knife (still gated off)
+
+Inject a real `loadIndex` (operator-safe retrieval over the corpus) + `answer`
+(existing `composeAnswer`) into `createCachedRagAnswerSource`, and install it via
+`setPartnerRagAnswerSource` — all BEHIND the still-off `AI_AGENT_PARTNER_RAG_DRAFT_ENABLED`.
+Only after that lands does flipping the gate become a deliberate op action. C
+(operator refresh) remains the M3.3 hardening layer over this same cache seam.
