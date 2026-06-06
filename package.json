@@ -19,6 +19,7 @@
     "agent:command": "node scripts/agent-command.mjs",
     "agent:notion-rag-dry-run": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-dry-run",
     "agent:notion-rag-search": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-search",
+    "agent:notion-rag-answer": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-answer",
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

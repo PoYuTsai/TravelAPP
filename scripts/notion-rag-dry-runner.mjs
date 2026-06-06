@@ -105,6 +105,25 @@ export async function importSearchDefault(ctx = {}) {
 }
 
 /**
+ * PRODUCTION default factory for `importComposer` — GUARDED dynamic import of the
+ * pure TS answer composer (`composeAnswer`). Same guard semantics as
+ * importSearchDefault: resolves under a TS runtime (tsx), swallowed → null under
+ * plain node. Loading it touches no Notion API and no LLM (composeAnswer is a
+ * pure, deterministic function with the LLM refine hook left off).
+ */
+export async function importComposerDefault(ctx = {}) {
+  const {
+    importModule = () => import('../src/lib/line-agent/notion/notion-rag-answer-composer.ts'),
+  } = ctx
+  try {
+    const mod = await importModule()
+    return mod?.composeAnswer ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * PRODUCTION default factory for `createClient` — assembles a REAL Notion client:
  *   1. dynamic-import `@notionhq/client` for its `Client` constructor;
  *   2. dynamic-import the TS adapter `notion-rag-client.ts` for
@@ -216,4 +235,45 @@ export async function loadNotionRagSearchRuntime(ctx = {}) {
     return { runSearch: null, client: null }
   }
   return { runSearch, client }
+}
+
+/**
+ * Assemble the operator ANSWER runtime — resolves `runSearch` (real corpus
+ * retrieval) AND the pure `composeAnswer` (deterministic draft), plus the Notion
+ * client. Same real-runtime gate, token gate, and sanitized leak guard as the
+ * search loader. A missing runSearch / composeAnswer / client ⇒ the command
+ * projects `client_not_wired`. No LLM and no message send are ever assembled.
+ */
+export async function loadNotionRagAnswerRuntime(ctx = {}) {
+  const {
+    env = {},
+    importSearch = importSearchDefault,
+    importComposer = importComposerDefault,
+    createClient = createClientDefault,
+  } = ctx
+
+  if (!isRealRuntimeMode(env)) {
+    return { runSearch: null, composeAnswer: null, client: null }
+  }
+
+  const token = readNotionToken(env)
+  if (!token) {
+    return { runSearch: null, composeAnswer: null, client: null }
+  }
+
+  let runSearch
+  let composeAnswer
+  let client
+  try {
+    runSearch = await importSearch({ env })
+    composeAnswer = await importComposer({ env })
+    client = await createClient({ env, token })
+  } catch {
+    throw new NotionRagRuntimeWiringError()
+  }
+
+  if (!runSearch || !composeAnswer || !client) {
+    return { runSearch: null, composeAnswer: null, client: null }
+  }
+  return { runSearch, composeAnswer, client }
 }

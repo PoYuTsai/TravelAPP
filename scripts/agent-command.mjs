@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import {
   loadNotionRagDryRunRuntime,
   loadNotionRagSearchRuntime,
+  loadNotionRagAnswerRuntime,
 } from './notion-rag-dry-runner.mjs'
 
 const DEFAULT_ORIGIN = 'https://chiangway-travel.com'
@@ -82,8 +83,12 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'notion-rag-search', query }
   }
+  if (command === 'notion-rag-answer' || command === '/notion-rag-answer') {
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'notion-rag-answer', query }
+  }
 
-  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search')
+  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer')
 }
 
 export function readDotEnvValue(dotenvText, key) {
@@ -460,6 +465,170 @@ function searchErrorReport(errorCode) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// notion-rag-answer — operator-only DRAFT preview (search → composeAnswer)
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a TransportationAssessmentInput from operator free text + the parsed
+ * query. CLI-input parsing only (like the query itself): partySize comes from the
+ * parsed query; airport / luggage are light surface signals. Returns `undefined`
+ * when there is no signal at all, so an unrelated draft is not padded with
+ * vehicle confirmations.
+ */
+export function deriveTransportationSignals(query, parsedQuery) {
+  const q = String(query ?? '')
+  const partySize = parsedQuery?.partySize
+  const airportTransfer = /機場|接機|送機|airport/i.test(q)
+  let luggageCount
+  const m = q.match(/行李\s*(\d+)\s*件?/)
+  if (m) luggageCount = Number(m[1])
+
+  if (partySize == null && !airportTransfer && luggageCount == null) return undefined
+
+  const out = {}
+  if (partySize != null) out.partySize = partySize
+  if (airportTransfer) out.airportTransfer = true
+  if (luggageCount != null) out.luggageCount = luggageCount
+  return out
+}
+
+/**
+ * Format a composed answer into a Traditional Chinese operator preview. Reads
+ * ONLY masked/composed fields (parsedQuery tokens, counts, confidence, draft
+ * text); the draft text comes from `composeAnswer`, which consumes operator-safe
+ * summaries and never fabricates private strings — so this renderer is masked by
+ * construction. Explicitly labelled partner-group draft only, never a customer
+ * reply, and nothing is ever sent.
+ */
+export function formatNotionRagAnswerReport(report) {
+  if (report?.status === 'skipped') {
+    return [
+      'RAG 草稿預覽 · 已略過',
+      '（AI_AGENT_NOTION_RAG_ENABLED 未開啟，未連線 Notion）',
+    ].join('\n')
+  }
+
+  if (report?.status === 'error') {
+    const lines = ['RAG 草稿預覽 · 失敗']
+    if (report.errorCode) {
+      lines.push(`錯誤碼：${report.errorCode}（${codeLabel(report.errorCode)}）`)
+    }
+    return lines.join('\n')
+  }
+
+  const pq = report?.parsedQuery ?? { areas: [], themes: [] }
+  const areas = Array.isArray(pq.areas) && pq.areas.length > 0 ? pq.areas.join(', ') : '-'
+  const themes = Array.isArray(pq.themes) && pq.themes.length > 0 ? pq.themes.join(', ') : '-'
+  const party = pq.partySize != null ? `${pq.partySize}` : '-'
+  const tokenLine = `查詢 token：區域 [${areas}] · 主題 [${themes}] · 人數 ${party}`
+
+  const answer = report?.answer ?? {}
+  const confidence = answer.confidence ?? 'low'
+
+  return [
+    'RAG 草稿預覽 · 完成（夥伴群草稿，僅供內部，非客人回覆）',
+    tokenLine,
+    `索引總筆數：${report?.totalRecords ?? 0} · 命中：${report?.resultCount ?? 0}`,
+    `信心：${confidence}`,
+    '— 草稿 —',
+    String(answer.text ?? ''),
+  ].join('\n')
+}
+
+/** Build the safe client_not_wired / client_error error projection for answer. */
+function answerErrorReport(errorCode) {
+  return { status: 'error', errorCode }
+}
+
+/**
+ * Run the notion-rag-answer command offline. Mirrors runNotionRagSearchCommand,
+ * with an extra pure `composeAnswer` step:
+ *   1. disabled gate → skipped, NOTHING loaded or read.
+ *   2. injected runSearch + composeAnswer + client → use them.
+ *   3. otherwise call the runtime loader loadNotionRagAnswerRuntime.
+ *   4. missing runSearch / composeAnswer / client → safe client_not_wired.
+ * A search skip/error passes through; a runner OR composer throw collapses to a
+ * sanitized client_error (a raw message may carry token / db id / notion.so url).
+ * No LLM refine hook is ever passed; no message is ever sent.
+ */
+export async function runNotionRagAnswerCommand(options = {}) {
+  const env = options.env ?? process.env
+  const query = options.query ?? ''
+
+  if (!isNotionRagEnabled(env)) {
+    return formatNotionRagAnswerReport({ status: 'skipped' })
+  }
+
+  let runSearch = options.runSearch ?? null
+  let composeAnswer = options.composeAnswer ?? null
+  let client = options.client ?? null
+
+  if (!runSearch || !composeAnswer || !client) {
+    const loadRuntime = options.loadRuntime ?? loadNotionRagAnswerRuntime
+    let runtime
+    try {
+      runtime = await loadRuntime({ env })
+    } catch {
+      return formatNotionRagAnswerReport(answerErrorReport('client_error'))
+    }
+    runSearch = runSearch ?? runtime?.runSearch ?? null
+    composeAnswer = composeAnswer ?? runtime?.composeAnswer ?? null
+    client = client ?? runtime?.client ?? null
+  }
+
+  if (!runSearch || !composeAnswer || !client) {
+    return formatNotionRagAnswerReport(answerErrorReport('client_not_wired'))
+  }
+
+  let searchReport
+  try {
+    searchReport = await runSearch(env, client, query)
+  } catch {
+    return formatNotionRagAnswerReport(answerErrorReport('client_error'))
+  }
+
+  if (searchReport?.status === 'skipped') {
+    return formatNotionRagAnswerReport({ status: 'skipped' })
+  }
+  if (searchReport?.status === 'error') {
+    return formatNotionRagAnswerReport(answerErrorReport(searchReport.errorCode ?? 'client_error'))
+  }
+
+  // Map the search REPORT (skipped|ok|error) onto the composer's expected
+  // NotionRagSearchResult (ok|low_confidence): zero hits ⇒ low_confidence.
+  const resultCount = searchReport?.resultCount ?? 0
+  const search = {
+    status: resultCount > 0 ? 'ok' : 'low_confidence',
+    parsedQuery: searchReport?.parsedQuery ?? { areas: [], themes: [] },
+    totalRecords: searchReport?.totalRecords ?? 0,
+    resultCount,
+    results: Array.isArray(searchReport?.results) ? searchReport.results : [],
+  }
+
+  const transportation = deriveTransportationSignals(query, search.parsedQuery)
+
+  let answer
+  try {
+    // No `options` passed ⇒ refine stays off and the LLM hook is never invoked.
+    answer = composeAnswer(
+      transportation
+        ? { userQuestion: query, search, transportation }
+        : { userQuestion: query, search }
+    )
+  } catch {
+    return formatNotionRagAnswerReport(answerErrorReport('client_error'))
+  }
+
+  return formatNotionRagAnswerReport({
+    status: 'ok',
+    parsedQuery: search.parsedQuery,
+    totalRecords: search.totalRecords,
+    resultCount: search.resultCount,
+    answer,
+  })
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'notion-rag-dry-run') {
@@ -467,6 +636,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'notion-rag-search') {
     return runNotionRagSearchCommand({ env: options.env ?? process.env, query })
+  }
+  if (commandText === 'notion-rag-answer') {
+    return runNotionRagAnswerCommand({ env: options.env ?? process.env, query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
