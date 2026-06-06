@@ -14,8 +14,9 @@
  *   - 行程框架 → facts.itinerarySnippet (searchable text).
  *   - 總成本 → privateContext.cost; 總收入 → privateContext.revenue;
  *     利潤 → privateContext.profitShare. NONE may reach facts or partner view.
- *   - No explicit area/theme column → areaHints/themeHints stay empty (this
- *     knife never invents them; that is a later parser's job).
+ *   - No explicit area/theme column → the deterministic itinerary-parser
+ *     (notion/itinerary-parser.ts) derives area/theme hints from 行程框架 text;
+ *     unrecognised text still yields nothing (never invented).
  */
 
 import { describe, it, expect } from 'vitest'
@@ -160,12 +161,20 @@ describe('cost / revenue / profit are private only', () => {
 })
 
 // ---------------------------------------------------------------------------
-// area/theme are NOT invented when the real schema has no such column
+// area/theme are DERIVED from 行程框架 by the deterministic parser (no explicit
+// column), but unrecognised text is still never invented.
 // ---------------------------------------------------------------------------
 
-describe('no invented area/theme without an explicit column', () => {
-  it('leaves areaHints/themeHints empty for the real-schema corpus', () => {
+describe('area/theme derived from 行程框架 (deterministic parser)', () => {
+  it('derives recognised area/theme tokens from the real-schema corpus', () => {
+    // 行程框架: '清邁親子 5 天：動物園 + 叢林飛索 + 夜間動物園 + 大象保護營'
     const f = factsOf(familyPage.properties)
+    expect(f.areaHints).toEqual(['chiangmai'])
+    expect(f.themeHints).toEqual(['night_safari', 'elephant'])
+  })
+
+  it('still invents nothing for unrecognised itinerary text', () => {
+    const f = factsOf({ 行程框架: '完全沒聽過的地名 xyz' })
     expect(f.areaHints).toBeUndefined()
     expect(f.themeHints).toBeUndefined()
   })

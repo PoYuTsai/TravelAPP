@@ -27,6 +27,7 @@ import type {
   NotionPageFixture,
 } from './types'
 import { normalizeField } from './field-policy'
+import { parseItineraryHints } from './itinerary-parser'
 import {
   buildRagIndexRecord,
   type RagCaseFacts,
@@ -209,6 +210,19 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
         break
       default:
         break // 人數/景點餐廳/車導配置/狀態/內部備註… not RAG facts; intentionally dropped
+    }
+  }
+
+  // Derive area/theme hints from the itinerary free-text ONLY when no explicit
+  // 城市區域 / 行程類型 column supplied them. Explicit columns always win; the
+  // deterministic parser is a fallback for the real corpus that lacks them.
+  if (facts.itinerarySnippet) {
+    const derived = parseItineraryHints(facts.itinerarySnippet)
+    if (facts.areaHints === undefined && derived.areaHints.length > 0) {
+      facts.areaHints = derived.areaHints
+    }
+    if (facts.themeHints === undefined && derived.themeHints.length > 0) {
+      facts.themeHints = derived.themeHints
     }
   }
 
