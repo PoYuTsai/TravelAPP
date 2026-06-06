@@ -27,6 +27,10 @@ import {
   createPartnerGroupResponderWithRagDraft,
 } from '@/lib/line-agent/partner-group/responder-factory'
 import type { PartnerRagDraftSource } from '@/lib/line-agent/partner-group/rag-draft-surfacing'
+import {
+  createNotionRagAnswerSource,
+  type NotionRagAnswerSourceDeps,
+} from '@/lib/line-agent/partner-group/notion-rag-answer-source'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
@@ -347,6 +351,21 @@ export function getPartnerRagAnswerSource(): PartnerRagDraftSource {
     }
   }
   return _partnerRagAnswerSource
+}
+
+/**
+ * Opt the runtime INTO the real cached Notion RAG answer source (design §6 cost
+ * guard + "Next knife"). This is the deliberate installer: NOTHING calls it at
+ * module load, so the production default above stays not-wired + fail-closed
+ * unless a bootstrap explicitly invokes this. It does NOT flip any env gate — the
+ * dispatcher's per-respond `shouldUsePartnerRagDraft` gate still governs whether
+ * the installed source is ever reached (gate off ⇒ `base` runs, source untouched).
+ *
+ * The caller supplies the loader `client` (the real `@notionhq/client` adapter in
+ * production, a fake in tests) so this module stays free of the SDK.
+ */
+export function installPartnerRagAnswerSource(deps: NotionRagAnswerSourceDeps): void {
+  setPartnerRagAnswerSource(createNotionRagAnswerSource(deps))
 }
 
 // ---------------------------------------------------------------------------
