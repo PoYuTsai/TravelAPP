@@ -279,4 +279,24 @@ describe('Discord AI room router', () => {
       requiresWrite: false,
     })
   })
+
+  it('routes active rc status questions to a read-only session peek', () => {
+    expect(
+      routeDiscordMessage(
+        {
+          channelId: 'private-ai-room',
+          authorId: 'eric',
+          content: '看得到現在rc 在做什麼事嗎？',
+        },
+        ENV
+      )
+    ).toEqual({
+      allowed: true,
+      intent: 'session_peek',
+      actor: 'eric',
+      targetAgent: 'room',
+      args: ['看得到現在rc 在做什麼事嗎？'],
+      requiresWrite: false,
+    })
+  })
 })

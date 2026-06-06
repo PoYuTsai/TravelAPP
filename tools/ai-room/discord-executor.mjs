@@ -55,6 +55,8 @@ export async function executeDiscordDecision(decision, options = {}) {
         return reply(await executeAmbientChat(decision, options))
       case 'two_agent_question':
         return reply(formatTwoAgentQuestion(firstArg(decision)))
+      case 'session_peek':
+        return reply(await executeSessionPeek(options))
       default:
         return reply(await executeAgentIntent(decision, options))
     }
@@ -233,6 +235,25 @@ async function executeChatModeSwitch(decision, options) {
   ].join('\n')
 }
 
+async function executeSessionPeek(options) {
+  const state = await readState(options)
+  const tmux = getTmux(options)
+  const liveSessions = await tmux.listSessions()
+
+  if (!liveSessions.includes(state.activeSession)) {
+    return [
+      `[Room/peek] ${state.activeSession}`,
+      `看不到。active rc session 目前不存在或 tmux 沒列出來。`,
+      `focus: ${state.focus} (${state.project})`,
+      'read-only: no tmux write',
+      '可以先跑 /sessions 或 /health 看是哪個環節斷掉。',
+    ].join('\n')
+  }
+
+  const captured = await tmux.capturePane(state.activeSession)
+  return formatSessionPeek({ state, captured })
+}
+
 async function executeLifecycle(decision, options) {
   const tmux = getTmux(options)
   const lifecycle = createLifecycle({
@@ -382,6 +403,25 @@ function formatLocalChatSupport({ body }) {
     '[Codex] 我在。聽起來你現在比較想輕鬆講幾句，不用轉成任務也沒關係。',
     '[CC] 我也在旁邊待命。先聊天、放鬆、整理一下心情都可以；要開工再 tag 我。',
   ].join('\n')
+}
+
+function formatSessionPeek({ state, captured }) {
+  const lines = recentPaneLines(captured)
+  return [
+    `[Room/peek] ${state.activeSession}`,
+    '看得到。這是 active rc session 的 read-only 畫面摘要，不會寫入 tmux。',
+    `focus: ${state.focus} (${state.project})`,
+    'recent pane:',
+    ...(lines.length ? lines : ['(目前 pane 沒有可讀文字)']),
+  ].join('\n')
+}
+
+function recentPaneLines(captured) {
+  return String(captured ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim() !== '')
+    .slice(-8)
 }
 
 function formatTwoAgentQuestion(body) {

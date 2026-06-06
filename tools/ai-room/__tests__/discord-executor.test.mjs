@@ -166,6 +166,48 @@ describe('Discord executor', () => {
     expect(calls).toEqual([])
   })
 
+  it('peeks at the active rc session for status questions even in casual mode', async () => {
+    await writeCurrentState(createInitialState('travel', { chatMode: 'casual' }), {
+      stateDir,
+    })
+    const { adapter, calls } = fakeTmux({
+      sessions: ['rc-travel', 'dc-travel'],
+      paneBySession: {
+        'rc-travel': [
+          'npm.cmd run ai-room:doctor',
+          '[Room/doctor] ready',
+          'focus: travel -> rc-travel',
+          'health: tmux_only',
+          'warning: desktop Claude Code bind is not confirmed',
+        ].join('\n'),
+      },
+    })
+    const routed = routeDiscordMessage(
+      {
+        channelId: 'private-ai-room',
+        authorId: 'eric',
+        content: '看得到現在rc 在做什麼事嗎？',
+      },
+      ENV
+    )
+
+    const result = await executeDiscordDecision(routed, {
+      stateDir,
+      tmux: adapter,
+    })
+
+    expect(result.content).toContain('[Room/peek] rc-travel')
+    expect(result.content).toContain('看得到')
+    expect(result.content).toContain('read-only')
+    expect(result.content).toContain('[Room/doctor] ready')
+    expect(result.content).not.toContain('不用轉成任務')
+    expect(result.content).not.toContain('[Room/dev-loop]')
+    expect(calls).toEqual([
+      { method: 'listSessions' },
+      { method: 'capturePane', session: 'rc-travel' },
+    ])
+  })
+
   it('switches chat mode from Discord', async () => {
     await writeCurrentState(createInitialState('travel'), { stateDir })
 
@@ -498,7 +540,7 @@ function discordMessage(id, createdAt) {
   }
 }
 
-function fakeTmux({ sessions = ['rc-travel'], cwdBySession = {} } = {}) {
+function fakeTmux({ sessions = ['rc-travel'], cwdBySession = {}, paneBySession = {} } = {}) {
   const calls = []
   return {
     calls,
@@ -516,7 +558,7 @@ function fakeTmux({ sessions = ['rc-travel'], cwdBySession = {} } = {}) {
       },
       async capturePane(session) {
         calls.push({ method: 'capturePane', session })
-        return 'captured output'
+        return paneBySession[session] ?? 'captured output'
       },
       async interrupt(session) {
         calls.push({ method: 'interrupt', session })

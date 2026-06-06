@@ -24,6 +24,15 @@ export function routeDiscordMessage(message, env) {
     return routeSlash(content, message.authorId)
   }
 
+  if (isSessionPeekQuestion(content)) {
+    return roomDecision({
+      actor: message.authorId,
+      intent: 'session_peek',
+      args: [content],
+      requiresWrite: false,
+    })
+  }
+
   if (mentionsBothAgents(content) && isTwoAgentOpenQuestion(content)) {
     return {
       allowed: true,
@@ -191,6 +200,14 @@ function isWriteLike(content) {
 
 function mentionsBothAgents(content) {
   return /@cc\b/i.test(content) && /@codex\b/i.test(content)
+}
+
+function isSessionPeekQuestion(content) {
+  const text = String(content ?? '').trim()
+  return (
+    /\b(?:rc|tmux|session|pane|claude code)\b/i.test(text) &&
+    /(看得到|在做|做什麼|現在|目前|狀態|status|current|doing)/i.test(text)
+  )
 }
 
 function isTwoAgentOpenQuestion(content) {
