@@ -20,7 +20,7 @@ import type {
   PartnerGroupRespondInput,
   PartnerGroupRespondResult,
 } from './responder'
-import type { AgentSourceChannel } from '../line/event-normalizer'
+import type { AgentSourceChannel } from '../types'
 
 // ---------------------------------------------------------------------------
 // Fixed phrasing

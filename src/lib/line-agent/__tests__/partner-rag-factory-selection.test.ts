@@ -13,7 +13,7 @@ import { createPartnerGroupResponderWithRagDraft } from '@/lib/line-agent/partne
 import { stubPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
 import { PARTNER_RAG_UNAVAILABLE_REPLY } from '@/lib/line-agent/partner-group/rag-draft-surfacing'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
-import type { AgentSourceChannel } from '@/lib/line-agent/line/event-normalizer'
+import type { AgentSourceChannel } from '@/lib/line-agent/types'
 
 const BOTH_GATES_ON = {
   AI_AGENT_NOTION_RAG_ENABLED: 'true',
