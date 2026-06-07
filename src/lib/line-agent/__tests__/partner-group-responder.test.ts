@@ -36,7 +36,10 @@ describe('stubPartnerGroupResponder', () => {
   it('returns the fixed safe stub text', async () => {
     const result = await stubPartnerGroupResponder.respond(makeInput())
     expect(result.text).toContain('收到，我先記下來')
-    expect(result.text).toContain('請 Eric 再拍板')
+    // partner-first wording (Eric 2026-06-07): escalate to Eric only for formal
+    // quotes / special commitments / exceptions — not a blanket 「拍板」 deferral.
+    expect(result.text).toContain('Eric 最終確認')
+    expect(result.text).not.toContain('拍板')
   })
 
   it('tags the result meta as the stub responder (no model)', async () => {

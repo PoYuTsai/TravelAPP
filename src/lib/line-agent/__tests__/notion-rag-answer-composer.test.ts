@@ -225,6 +225,64 @@ describe('transportationAssessment — airport + luggage (contract 5)', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// Regression locks — Eric 2026-06-07 (decision A: deterministic composer is the
+// partner-group MAIN reply; Anthropic free-form is NOT). These pin behaviors the
+// deterministic composer already has (A1 source-year, A6 no-simulated-search) AND
+// add new partner-first behaviors (A4 Chiang Mai airport SOP, partner-first closing).
+// ---------------------------------------------------------------------------
+
+describe('composeAnswer — source-year guard (regression A1: never fabricate a year)', () => {
+  it('never emits a 4-digit year even with results', () => {
+    const out = composeAnswer({ userQuestion: '古城區親子4天', search: okSearch() })
+    expect(out.text).not.toMatch(/20\d{2}/)
+  })
+})
+
+describe('composeAnswer — low-confidence guard (regression A6: never simulate a search)', () => {
+  it('low_confidence → no-strong-reference framing and never simulates searching/waiting', () => {
+    const out = composeAnswer({ userQuestion: '東京滑雪溫泉', search: lowSearch() })
+    expect(out.confidence).toBe('low')
+    expect(out.text).toContain('目前沒有強內部參考')
+    expect(out.text).not.toMatch(/搜尋中|查詢中|正在查|稍等|讓我查一下|searching/i)
+  })
+})
+
+describe('composeAnswer — partner-first closing (regression: stop over-deferring to Eric)', () => {
+  it('appends partner-first wording and never says 需 Eric 拍板', () => {
+    const out = composeAnswer({ userQuestion: '古城區親子', search: okSearch() })
+    expect(out.text).toContain('夥伴可先依此整理回覆')
+    expect(out.text).toContain('正式報價、特殊承諾或例外狀況再請 Eric 最終確認')
+    expect(out.text).not.toContain('拍板')
+  })
+})
+
+describe('transportationAssessment — Chiang Mai airport SOP (regression A4)', () => {
+  it('airport transfer → asks 航班號 / CNX 抵達起飛時間 / 司機提前到 / 第一天接機型態, never 桃機', () => {
+    const ta = transportationAssessment({ airportTransfer: true })
+    const mc = ta.mustConfirm.join('|')
+    expect(mc).toContain('航班號')
+    expect(mc).toMatch(/CNX.*(抵達|起飛)/)
+    expect(mc).toMatch(/司機.*提前/)
+    expect(mc).toMatch(/第一天.*(接機|換匯)/)
+    // Chiang Mai SOP — never the Taoyuan→city framing the free-form LLM hallucinated
+    expect(mc).not.toContain('桃機')
+    expect(mc).not.toMatch(/市區→|→市區/)
+  })
+
+  it('bangkok domestic transfer → additionally confirms 國內線轉機時間', () => {
+    const ta = transportationAssessment({ airportTransfer: true, bangkokDomesticTransfer: true })
+    expect(ta.mustConfirm.join('|')).toMatch(/國內線.*轉機/)
+  })
+
+  it('non-airport request → no airport SOP items', () => {
+    const ta = transportationAssessment({ partySize: 4 })
+    const mc = ta.mustConfirm.join('|')
+    expect(mc).not.toContain('CNX')
+    expect(mc).not.toContain('航班號')
+  })
+})
+
 describe('transportationAssessment — guardrails', () => {
   it('does NOT treat partySize > 1 as family', () => {
     const ta = transportationAssessment({ partySize: 3 })

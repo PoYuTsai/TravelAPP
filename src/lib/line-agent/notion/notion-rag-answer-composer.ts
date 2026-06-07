@@ -35,6 +35,12 @@ export interface TransportationAssessmentInput {
   vehicleTypeFromCases?: string[]
   luggageCount?: number
   airportTransfer?: boolean
+  /**
+   * Bangkok domestic-leg transfer (BKK/DMK → CNX). Default service is a Chiang
+   * Mai (CNX) pickup; only when a Bangkok domestic transfer is in play do we also
+   * confirm the domestic-flight timing (Eric SOP 2026-06-07).
+   */
+  bangkokDomesticTransfer?: boolean
   childSeatSignal?: boolean
 }
 
@@ -79,6 +85,30 @@ const DRAFT_MARKER = '【夥伴群草稿】'
 const INTERNAL_TENDENCY = '內部過往案例傾向'
 const NO_STRONG_REFERENCE = '目前沒有強內部參考案例，建議先確認以下項目再評估'
 
+/**
+ * Partner-first closing (Eric 2026-06-07). The partner is the primary
+ * customer-facing window, so a routine draft must NOT defer every line to Eric
+ * ("需 Eric 拍板"); Eric is the escalation only for formal quotes / special
+ * commitments / exceptions / high-risk calls.
+ */
+export const PARTNER_FIRST_CLOSING =
+  '夥伴可先依此整理回覆；正式報價、特殊承諾或例外狀況再請 Eric 最終確認。'
+
+/**
+ * Chiang Mai (CNX) airport-pickup SOP (Eric 2026-06-07). The default service is a
+ * Chiang Mai arrival, so we confirm the CNX-side facts — NEVER a Taoyuan→city
+ * framing (a free-form-LLM hallucination, A4). A Bangkok domestic leg is a
+ * separate, additionally-confirmed case.
+ */
+export const CHIANG_MAI_AIRPORT_SOP = [
+  '航班號',
+  'CNX 抵達/起飛時間',
+  '司機是否需提前到',
+  '第一天為單純接機，或接機＋換匯＋行程',
+] as const
+
+const BANGKOK_DOMESTIC_TRANSFER_CONFIRM = '曼谷國內線轉機時間'
+
 /** Base confirmation items every draft must surface (contract 6). */
 const BASE_MUST_CONFIRM = [
   '出發日期',
@@ -118,13 +148,20 @@ export function transportationAssessment(
     mustConfirm.push('行李件數與尺寸', '是否需要兒童座椅', '是否需要導遊', '上車地點/住宿')
   }
 
-  if (input.airportTransfer && (input.luggageCount ?? 0) >= 6) {
-    mustConfirm.push('行李件數與尺寸')
-    safetyNotes.push('行李較多，可能需要安排行李車或第二台車')
+  if (input.airportTransfer) {
+    // Chiang Mai (CNX) pickup SOP — flight + CNX timing + driver lead + day-1 type.
+    mustConfirm.push(...CHIANG_MAI_AIRPORT_SOP)
+    if (input.bangkokDomesticTransfer) {
+      mustConfirm.push(BANGKOK_DOMESTIC_TRANSFER_CONFIRM)
+    }
+    if ((input.luggageCount ?? 0) >= 6) {
+      mustConfirm.push('行李件數與尺寸')
+      safetyNotes.push('行李較多，可能需要安排行李車或第二台車')
+    }
   }
 
   // Insufficient data → only ask to confirm headcount & luggage first (rule 7).
-  if (hints.length === 0 && partySize === undefined) {
+  if (hints.length === 0 && partySize === undefined && !input.airportTransfer) {
     mustConfirm.push('需再確認人數與行李後評估車型')
   }
 
@@ -173,6 +210,7 @@ export function composeAnswer(input: ComposeAnswerInput): ComposedAnswer {
   if (safetyNotes.length > 0) {
     lines.push(`提醒：${safetyNotes.join('；')}`)
   }
+  lines.push(PARTNER_FIRST_CLOSING)
 
   // refineHook is intentionally NOT called: refine is off this slice.
 

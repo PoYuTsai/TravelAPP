@@ -165,6 +165,36 @@ describe('composeRagAnswerFromIndex — operator-safe, no private leak', () => {
   })
 })
 
+describe('composeRagAnswerFromIndex — Chiang Mai airport SOP wiring (regression A4)', () => {
+  // Empty index → low_confidence body; the airport SOP must still surface because
+  // it is derived from the partner's message text, not from a retrieved case.
+  const emptyIndex = buildRagIndex([])
+
+  it('a 接機/機場 message surfaces the CNX airport SOP, never the 桃機→市區 hallucination', () => {
+    const { text } = composeRagAnswerFromIndex(emptyIndex, input('幫我草稿 客人要接機'))
+    expect(text).toContain('航班號')
+    expect(text).toMatch(/CNX.*(抵達|起飛)/)
+    expect(text).toContain('司機')
+    expect(text).toMatch(/第一天.*(接機|換匯)/)
+    expect(text).not.toContain('桃機')
+    expect(text).not.toMatch(/市區→|→市區/)
+  })
+
+  it('a non-airport message does NOT surface the airport SOP', () => {
+    const { text } = composeRagAnswerFromIndex(emptyIndex, input('幫我草稿 古城區親子四天'))
+    expect(text).not.toContain('CNX')
+    expect(text).not.toContain('航班號')
+  })
+
+  it('a Bangkok domestic-transfer message additionally confirms 國內線轉機時間', () => {
+    const { text } = composeRagAnswerFromIndex(
+      emptyIndex,
+      input('客人從曼谷搭國內線轉機到清邁，幫我草稿接機'),
+    )
+    expect(text).toMatch(/國內線.*轉機/)
+  })
+})
+
 describe('createNotionRagAnswerSource — cached real source (TTL + single-flight)', () => {
   it('point 1: first call builds the index once and returns a draft body', async () => {
     const { client, calls } = fakeClient()

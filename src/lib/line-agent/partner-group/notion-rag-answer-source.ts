@@ -79,17 +79,53 @@ export async function loadNotionRagIndex(deps: LoadNotionRagIndexDeps): Promise<
 }
 
 /**
+ * Detect a Chiang Mai airport-pickup need from the partner's free-text message so
+ * the draft surfaces the CNX SOP (flight no. / CNX timing / driver lead / day-1
+ * type). Pure substring — the SOP framing itself lives in the composer.
+ */
+export function detectAirportTransfer(text: string): boolean {
+  if (!text) return false
+  return /接機|送機|機場|機場接送|airport|pick\s?-?\s?up|CNX/i.test(text)
+}
+
+/**
+ * Detect a Bangkok domestic-leg transfer (BKK/DMK → CNX). Only then do we add the
+ * domestic-flight-timing confirm on top of the default Chiang Mai pickup SOP.
+ */
+export function detectBangkokDomesticTransfer(text: string): boolean {
+  if (!text) return false
+  const hasBangkok = /曼谷|bangkok|bkk|dmk|素萬那普|廊曼/i.test(text)
+  const hasDomesticLeg = /國內線|轉機|內陸|轉國內/.test(text)
+  return hasBangkok && hasDomesticLeg
+}
+
+/**
  * The CHEAP half: search the cached index for the message need and compose the
  * deterministic operator-safe draft body. `searchRagIndex` does the whitelist
  * projection, so nothing private/PII can reach `composeAnswer`; this returns only
  * the body text (the surfacing banner is added later by the rag responder).
+ *
+ * Airport-pickup intent is derived from the message text (not from a retrieved
+ * case) so the CNX SOP surfaces even on a low-confidence/empty corpus hit.
  */
 export function composeRagAnswerFromIndex(
   index: RagIndex,
   input: PartnerGroupRespondInput,
 ): { text: string } {
   const search = searchRagIndex(index, input.text)
-  const composed = composeAnswer({ userQuestion: input.text, search })
+  const airportTransfer = detectAirportTransfer(input.text)
+  const composed = composeAnswer({
+    userQuestion: input.text,
+    search,
+    ...(airportTransfer
+      ? {
+          transportation: {
+            airportTransfer: true,
+            bangkokDomesticTransfer: detectBangkokDomesticTransfer(input.text),
+          },
+        }
+      : {}),
+  })
   return { text: composed.text }
 }
 

@@ -34,6 +34,12 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('Eric')
   })
 
+  it('names the operating partners (Lulu / 彥均) so they are not treated as customers', () => {
+    expect(prompt).toContain('Lulu')
+    expect(prompt).toContain('彥均')
+    expect(prompt).toContain('夥伴是主要對客窗口')
+  })
+
   it('locks the Traditional-Chinese + concise/actionable style clauses', () => {
     expect(prompt).toContain('繁體中文')
     expect(prompt).toContain('簡短')
@@ -53,9 +59,12 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('天氣')
   })
 
-  it('forbids formal quote numbers / outward commitments and requires Eric sign-off', () => {
+  it('forbids formal quote numbers / outward commitments and escalates to Eric partner-first', () => {
     expect(prompt).toContain('正式報價')
-    expect(prompt).toContain('需 Eric 拍板')
+    // partner-first (Eric 2026-06-07): Eric is the escalation for formal quotes /
+    // special commitments / exceptions / high-risk — NOT a blanket 「拍板」 deferral.
+    expect(prompt).toContain('Eric 最終確認')
+    expect(prompt).not.toContain('拍板')
   })
 
   it('requires admitting uncertainty rather than fabricating', () => {
@@ -107,9 +116,9 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('還缺哪些資訊')
   })
 
-  it('does not over-escalate known hard rules to Eric (only unknown/special/quote/risk cases)', () => {
-    expect(prompt).toContain('不要每句都推給 Eric 拍板')
-    expect(prompt).toContain('牽涉報價')
+  it('does not over-escalate known hard rules to Eric (only quote/special/exception/high-risk cases)', () => {
+    expect(prompt).toContain('不要每句都推回 Eric')
+    expect(prompt).toContain('高風險')
   })
 
   // --- 清微旅行 vehicle-naming + budget polish（2026-06-05）---

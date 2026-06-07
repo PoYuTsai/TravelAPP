@@ -70,7 +70,7 @@ export interface PartnerGroupResponder {
  * NOT say "tag Eric" so it never reads like a system/test message.
  */
 export const STUB_PARTNER_GROUP_REPLY =
-  '收到，我先記下來。這批我目前先跑安全版助理流程，會先協助整理與判斷；需要正式結論或外部確認時，請 Eric 再拍板。'
+  '收到，我先記下來。這批我目前先跑安全版助理流程，會先協助整理與判斷；夥伴可先依此整理回覆，正式報價、特殊承諾或例外狀況再請 Eric 最終確認。'
 
 /**
  * Deterministic safe-default responder.  Returns a fixed reassurance line and
