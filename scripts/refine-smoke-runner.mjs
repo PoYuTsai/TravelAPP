@@ -240,6 +240,31 @@ function countErrors(issues) {
 }
 
 /**
+ * Group structuralDiffGuard issues by their `code` (the masked sub-reason key —
+ * a fact CATEGORY only, never a value/name/date/amount). Insertion-ordered so the
+ * report is deterministic and reads in the guard's natural top-to-bottom order.
+ * Returns a plain object { reason: count }.
+ */
+function groupStructuralReasons(issues) {
+  const counts = new Map()
+  if (Array.isArray(issues)) {
+    for (const i of issues) {
+      const reason = typeof i?.code === 'string' && i.code ? i.code : 'unknown'
+      counts.set(reason, (counts.get(reason) ?? 0) + 1)
+    }
+  }
+  return Object.fromEntries(counts)
+}
+
+/** `struct=0` when clean; `struct=N(reasonA=x, reasonB=y)` when facts drifted. */
+function formatStructCount(structural) {
+  const entries = Object.entries(structural ?? {})
+  const total = entries.reduce((sum, [, c]) => sum + c, 0)
+  if (total === 0) return 'struct=0'
+  return `struct=${total}(${entries.map(([r, c]) => `${r}=${c}`).join(', ')})`
+}
+
+/**
  * Classify one per-case outcome into a masked report row. An outcome is:
  *   { caseId, model, promptLeak: boolean, result: RefineResult | null }
  * The prompt_leak pre-check carries no RefineResult; every other fallback maps
@@ -248,18 +273,34 @@ function countErrors(issues) {
 function classifyRow(outcome) {
   const { caseId, model } = outcome
   if (outcome.promptLeak) {
-    return { caseId, model, status: 'fallback', reason: 'prompt_leak', isFallback: true, guardSummary: 'prompt_leak' }
+    return {
+      caseId,
+      model,
+      status: 'fallback',
+      reason: 'prompt_leak',
+      isFallback: true,
+      structural: {},
+      guardSummary: 'prompt_leak',
+    }
   }
 
   const result = outcome.result ?? {}
   if (result.used === 'refined') {
-    return { caseId, model, status: 'refined', reason: null, isFallback: false, guardSummary: 'struct=0 leak=0 lint=0' }
+    return {
+      caseId,
+      model,
+      status: 'refined',
+      reason: null,
+      isFallback: false,
+      structural: {},
+      guardSummary: 'struct=0 leak=0 lint=0',
+    }
   }
 
   const reasons = Array.isArray(result.rejectionReasons) ? result.rejectionReasons : []
   const mapped = reasons.map((r) => REFINE_REASON_MAP[r] ?? r)
   const reason = mapped[0] ?? 'unknown'
-  const struct = Array.isArray(result.structuralIssues) ? result.structuralIssues.length : 0
+  const structural = groupStructuralReasons(result.structuralIssues)
   const leak = Array.isArray(result.leakHits) ? result.leakHits.length : 0
   const lint = countErrors(result.lintIssues)
   return {
@@ -268,7 +309,8 @@ function classifyRow(outcome) {
     status: 'fallback',
     reason,
     isFallback: true,
-    guardSummary: `struct=${struct} leak=${leak} lint=${lint}`,
+    structural,
+    guardSummary: `${formatStructCount(structural)} leak=${leak} lint=${lint}`,
   }
 }
 
@@ -281,8 +323,12 @@ export function summarizeRefineSmoke(outcomes) {
   const rejected = total - accepted
 
   const byReason = {}
+  const structuralBreakdown = {}
   for (const row of rows) {
     if (row.isFallback && row.reason) byReason[row.reason] = (byReason[row.reason] ?? 0) + 1
+    for (const [reason, count] of Object.entries(row.structural ?? {})) {
+      structuralBreakdown[reason] = (structuralBreakdown[reason] ?? 0) + count
+    }
   }
 
   return {
@@ -293,6 +339,7 @@ export function summarizeRefineSmoke(outcomes) {
     acceptRate: total ? accepted / total : 0,
     fallbackRate: total ? rejected / total : 0,
     byReason,
+    structuralBreakdown,
     rows,
   }
 }
@@ -316,6 +363,18 @@ function formatByReason(byReason) {
   const entries = Object.entries(byReason ?? {})
   if (entries.length === 0) return ['  · （無 fallback）']
   return entries.map(([reason, count]) => `  · ${reason}：${count}`)
+}
+
+/** Masked aggregate of the structural sub-reasons that caused structural_drift
+ * fallbacks across every case — the at-a-glance "which facts moved" rollup. Each
+ * key is a fact category only, so this is safe to print. Empty → omitted. */
+function formatStructuralBreakdown(structuralBreakdown) {
+  const entries = Object.entries(structuralBreakdown ?? {})
+  if (entries.length === 0) return []
+  return [
+    'structural 子原因（全案彙總）：',
+    ...entries.map(([reason, count]) => `  · ${reason}：${count}`),
+  ]
 }
 
 function formatRow(row) {
@@ -350,6 +409,7 @@ export function formatRefineSmokeReport(report) {
     `採用率：${pct(s.acceptRate)} · fallback 率：${pct(s.fallbackRate)}`,
     'fallback 原因分佈：',
     ...formatByReason(s.byReason),
+    ...formatStructuralBreakdown(s.structuralBreakdown),
     '— per-case（masked guard 計數）—',
     ...(Array.isArray(s.rows) ? s.rows.map(formatRow) : []),
   ]

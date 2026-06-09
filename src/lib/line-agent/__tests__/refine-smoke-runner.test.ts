@@ -314,6 +314,90 @@ describe('summarizeRefineSmoke', () => {
 })
 
 // ---------------------------------------------------------------------------
+// structural_diff sub-reason breakdown (M3.4c follow-up diagnostics)
+// ---------------------------------------------------------------------------
+
+/** A structural_drift fallback carrying the given guard issue codes. */
+function structFallback(codes) {
+  return fallbackResult(['structural_drift'], {
+    structuralIssues: codes.map((code) => ({ code, message: 'masked' })),
+  })
+}
+
+describe('summarizeRefineSmoke — structural sub-reason breakdown', () => {
+  test('a structural row expands its struct count into masked sub-reason counts', () => {
+    const summary = summarizeRefineSmoke([
+      {
+        caseId: 'c',
+        model: 'm',
+        promptLeak: false,
+        result: structFallback(['activity_line_changed', 'day_title_fact_changed']),
+      },
+    ])
+    expect(summary.rows[0].guardSummary).toContain(
+      'struct=2(activity_line_changed=1, day_title_fact_changed=1)'
+    )
+  })
+
+  test('repeated sub-reasons are counted, not duplicated', () => {
+    const summary = summarizeRefineSmoke([
+      {
+        caseId: 'c',
+        model: 'm',
+        promptLeak: false,
+        result: structFallback(['activity_line_changed', 'activity_line_changed', 'lunch_changed']),
+      },
+    ])
+    expect(summary.rows[0].guardSummary).toContain(
+      'struct=3(activity_line_changed=2, lunch_changed=1)'
+    )
+  })
+
+  test('a refined (no-drift) row stays struct=0 with no sub-reason parens', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'a', model: 'm', promptLeak: false, result: refinedResult() },
+    ])
+    expect(summary.rows[0].guardSummary).toBe('struct=0 leak=0 lint=0')
+  })
+
+  test('aggregates sub-reason counts across every fallback row', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'a', model: 'm', promptLeak: false, result: structFallback(['activity_line_changed']) },
+      {
+        caseId: 'b',
+        model: 'm',
+        promptLeak: false,
+        result: structFallback(['activity_line_changed', 'lunch_changed']),
+      },
+      { caseId: 'c', model: 'm', promptLeak: false, result: refinedResult() },
+    ])
+    expect(summary.structuralBreakdown).toEqual({ activity_line_changed: 2, lunch_changed: 1 })
+  })
+})
+
+describe('formatRefineSmokeReport — structural breakdown stays masked', () => {
+  test('report surfaces the aggregate sub-reasons but never a draft body', () => {
+    const DRAFT_LINE = '📅 日期：2026/8/4 - 8/10'
+    const summary = summarizeRefineSmoke([
+      { caseId: 'golden', model: 'm', promptLeak: false, result: refinedResult() },
+      {
+        caseId: 'drift',
+        model: 'm',
+        promptLeak: false,
+        result: structFallback(['activity_line_changed', 'day_title_fact_changed']),
+      },
+    ])
+
+    const out = formatRefineSmokeReport({ status: 'ok', summary })
+
+    expect(out).toContain('activity_line_changed')
+    expect(out).toContain('day_title_fact_changed')
+    // Masking holds: a sub-reason is a fact category, never a draft body.
+    expect(out).not.toContain(DRAFT_LINE)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // formatRefineSmokeReport — masked operator output
 // ---------------------------------------------------------------------------
 

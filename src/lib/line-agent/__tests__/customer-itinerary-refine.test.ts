@@ -86,67 +86,88 @@ describe('structuralDiffGuard', () => {
     expect(guard(ref)).toEqual([])
   })
 
-  it('flags a景點名 added/removed in a Day title', () => {
+  it('flags a景點名 added/removed in a Day title → day_title_fact_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace(
       'Day 1｜抵達清邁・換匯入住・古城慢遊',
       'Day 1｜抵達清邁・換匯入住・夜市慢遊'
     )
-    expect(guard(ref).map((i) => i.code)).toContain('day_title_changed')
+    expect(guard(ref).map((i) => i.code)).toContain('day_title_fact_changed')
   })
 
-  it('flags a renamed activity', () => {
+  it('flags a renamed activity → activity_line_changed', () => {
     expect(guard(DETERMINISTIC_DRAFT.replace('・水果市場', '・夜市')).map((i) => i.code)).toContain(
-      'activities_changed'
+      'activity_line_changed'
     )
   })
 
-  it('flags an added activity', () => {
+  it('flags an added activity → activity_line_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('・水果市場\n', '・水果市場\n・夜市\n')
-    expect(guard(ref).map((i) => i.code)).toContain('activities_changed')
+    expect(guard(ref).map((i) => i.code)).toContain('activity_line_changed')
   })
 
-  it('flags a changed lunch', () => {
+  it('flags a changed lunch → lunch_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('午餐：營區或附近餐廳', '午餐：別家餐廳')
     expect(guard(ref).map((i) => i.code)).toContain('lunch_changed')
   })
 
-  it('flags a changed dinner', () => {
+  it('flags a changed dinner → dinner_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('晚餐：Samsen Villa', '晚餐：別家晚餐')
     expect(guard(ref).map((i) => i.code)).toContain('dinner_changed')
   })
 
-  it('flags a changed lodging', () => {
+  it('flags a changed lodging → lodging_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('・住宿：清邁古城民宿', '・住宿：別間民宿')
     expect(guard(ref).map((i) => i.code)).toContain('lodging_changed')
   })
 
-  it('flags a changed date line', () => {
+  it('flags a changed date line → date_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('2025/08/04', '2025/09/04')
-    expect(guard(ref).map((i) => i.code)).toContain('date_line_changed')
+    expect(guard(ref).map((i) => i.code)).toContain('date_changed')
   })
 
-  it('flags a changed party line', () => {
+  it('flags a changed party line → people_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('👨‍👩‍👧‍👦 人數：8大', '👨‍👩‍👧‍👦 人數：6大')
-    expect(guard(ref).map((i) => i.code)).toContain('party_line_changed')
+    expect(guard(ref).map((i) => i.code)).toContain('people_changed')
   })
 
-  it('flags a dropped day', () => {
+  it('flags a dropped day → day_count_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace('Day 7｜收心慢遊・送機\n', '')
     expect(guard(ref).map((i) => i.code)).toContain('day_count_changed')
   })
 
-  it('flags a changed per-day date label', () => {
-    const ref = DETERMINISTIC_DRAFT.replace('8/5 (三)', '8/6 (三)')
-    expect(guard(ref).map((i) => i.code)).toContain('day_date_changed')
+  it('flags a renumbered day (same count, different sequence) → day_order_changed', () => {
+    // Renumber Day 6 → Day 99: count stays 7 but the day sequence diverges.
+    const ref = DETERMINISTIC_DRAFT.replace('Day 6｜', 'Day 99｜')
+    const codes = guard(ref).map((i) => i.code)
+    expect(codes).toContain('day_order_changed')
+    expect(codes).not.toContain('day_count_changed')
   })
 
-  it('flags lunch/dinner/lodging appearing on the morning-transfer final day', () => {
+  it('flags a changed per-day date label → day_date_label_changed', () => {
+    const ref = DETERMINISTIC_DRAFT.replace('8/5 (三)', '8/6 (三)')
+    expect(guard(ref).map((i) => i.code)).toContain('day_date_label_changed')
+  })
+
+  it('flags lunch/dinner/lodging on the morning-transfer final day → final_day_meal_added', () => {
     const ref = DETERMINISTIC_DRAFT.replace(
       '・9:30 送機，平安返家',
       '午餐：機場餐廳\n・9:30 送機，平安返家'
     )
     const codes = guard(ref).map((i) => i.code)
-    expect(codes).toContain('final_day_meal_or_lodging')
+    expect(codes).toContain('final_day_meal_added')
+  })
+
+  it('attributes EACH drift to its own reason when several coincide', () => {
+    // Two independent facts move in one refined candidate: an activity rename and
+    // a lunch change. Each must surface as its own distinct sub-reason so the
+    // smoke report can break the fallback down per fact.
+    const ref = DETERMINISTIC_DRAFT.replace('・水果市場', '・夜市').replace(
+      '午餐：營區或附近餐廳',
+      '午餐：別家餐廳'
+    )
+    const codes = guard(ref).map((i) => i.code)
+    expect(codes).toContain('activity_line_changed')
+    expect(codes).toContain('lunch_changed')
   })
 })
 
