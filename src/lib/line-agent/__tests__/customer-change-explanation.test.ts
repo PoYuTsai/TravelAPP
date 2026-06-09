@@ -12,20 +12,10 @@
 import { describe, it, expect } from 'vitest'
 import { composeCustomerChange } from '../notion/customer-itinerary-change-composer'
 import { ALL_CHANGE_SCENARIOS } from '../notion/__fixtures__/customer-change-scenarios'
-
-/** Internal vocabulary that must never reach the customer. */
-const FORBIDDEN_TERMS = [
-  'internal',
-  'retrieval',
-  'source',
-  'themetag',
-  'mobilityfriendly',
-  'operator',
-  'lint',
-  'fail-closed',
-  'system',
-]
-const FORBIDDEN_CJK = ['內部', '候選', '白名單', '代入', '來源 case', '否決', 'decision']
+import {
+  FORBIDDEN_CUSTOMER_TERMS as FORBIDDEN_TERMS,
+  FORBIDDEN_CUSTOMER_CJK as FORBIDDEN_CJK,
+} from '../notion/customer-facing-forbidden-terms'
 
 describe('customerExplanation — forbidden-terms regression', () => {
   for (const scenario of ALL_CHANGE_SCENARIOS) {
