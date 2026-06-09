@@ -57,6 +57,16 @@ export interface RetrievalCaseRef {
   name: string
   themeTag?: string
   mobilityFriendly?: boolean
+  /**
+   * Provenance of the case (M3.4a). Absent / 'fixture' = a curated whitelist
+   * entry with a trustworthy concrete name → substitutable into the draft.
+   * 'live_masked' = derived from a Notion LIVE operator-safe summary that carries
+   * NO real attraction name (only a theme signal); such a case is NEVER
+   * substituted into the draft (it can only be suggested as named_only). The
+   * guard lives in pickRetrievalAlternative so even a hand-stuffed live_masked +
+   * name cannot reach the draft.
+   */
+  provenance?: 'fixture' | 'live_masked'
 }
 
 export interface CustomerChangeRequest {
@@ -346,7 +356,12 @@ function pickRetrievalAlternative(
 ): RetrievalApplication {
   const candidates = retrievalCases.filter((c) => c.mobilityFriendly && !unsuitableHit(c.name))
   if (themeTag) {
-    const chosen = candidates.find((c) => c.themeTag === themeTag)
+    // SUBSTITUTION GUARD (M3.4a): only fixture-provenance cases carry a
+    // trustworthy concrete name, so only they may be written into the draft. A
+    // live_masked case (theme signal only) is excluded here even if it matches
+    // the theme and was hand-stuffed with a name — it can still be SUGGESTED as
+    // named_only below, but never substituted.
+    const chosen = candidates.find((c) => c.themeTag === themeTag && c.provenance !== 'live_masked')
     if (chosen) {
       return {
         day,

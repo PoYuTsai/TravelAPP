@@ -42,7 +42,14 @@ export function buildOperatorRetrievalPreview(applications: RetrievalApplication
     } else if (app.outcome === 'named_only') {
       lines.push('　是否代入 draft：否（僅建議，待人工挑選代入）')
       lines.push(`　替代候選：${candidateList}`)
-      lines.push(`　來源 case：— （theme=${theme} 未對齊或未指定）`)
+      // M3.4a: when the candidates are Notion-live theme signals (no concrete
+      // attraction name), say so explicitly — they are policy-barred from the
+      // draft, so the operator knows to fill in a real attraction by hand.
+      if (app.candidates.some((c) => c.provenance === 'live_masked')) {
+        lines.push(`　來源 case：Notion live（masked，僅 theme=${theme} 訊號，無景點名，依政策不代入）`)
+      } else {
+        lines.push(`　來源 case：— （theme=${theme} 未對齊或未指定）`)
+      }
     } else {
       lines.push('　是否代入 draft：否')
       lines.push(`　替代候選：${candidateList}`)
