@@ -10,6 +10,11 @@ import {
   loadNotionRagAnswerRuntime,
   loadNotionRagChangeRuntime,
 } from './notion-rag-dry-runner.mjs'
+import {
+  loadRefineLlmRuntime,
+  summarizeRefineSmoke,
+  formatRefineSmokeReport,
+} from './refine-smoke-runner.mjs'
 
 const DEFAULT_ORIGIN = 'https://chiangway-travel.com'
 const DOTENV_PATH = '.env.local'
@@ -92,9 +97,12 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'notion-rag-change-dry-run', query }
   }
+  if (command === 'refine-smoke' || command === '/refine-smoke') {
+    return { commandText: 'refine-smoke' }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke'
   )
 }
 
@@ -805,8 +813,89 @@ export async function runNotionRagChangeDryRunCommand(options = {}) {
   })
 }
 
+/**
+ * Run the refine-smoke command offline (M3.4c Cut 2). Mirrors the RAG commands'
+ * resolution seam:
+ *   1. resolve the three-gate runtime (loadRefineLlmRuntime) unless a source +
+ *      kit are injected (tests).
+ *   2. no source → project the loader's status/reason (skipped / client_not_wired).
+ *   3. a loader throw (sanitized wiring error) → error report.
+ *   4. source present → for each fixture draft, PRE-CHECK scanRefinePromptLeak (a
+ *      hit is a first-class prompt_leak fallback and the LLM is NOT called),
+ *      otherwise run the real M3.4b harness whose three guards decide adoption.
+ * The report is masked: guard COUNTS and rates only — no draft, prompt, token,
+ * cost, or PII. REAL runs are operator-initiated only; CC/tmux never auto-runs.
+ */
+export async function runRefineSmokeCommand(options = {}) {
+  const env = options.env ?? process.env
+
+  let refineSource = options.refineSource ?? null
+  let kit = options.kit ?? null
+  let status = null
+  let reason = null
+
+  if (!refineSource || !kit) {
+    const loadRuntime = options.loadRuntime ?? loadRefineLlmRuntime
+    let runtime
+    try {
+      runtime = await loadRuntime({ env })
+    } catch {
+      return formatRefineSmokeReport({ status: 'error' })
+    }
+    refineSource = refineSource ?? runtime?.refineSource ?? null
+    kit = kit ?? runtime?.kit ?? null
+    status = runtime?.status ?? null
+    reason = runtime?.reason ?? null
+  }
+
+  if (!refineSource || !kit) {
+    if (status === 'skipped') {
+      return formatRefineSmokeReport({ status: 'skipped', reason })
+    }
+    return formatRefineSmokeReport({ status: 'client_not_wired', reason: reason ?? 'factory_unavailable' })
+  }
+
+  const model = typeof kit.resolveModel === 'function' ? kit.resolveModel({ env }) : 'unknown'
+  const cases = Array.isArray(kit.cases) ? kit.cases : []
+  const outcomes = []
+
+  for (const c of cases) {
+    const leak = kit.scanPromptLeak(c.deterministicDraft)
+    if (Array.isArray(leak) && leak.length > 0) {
+      // Dirty deterministic draft: never send it to the LLM. First-class fallback.
+      outcomes.push({ caseId: c.caseId, model, promptLeak: true, result: null })
+      continue
+    }
+
+    let result
+    try {
+      result = await kit.refine({
+        deterministicDraft: c.deterministicDraft,
+        constraints: c.constraints,
+        source: refineSource,
+      })
+    } catch {
+      // The harness already fail-closes a throwing source; a throw here is
+      // unexpected, so treat it as a source_error fallback rather than crashing.
+      result = {
+        used: 'deterministic',
+        rejectionReasons: ['source_error'],
+        structuralIssues: [],
+        lintIssues: [],
+        leakHits: [],
+      }
+    }
+    outcomes.push({ caseId: c.caseId, model, promptLeak: false, result })
+  }
+
+  return formatRefineSmokeReport({ status: 'ok', summary: summarizeRefineSmoke(outcomes) })
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
+  if (commandText === 'refine-smoke') {
+    return runRefineSmokeCommand({ env: options.env ?? process.env })
+  }
   if (commandText === 'notion-rag-dry-run') {
     return runNotionRagDryRunCommand({ env: options.env ?? process.env })
   }
