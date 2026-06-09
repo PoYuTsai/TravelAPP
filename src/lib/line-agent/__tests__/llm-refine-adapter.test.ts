@@ -63,6 +63,13 @@ describe('buildRefinePrompt', () => {
     expect(system).toMatch(/逐字|凍結|不得|不要/)
   })
 
+  it('explicitly freezes the Day title line verbatim (M3.4c follow-up)', () => {
+    const { system } = buildRefinePrompt(DETERMINISTIC_DRAFT)
+    // v1 polishes opening/closing only; the 'Day X｜…' title line must be byte-identical.
+    expect(system).toContain('Day X｜')
+    expect(system).toMatch(/標題[^。]*逐字/)
+  })
+
   it('never surfaces internal field vocabulary in the assembled prompt', () => {
     const { system, user } = buildRefinePrompt(DETERMINISTIC_DRAFT)
     const assembled = `${system}\n${user}`.toLowerCase()

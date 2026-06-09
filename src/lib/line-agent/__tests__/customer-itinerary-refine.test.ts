@@ -78,12 +78,12 @@ describe('structuralDiffGuard', () => {
     expect(guard(ref)).toEqual([])
   })
 
-  it('allows punctuation/whitespace micro-adjust in a Day title', () => {
+  it('freezes a Day title verbatim — a punctuation/whitespace-only edit → day_title_fact_changed', () => {
     const ref = DETERMINISTIC_DRAFT.replace(
       'Day 1｜抵達清邁・換匯入住・古城慢遊',
       'Day 1｜抵達清邁 ・ 換匯入住、古城慢遊'
     )
-    expect(guard(ref)).toEqual([])
+    expect(guard(ref).map((i) => i.code)).toContain('day_title_fact_changed')
   })
 
   it('flags a景點名 added/removed in a Day title → day_title_fact_changed', () => {
@@ -92,6 +92,15 @@ describe('structuralDiffGuard', () => {
       'Day 1｜抵達清邁・換匯入住・夜市慢遊'
     )
     expect(guard(ref).map((i) => i.code)).toContain('day_title_fact_changed')
+  })
+
+  it('passes when every Day title is byte-identical (only the opening/closing moves)', () => {
+    const ref =
+      DETERMINISTIC_DRAFT.replace('<李先生一家套餐訂製> ', '<李先生一家 ✦ 訂製> ') +
+      '\n\n有任何想調整的都歡迎再跟我說～'
+    // All Day｜… lines untouched ⇒ no day_title_fact_changed (and no other drift).
+    expect(guard(ref).map((i) => i.code)).not.toContain('day_title_fact_changed')
+    expect(guard(ref)).toEqual([])
   })
 
   it('flags a renamed activity → activity_line_changed', () => {
