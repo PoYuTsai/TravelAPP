@@ -830,6 +830,7 @@ export async function runRefineSmokeCommand(options = {}) {
   const env = options.env ?? process.env
 
   let refineSource = options.refineSource ?? null
+  let rescueSource = options.rescueSource ?? null
   let kit = options.kit ?? null
   let status = null
   let reason = null
@@ -843,6 +844,7 @@ export async function runRefineSmokeCommand(options = {}) {
       return formatRefineSmokeReport({ status: 'error' })
     }
     refineSource = refineSource ?? runtime?.refineSource ?? null
+    rescueSource = rescueSource ?? runtime?.rescueSource ?? null
     kit = kit ?? runtime?.kit ?? null
     status = runtime?.status ?? null
     reason = runtime?.reason ?? null
@@ -856,6 +858,8 @@ export async function runRefineSmokeCommand(options = {}) {
   }
 
   const model = typeof kit.resolveModel === 'function' ? kit.resolveModel({ env }) : 'unknown'
+  const rescueModel =
+    typeof kit.resolveRescueModel === 'function' ? kit.resolveRescueModel({ env }) : undefined
   const cases = Array.isArray(kit.cases) ? kit.cases : []
   const outcomes = []
 
@@ -863,7 +867,7 @@ export async function runRefineSmokeCommand(options = {}) {
     const leak = kit.scanPromptLeak(c.deterministicDraft)
     if (Array.isArray(leak) && leak.length > 0) {
       // Dirty deterministic draft: never send it to the LLM. First-class fallback.
-      outcomes.push({ caseId: c.caseId, model, promptLeak: true, result: null })
+      outcomes.push({ caseId: c.caseId, model, rescueModel, promptLeak: true, result: null })
       continue
     }
 
@@ -873,6 +877,8 @@ export async function runRefineSmokeCommand(options = {}) {
         deterministicDraft: c.deterministicDraft,
         constraints: c.constraints,
         source: refineSource,
+        // M3.4d: rescue tier runs ONLY if the primary candidate is rejected.
+        rescueSource: rescueSource ?? undefined,
       })
     } catch {
       // The harness already fail-closes a throwing source; a throw here is
@@ -885,7 +891,7 @@ export async function runRefineSmokeCommand(options = {}) {
         leakHits: [],
       }
     }
-    outcomes.push({ caseId: c.caseId, model, promptLeak: false, result })
+    outcomes.push({ caseId: c.caseId, model, rescueModel, promptLeak: false, result })
   }
 
   return formatRefineSmokeReport({ status: 'ok', summary: summarizeRefineSmoke(outcomes) })

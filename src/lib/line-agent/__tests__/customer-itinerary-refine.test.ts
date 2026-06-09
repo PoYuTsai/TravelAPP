@@ -15,6 +15,7 @@ import {
   structuralDiffGuard,
   scanCustomerForbiddenTerms,
   refineCustomerItineraryDraft,
+  evaluateRefineCandidate,
 } from '../notion/customer-itinerary-refine'
 import {
   DETERMINISTIC_DRAFT,
@@ -220,13 +221,15 @@ describe('refineCustomerItineraryDraft', () => {
     expect(r.draft).toContain('✦ 專屬訂製')
   })
 
-  it('fail-closes to deterministic on structural drift', async () => {
+  it('fail-closes to deterministic on structural drift (reason: structural_diff)', async () => {
     const r = await run(structureBreakSource)
     expect(r.used).toBe('deterministic')
     expect(r.refinedDraft).toBeNull()
     expect(r.draft).toBe(DETERMINISTIC_DRAFT)
     expect(r.structuralIssues.length).toBeGreaterThan(0)
-    expect(r.rejectionReasons.length).toBeGreaterThan(0)
+    // M3.4d rename: the structural rejection reason is structural_diff (not _drift).
+    expect(r.rejectionReasons).toContain('structural_diff')
+    expect(r.rejectionReasons).not.toContain('structural_drift')
   })
 
   it('fail-closes to deterministic on an internal-data leak', async () => {
@@ -264,5 +267,96 @@ describe('refineCustomerItineraryDraft', () => {
   it('pins the accepted refined draft tone', async () => {
     const r = await run(goodPolishSource)
     expect(r.draft).toMatchSnapshot()
+  })
+
+  it('a single-tier (no rescueSource) reject reports tier null with one attempt', async () => {
+    const r = await run(structureBreakSource)
+    expect(r.tier).toBeNull()
+    expect(r.attempts).toHaveLength(1)
+    expect(r.attempts[0].tier).toBe('primary')
+    expect(r.attempts[0].accepted).toBe(false)
+  })
+
+  it('a primary accept reports tier primary with one attempt', async () => {
+    const r = await run(goodPolishSource)
+    expect(r.tier).toBe('primary')
+    expect(r.attempts).toHaveLength(1)
+    expect(r.attempts[0].accepted).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// refineCustomerItineraryDraft — M3.4d primary→rescue tier
+// ---------------------------------------------------------------------------
+
+describe('refineCustomerItineraryDraft — primary→rescue tier', () => {
+  const runTier = (
+    source: Parameters<typeof refineCustomerItineraryDraft>[0]['source'],
+    rescueSource: Parameters<typeof refineCustomerItineraryDraft>[0]['rescueSource']
+  ) =>
+    refineCustomerItineraryDraft({
+      deterministicDraft: DETERMINISTIC_DRAFT,
+      constraints: REFINE_CONSTRAINTS,
+      source,
+      rescueSource,
+    })
+
+  it('escalates to rescue when primary is rejected and rescue passes', async () => {
+    const r = await runTier(structureBreakSource, goodPolishSource)
+    expect(r.used).toBe('refined')
+    expect(r.tier).toBe('rescue')
+    expect(r.draft).toBe(r.refinedDraft)
+    expect(r.attempts).toHaveLength(2)
+    expect(r.attempts[0].tier).toBe('primary')
+    expect(r.attempts[0].accepted).toBe(false)
+    expect(r.attempts[1].tier).toBe('rescue')
+    expect(r.attempts[1].accepted).toBe(true)
+    // Adopted result is clean.
+    expect(r.rejectionReasons).toEqual([])
+  })
+
+  it('never calls rescue when primary already passes', async () => {
+    let rescueCalls = 0
+    const spyRescue: Parameters<typeof refineCustomerItineraryDraft>[0]['rescueSource'] = (req) => {
+      rescueCalls += 1
+      return req.deterministicDraft
+    }
+    const r = await runTier(goodPolishSource, spyRescue)
+    expect(r.used).toBe('refined')
+    expect(r.tier).toBe('primary')
+    expect(r.attempts).toHaveLength(1)
+    expect(rescueCalls).toBe(0)
+  })
+
+  it('fail-closes when both tiers are rejected; top-level guard fields come from the rescue attempt', async () => {
+    const r = await runTier(structureBreakSource, leakySource)
+    expect(r.used).toBe('deterministic')
+    expect(r.tier).toBeNull()
+    expect(r.refinedDraft).toBeNull()
+    expect(r.draft).toBe(DETERMINISTIC_DRAFT)
+    expect(r.attempts).toHaveLength(2)
+    // Top-level reflects the LAST attempt (rescue → leak), not the primary's structural drift.
+    expect(r.leakHits.length).toBeGreaterThan(0)
+    expect(r.rejectionReasons).toContain('internal_leak')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// evaluateRefineCandidate — the shared three-guard helper (M3.4d DRY)
+// ---------------------------------------------------------------------------
+
+describe('evaluateRefineCandidate', () => {
+  it('passes a byte-identical candidate with no reasons', () => {
+    const e = evaluateRefineCandidate(DETERMINISTIC_DRAFT, DETERMINISTIC_DRAFT, REFINE_CONSTRAINTS)
+    expect(e.ok).toBe(true)
+    expect(e.rejectionReasons).toEqual([])
+  })
+
+  it('rejects a structural drift with reason structural_diff', () => {
+    const drifted = DETERMINISTIC_DRAFT.replace('・水果市場', '・夜市')
+    const e = evaluateRefineCandidate(DETERMINISTIC_DRAFT, drifted, REFINE_CONSTRAINTS)
+    expect(e.ok).toBe(false)
+    expect(e.rejectionReasons).toContain('structural_diff')
+    expect(e.structuralIssues.length).toBeGreaterThan(0)
   })
 })

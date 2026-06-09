@@ -88,9 +88,16 @@ export async function importRefineKitDefault(ctx = {}) {
       refine: harnessMod?.refineCustomerItineraryDraft ?? null,
       scanPromptLeak: adapterMod?.scanRefinePromptLeak ?? null,
       resolveModel: adapterMod?.resolveRefineModel ?? null,
+      resolveRescueModel: adapterMod?.resolveRescueRefineModel ?? null,
       cases: casesMod?.REFINE_SMOKE_CASES ?? null,
     }
-    if (!kit.refine || !kit.scanPromptLeak || !kit.resolveModel || !Array.isArray(kit.cases)) {
+    if (
+      !kit.refine ||
+      !kit.scanPromptLeak ||
+      !kit.resolveModel ||
+      !kit.resolveRescueModel ||
+      !Array.isArray(kit.cases)
+    ) {
       return null
     }
     return kit
@@ -100,16 +107,19 @@ export async function importRefineKitDefault(ctx = {}) {
 }
 
 /**
- * PRODUCTION default `createSource` — assembles the REAL refine source:
+ * PRODUCTION default `createSource` — assembles the REAL refine source PAIR
+ * (M3.4d primary→rescue):
  *   1. dynamic-import `@anthropic-ai/sdk` for its `Anthropic` client (THE ONLY
  *      place the SDK is ever imported — the TS adapter stays SDK-free);
- *   2. dynamic-import the TS adapter for `createAnthropicRefineSource`;
- *   3. build a `callModel` that issues one `messages.create` and returns the
- *      concatenated text blocks;
- *   4. return the adapter source (which still pre-scans the prompt for leaks and
- *      hands the candidate to the harness's three guards).
+ *   2. dynamic-import the TS adapter for `createAnthropicRefineSource` +
+ *      `resolveRescueRefineModel`;
+ *   3. build ONE `callModel` (one `messages.create`, returns the concatenated
+ *      text blocks) shared by both tiers;
+ *   4. return `{ primarySource, rescueSource }` — the primary binds the default/
+ *      env primary model, the rescue binds the resolved rescue model. Both still
+ *      pre-scan the prompt for leaks and hand the candidate to the harness guards.
  * Construction touches NO network — the API is first hit only when the smoke
- * later calls the source. Both imports are injectable so this is unit-testable
+ * later calls a source. Both imports are injectable so this is unit-testable
  * fully offline.
  *
  * Failure split (Eric's Cut 2 requirement):
@@ -135,11 +145,13 @@ export async function createSourceDefault(ctx = {}) {
   //    hard wiring error.
   let Anthropic
   let createAnthropicRefineSource
+  let resolveRescueRefineModel
   try {
     const sdkMod = await importSdkModule()
     Anthropic = sdkMod?.default ?? sdkMod?.Anthropic
     const adapterMod = await importAdapterModule()
     createAnthropicRefineSource = adapterMod?.createAnthropicRefineSource
+    resolveRescueRefineModel = adapterMod?.resolveRescueRefineModel
   } catch {
     // SDK not installed / adapter not loadable → safe not-wired, no key involved.
     return null
@@ -166,7 +178,13 @@ export async function createSourceDefault(ctx = {}) {
         .map((b) => b.text)
         .join('')
     }
-    return createAnthropicRefineSource({ apiKey, env, callModel })
+    // Primary: no explicit model ⇒ adapter resolves default/env primary model.
+    const primarySource = createAnthropicRefineSource({ apiKey, env, callModel })
+    // Rescue: bind the resolved rescue model (sonnet by default / env override).
+    const rescueModel =
+      typeof resolveRescueRefineModel === 'function' ? resolveRescueRefineModel({ env }) : undefined
+    const rescueSource = createAnthropicRefineSource({ apiKey, env, model: rescueModel, callModel })
+    return { primarySource, rescueSource }
   } catch {
     throw new RefineLlmWiringError()
   }
@@ -181,43 +199,48 @@ export async function createSourceDefault(ctx = {}) {
  * any factory runs, so the safe path never imports the SDK or leaks. A source-
  * factory throw is re-thrown sanitized.
  *
- * Returns `{ status, reason, refineSource, kit }`:
+ * Returns `{ status, reason, refineSource, rescueSource, kit }`:
  *   disabled          → skipped         (feature off)
  *   runtime_not_real  → skipped         (no real-connection intent)
  *   missing_key       → client_not_wired
- *   factory_unavailable → client_not_wired (kit or source unavailable, e.g. plain node)
- *   wired             → real            (refineSource + kit non-null)
+ *   factory_unavailable → client_not_wired (kit or source pair unavailable, e.g. plain node)
+ *   wired             → real            (primary + rescue source + kit non-null)
  */
 export async function loadRefineLlmRuntime(ctx = {}) {
   const { env = {}, importRefineKit = importRefineKitDefault, createSource = createSourceDefault } = ctx
 
-  if (!isRefineEnabled(env)) {
-    return { status: 'skipped', reason: 'disabled', refineSource: null, kit: null }
-  }
-  if (!isRealRuntimeMode(env)) {
-    return { status: 'skipped', reason: 'runtime_not_real', refineSource: null, kit: null }
-  }
+  const notWired = (reason) => ({
+    status: reason === 'disabled' || reason === 'runtime_not_real' ? 'skipped' : 'client_not_wired',
+    reason,
+    refineSource: null,
+    rescueSource: null,
+    kit: null,
+  })
+
+  if (!isRefineEnabled(env)) return notWired('disabled')
+  if (!isRealRuntimeMode(env)) return notWired('runtime_not_real')
 
   const apiKey = readAnthropicKey(env)
   if (!apiKey) {
     // Three gates but no credential: safe not-wired. Do NOT call the source factory.
-    return { status: 'client_not_wired', reason: 'missing_key', refineSource: null, kit: null }
+    return notWired('missing_key')
   }
 
   let kit
-  let refineSource
+  let pair
   try {
     kit = await importRefineKit({ env })
-    refineSource = await createSource({ env, apiKey })
+    pair = await createSource({ env, apiKey })
   } catch {
     // A factory error may carry the API key — re-throw sanitized.
     throw new RefineLlmWiringError()
   }
 
-  if (!kit || !refineSource) {
-    return { status: 'client_not_wired', reason: 'factory_unavailable', refineSource: null, kit: null }
-  }
-  return { status: 'real', reason: 'wired', refineSource, kit }
+  const refineSource = pair?.primarySource ?? null
+  const rescueSource = pair?.rescueSource ?? null
+  if (!kit || !refineSource) return notWired('factory_unavailable')
+
+  return { status: 'real', reason: 'wired', refineSource, rescueSource, kit }
 }
 
 // ---------------------------------------------------------------------------
@@ -225,10 +248,11 @@ export async function loadRefineLlmRuntime(ctx = {}) {
 // ---------------------------------------------------------------------------
 
 /** Harness RefineResult.rejectionReasons → report reason. prompt_leak is the
- * runner-only pre-check path and never appears in a RefineResult. */
+ * runner-only pre-check path and never appears in a RefineResult. The harness now
+ * emits `structural_diff` directly (M3.4d rename), so that mapping is identity. */
 const REFINE_REASON_MAP = {
   lint_error: 'lint',
-  structural_drift: 'structural_diff',
+  structural_diff: 'structural_diff',
   internal_leak: 'forbidden_terms',
   source_error: 'source_error',
   empty_output: 'empty_output',
@@ -264,20 +288,29 @@ function formatStructCount(structural) {
   return `struct=${total}(${entries.map(([r, c]) => `${r}=${c}`).join(', ')})`
 }
 
+/** Did this RefineResult escalate to the rescue tier (i.e. a second attempt ran)? */
+function rescueAttempted(result) {
+  return Array.isArray(result?.attempts) && result.attempts.length > 1
+}
+
 /**
  * Classify one per-case outcome into a masked report row. An outcome is:
- *   { caseId, model, promptLeak: boolean, result: RefineResult | null }
+ *   { caseId, model, rescueModel, promptLeak: boolean, result: RefineResult | null }
  * The prompt_leak pre-check carries no RefineResult; every other fallback maps
  * its FIRST rejection reason for the row label (full guard counts ride alongside).
+ *
+ * Model label (M3.4d): a rescue-adopted row shows the rescue model; a both-tiers
+ * fallback shows the `primary→rescue` escalation; everything else shows primary.
  */
 function classifyRow(outcome) {
-  const { caseId, model } = outcome
+  const { caseId, model, rescueModel } = outcome
   if (outcome.promptLeak) {
     return {
       caseId,
       model,
       status: 'fallback',
       reason: 'prompt_leak',
+      tier: null,
       isFallback: true,
       structural: {},
       guardSummary: 'prompt_leak',
@@ -286,11 +319,13 @@ function classifyRow(outcome) {
 
   const result = outcome.result ?? {}
   if (result.used === 'refined') {
+    const tier = result.tier ?? 'primary'
     return {
       caseId,
-      model,
+      model: tier === 'rescue' ? rescueModel ?? model : model,
       status: 'refined',
       reason: null,
+      tier,
       isFallback: false,
       structural: {},
       guardSummary: 'struct=0 leak=0 lint=0',
@@ -303,11 +338,13 @@ function classifyRow(outcome) {
   const structural = groupStructuralReasons(result.structuralIssues)
   const leak = Array.isArray(result.leakHits) ? result.leakHits.length : 0
   const lint = countErrors(result.lintIssues)
+  const label = rescueAttempted(result) && rescueModel ? `${model}→${rescueModel}` : model
   return {
     caseId,
-    model,
+    model: label,
     status: 'fallback',
     reason,
+    tier: null,
     isFallback: true,
     structural,
     guardSummary: `${formatStructCount(structural)} leak=${leak} lint=${lint}`,
@@ -324,8 +361,17 @@ export function summarizeRefineSmoke(outcomes) {
 
   const byReason = {}
   const structuralBreakdown = {}
+  // M3.4d adoption tier: primary-accepted / rescue-accepted / fell back to deterministic.
+  const byTier = { primary: 0, rescue: 0, deterministic: 0 }
   for (const row of rows) {
-    if (row.isFallback && row.reason) byReason[row.reason] = (byReason[row.reason] ?? 0) + 1
+    if (row.isFallback) {
+      byTier.deterministic += 1
+      if (row.reason) byReason[row.reason] = (byReason[row.reason] ?? 0) + 1
+    } else if (row.tier === 'rescue') {
+      byTier.rescue += 1
+    } else {
+      byTier.primary += 1
+    }
     for (const [reason, count] of Object.entries(row.structural ?? {})) {
       structuralBreakdown[reason] = (structuralBreakdown[reason] ?? 0) + count
     }
@@ -339,6 +385,7 @@ export function summarizeRefineSmoke(outcomes) {
     acceptRate: total ? accepted / total : 0,
     fallbackRate: total ? rejected / total : 0,
     byReason,
+    byTier,
     structuralBreakdown,
     rows,
   }
@@ -359,13 +406,25 @@ function pct(x) {
   return `${Math.round((Number(x) || 0) * 100)}%`
 }
 
+/** M3.4d adoption-tier rollup: how many the primary (Haiku) won, how many the
+ * rescue (Sonnet) saved, how many still fell back. Masked — pure counts. */
+function formatByTier(byTier) {
+  const t = byTier ?? {}
+  return [
+    '採用層分佈：',
+    `  · primary：${t.primary ?? 0}`,
+    `  · rescue：${t.rescue ?? 0}`,
+    `  · 仍 fallback（deterministic）：${t.deterministic ?? 0}`,
+  ]
+}
+
 function formatByReason(byReason) {
   const entries = Object.entries(byReason ?? {})
   if (entries.length === 0) return ['  · （無 fallback）']
   return entries.map(([reason, count]) => `  · ${reason}：${count}`)
 }
 
-/** Masked aggregate of the structural sub-reasons that caused structural_drift
+/** Masked aggregate of the structural sub-reasons that caused structural_diff
  * fallbacks across every case — the at-a-glance "which facts moved" rollup. Each
  * key is a fact category only, so this is safe to print. Empty → omitted. */
 function formatStructuralBreakdown(structuralBreakdown) {
@@ -407,6 +466,7 @@ export function formatRefineSmokeReport(report) {
     'Refine Smoke · 完成（offline guard 統計；草稿／prompt 全文不顯示）',
     `總數：${s.total ?? 0} · 採用 refined：${s.accepted ?? 0} · 退回 deterministic：${s.rejected ?? 0}`,
     `採用率：${pct(s.acceptRate)} · fallback 率：${pct(s.fallbackRate)}`,
+    ...formatByTier(s.byTier),
     'fallback 原因分佈：',
     ...formatByReason(s.byReason),
     ...formatStructuralBreakdown(s.structuralBreakdown),

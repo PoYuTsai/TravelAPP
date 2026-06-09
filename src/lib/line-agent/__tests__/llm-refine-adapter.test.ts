@@ -13,7 +13,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   REFINE_MODEL_DEFAULT,
+  REFINE_RESCUE_MODEL_DEFAULT,
   resolveRefineModel,
+  resolveRescueRefineModel,
   buildRefinePrompt,
   scanRefinePromptLeak,
   createAnthropicRefineSource,
@@ -43,6 +45,44 @@ describe('resolveRefineModel', () => {
     expect(resolveRefineModel({ env: { AI_AGENT_REFINE_LLM_MODEL: 'claude-sonnet-4-6' } })).toBe(
       'claude-sonnet-4-6'
     )
+  })
+
+  it('is NOT influenced by the rescue env var', () => {
+    expect(resolveRefineModel({ env: { AI_AGENT_REFINE_RESCUE_MODEL: 'claude-opus-4-8' } })).toBe(
+      'claude-haiku-4-5'
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// resolveRescueRefineModel — M3.4d: symmetric rescue tier, configurable
+// ---------------------------------------------------------------------------
+
+describe('resolveRescueRefineModel', () => {
+  it('defaults to the centralised Sonnet rescue constant', () => {
+    expect(REFINE_RESCUE_MODEL_DEFAULT).toBe('claude-sonnet-4-6')
+    expect(resolveRescueRefineModel()).toBe('claude-sonnet-4-6')
+  })
+
+  it('prefers an explicit model over env and default', () => {
+    expect(
+      resolveRescueRefineModel({
+        model: 'claude-opus-4-8',
+        env: { AI_AGENT_REFINE_RESCUE_MODEL: 'x' },
+      })
+    ).toBe('claude-opus-4-8')
+  })
+
+  it('falls back to AI_AGENT_REFINE_RESCUE_MODEL when no explicit model is given', () => {
+    expect(
+      resolveRescueRefineModel({ env: { AI_AGENT_REFINE_RESCUE_MODEL: 'claude-opus-4-8' } })
+    ).toBe('claude-opus-4-8')
+  })
+
+  it('is NOT influenced by the primary env var', () => {
+    expect(
+      resolveRescueRefineModel({ env: { AI_AGENT_REFINE_LLM_MODEL: 'claude-haiku-4-5' } })
+    ).toBe('claude-sonnet-4-6')
   })
 })
 

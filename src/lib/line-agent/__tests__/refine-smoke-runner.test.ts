@@ -49,8 +49,17 @@ function spyFactory(value) {
   }
 }
 
-const fakeKit = { refine: async () => ({}), scanPromptLeak: () => [], cases: [], resolveModel: () => 'm' }
+const fakeKit = {
+  refine: async () => ({}),
+  scanPromptLeak: () => [],
+  cases: [],
+  resolveModel: () => 'm',
+  resolveRescueModel: () => 'r',
+}
 const fakeSource = async (req) => req.deterministicDraft
+const fakeRescueSource = async (req) => req.deterministicDraft
+/** createSource now yields BOTH tiers (M3.4d). */
+const fakeSourcePair = { primarySource: fakeSource, rescueSource: fakeRescueSource }
 
 describe('loadRefineLlmRuntime — three gates short-circuit before any factory', () => {
   test('feature disabled → skipped/disabled, factories never called', async () => {
@@ -106,7 +115,7 @@ describe('loadRefineLlmRuntime — wiring under all three gates', () => {
     const rt = await loadRefineLlmRuntime({
       env: realEnv(),
       importRefineKit: async () => null, // mirrors a swallowed .ts import under plain node
-      createSource: async () => fakeSource,
+      createSource: async () => fakeSourcePair,
     })
 
     expect(rt.status).toBe('client_not_wired')
@@ -114,16 +123,17 @@ describe('loadRefineLlmRuntime — wiring under all three gates', () => {
     expect(rt.refineSource).toBeNull()
   })
 
-  test('all three gates + working factories → real/wired with a non-null source + kit', async () => {
+  test('all three gates + working factories → real/wired with non-null primary + rescue + kit', async () => {
     const rt = await loadRefineLlmRuntime({
       env: realEnv(),
       importRefineKit: async () => fakeKit,
-      createSource: async () => fakeSource,
+      createSource: async () => fakeSourcePair,
     })
 
     expect(rt.status).toBe('real')
     expect(rt.reason).toBe('wired')
     expect(rt.refineSource).toBe(fakeSource)
+    expect(rt.rescueSource).toBe(fakeRescueSource)
     expect(rt.kit).toBe(fakeKit)
   })
 
@@ -158,13 +168,13 @@ describe('loadRefineLlmRuntime — wiring under all three gates', () => {
   })
 })
 
-describe('createSourceDefault — SDK-missing is graceful, construction is sanitized', () => {
+describe('createSourceDefault — dual-tier source, SDK-missing graceful, construction sanitized', () => {
   // SDK NOT INSTALLED: the dynamic import throws module-not-found, which carries
   // NO key (the key is only used at construction below). It must resolve null so
   // the loader projects factory_unavailable — never an error, never an API call.
   test('SDK import failure (not installed) → resolves null, no throw, no construction', async () => {
     let constructed = false
-    const source = await createSourceDefault({
+    const pair = await createSourceDefault({
       apiKey: SECRET_KEY,
       importSdkModule: async () => {
         throw new Error("Cannot find module '@anthropic-ai/sdk'")
@@ -177,17 +187,17 @@ describe('createSourceDefault — SDK-missing is graceful, construction is sanit
       }),
     })
 
-    expect(source).toBeNull()
+    expect(pair).toBeNull()
     expect(constructed).toBe(false)
   })
 
   test('malformed SDK module (no Anthropic export) → resolves null', async () => {
-    const source = await createSourceDefault({
+    const pair = await createSourceDefault({
       apiKey: SECRET_KEY,
       importSdkModule: async () => ({}),
       importAdapterModule: async () => ({ createAnthropicRefineSource: () => async () => '' }),
     })
-    expect(source).toBeNull()
+    expect(pair).toBeNull()
   })
 
   test('SDK present but construction throws with the key → sanitized RefineLlmWiringError', async () => {
@@ -211,25 +221,33 @@ describe('createSourceDefault — SDK-missing is graceful, construction is sanit
     expect(boom.message).not.toContain(SECRET_KEY)
   })
 
-  test('SDK + adapter present → builds a working source (no network on construction)', async () => {
-    const source = await createSourceDefault({
+  test('SDK + adapter present → builds a primary + rescue source pair, each with its own model', async () => {
+    const pair = await createSourceDefault({
       apiKey: SECRET_KEY,
       importSdkModule: async () => ({
         Anthropic: class {
           constructor() {
-            this.messages = { create: async () => ({ content: [{ type: 'text', text: 'ok' }] }) }
+            // Echo the requested model so we can prove the two tiers differ.
+            this.messages = { create: async ({ model }) => ({ content: [{ type: 'text', text: model }] }) }
           }
         },
       }),
       importAdapterModule: async () => ({
-        createAnthropicRefineSource: (deps) => async () => {
-          return deps.callModel({ system: 's', user: 'u', model: 'm' })
-        },
+        // deps.model wins when present (rescue); absent → 'haiku-default' (primary).
+        createAnthropicRefineSource: (deps) => async () =>
+          deps.callModel({ system: 's', user: 'u', model: deps.model ?? 'haiku-default' }),
+        resolveRescueRefineModel: () => 'claude-sonnet-4-6',
       }),
     })
 
-    expect(typeof source).toBe('function')
-    await expect(source({ deterministicDraft: 'd', constraints: {} })).resolves.toBe('ok')
+    expect(typeof pair.primarySource).toBe('function')
+    expect(typeof pair.rescueSource).toBe('function')
+    await expect(pair.primarySource({ deterministicDraft: 'd', constraints: {} })).resolves.toBe(
+      'haiku-default'
+    )
+    await expect(pair.rescueSource({ deterministicDraft: 'd', constraints: {} })).resolves.toBe(
+      'claude-sonnet-4-6'
+    )
   })
 })
 
@@ -266,7 +284,7 @@ describe('summarizeRefineSmoke', () => {
       { caseId: 'a', model: 'claude-haiku-4-5', promptLeak: false, result: refinedResult() },
       { caseId: 'b', model: 'claude-haiku-4-5', promptLeak: false, result: refinedResult() },
       { caseId: 'c', model: 'claude-haiku-4-5', promptLeak: false, result: fallbackResult(['lint_error']) },
-      { caseId: 'd', model: 'claude-haiku-4-5', promptLeak: false, result: fallbackResult(['structural_drift']) },
+      { caseId: 'd', model: 'claude-haiku-4-5', promptLeak: false, result: fallbackResult(['structural_diff']) },
     ])
 
     expect(summary.total).toBe(4)
@@ -280,7 +298,7 @@ describe('summarizeRefineSmoke', () => {
   test('maps harness reasons to report reasons, including the runner-only prompt_leak', () => {
     const summary = summarizeRefineSmoke([
       { caseId: 'lint', model: 'm', promptLeak: false, result: fallbackResult(['lint_error']) },
-      { caseId: 'struct', model: 'm', promptLeak: false, result: fallbackResult(['structural_drift']) },
+      { caseId: 'struct', model: 'm', promptLeak: false, result: fallbackResult(['structural_diff']) },
       { caseId: 'leak', model: 'm', promptLeak: false, result: fallbackResult(['internal_leak']) },
       { caseId: 'srcerr', model: 'm', promptLeak: false, result: fallbackResult(['source_error']) },
       { caseId: 'empty', model: 'm', promptLeak: false, result: fallbackResult(['empty_output']) },
@@ -317,9 +335,9 @@ describe('summarizeRefineSmoke', () => {
 // structural_diff sub-reason breakdown (M3.4c follow-up diagnostics)
 // ---------------------------------------------------------------------------
 
-/** A structural_drift fallback carrying the given guard issue codes. */
+/** A structural_diff fallback carrying the given guard issue codes. */
 function structFallback(codes) {
-  return fallbackResult(['structural_drift'], {
+  return fallbackResult(['structural_diff'], {
     structuralIssues: codes.map((code) => ({ code, message: 'masked' })),
   })
 }
@@ -372,6 +390,61 @@ describe('summarizeRefineSmoke — structural sub-reason breakdown', () => {
       { caseId: 'c', model: 'm', promptLeak: false, result: refinedResult() },
     ])
     expect(summary.structuralBreakdown).toEqual({ activity_line_changed: 2, lunch_changed: 1 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M3.4d — primary→rescue tier accounting
+// ---------------------------------------------------------------------------
+
+/** A refined RefineResult adopted at the given tier. */
+function refinedAt(tier) {
+  return { ...refinedResult(), tier, attempts: [{ tier: 'primary' }, { tier: 'rescue' }].slice(0, tier === 'rescue' ? 2 : 1) }
+}
+
+/** A both-tiers-failed RefineResult (primary + rescue attempts, top-level = rescue). */
+function bothTiersFailed(reasons) {
+  return fallbackResult(reasons, { tier: null, attempts: [{ tier: 'primary' }, { tier: 'rescue' }] })
+}
+
+describe('summarizeRefineSmoke — primary→rescue tier', () => {
+  test('byTier counts primary-accepted, rescue-accepted, and fallback', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'p', model: 'h', rescueModel: 's', promptLeak: false, result: refinedAt('primary') },
+      { caseId: 'r', model: 'h', rescueModel: 's', promptLeak: false, result: refinedAt('rescue') },
+      { caseId: 'f', model: 'h', rescueModel: 's', promptLeak: false, result: bothTiersFailed(['lint_error']) },
+    ])
+    expect(summary.byTier).toEqual({ primary: 1, rescue: 1, deterministic: 1 })
+  })
+
+  test('a rescue-adopted row shows the rescue model, a primary-adopted row shows the primary model', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'p', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: refinedAt('primary') },
+      { caseId: 'r', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: refinedAt('rescue') },
+    ])
+    expect(summary.rows.find((x) => x.caseId === 'p').model).toBe('claude-haiku-4-5')
+    expect(summary.rows.find((x) => x.caseId === 'r').model).toBe('claude-sonnet-4-6')
+  })
+
+  test('a both-tiers fallback row shows the primary→rescue escalation in its model label', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'f', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: bothTiersFailed(['structural_diff']) },
+    ])
+    expect(summary.rows[0].model).toBe('claude-haiku-4-5→claude-sonnet-4-6')
+  })
+})
+
+describe('formatRefineSmokeReport — tier distribution section', () => {
+  test('ok report surfaces the adoption-tier rollup, masked', () => {
+    const summary = summarizeRefineSmoke([
+      { caseId: 'p', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: refinedAt('primary') },
+      { caseId: 'r', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: refinedAt('rescue') },
+      { caseId: 'f', model: 'claude-haiku-4-5', rescueModel: 'claude-sonnet-4-6', promptLeak: false, result: bothTiersFailed(['lint_error']) },
+    ])
+    const out = formatRefineSmokeReport({ status: 'ok', summary })
+    expect(out).toContain('採用層分佈')
+    expect(out).toContain('primary')
+    expect(out).toContain('rescue')
   })
 })
 

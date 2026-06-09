@@ -43,6 +43,25 @@ export function resolveRefineModel(opts?: {
   return REFINE_MODEL_DEFAULT
 }
 
+/**
+ * M3.4d — the RESCUE tier model. When the primary (Haiku) candidate is rejected
+ * by the three deterministic guards, the harness escalates to this stronger model
+ * for a second candidate over the SAME guards. Symmetric to the primary resolver,
+ * with its own env var so the two tiers are configured independently. */
+export const REFINE_RESCUE_MODEL_DEFAULT = 'claude-sonnet-4-6'
+
+/** Resolve order: explicit `model` > env `AI_AGENT_REFINE_RESCUE_MODEL` > default. */
+export function resolveRescueRefineModel(opts?: {
+  model?: string
+  env?: Record<string, string | undefined>
+}): string {
+  const explicit = opts?.model?.trim()
+  if (explicit) return explicit
+  const fromEnv = opts?.env?.AI_AGENT_REFINE_RESCUE_MODEL?.trim()
+  if (fromEnv) return fromEnv
+  return REFINE_RESCUE_MODEL_DEFAULT
+}
+
 // ---------------------------------------------------------------------------
 // Prompt builder (correction 3: only the draft string can enter the prompt)
 // ---------------------------------------------------------------------------
