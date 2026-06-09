@@ -14,17 +14,41 @@
 
 import type { RetrievalApplication } from './customer-itinerary-change-composer'
 
+/**
+ * One labelled block per declined activity so Eric can judge at a glance:
+ *   原需求 / 否決原因 / 是否代入 draft / 替代候選 / 來源 case
+ * Each block is a single multi-line array element (callers can join with a blank
+ * line). Internal-only: theme, source and candidate counts are fine to show.
+ */
 export function buildOperatorRetrievalPreview(applications: RetrievalApplication[]): string[] {
   return applications.map((app) => {
-    const head = `Day ${app.day}｜原需求「${app.declinedActivity}」`
     const theme = app.themeTag ?? '未指定'
+    const reason = app.declineReason ? `長輩不適合（${app.declineReason}）` : '長輩不適合'
+    const candidateList =
+      app.candidates.length > 0
+        ? `${app.candidates.map((c) => c.name).join('、')}（共 ${app.candidates.length} 筆，皆來自 retrieval 白名單）`
+        : '無'
+
+    const lines = [
+      `Day ${app.day}｜原需求「${app.declinedActivity}」`,
+      `　否決原因：${reason}`,
+    ]
+
     if (app.outcome === 'substituted' && app.chosen) {
-      return `${head} → 已代入同主題替代「${app.chosen.name}」（theme=${theme}；retrieval 白名單候選 ${app.candidates.length} 筆）`
+      lines.push('　是否代入 draft：是')
+      lines.push(`　代入替代：${app.chosen.name}`)
+      lines.push(`　替代候選：${candidateList}`)
+      lines.push(`　來源 case：${app.chosen.name}（theme=${app.chosen.themeTag ?? theme}）`)
+    } else if (app.outcome === 'named_only') {
+      lines.push('　是否代入 draft：否（僅建議，待人工挑選代入）')
+      lines.push(`　替代候選：${candidateList}`)
+      lines.push(`　來源 case：— （theme=${theme} 未對齊或未指定）`)
+    } else {
+      lines.push('　是否代入 draft：否')
+      lines.push(`　替代候選：${candidateList}`)
+      lines.push('　來源 case：無可用 retrieval 白名單，請人工補景點（系統不杜撰）')
     }
-    if (app.outcome === 'named_only') {
-      const names = app.candidates.map((c) => c.name).join('、')
-      return `${head} → 未代入，建議候選：${names}（theme=${theme} 未對齊或未指定，需人工挑選代入）`
-    }
-    return `${head} → 無可用 retrieval 白名單替代，請人工補景點（系統不杜撰，theme=${theme}）`
+
+    return lines.join('\n')
   })
 }

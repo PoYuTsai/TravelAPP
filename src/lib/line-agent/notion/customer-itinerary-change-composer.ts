@@ -110,6 +110,8 @@ export interface ChangeDecision {
 export interface RetrievalApplication {
   day: number
   declinedActivity: string
+  /** The matched mobility-unsuitable token that triggered the decline. */
+  declineReason?: string
   themeTag?: string
   chosen?: { name: string; themeTag?: string }
   /** Mobility-friendly whitelist candidates considered (for the operator). */
@@ -246,6 +248,7 @@ export function applyChanges(
     const hit = limited ? unsuitableHit(add.activity) : undefined
     if (hit) {
       const app = pickRetrievalAlternative(add.day, add.activity, add.themeTag, retrievalCases)
+      app.declineReason = hit
       retrievalApplications.push(app)
       if (app.outcome === 'substituted' && app.chosen) {
         day.afternoonActivities = [...(day.afternoonActivities ?? []), app.chosen.name]
