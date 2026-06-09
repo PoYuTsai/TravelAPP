@@ -100,9 +100,14 @@ export function parseAgentCommandArgs(args) {
   if (command === 'refine-smoke' || command === '/refine-smoke') {
     return { commandText: 'refine-smoke' }
   }
+  if (command === 'partner-rag-path-trace' || command === '/partner-rag-path-trace') {
+    // The remaining args form the simulated partner-group message text.
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'partner-rag-path-trace', query }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace'
   )
 }
 
@@ -897,6 +902,56 @@ export async function runRefineSmokeCommand(options = {}) {
   return formatRefineSmokeReport({ status: 'ok', summary: summarizeRefineSmoke(outcomes) })
 }
 
+// ---------------------------------------------------------------------------
+// partner-rag-path-trace — OFFLINE private-group RAG path tracer (M3.6b)
+// ---------------------------------------------------------------------------
+// Diagnoses "why did my tagged private-group RAG message get a free-form answer
+// instead of a deterministic Notion draft?" WITHOUT touching the real group: no
+// LINE, no Notion live read, no LLM, no gate flip. The trace + masked formatter
+// live in the pure TS module src/lib/line-agent/partner-group/rag-path-trace.ts,
+// which reuses the SAME decision functions the webhook calls so it cannot drift.
+// The report is masked by construction (enabled/disabled/present/missing only).
+
+/**
+ * GUARD-loaded dynamic import of the pure TS trace kit — resolves under a TS
+ * runtime (tsx, the npm script); under plain `node` the `.ts` import throws and
+ * is swallowed → null, so the command surfaces a wiring error rather than crash.
+ * Injectable so the command is testable without the host runtime.
+ */
+export async function loadPartnerRagPathTraceKit(ctx = {}) {
+  const {
+    importModule = () => import('../src/lib/line-agent/partner-group/rag-path-trace.ts'),
+  } = ctx
+  try {
+    const mod = await importModule()
+    if (!mod?.tracePartnerRagPath || !mod?.formatPartnerRagPathTrace) return null
+    return {
+      tracePartnerRagPath: mod.tracePartnerRagPath,
+      formatPartnerRagPathTrace: mod.formatPartnerRagPathTrace,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Run the partner-rag-path-trace command offline. The `traceKit` (pure TS) is
+ * injected in tests; otherwise it is guard-loaded. A missing kit (plain node /
+ * import failure) surfaces a fixed sanitized message — never a raw error.
+ */
+export async function runPartnerRagPathTraceCommand(options = {}) {
+  const env = options.env ?? process.env
+  const text = options.query ?? ''
+
+  const traceKit = options.traceKit ?? (await loadPartnerRagPathTraceKit())
+  if (!traceKit?.tracePartnerRagPath || !traceKit?.formatPartnerRagPathTrace) {
+    return '夥伴群 RAG 路徑追蹤 · 失敗（trace 模組未載入，請用 tsx 執行）'
+  }
+
+  const trace = traceKit.tracePartnerRagPath({ text, env })
+  return traceKit.formatPartnerRagPathTrace(trace, text)
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
@@ -913,6 +968,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'notion-rag-change-dry-run') {
     return runNotionRagChangeDryRunCommand({ env: options.env ?? process.env, query })
+  }
+  if (commandText === 'partner-rag-path-trace') {
+    return runPartnerRagPathTraceCommand({ env: options.env ?? process.env, query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

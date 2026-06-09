@@ -22,6 +22,7 @@
     "agent:notion-rag-answer": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-answer",
     "agent:notion-rag-change-dry-run": "tsx --env-file=.env.local scripts/agent-command.mjs notion-rag-change-dry-run",
     "agent:refine-smoke": "tsx --env-file=.env.local scripts/agent-command.mjs refine-smoke",
+    "agent:partner-rag-path-trace": "tsx --env-file=.env.local scripts/agent-command.mjs partner-rag-path-trace",
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
