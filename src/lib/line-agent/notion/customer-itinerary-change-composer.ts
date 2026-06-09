@@ -70,7 +70,8 @@ export interface CustomerChangeRequest {
   lodgingChangeRequests?: Array<{ day: number; lodging: string }>
   /** Final day has an early-morning airport transfer. */
   finalDayMorningTransfer?: { time: string }
-  addActivities?: Array<{ day: number; activity: string }>
+  /** themeTag opts an add into deterministic retrieval-case substitution (M3.3d). */
+  addActivities?: Array<{ day: number; activity: string; themeTag?: string }>
   removeActivities?: Array<{ day: number; activity: string }>
   /** Activities the customer explicitly wants kept → protected from auto-removal. */
   keepActivities?: string[]
@@ -97,6 +98,25 @@ export interface ChangeDecision {
   customerNote?: string
 }
 
+/**
+ * M3.3d — the trace of one declined activity's retrieval-case substitution
+ * attempt. Operator-facing: lets Eric see which alternatives were considered and
+ * why one was (or wasn't) applied, before the draft goes out.
+ *   - substituted: a same-theme mobility-friendly case was applied into the draft
+ *   - named_only:  a mobility-friendly case exists but theme didn't match → only
+ *                  suggested in the explanation, NOT applied
+ *   - none:        no usable whitelist candidate → generic phrasing, no invention
+ */
+export interface RetrievalApplication {
+  day: number
+  declinedActivity: string
+  themeTag?: string
+  chosen?: { name: string; themeTag?: string }
+  /** Mobility-friendly whitelist candidates considered (for the operator). */
+  candidates: RetrievalCaseRef[]
+  outcome: 'substituted' | 'named_only' | 'none'
+}
+
 export interface CustomerChangeResult {
   /** Defined as (draft !== null): is there a usable customer draft? */
   ok: boolean
@@ -105,6 +125,8 @@ export interface CustomerChangeResult {
   customerExplanation: string
   /** Internal-only adjustment/decline reasons. */
   operatorNotes: string[]
+  /** Per-declined-activity retrieval substitution trace (M3.3d). */
+  retrievalApplications: RetrievalApplication[]
   /** Residual lint violations when fail-closed. */
   issues: ItineraryLintIssue[]
 }
@@ -144,9 +166,14 @@ export function applyChanges(
   base: ComposeCustomerItineraryInput,
   changes: CustomerChangeRequest,
   retrievalCases: RetrievalCaseRef[] = []
-): { adjustedInput: ComposeCustomerItineraryInput; decisions: ChangeDecision[] } {
+): {
+  adjustedInput: ComposeCustomerItineraryInput
+  decisions: ChangeDecision[]
+  retrievalApplications: RetrievalApplication[]
+} {
   const adjusted = cloneInput(base)
   const decisions: ChangeDecision[] = []
+  const retrievalApplications: RetrievalApplication[] = []
   const days = adjusted.requirements.days
   const keep = new Set(changes.keepActivities ?? [])
   const findDay = (n: number) => days.find((d) => d.day === n)
@@ -218,15 +245,26 @@ export function applyChanges(
     if (!day) continue
     const hit = limited ? unsuitableHit(add.activity) : undefined
     if (hit) {
-      const alt = retrievalCases.find((c) => c.mobilityFriendly)
-      const altPhrase = alt ? `可改成「${alt.name}」` : '可改成較輕鬆的替代景點'
-      decisions.push({
-        status: 'declined',
-        operatorNote: `Day ${add.day}「${add.activity}」含長輩不適合項目（${hit}），未加入；替代＝${
-          alt ? alt.name : '無白名單，泛稱替代景點'
-        }。`,
-        customerNote: `「${add.activity}」對長輩體力比較吃力，這次先不安排，${altPhrase}，會更輕鬆又好拍。`,
-      })
+      const app = pickRetrievalAlternative(add.day, add.activity, add.themeTag, retrievalCases)
+      retrievalApplications.push(app)
+      if (app.outcome === 'substituted' && app.chosen) {
+        day.afternoonActivities = [...(day.afternoonActivities ?? []), app.chosen.name]
+        decisions.push({
+          status: 'adjusted',
+          operatorNote: `Day ${add.day}「${add.activity}」含長輩不適合項目（${hit}）；以同主題替代景點「${app.chosen.name}」代入（來源 retrieval case，theme=${app.themeTag}）。`,
+          customerNote: `「${add.activity}」對長輩體力比較吃力，這次改安排「${app.chosen.name}」，一樣好玩又更輕鬆好走。`,
+        })
+      } else {
+        const named = app.candidates[0]
+        const altPhrase = named ? `可改成「${named.name}」` : '可改成較輕鬆的替代景點'
+        decisions.push({
+          status: 'declined',
+          operatorNote: `Day ${add.day}「${add.activity}」含長輩不適合項目（${hit}），未加入；替代＝${
+            named ? `${named.name}（僅建議，未代入）` : '無白名單，泛稱替代景點'
+          }。`,
+          customerNote: `「${add.activity}」對長輩體力比較吃力，這次先不安排，${altPhrase}，會更輕鬆又好拍。`,
+        })
+      }
       continue
     }
     day.afternoonActivities = [...(day.afternoonActivities ?? []), add.activity]
@@ -287,7 +325,40 @@ export function applyChanges(
   // 8. over-full rerank — conservative, signal-gated, no cross-area moves.
   rerankOverFullDays(adjusted, changes, keep, decisions)
 
-  return { adjustedInput: adjusted, decisions }
+  return { adjustedInput: adjusted, decisions, retrievalApplications }
+}
+
+/**
+ * Deterministically pick a retrieval-case alternative for a declined activity.
+ * Candidates are the mobility-friendly whitelist entries that are not themselves
+ * mobility-unsuitable. Substitution requires an explicit themeTag on BOTH the
+ * request and a candidate (no theme → suggest only, preserving M3.3c behaviour).
+ * Order is stable (first match wins) so the choice is reproducible.
+ */
+function pickRetrievalAlternative(
+  day: number,
+  declinedActivity: string,
+  themeTag: string | undefined,
+  retrievalCases: RetrievalCaseRef[]
+): RetrievalApplication {
+  const candidates = retrievalCases.filter((c) => c.mobilityFriendly && !unsuitableHit(c.name))
+  if (themeTag) {
+    const chosen = candidates.find((c) => c.themeTag === themeTag)
+    if (chosen) {
+      return {
+        day,
+        declinedActivity,
+        themeTag,
+        chosen: { name: chosen.name, themeTag: chosen.themeTag },
+        candidates,
+        outcome: 'substituted',
+      }
+    }
+  }
+  if (candidates.length > 0) {
+    return { day, declinedActivity, themeTag, candidates, outcome: 'named_only' }
+  }
+  return { day, declinedActivity, themeTag, candidates: [], outcome: 'none' }
 }
 
 /**
@@ -384,7 +455,11 @@ function buildCustomerExplanation(decisions: ChangeDecision[]): string {
 
 export function composeCustomerChange(input: ChangeComposerInput): CustomerChangeResult {
   const { base, changes, retrievalCases = [] } = input
-  const { adjustedInput, decisions } = applyChanges(base, changes, retrievalCases)
+  const { adjustedInput, decisions, retrievalApplications } = applyChanges(
+    base,
+    changes,
+    retrievalCases
+  )
   const composed = composeCustomerItineraryDraft(adjustedInput)
 
   return {
@@ -392,6 +467,7 @@ export function composeCustomerChange(input: ChangeComposerInput): CustomerChang
     draft: composed.draft,
     customerExplanation: buildCustomerExplanation(decisions),
     operatorNotes: decisions.map((d) => d.operatorNote),
+    retrievalApplications,
     issues: composed.issues,
   }
 }
