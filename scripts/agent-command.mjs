@@ -8,6 +8,7 @@ import {
   loadNotionRagDryRunRuntime,
   loadNotionRagSearchRuntime,
   loadNotionRagAnswerRuntime,
+  loadNotionRagChangeRuntime,
 } from './notion-rag-dry-runner.mjs'
 
 const DEFAULT_ORIGIN = 'https://chiangway-travel.com'
@@ -87,8 +88,14 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'notion-rag-answer', query }
   }
+  if (command === 'notion-rag-change-dry-run' || command === '/notion-rag-change-dry-run') {
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'notion-rag-change-dry-run', query }
+  }
 
-  throw new Error('目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer')
+  throw new Error(
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run'
+  )
 }
 
 export function readDotEnvValue(dotenvText, key) {
@@ -629,6 +636,175 @@ export async function runNotionRagAnswerCommand(options = {}) {
   })
 }
 
+// ---------------------------------------------------------------------------
+// notion-rag-change-dry-run — operator-only CHANGE dry-run (live masked → preview)
+// ---------------------------------------------------------------------------
+// M3.4a Cut 2. Runs a FIXTURE change scenario but swaps its retrieval cases for
+// the LIVE Notion masked theme signals, proving the policy: a live_masked case is
+// theme-signal only, so it can be SUGGESTED (named_only) but is never written into
+// the draft (substitution guard lives in the composer). The report is masked by
+// construction — it surfaces theme tokens / counts / outcomes / the operator
+// preview, never a raw Notion payload, URL, db id, token, customer PII, cost,
+// revenue, profit, or a concrete live attraction name. The draft (built from the
+// fixture) must pass lint; a lint error fails closed.
+
+const NOTION_RAG_CHANGE_OUTCOME_LABELS = {
+  substituted: '已代入替代景點',
+  named_only: '僅建議，不代入 draft',
+  none: '無候選，請人工補景點',
+}
+
+/**
+ * Format a change dry-run report into a Traditional Chinese operator summary.
+ * Reads ONLY masked fields: theme tokens (generic), hit counts, per-activity
+ * outcome codes, the draft lint status, and the operator preview (which itself
+ * only names generic labels for live_masked candidates).
+ */
+export function formatNotionRagChangeReport(report) {
+  if (report?.status === 'skipped') {
+    return [
+      '客變 Dry-run · 已略過',
+      '（AI_AGENT_NOTION_RAG_ENABLED 未開啟，未連線 Notion）',
+    ].join('\n')
+  }
+
+  if (report?.status === 'error') {
+    const lines = ['客變 Dry-run · 失敗']
+    if (report.errorCode) {
+      lines.push(`錯誤碼：${report.errorCode}（${codeLabel(report.errorCode)}）`)
+    }
+    return lines.join('\n')
+  }
+
+  const themes = Array.isArray(report?.liveThemeSignals) ? report.liveThemeSignals : []
+  const themeLine =
+    themes.length > 0
+      ? `live theme 訊號：[${themes.join(', ')}]（masked，僅 theme，無景點名，依政策不代入）`
+      : 'live theme 訊號：[]（無 mobility-friendly 主題，未提供候選）'
+
+  const applications = Array.isArray(report?.applications) ? report.applications : []
+  const outcomeLines = applications.map((app) => {
+    const code = app.outcome
+    const label = NOTION_RAG_CHANGE_OUTCOME_LABELS[code] ?? code
+    const count = Array.isArray(app.candidates) ? app.candidates.length : 0
+    return `  · Day ${app.day}「${app.declinedActivity}」→ ${code}（${label}；候選 ${count} 筆）`
+  })
+
+  const lines = [
+    '客變 Dry-run · 完成（live masked，僅 theme 訊號，不代入 draft；fixture 情境）',
+    `索引總筆數：${report?.totalRecords ?? 0} · 命中：${report?.resultCount ?? 0}`,
+    themeLine,
+    '替代結果：',
+    ...(outcomeLines.length > 0 ? outcomeLines : ['  · （此情境無替代判斷）']),
+    report?.draftPresent ? '草稿：已產生（過 lint）' : '草稿：fail-closed（lint error，未產生）',
+  ]
+  const preview = Array.isArray(report?.preview) ? report.preview : []
+  if (preview.length > 0) {
+    lines.push('— operator preview —')
+    lines.push(preview.join('\n\n'))
+  }
+  return lines.join('\n')
+}
+
+/** Build the safe client_not_wired / client_error error projection for change. */
+function changeErrorReport(errorCode) {
+  return { status: 'error', errorCode }
+}
+
+/**
+ * Run the notion-rag-change-dry-run command offline. Mirrors the other RAG
+ * commands' resolution seam:
+ *   1. disabled gate → skipped, NOTHING loaded or read.
+ *   2. injected runSearch + changeKit + client → use them.
+ *   3. otherwise call the runtime loader loadNotionRagChangeRuntime.
+ *   4. missing runSearch / changeKit / client → safe client_not_wired.
+ * A loader / runner / scenario / composer throw collapses to a sanitized
+ * client_error (a raw message may carry token / db id / notion.so url). No LLM,
+ * no Sanity, no message send. The live retrieval only contributes a theme signal;
+ * the composer's guard keeps live_masked cases out of the draft.
+ */
+export async function runNotionRagChangeDryRunCommand(options = {}) {
+  const env = options.env ?? process.env
+  const query = options.query ?? ''
+
+  if (!isNotionRagEnabled(env)) {
+    return formatNotionRagChangeReport({ status: 'skipped' })
+  }
+
+  let runSearch = options.runSearch ?? null
+  let changeKit = options.changeKit ?? null
+  let client = options.client ?? null
+
+  if (!runSearch || !changeKit || !client) {
+    const loadRuntime = options.loadRuntime ?? loadNotionRagChangeRuntime
+    let runtime
+    try {
+      runtime = await loadRuntime({ env })
+    } catch {
+      return formatNotionRagChangeReport(changeErrorReport('client_error'))
+    }
+    runSearch = runSearch ?? runtime?.runSearch ?? null
+    changeKit = changeKit ?? runtime?.changeKit ?? null
+    client = client ?? runtime?.client ?? null
+  }
+
+  if (!runSearch || !changeKit || !client) {
+    return formatNotionRagChangeReport(changeErrorReport('client_not_wired'))
+  }
+
+  // The demo scenario is a FIXTURE (base + changes); only its retrievalCases are
+  // replaced with the LIVE masked theme signals below, so the live path can only
+  // ever degrade a fixture substitution into named_only — never inject a name.
+  const buildScenario = options.buildScenario ?? changeKit.buildScenario
+  let scenario
+  try {
+    scenario = buildScenario()
+  } catch {
+    return formatNotionRagChangeReport(changeErrorReport('client_error'))
+  }
+
+  let searchReport
+  try {
+    searchReport = await runSearch(env, client, query)
+  } catch {
+    return formatNotionRagChangeReport(changeErrorReport('client_error'))
+  }
+
+  if (searchReport?.status === 'skipped') {
+    return formatNotionRagChangeReport({ status: 'skipped' })
+  }
+  if (searchReport?.status === 'error') {
+    return formatNotionRagChangeReport(changeErrorReport(searchReport.errorCode ?? 'client_error'))
+  }
+
+  let liveCases
+  let result
+  let preview
+  try {
+    liveCases = changeKit.toLiveMaskedRetrievalCases(
+      Array.isArray(searchReport?.results) ? searchReport.results : []
+    )
+    result = changeKit.composeCustomerChange({
+      base: scenario.base,
+      changes: scenario.changes,
+      retrievalCases: liveCases,
+    })
+    preview = changeKit.buildOperatorRetrievalPreview(result.retrievalApplications)
+  } catch {
+    return formatNotionRagChangeReport(changeErrorReport('client_error'))
+  }
+
+  return formatNotionRagChangeReport({
+    status: 'ok',
+    totalRecords: searchReport?.totalRecords ?? 0,
+    resultCount: searchReport?.resultCount ?? 0,
+    liveThemeSignals: liveCases.map((c) => c.themeTag),
+    applications: result.retrievalApplications,
+    draftPresent: result.draft !== null,
+    preview,
+  })
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'notion-rag-dry-run') {
@@ -639,6 +815,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'notion-rag-answer') {
     return runNotionRagAnswerCommand({ env: options.env ?? process.env, query })
+  }
+  if (commandText === 'notion-rag-change-dry-run') {
+    return runNotionRagChangeDryRunCommand({ env: options.env ?? process.env, query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

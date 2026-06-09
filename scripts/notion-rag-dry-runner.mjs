@@ -124,6 +124,54 @@ export async function importComposerDefault(ctx = {}) {
 }
 
 /**
+ * PRODUCTION default factory for `importChangeKit` (M3.4a Cut 2) — GUARDED
+ * dynamic import of the THREE pure TS pieces the change dry-run assembles, plus
+ * the fixture demo scenario:
+ *   - toLiveMaskedRetrievalCases  (live masked summary → theme-signal cases)
+ *   - composeCustomerChange       (deterministic change composer + lint gate)
+ *   - buildOperatorRetrievalPreview (operator-facing retrieval trace)
+ *   - buildScenario               (the demo fixture base + changes)
+ * Same guard semantics as importSearchDefault: resolves under a TS runtime
+ * (tsx / vitest), swallowed → null under plain node. Loading touches NO Notion
+ * API, NO LLM (the composer is pure), and the scenario is a code-only fixture.
+ * A null is returned if ANY piece is missing so the command stays not-wired.
+ */
+export async function importChangeKitDefault(ctx = {}) {
+  const {
+    importMapperModule = () => import('../src/lib/line-agent/notion/live-masked-retrieval-cases.ts'),
+    importComposerModule = () =>
+      import('../src/lib/line-agent/notion/customer-itinerary-change-composer.ts'),
+    importPreviewModule = () =>
+      import('../src/lib/line-agent/notion/customer-change-operator-preview.ts'),
+    importScenarioModule = () =>
+      import('../src/lib/line-agent/notion/__fixtures__/customer-change-scenarios.ts'),
+  } = ctx
+  try {
+    const mapperMod = await importMapperModule()
+    const composerMod = await importComposerModule()
+    const previewMod = await importPreviewModule()
+    const scenarioMod = await importScenarioModule()
+    const kit = {
+      toLiveMaskedRetrievalCases: mapperMod?.toLiveMaskedRetrievalCases ?? null,
+      composeCustomerChange: composerMod?.composeCustomerChange ?? null,
+      buildOperatorRetrievalPreview: previewMod?.buildOperatorRetrievalPreview ?? null,
+      buildScenario: scenarioMod?.scenarioAddThrillActivity ?? null,
+    }
+    if (
+      !kit.toLiveMaskedRetrievalCases ||
+      !kit.composeCustomerChange ||
+      !kit.buildOperatorRetrievalPreview ||
+      !kit.buildScenario
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/**
  * PRODUCTION default factory for `createClient` — assembles a REAL Notion client:
  *   1. dynamic-import `@notionhq/client` for its `Client` constructor;
  *   2. dynamic-import the TS adapter `notion-rag-client.ts` for
@@ -276,4 +324,48 @@ export async function loadNotionRagAnswerRuntime(ctx = {}) {
     return { runSearch: null, composeAnswer: null, client: null }
   }
   return { runSearch, composeAnswer, client }
+}
+
+/**
+ * Assemble the operator CHANGE dry-run runtime (M3.4a Cut 2) — resolves
+ * `runSearch` (real corpus retrieval), the pure `changeKit` (live-masked mapper +
+ * change composer + operator preview + demo scenario), and the Notion client.
+ * Same real-runtime gate, token gate, and sanitized leak guard as the other
+ * loaders. A missing runSearch / changeKit / client ⇒ the command projects
+ * `client_not_wired`. No LLM, no Sanity, and no message send is ever assembled —
+ * the live retrieval only ever contributes a THEME signal that is policy-barred
+ * from the draft (the substitution guard lives in the composer).
+ */
+export async function loadNotionRagChangeRuntime(ctx = {}) {
+  const {
+    env = {},
+    importSearch = importSearchDefault,
+    importChangeKit = importChangeKitDefault,
+    createClient = createClientDefault,
+  } = ctx
+
+  if (!isRealRuntimeMode(env)) {
+    return { runSearch: null, changeKit: null, client: null }
+  }
+
+  const token = readNotionToken(env)
+  if (!token) {
+    return { runSearch: null, changeKit: null, client: null }
+  }
+
+  let runSearch
+  let changeKit
+  let client
+  try {
+    runSearch = await importSearch({ env })
+    changeKit = await importChangeKit({ env })
+    client = await createClient({ env, token })
+  } catch {
+    throw new NotionRagRuntimeWiringError()
+  }
+
+  if (!runSearch || !changeKit || !client) {
+    return { runSearch: null, changeKit: null, client: null }
+  }
+  return { runSearch, changeKit, client }
 }
