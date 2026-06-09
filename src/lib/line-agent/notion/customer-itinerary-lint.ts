@@ -80,13 +80,20 @@ const DINNER_PREFIX = '晚餐：'
 const LODGING_MARKER = '住宿：'
 const ACTIVITY_PREFIX = '・'
 
-/** Lodging-area conflicts, keyed by the trip's canonical stayArea. */
-const FORBIDDEN_LODGING_TOKENS: Record<string, string[]> = {
+/**
+ * Lodging-area conflicts, keyed by the trip's canonical stayArea. Exported as the
+ * single source of truth so the M3.3c change composer declines the same lodging
+ * moves this linter would flag — the two layers must never drift apart.
+ */
+export const FORBIDDEN_LODGING_TOKENS: Record<string, string[]> = {
   chiangmai_old_city: ['清萊', '尼曼', '寧曼', 'Nimman', '芳縣', '南邦', '南奔', '曼谷'],
 }
 
-/** Activities to remove for a limited-mobility / wheelchair-assisted case. */
-const MOBILITY_UNSUITABLE_TOKENS = [
+/**
+ * Activities to remove for a limited-mobility / wheelchair-assisted case. Exported
+ * so the change composer declines the same intense activities the linter rejects.
+ */
+export const MOBILITY_UNSUITABLE_TOKENS = [
   '叢林飛索',
   '飛索',
   'Jungle Flight',
