@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-06-11 圖片刀A+B（誠實條款 + LINE content API + Haiku vision → 三分流） -->
+<!-- Last build trigger: 2026-06-11 開閘煙測（OCR+成本帽+三分流 branch-scoped preview env） -->
