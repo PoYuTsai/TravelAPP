@@ -137,4 +137,14 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('主動提到價格')
     expect(prompt).toContain('方案取捨')
   })
+
+  // 2026-06-10 private-group smoke regression: with no geographic anchor in the
+  // prompt, a "哪個夜市適合帶小孩" probe came back with TAIPEI night markets.
+  // These clauses pin every place/weather/transport answer to Chiang Mai.
+  it('anchors all answers to Chiang Mai and forbids defaulting to Taiwan locations', () => {
+    expect(prompt).toContain('泰國清邁')
+    expect(prompt).toContain('一律以清邁為預設脈絡')
+    expect(prompt).toContain('一律假設客人問的是清邁')
+    expect(prompt).toContain('不得以台灣或其他城市的地點回答')
+  })
 })
