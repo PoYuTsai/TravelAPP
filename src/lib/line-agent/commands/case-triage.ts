@@ -54,7 +54,11 @@ export function buildCaseTriage(agentCase: AgentCase): CaseTriageSummary {
   }
 }
 
-function extractKnownFacts(text: string): CaseTriageKnownFacts {
+/**
+ * Text-based extraction core — exported so the partner-group case-intake flow
+ * (design 2026-06-10 §1) can triage a RAW requirement text without an AgentCase.
+ */
+export function extractKnownFacts(text: string): CaseTriageKnownFacts {
   const knownFacts: CaseTriageKnownFacts = {}
 
   const travelDate = chooseTravelDate(text)
@@ -85,7 +89,8 @@ function extractKnownFacts(text: string): CaseTriageKnownFacts {
   return knownFacts
 }
 
-function deriveMissingFields(
+/** Exported for the same text-based reuse as extractKnownFacts. */
+export function deriveMissingFields(
   existingMissingFields: string[],
   text: string,
   knownFacts: CaseTriageKnownFacts
@@ -138,7 +143,8 @@ function hasExplicitChildSeatDecision(text: string): boolean {
   return /(需要|要|不用|不需要)/.test(text)
 }
 
-function buildSummaryText(knownFacts: CaseTriageKnownFacts): string {
+/** Exported for the same text-based reuse as extractKnownFacts. */
+export function buildSummaryText(knownFacts: CaseTriageKnownFacts): string {
   const parts: string[] = []
 
   if (knownFacts.travelDate) parts.push(`日期：${knownFacts.travelDate}`)

@@ -71,7 +71,7 @@ export interface PartnerGroupRespondResult {
    * plus a non-minified log let the failure be traced.
    */
   meta?: {
-    responder: 'stub' | 'llm' | 'rag'
+    responder: 'stub' | 'llm' | 'rag' | 'intake'
     model?: string
     confidence?: string
     degraded?: boolean
