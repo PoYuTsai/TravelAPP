@@ -147,4 +147,31 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('一律假設客人問的是清邁')
     expect(prompt).toContain('不得以台灣或其他城市的地點回答')
   })
+
+  // 2026-06-10 刀4 (Eric): tone split — casual chat relaxed, business decisive.
+  it('locks the tone split: casual chat relaxed, work topics professional and decisive', () => {
+    expect(prompt).toContain('閒聊')
+    expect(prompt).toContain('輕鬆自然')
+    expect(prompt).toContain('專業')
+    expect(prompt).toContain('果斷')
+  })
+
+  // 2026-06-10 刀4 (Eric): plain-spoken self-intro for the real partner group.
+  // Web search is NOT wired into the responder (tool gate scaffolding only),
+  // so the intro must honestly say it cannot browse — never promise googling.
+  it('locks the self-intro: AI assistant persona, tag/quote to reach it, partners are final decision', () => {
+    expect(prompt).toContain('自我介紹')
+    expect(prompt).toContain('AI 小助理')
+    expect(prompt).toContain('ChatGPT')
+    expect(prompt).toContain('引用我的訊息')
+    expect(prompt).toContain('其餘時間不會主動打擾')
+    expect(prompt).toContain('過往')
+    expect(prompt).toContain('初版行程草稿')
+    expect(prompt).toContain('最高決策')
+    expect(prompt).toContain('測試階段')
+  })
+
+  it('self-intro honestly admits it cannot browse the web (web_search not wired)', () => {
+    expect(prompt).toContain('還不能上網')
+  })
 })
