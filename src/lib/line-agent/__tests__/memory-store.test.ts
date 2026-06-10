@@ -8,6 +8,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest'
 import { MemoryStore } from '../storage/memory-store'
+import { BOT_AUTHORED_CONTENT_MAX_CHARS } from '../storage/store'
 import { createInitialCase } from '../cases/case-state'
 import type { AgentCase } from '../cases/case-state'
 import { runCaseStoreContract } from './case-store-contract'
@@ -285,5 +286,42 @@ describe('bot-authored partner message tracking', () => {
     const store = new MemoryStore()
     await store.putBotAuthoredPartnerMsg('')
     expect(await store.isBotAuthoredPartnerMsg('')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Bot-authored partner-group message CONTENT cache (M3.6c quote-to-bot carryover)
+// ---------------------------------------------------------------------------
+
+describe('bot-authored partner message content cache', () => {
+  it('round-trips put(id, content) → getBotAuthoredPartnerMsgContent', async () => {
+    const store = new MemoryStore()
+    expect(await store.getBotAuthoredPartnerMsgContent('Mc1')).toBeNull()
+    await store.putBotAuthoredPartnerMsg('Mc1', '【夥伴內部草稿】清邁親子 5 天行程草稿')
+    expect(await store.getBotAuthoredPartnerMsgContent('Mc1')).toBe(
+      '【夥伴內部草稿】清邁親子 5 天行程草稿',
+    )
+    // The id flag is still set independently of the content.
+    expect(await store.isBotAuthoredPartnerMsg('Mc1')).toBe(true)
+  })
+
+  it('returns null when only the id (no content) was recorded — backward compatible', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('Mc2')
+    expect(await store.isBotAuthoredPartnerMsg('Mc2')).toBe(true)
+    expect(await store.getBotAuthoredPartnerMsgContent('Mc2')).toBeNull()
+  })
+
+  it('returns null for an empty id', async () => {
+    const store = new MemoryStore()
+    expect(await store.getBotAuthoredPartnerMsgContent('')).toBeNull()
+  })
+
+  it('caps stored content length', async () => {
+    const store = new MemoryStore()
+    const huge = 'x'.repeat(BOT_AUTHORED_CONTENT_MAX_CHARS + 1000)
+    await store.putBotAuthoredPartnerMsg('Mc3', huge)
+    const got = await store.getBotAuthoredPartnerMsgContent('Mc3')
+    expect(got?.length).toBe(BOT_AUTHORED_CONTENT_MAX_CHARS)
   })
 })

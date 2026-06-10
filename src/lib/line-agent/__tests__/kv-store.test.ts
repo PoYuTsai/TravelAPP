@@ -144,6 +144,70 @@ describe('bot-authored partner message store', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Bot-authored partner-group message CONTENT cache (M3.6c quote-to-bot carryover)
+// ---------------------------------------------------------------------------
+
+describe('bot-authored partner message content cache', () => {
+  it('put(id, content) writes the content key with a 7-day TTL; get reads it back', async () => {
+    const calls: Array<{ key: string; value: unknown; ttl: number }> = []
+    const kv = new Map<string, string>()
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async setWithTtl(key, value, ttl) {
+        calls.push({ key, value, ttl })
+        kv.set(key, String(value))
+        return 'OK'
+      },
+      async get<T = unknown>(key: string): Promise<T | null> {
+        return (kv.has(key) ? (kv.get(key) as unknown as T) : null)
+      },
+    }
+    const store = new KvStore(client)
+
+    await store.putBotAuthoredPartnerMsg('Mbot777', '【夥伴內部草稿】行程草稿內容')
+    // Two writes: the id flag AND the content, each on its own namespaced key.
+    expect(calls).toHaveLength(2)
+    const contentCall = calls.find((c) =>
+      c.key === 'line-agent:partner-bot-msg-content:Mbot777',
+    )
+    expect(contentCall).toBeDefined()
+    expect(contentCall?.ttl).toBe(604800)
+    expect(contentCall?.value).toBe('【夥伴內部草稿】行程草稿內容')
+
+    expect(await store.getBotAuthoredPartnerMsgContent('Mbot777')).toBe(
+      '【夥伴內部草稿】行程草稿內容',
+    )
+    expect(await store.getBotAuthoredPartnerMsgContent('Munknown')).toBeNull()
+  })
+
+  it('put without content writes ONLY the id flag (no content key)', async () => {
+    const keys: string[] = []
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async setWithTtl(key, _value, _ttl) {
+        keys.push(key)
+        return 'OK'
+      },
+    }
+    await new KvStore(client).putBotAuthoredPartnerMsg('Mbot888')
+    expect(keys).toEqual(['line-agent:partner-bot-msg:Mbot888'])
+  })
+
+  it('getBotAuthoredPartnerMsgContent returns null for empty id without touching KV', async () => {
+    let getCalls = 0
+    const client: KvClient = {
+      ...makeMockKvClient(),
+      async get() {
+        getCalls++
+        return null
+      },
+    }
+    expect(await new KvStore(client).getBotAuthoredPartnerMsgContent('')).toBeNull()
+    expect(getCalls).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Fail-closed: no injected client AND no env → every method throws.
 // ---------------------------------------------------------------------------
 

@@ -28,6 +28,10 @@ import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
 import { LineApiError, type LineMessage } from '../line/message-client'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { PartnerGroupResponder } from '../partner-group/responder'
+import {
+  QUOTED_DRAFT_CUSTOMER_REPLY,
+  QUOTED_DRAFT_CONTENT_MISSING_REPLY,
+} from '../partner-group/quoted-draft-customer-reply'
 
 // Capture the pristine lazy defaults BEFORE any injection so afterEach can
 // restore them — the seams are module singletons and would otherwise leak.
@@ -432,6 +436,98 @@ describe('quote-to-bot runtime control flow', () => {
     expect(calls).toHaveLength(0)
     expect(spy).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M3.6c — quote-to-bot "整理給客人" content carryover (end-to-end wiring)
+//
+// These use the PRISTINE dispatching responder (no fake injected) so the real
+// customer-summary path runs. The webhook must fetch the cached quoted bot
+// content, sanitize it, and thread it into the responder context so the
+// deterministic customer template is produced; on a content miss it fails closed
+// to the paste-the-draft reply; and it must cache the OUTBOUND content of the
+// reply it sends so a chained quote carries content too.
+// ---------------------------------------------------------------------------
+
+describe('M3.6c quoted-draft customer-summary wiring', () => {
+  const SUMMARIZE_TEXT = '請根據我引用的這則內部案例草稿，幫我整理一段可以回客人的簡短說法'
+  const INTERNAL_DRAFT = '【夥伴內部草稿】清邁親子 5 天：大象保育營、夜間動物園；成本約 NT$38000。'
+
+  function summarizeQuoteEvent(o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
+    return {
+      kind: 'group_quoted',
+      sourceChannel: 'line_partner_group',
+      lineUserId: 'U_min',
+      groupId: 'G_partner',
+      messageId: 'M_q_sum',
+      text: SUMMARIZE_TEXT,
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt_sum',
+      quotedRef: { quotedMessageId: 'M_botPrev' },
+      ...o,
+    }
+  }
+
+  it('quoted bot draft cached + summarise intent → replies with the customer template', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+    // No responder injected: the pristine dispatcher owns the customer path.
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0]).toMatchObject({
+      type: 'text',
+      text: QUOTED_DRAFT_CUSTOMER_REPLY,
+    })
+    // The reply must not leak the quoted internal draft body.
+    expect(calls[0].messages[0].text).not.toContain('成本')
+    expect(calls[0].messages[0].text).not.toContain('夥伴內部草稿')
+  })
+
+  it('caches the OUTBOUND reply content so a chained quote carries content', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    const { client } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(await store.getBotAuthoredPartnerMsgContent('M_botNew')).toBe(
+      QUOTED_DRAFT_CUSTOMER_REPLY,
+    )
+  })
+
+  it('quoted id is bot-authored but content NOT cached → fail-closed paste-the-draft reply', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev') // id flag only, no content
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toBe(QUOTED_DRAFT_CONTENT_MISSING_REPLY)
+  })
+
+  it('content fetch throws → fail-safe: still replies with the paste-the-draft fallback', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    store.getBotAuthoredPartnerMsgContent = async () => {
+      throw new Error('KV down')
+    }
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await expect(
+      getEventHandler()(summarizeQuoteEvent(), store),
+    ).resolves.toBeUndefined()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toBe(QUOTED_DRAFT_CONTENT_MISSING_REPLY)
   })
 })
 

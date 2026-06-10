@@ -17,7 +17,7 @@
 import { Redis } from '@upstash/redis'
 import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
-import type { CaseStore } from './store'
+import { type CaseStore, BOT_AUTHORED_CONTENT_MAX_CHARS } from './store'
 
 // ---------------------------------------------------------------------------
 // Error when KV is not configured
@@ -125,6 +125,10 @@ const PARTNER_REPLY_PREFIX = 'line-agent:partner-reply:'
 // plan §2).  Written ONLY by the webhook send gate's partner-group path; the
 // customer OA plane never writes here, so an OA quotedMessageId can never hit.
 const PARTNER_BOT_MSG_PREFIX = 'line-agent:partner-bot-msg:'
+// Sibling namespace for the cached OUTBOUND content of a bot-authored message
+// (M3.6c quote-to-bot carryover).  Distinct from the id-flag namespace so the
+// flag and the content have independent lifecycles and neither matches case:*.
+const PARTNER_BOT_MSG_CONTENT_PREFIX = 'line-agent:partner-bot-msg-content:'
 const BOT_AUTHORED_TTL_SECONDS = 604800 // 7 days
 
 function caseKey(caseId: string): string {
@@ -137,6 +141,10 @@ function partnerReplyKey(messageId: string): string {
 
 function partnerBotMsgKey(messageId: string): string {
   return `${PARTNER_BOT_MSG_PREFIX}${messageId}`
+}
+
+function partnerBotMsgContentKey(messageId: string): string {
+  return `${PARTNER_BOT_MSG_CONTENT_PREFIX}${messageId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -269,10 +277,19 @@ export class KvStore implements CaseStore {
 
   // ── putBotAuthoredPartnerMsg ─────────────────────────────────────────────────
 
-  async putBotAuthoredPartnerMsg(messageId: string): Promise<void> {
+  async putBotAuthoredPartnerMsg(messageId: string, content?: string): Promise<void> {
     if (messageId === '') return
     const kv = this.ensureClient()
     await kv.setWithTtl(partnerBotMsgKey(messageId), '1', BOT_AUTHORED_TTL_SECONDS)
+    // Cache the outbound content (M3.6c) only when supplied — preserves the
+    // id-only write for callers that do not pass content.
+    if (typeof content === 'string' && content !== '') {
+      await kv.setWithTtl(
+        partnerBotMsgContentKey(messageId),
+        content.slice(0, BOT_AUTHORED_CONTENT_MAX_CHARS),
+        BOT_AUTHORED_TTL_SECONDS,
+      )
+    }
   }
 
   // ── isBotAuthoredPartnerMsg ──────────────────────────────────────────────────
@@ -281,5 +298,13 @@ export class KvStore implements CaseStore {
     if (messageId === '') return false
     const kv = this.ensureClient()
     return (await kv.get(partnerBotMsgKey(messageId))) !== null
+  }
+
+  // ── getBotAuthoredPartnerMsgContent ──────────────────────────────────────────
+
+  async getBotAuthoredPartnerMsgContent(messageId: string): Promise<string | null> {
+    if (messageId === '') return null
+    const kv = this.ensureClient()
+    return (await kv.get<string>(partnerBotMsgContentKey(messageId))) ?? null
   }
 }

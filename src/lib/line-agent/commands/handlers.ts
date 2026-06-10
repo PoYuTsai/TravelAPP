@@ -112,7 +112,8 @@ export async function handleRespondToPartnerGroup(
   event: NormalizedLineEvent,
   intent: CommandIntent,
   responder: PartnerGroupResponder = stubPartnerGroupResponder,
-  botDirected?: boolean
+  botDirected?: boolean,
+  quotedBotContent?: string
 ): Promise<HandlerResult> {
   // The responder ONLY produces text; it never sends. Whether outboundText
   // actually reaches the group is decided by the router + permission layer.
@@ -122,12 +123,17 @@ export async function handleRespondToPartnerGroup(
   // quote-to-bot message without a re-tag; absent, consumers fall back to
   // `event.mentionsBot`.  It does NOT change the send decision — that stays the
   // router's job.
+  //
+  // `quotedBotContent` (M3.6c) is the cached content of the quoted bot draft,
+  // resolved + sanitized by the webhook. It lets the customer-summary path fire;
+  // absent, that path fails closed (asks the partner to paste the draft).
   const result = await responder.respond({
     event,
     intent,
     text: event.text ?? '',
     actor: { lineUserId: event.lineUserId },
     ...(botDirected !== undefined ? { botDirected } : {}),
+    ...(quotedBotContent !== undefined ? { quotedBotContent } : {}),
   })
 
   return {

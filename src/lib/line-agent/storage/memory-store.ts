@@ -10,7 +10,7 @@
 
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
-import type { CaseStore } from './store'
+import { type CaseStore, BOT_AUTHORED_CONTENT_MAX_CHARS } from './store'
 
 export class MemoryStore implements CaseStore {
   /** Primary map: caseId → AgentCase */
@@ -31,6 +31,13 @@ export class MemoryStore implements CaseStore {
    * counts as addressing the bot (quote-to-bot plan §2).
    */
   private readonly botAuthoredPartnerMsgs = new Set<string>()
+
+  /**
+   * Cached outbound content of bot-authored partner-group messages (NOT case
+   * state), keyed by messageId (M3.6c quote-to-bot carryover).  Length-capped
+   * on write; only populated when a content arg is supplied to put.
+   */
+  private readonly botAuthoredPartnerMsgContent = new Map<string, string>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -120,9 +127,15 @@ export class MemoryStore implements CaseStore {
 
   // ── putBotAuthoredPartnerMsg ─────────────────────────────────────────────────
 
-  async putBotAuthoredPartnerMsg(messageId: string): Promise<void> {
+  async putBotAuthoredPartnerMsg(messageId: string, content?: string): Promise<void> {
     if (messageId === '') return
     this.botAuthoredPartnerMsgs.add(messageId)
+    if (typeof content === 'string' && content !== '') {
+      this.botAuthoredPartnerMsgContent.set(
+        messageId,
+        content.slice(0, BOT_AUTHORED_CONTENT_MAX_CHARS),
+      )
+    }
   }
 
   // ── isBotAuthoredPartnerMsg ──────────────────────────────────────────────────
@@ -130,5 +143,12 @@ export class MemoryStore implements CaseStore {
   async isBotAuthoredPartnerMsg(messageId: string): Promise<boolean> {
     if (messageId === '') return false
     return this.botAuthoredPartnerMsgs.has(messageId)
+  }
+
+  // ── getBotAuthoredPartnerMsgContent ──────────────────────────────────────────
+
+  async getBotAuthoredPartnerMsgContent(messageId: string): Promise<string | null> {
+    if (messageId === '') return null
+    return this.botAuthoredPartnerMsgContent.get(messageId) ?? null
   }
 }

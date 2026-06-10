@@ -37,6 +37,16 @@ export interface PartnerGroupRespondInput {
   actor?: { lineUserId?: string }
   /** Future group-quoted case linkage — unused in this batch. */
   caseId?: string
+  /**
+   * Cached content of the bot-authored message this event quoted (M3.6c
+   * quote-to-bot carryover). Present ONLY for a partner-group quote-to-bot event
+   * whose quoted messageId hit the bot-content store; the caller sanitises +
+   * length-caps it. Absent when there is no quote, the quoted message is not
+   * bot-authored, or the content was not cached / has expired. Consumers MUST
+   * treat absence as fail-closed (ask the partner to paste the draft), never
+   * fabricate the quoted content.
+   */
+  quotedBotContent?: string
   /** Reserved — NOT wired to Notion/Google in this batch. */
   context?: unknown
 }

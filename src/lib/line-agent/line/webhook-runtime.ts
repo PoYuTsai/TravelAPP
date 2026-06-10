@@ -34,6 +34,7 @@ import {
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ensure-partner-rag-installed'
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
+import { sanitizeQuotedBotContext } from '@/lib/line-agent/partner-group/quoted-draft-customer-reply'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
 
 // ---------------------------------------------------------------------------
@@ -117,6 +118,40 @@ export async function deriveBotDirected(
   return false
 }
 
+/**
+ * Resolve the cached content of the bot-authored message a partner-group event
+ * quoted (M3.6c quote-to-bot carryover). Returns the sanitized + length-capped
+ * content ONLY for a bot-directed partner-group `group_quoted` event whose
+ * quoted messageId has cached content; undefined otherwise.
+ *
+ * FAIL-SAFE: any store read failure returns undefined — the responder then takes
+ * its conservative "ask the partner to paste the draft" fallback, never
+ * fabricates the quoted content. The OA plane is never bot-directed, so a
+ * customer message can never reach this read.
+ */
+async function resolveQuotedBotContent(
+  event: NormalizedLineEvent,
+  store: CaseStore,
+  botDirected: boolean
+): Promise<string | undefined> {
+  if (
+    !botDirected ||
+    event.sourceChannel !== 'line_partner_group' ||
+    event.kind !== 'group_quoted'
+  ) {
+    return undefined
+  }
+  const qid = event.quotedRef?.quotedMessageId
+  if (typeof qid !== 'string' || qid === '') return undefined
+  try {
+    const raw = await store.getBotAuthoredPartnerMsgContent(qid)
+    if (!raw) return undefined
+    return sanitizeQuotedBotContext(raw)
+  } catch {
+    return undefined // fail-safe: cannot read content → responder fails closed
+  }
+}
+
 function mayProducePartnerGroupReply(
   event: NormalizedLineEvent,
   botDirected: boolean
@@ -135,6 +170,12 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   //    inside (store read failure → false); the customer OA plane is always
   //    false, so a customer can never be auto-replied.
   const botDirected = await deriveBotDirected(event, store)
+
+  // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
+  //     the quoted bot draft (fail-safe inside) so the responder can turn it into
+  //     a customer-safe summary. undefined ⇒ the responder fails closed and asks
+  //     the partner to paste the draft; it never fabricates the quoted content.
+  const quotedBotContent = await resolveQuotedBotContent(event, store, botDirected)
 
   // 2. Cheap precondition (a SUBSET of the full send gate): could this event
   //    even produce a reply? — partner group, addressed, live reply token.
@@ -170,6 +211,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     store,
     llmClassifier: safeDefaultLlmClassifier,
     botDirected,
+    quotedBotContent,
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
   })
 
@@ -181,12 +223,14 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
         { type: 'text', text: outboundText },
       ])
       // 6. Record the bot-authored ids so a future quote-reply to THIS message
-      //    is itself botDirected (quote-to-bot plan §4).  Best-effort: a store
-      //    write failure must NOT disturb the already-sent reply, so each write
-      //    is guarded — the worst case is the partner has to re-tag next time.
+      //    is itself botDirected (quote-to-bot plan §4).  M3.6c also caches the
+      //    OUTBOUND text so a later quote can carry this reply's content into the
+      //    responder context.  Best-effort: a store write failure must NOT disturb
+      //    the already-sent reply, so each write is guarded — the worst case is the
+      //    partner has to re-tag (and paste the draft) next time.
       for (const id of sentIds) {
         try {
-          await store.putBotAuthoredPartnerMsg(id)
+          await store.putBotAuthoredPartnerMsg(id, outboundText)
         } catch (err) {
           console.error(
             '[line-agent] failed to record bot-authored partner msg id; reply already sent:',

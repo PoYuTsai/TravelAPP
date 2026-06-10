@@ -28,6 +28,10 @@ import {
   createRagPartnerGroupResponder,
   type PartnerRagDraftSource,
 } from './rag-draft-surfacing'
+import {
+  shouldUseQuotedDraftCustomerReply,
+  quotedDraftCustomerResponder,
+} from './quoted-draft-customer-reply'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -123,10 +127,29 @@ export function createPartnerGroupResponderWithRagDraft(
 
   return {
     async respond(respondInput) {
+      const botDirected =
+        respondInput.botDirected ?? respondInput.event.mentionsBot === true
+
+      // M3.6c — quote-to-bot "整理給客人" path. Checked BEFORE rag/base: when a
+      // partner quotes a bot draft and asks to summarise it for a customer, this
+      // deterministic, gate-free path owns the reply (template if the quoted bot
+      // content is cached, else a fail-closed paste-the-draft fallback). It never
+      // reads Notion and is unaffected by the rag gates; a bare tag (no quote) or
+      // a rag-lookup intent never satisfies it, so the rag path is not regressed.
+      if (
+        shouldUseQuotedDraftCustomerReply({
+          sourceChannel: respondInput.event.sourceChannel,
+          botDirected,
+          isQuoteEvent: respondInput.event.kind === 'group_quoted',
+          text: respondInput.text,
+        })
+      ) {
+        return quotedDraftCustomerResponder.respond(respondInput)
+      }
+
       const useRag = shouldUsePartnerRagDraft({
         sourceChannel: respondInput.event.sourceChannel,
-        botDirected:
-          respondInput.botDirected ?? respondInput.event.mentionsBot === true,
+        botDirected,
         text: respondInput.text,
         env,
       })

@@ -117,6 +117,13 @@ export interface RouterInput {
    * does not provide it.
    */
   botDirected?: boolean
+  /**
+   * Cached content of the bot-authored message this event quoted (M3.6c
+   * quote-to-bot carryover). Resolved + sanitized by the webhook for a
+   * partner-group quote-to-bot event; threaded to the responder so the
+   * customer-summary path can fire. Absent ⇒ the responder fails closed.
+   */
+  quotedBotContent?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +273,8 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
           event,
           earlyIntent,
           input.partnerGroupResponder ?? stubPartnerGroupResponder,
-          botDirected
+          botDirected,
+          input.quotedBotContent
         )
         return { action: 'respond', source, handlerResult, intent: earlyIntent }
       }
