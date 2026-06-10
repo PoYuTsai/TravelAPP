@@ -25,9 +25,13 @@
 ### P0 — 立即動工（三條互不阻塞）
 
 **A. Agent 最短上線路徑**（下個 session 從這裡起手 ✅）
-1. 真 Notion API adapter（取代 mock port，RAG 才有實料）
-2. 最小 observability：structured log + request ID + Anthropic **每日成本上限**（開 gate 硬前置）
-3. `scanRefinePromptLeak()` 接進 production refine path（現只在 smoke 路徑）
+1. ~~真 Notion API adapter~~ **查核＝已於 M3.2 完成**（2026-06-10；體檢「還是 mock」為過時敘述，詳見 cut2 設計檔前置）
+2. ~~最小 observability~~ **完成**（2026-06-10，commit `4bda558`：structured log + requestId + 每日成本上限雙 fail-closed）
+3. ~~`scanRefinePromptLeak()` 接進 production refine path~~ **查核＝體檢敘述過時，零工程跳過**（2026-06-10）：
+   scanner 自 M3.4c 起就結構性內建在 `createAnthropicRefineSource`（`llm-refine-adapter.ts:144`，
+   `callModel` 前必跑，唯一真 adapter 繞不開；smoke runner 的 pre-check 只是第二道報告用）。
+   真正不存在的是「production refine path」本身——`refineCustomerItineraryDraft` 在 production
+   零呼叫，僅 offline `refine-smoke` CLI 可達。refine 進 production 時同刀補 cost cap 接線（接點已留）。
 4. 開 partner group gate：只回 @點名、Haiku only、小範圍 live
 5. 跑 1–2 週真實對話 → 再決定 quote write token 六前置條件（見 2026-06-02 phase-c 設計檔 §114–141）
 
