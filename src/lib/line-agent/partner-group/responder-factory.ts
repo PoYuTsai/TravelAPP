@@ -38,6 +38,7 @@ import {
   shouldUseCaseIntake,
   caseIntakeResponder,
 } from './case-intake-surfacing'
+import { shouldUseVisionIntake } from './vision-intake-surfacing'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -126,6 +127,12 @@ export interface CreatePartnerGroupResponderWithRagDraftInput {
    * deterministic-only default。Surfacing 判斷（shouldUseCaseIntake）不變。
    */
   caseIntake?: PartnerGroupResponder
+  /**
+   * 讀圖 responder（圖片刀B）— 注入＝webhook 端組好的 vision responder
+   * （createVisionIntakeResponder 蓋 content fetch + vision adapter + store）。
+   * 省略 ⇒ 讀圖路徑不存在，dispatcher 行為與本刀落地前 byte-identical。
+   */
+  visionIntake?: PartnerGroupResponder
 }
 
 /**
@@ -166,6 +173,24 @@ export function createPartnerGroupResponderWithRagDraft(
       ) {
         respondInput.log?.('route_decision', { path: 'quoted_draft' })
         return quotedDraftCustomerResponder.respond(respondInput)
+      }
+
+      // 讀圖（圖片刀B）— vision intake. Checked AFTER quoted_draft（quote-to-bot
+      // 語意更明確）、BEFORE case_intake：同一句話帶兩種詞彙時（「客需 讀取
+      // 這張圖」）讀圖更具體 — 客需整理正是 vision 抽完文字後的下游。Surfacing
+      // 走 M3-0 ocr tool-gate（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD
+      // 雙閘 default off）⇒ 不開閘完全不影響現行行為；responder 未注入時
+      // 路徑不存在。
+      if (
+        input.visionIntake &&
+        shouldUseVisionIntake({
+          sourceChannel: respondInput.event.sourceChannel,
+          botDirected,
+          text: respondInput.text,
+          env,
+        })
+      ) {
+        return input.visionIntake.respond(respondInput)
       }
 
       // 客需三分流（design 2026-06-10 §1）— deterministic intake triage. Checked

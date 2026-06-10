@@ -34,7 +34,7 @@ export interface AgentLogFieldsByEvent {
     botDirected?: boolean
   }
   route_decision: {
-    path?: 'rag_composer' | 'quoted_draft' | 'base' | 'no_reply' | 'case_intake'
+    path?: 'rag_composer' | 'quoted_draft' | 'base' | 'no_reply' | 'case_intake' | 'vision_intake'
     /** Gate STATE words only（enabled/disabled）— never an env var value. */
     ragDraftGate?: 'enabled' | 'disabled'
     /** case_intake 三分流結果（fixed vocabulary, never content）。 */

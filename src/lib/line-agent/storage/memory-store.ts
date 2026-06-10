@@ -10,7 +10,11 @@
 
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
-import { type CaseStore, BOT_AUTHORED_CONTENT_MAX_CHARS } from './store'
+import {
+  type CaseStore,
+  type PartnerGroupImageMsg,
+  BOT_AUTHORED_CONTENT_MAX_CHARS,
+} from './store'
 
 export class MemoryStore implements CaseStore {
   /** Primary map: caseId → AgentCase */
@@ -38,6 +42,13 @@ export class MemoryStore implements CaseStore {
    * on write; only populated when a content arg is supplied to put.
    */
   private readonly botAuthoredPartnerMsgContent = new Map<string, string>()
+
+  /**
+   * Latest user-sent image per partner group (NOT case state) — 圖片刀B.
+   * Only the newest record per groupId is kept; freshness is enforced by the
+   * vision responder at read time (timestamp window), not here.
+   */
+  private readonly partnerGroupImageMsgs = new Map<string, PartnerGroupImageMsg>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -150,5 +161,27 @@ export class MemoryStore implements CaseStore {
   async getBotAuthoredPartnerMsgContent(messageId: string): Promise<string | null> {
     if (messageId === '') return null
     return this.botAuthoredPartnerMsgContent.get(messageId) ?? null
+  }
+
+  // ── Partner-group image tracking（圖片刀B）──────────────────────────────────
+
+  async putPartnerGroupImageMsg(
+    groupId: string,
+    messageId: string,
+    timestamp: number
+  ): Promise<void> {
+    if (groupId === '' || messageId === '') return
+    const existing = this.partnerGroupImageMsgs.get(groupId)
+    // Older-timestamp puts never regress the latest (redelivery reorder guard).
+    if (existing && existing.timestamp > timestamp) return
+    this.partnerGroupImageMsgs.set(groupId, { messageId, timestamp })
+  }
+
+  async getLatestPartnerGroupImageMsg(
+    groupId: string
+  ): Promise<PartnerGroupImageMsg | null> {
+    if (groupId === '') return null
+    const record = this.partnerGroupImageMsgs.get(groupId)
+    return record ? { ...record } : null
   }
 }

@@ -721,3 +721,65 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
   //   §6.7 stub 預設         → 'webhook-runtime partner-group responder seam' ›
   //        'lazily defaults to the safe stub responder when none is injected'
 })
+
+// ---------------------------------------------------------------------------
+// 圖片刀B — partner-group image tracking（「@bot 讀取這張圖」沒引用時的來源）
+// ---------------------------------------------------------------------------
+
+describe('partner-group image event recording（圖片刀B）', () => {
+  it('records a partner-group image event so the vision path can resolve 最近一張圖', async () => {
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({
+      kind: 'image',
+      messageId: 'M_img_001',
+      text: undefined,
+      mentionsBot: false,
+      timestamp: 1_700_000_111_000,
+    })
+    await getEventHandler()(event, store)
+
+    expect(await store.getLatestPartnerGroupImageMsg('G_partner')).toEqual({
+      messageId: 'M_img_001',
+      timestamp: 1_700_000_111_000,
+    })
+  })
+
+  it('never records an OA customer image（customer plane never feeds the vision path）', async () => {
+    const store = new MemoryStore()
+    const event = oaEvent({ kind: 'image', messageId: 'M_oa_img', text: undefined })
+    await getEventHandler()(event, store)
+
+    // OA events have no groupId — nothing may appear under ANY group key, and
+    // the store must stay image-free.
+    expect(await store.getLatestPartnerGroupImageMsg('G_partner')).toBeNull()
+  })
+
+  it('a store write failure is best-effort: logged, never thrown（webhook 還是 200）', async () => {
+    const store = new MemoryStore()
+    const failingStore = new Proxy(store, {
+      get(target, prop, receiver) {
+        if (prop === 'putPartnerGroupImageMsg') {
+          return async () => {
+            throw new Error('kv down')
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as unknown as CaseStore
+
+    const lines: string[] = []
+    setDefaultAgentLogSink((line) => lines.push(line))
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'image',
+      messageId: 'M_img_002',
+      text: undefined,
+      mentionsBot: false,
+    })
+    await expect(getEventHandler()(event, failingStore)).resolves.toBeUndefined()
+
+    const failureLine = lines.find((l) => l.includes('store_write_failed'))
+    expect(failureLine).toBeDefined()
+    expect(failureLine).toContain('partner_image_record_failed')
+  })
+})

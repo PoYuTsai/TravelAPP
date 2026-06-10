@@ -40,6 +40,9 @@ import { createDailyCostCap } from '@/lib/line-agent/observability/daily-cost-ca
 import { createKvClientFromEnv } from '@/lib/line-agent/storage/kv-store'
 import { createCaseIntakeResponder } from '@/lib/line-agent/partner-group/case-intake-surfacing'
 import { createAnthropicCaseIntakeSources } from '@/lib/line-agent/partner-group/case-intake-llm-adapter'
+import { createVisionIntakeResponder } from '@/lib/line-agent/partner-group/vision-intake-surfacing'
+import { createAnthropicVisionIntakeSource } from '@/lib/line-agent/partner-group/vision-intake-adapter'
+import { fetchLineImageContent } from '@/lib/line-agent/line/content-client'
 import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
 import { randomUUID } from 'node:crypto'
 
@@ -188,6 +191,27 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     messageKind: event.kind,
     botDirected,
   })
+
+  // 1a. 圖片刀B — record partner-group image messageIds so a later
+  //     「@bot 讀取這張圖」 without a quote can resolve 最近一張圖.  Best-effort:
+  //     a store failure must never 500 the webhook (LINE would redeliver) —
+  //     worst case the partner has to quote the image explicitly.  Code-only
+  //     log: the raw store error could echo a KV url.  OA events never reach
+  //     this branch (no partner-group sourceChannel / no groupId), so the
+  //     customer plane never feeds the vision path.
+  if (
+    event.kind === 'image' &&
+    event.sourceChannel === 'line_partner_group' &&
+    typeof event.groupId === 'string' &&
+    event.groupId !== '' &&
+    event.messageId !== ''
+  ) {
+    try {
+      await store.putPartnerGroupImageMsg(event.groupId, event.messageId, event.timestamp)
+    } catch {
+      log('store_write_failed', { reason: 'partner_image_record_failed' })
+    }
+  }
 
   // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
   //     the quoted bot draft (fail-safe inside) so the responder can turn it into
@@ -401,9 +425,28 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
           }),
         })
       : undefined
+    // 圖片刀B — 讀圖 responder：有 key 才組；無 key ⇒ 路徑不存在。Surfacing
+    // 走 M3-0 ocr 雙閘（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD，
+    // default off）⇒ 不開閘完全不影響現行行為。fetchImage 的 channel token
+    // 在 CALL time 讀（mirror reply client）；getLatestImage 走 seam getter，
+    // 與 handler 共用同一個 store。共用同一個 daily cost cap。
+    const visionIntake = models.anthropicApiKey
+      ? createVisionIntakeResponder({
+          fetchImage: (messageId) =>
+            fetchLineImageContent(messageId, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''),
+          vision: createAnthropicVisionIntakeSource({
+            transport: fetch,
+            apiKey: models.anthropicApiKey,
+            costCap,
+            env: process.env,
+          }),
+          getLatestImage: (groupId) => getStore().getLatestPartnerGroupImageMsg(groupId),
+        })
+      : undefined
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
       base,
       caseIntake,
+      visionIntake,
       // Late-bound thunk: always calls the CURRENTLY registered source, so a test
       // injecting a fake via setPartnerRagAnswerSource is honoured even though
       // this dispatcher singleton was built earlier.

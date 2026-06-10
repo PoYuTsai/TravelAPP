@@ -113,4 +113,39 @@ export interface CaseStore {
    * caller MUST treat null as fail-closed — never fabricate the quoted content.
    */
   getBotAuthoredPartnerMsgContent(messageId: string): Promise<string | null>
+
+  // ── Partner-group image tracking（圖片刀B）──────────────────────────────────
+
+  /**
+   * Record the LATEST user-sent image message in a partner group, so a later
+   * 「@bot 讀取這張圖」 without a quote can resolve "這張圖" to it.  Only one
+   * record per group is kept; a put with an OLDER timestamp than the stored
+   * record is a no-op (LINE redelivery may reorder events).  Empty groupId or
+   * messageId is a no-op.  Lives in its own key namespace — never case state,
+   * never the customer OA plane (the webhook only writes partner-group events).
+   *
+   * Freshness is the READER's job: the vision responder compares the stored
+   * timestamp against the triggering event's timestamp (30-minute window);
+   * the KV TTL is garbage collection, not the policy.
+   */
+  putPartnerGroupImageMsg(
+    groupId: string,
+    messageId: string,
+    timestamp: number
+  ): Promise<void>
+
+  /**
+   * The latest recorded image message for a group, or null when none exists
+   * (never recorded, expired, or empty groupId — no I/O for the latter).
+   */
+  getLatestPartnerGroupImageMsg(
+    groupId: string
+  ): Promise<PartnerGroupImageMsg | null>
+}
+
+/** The latest user-sent image in a partner group（圖片刀B）. */
+export interface PartnerGroupImageMsg {
+  messageId: string
+  /** LINE event timestamp (ms since epoch) of the image message. */
+  timestamp: number
 }

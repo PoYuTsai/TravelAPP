@@ -225,6 +225,54 @@ export function runCaseStoreContract(
       expect(await store.get('M-partner-xyz')).toBeNull()
     })
 
+    // ── Partner-group image tracking（圖片刀B）─────────────────────────────
+    // 「@bot 讀取這張圖」沒引用時取群內最近一張圖。Only the LATEST image per
+    // group is kept; freshness（30 分鐘窗）由 responder 讀取端用 timestamp 判斷。
+
+    it('putPartnerGroupImageMsg then getLatest returns the record', async () => {
+      await store.putPartnerGroupImageMsg('G1', 'Mimg1', 1000)
+      expect(await store.getLatestPartnerGroupImageMsg('G1')).toEqual({
+        messageId: 'Mimg1',
+        timestamp: 1000,
+      })
+    })
+
+    it('getLatestPartnerGroupImageMsg returns null when no image was recorded', async () => {
+      expect(await store.getLatestPartnerGroupImageMsg('G-none')).toBeNull()
+    })
+
+    it('a newer image replaces the previous latest', async () => {
+      await store.putPartnerGroupImageMsg('G1', 'Mimg1', 1000)
+      await store.putPartnerGroupImageMsg('G1', 'Mimg2', 2000)
+      expect((await store.getLatestPartnerGroupImageMsg('G1'))?.messageId).toBe('Mimg2')
+    })
+
+    it('an OLDER timestamp never regresses the latest (redelivery reorder guard)', async () => {
+      await store.putPartnerGroupImageMsg('G1', 'Mimg2', 2000)
+      await store.putPartnerGroupImageMsg('G1', 'Mimg1', 1000)
+      expect((await store.getLatestPartnerGroupImageMsg('G1'))?.messageId).toBe('Mimg2')
+    })
+
+    it('image tracking is isolated per groupId', async () => {
+      await store.putPartnerGroupImageMsg('G1', 'Mimg1', 1000)
+      await store.putPartnerGroupImageMsg('G2', 'Mimg9', 2000)
+      expect((await store.getLatestPartnerGroupImageMsg('G1'))?.messageId).toBe('Mimg1')
+      expect((await store.getLatestPartnerGroupImageMsg('G2'))?.messageId).toBe('Mimg9')
+    })
+
+    it('empty groupId / messageId: put is a no-op, get returns null', async () => {
+      await store.putPartnerGroupImageMsg('', 'Mimg1', 1000)
+      await store.putPartnerGroupImageMsg('G1', '', 1000)
+      expect(await store.getLatestPartnerGroupImageMsg('')).toBeNull()
+      expect(await store.getLatestPartnerGroupImageMsg('G1')).toBeNull()
+    })
+
+    it('image records never pollute case space (no listAll/get hits)', async () => {
+      await store.putPartnerGroupImageMsg('G1', 'Mimg1', 1000)
+      expect(await store.listAll()).toHaveLength(0)
+      expect(await store.get('Mimg1')).toBeNull()
+    })
+
     it('appendAudit does not cross-contaminate between cases', async () => {
       const alice = makeAlice()
       const bob = makeBob()

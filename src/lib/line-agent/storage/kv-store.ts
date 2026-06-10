@@ -17,7 +17,11 @@
 import { Redis } from '@upstash/redis'
 import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
-import { type CaseStore, BOT_AUTHORED_CONTENT_MAX_CHARS } from './store'
+import {
+  type CaseStore,
+  type PartnerGroupImageMsg,
+  BOT_AUTHORED_CONTENT_MAX_CHARS,
+} from './store'
 
 // ---------------------------------------------------------------------------
 // Error when KV is not configured
@@ -161,6 +165,12 @@ const PARTNER_BOT_MSG_PREFIX = 'line-agent:partner-bot-msg:'
 // flag and the content have independent lifecycles and neither matches case:*.
 const PARTNER_BOT_MSG_CONTENT_PREFIX = 'line-agent:partner-bot-msg-content:'
 const BOT_AUTHORED_TTL_SECONDS = 604800 // 7 days
+// Dedicated namespace for the latest user-sent image per partner group
+// （圖片刀B）.  Written ONLY by the webhook's partner-group image path; the
+// customer OA plane never writes here.  TTL is garbage collection — the
+// 30-minute freshness POLICY lives in the vision responder (timestamp window).
+const PARTNER_GROUP_IMG_PREFIX = 'line-agent:partner-group-img:'
+const PARTNER_GROUP_IMG_TTL_SECONDS = 1800 // 30 minutes
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -176,6 +186,10 @@ function partnerBotMsgKey(messageId: string): string {
 
 function partnerBotMsgContentKey(messageId: string): string {
   return `${PARTNER_BOT_MSG_CONTENT_PREFIX}${messageId}`
+}
+
+function partnerGroupImgKey(groupId: string): string {
+  return `${PARTNER_GROUP_IMG_PREFIX}${groupId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -335,5 +349,34 @@ export class KvStore implements CaseStore {
     if (messageId === '') return null
     const kv = this.ensureClient()
     return (await kv.get<string>(partnerBotMsgContentKey(messageId))) ?? null
+  }
+
+  // ── Partner-group image tracking（圖片刀B）──────────────────────────────────
+
+  async putPartnerGroupImageMsg(
+    groupId: string,
+    messageId: string,
+    timestamp: number
+  ): Promise<void> {
+    if (groupId === '' || messageId === '') return
+    const kv = this.ensureClient()
+    // Read-then-write so an OLDER timestamp never regresses the latest (LINE
+    // redelivery may reorder).  The race window between two NEW images is
+    // acceptable: worst case the "latest" is off by one very recent image.
+    const existing = await kv.get<PartnerGroupImageMsg>(partnerGroupImgKey(groupId))
+    if (existing && existing.timestamp > timestamp) return
+    await kv.setWithTtl(
+      partnerGroupImgKey(groupId),
+      { messageId, timestamp },
+      PARTNER_GROUP_IMG_TTL_SECONDS
+    )
+  }
+
+  async getLatestPartnerGroupImageMsg(
+    groupId: string
+  ): Promise<PartnerGroupImageMsg | null> {
+    if (groupId === '') return null
+    const kv = this.ensureClient()
+    return (await kv.get<PartnerGroupImageMsg>(partnerGroupImgKey(groupId))) ?? null
   }
 }
