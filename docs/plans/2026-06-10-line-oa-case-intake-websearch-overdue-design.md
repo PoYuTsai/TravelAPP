@@ -6,7 +6,13 @@
 > - 已上：三分流核心（`case-intake-triage`）、parser round-trip 閘（`customer-itinerary-roundtrip`，golden 7D6N 迴歸基準）、surfacing（`case-intake-surfacing`，觸發詞=客需/客人需求/整理需求/需求整理）、dispatcher 接線、`npm run agent:case-intake` dev harness。
 > - 閘：`AI_AGENT_CASE_INTAKE_ENABLED=true` 才會觸發，**default off，尚未開**。
 > - Spike 結論：`parseItineraryText` 對 golden 完美 round-trip；`parseBasicInfoText` 行首錨定吃不到 emoji header → 閘內前置剝 emoji，共用 parser 未動。
-> - 未做（下一刀=LLM enrichment，過三閘+cost cap）：充足度判斷潤飾、問法生成、行程草稿 JSON→composer→lint→round-trip 閘。已知 v1 瑕疵：日期摘要挑迄日、住宿地名誤入興趣清單。
+> - 已知 v1 瑕疵（deterministic extractor，未修）：日期摘要挑迄日、住宿地名誤入興趣清單。
+>
+> **實作進度（2026-06-11）**：§1 LLM enrichment 刀已完成（commit `ec9c3e7`）。
+> - 已上：`case-intake-enrichment.ts`（純函式 guards：insufficient→問法潤飾走 coverage/format/leak 閘、sufficient→草稿閘鏈 schema→composer/lint→真 parser round-trip→leak、tricky 零 LLM）；`case-intake-llm-adapter.ts`（transport 注入無 SDK、cost cap 前 check 後 record、fixed-code error）；`createCaseIntakeResponder({enrichment})` + webhook 接線（與 base responder 共用 daily cost cap）；CLI 三閘（`AI_AGENT_CASE_INTAKE_LLM_ENABLED` + `AI_AGENT_CASE_INTAKE_LLM_RUNTIME=real` + `ANTHROPIC_API_KEY`）。
+> - 閘：webhook 路徑 `AI_AGENT_CASE_INTAKE_LLM_ENABLED=true` 每次 respond 重讀，**default off，尚未開**；潤飾問句只能替換模板編號區，骨架（缺項行/已知行/Eric boundary）永遠 deterministic。
+> - 模型：Haiku default（`AI_AGENT_CASE_INTAKE_LLM_MODEL` 可換）；問句 1024 tokens、草稿 2048。
+> - 未做：real smoke（夥伴群實測）、§3 超時提醒、§2 web search。
 > 核心修正（兩次踩到同一個盲點）：**操作者是夥伴，不是 Eric**。客服／排行程／報價／銷售已外包給夥伴；任何要 Eric 動手輸入的形態（CLI 產品化）都是把工作收回來，一律否決。CLI 只能當 CC 的開發驗證 harness。
 
 ## 北極星（Eric 的產品方向）
