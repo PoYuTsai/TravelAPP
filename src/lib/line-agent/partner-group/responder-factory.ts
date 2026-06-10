@@ -120,6 +120,12 @@ export interface CreatePartnerGroupResponderWithRagDraftInput {
   answerSource: PartnerRagDraftSource
   /** Env record for the two gates (defaults to process.env). */
   env?: Record<string, string | undefined>
+  /**
+   * 客需三分流 responder（LLM 刀）— 注入＝webhook 端組好的 enriched
+   * responder（createCaseIntakeResponder({ enrichment })）；省略＝
+   * deterministic-only default。Surfacing 判斷（shouldUseCaseIntake）不變。
+   */
+  caseIntake?: PartnerGroupResponder
 }
 
 /**
@@ -137,6 +143,7 @@ export function createPartnerGroupResponderWithRagDraft(
 ): PartnerGroupResponder {
   const { base, answerSource, env } = input
   const ragResponder = createRagPartnerGroupResponder({ source: answerSource })
+  const intakeResponder = input.caseIntake ?? caseIntakeResponder
 
   return {
     async respond(respondInput) {
@@ -173,7 +180,7 @@ export function createPartnerGroupResponderWithRagDraft(
           env,
         })
       ) {
-        return caseIntakeResponder.respond(respondInput)
+        return intakeResponder.respond(respondInput)
       }
 
       const useRag = shouldUsePartnerRagDraft({

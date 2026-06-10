@@ -958,10 +958,16 @@ export async function runPartnerRagPathTraceCommand(options = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// case-intake — OFFLINE 客需三分流 dev harness（design 2026-06-10 §1）
+// case-intake — 客需三分流 dev harness（design 2026-06-10 §1）
 // ---------------------------------------------------------------------------
-// CLI 僅為 CC 的開發驗證 harness（非產品；產品形態是夥伴群 @bot）。純函式：
-// 不碰 LINE / Notion / LLM / gate，吃裸客需文字，回三分流結果＋回覆草稿。
+// CLI 僅為 CC 的開發驗證 harness（非產品；產品形態是夥伴群 @bot）。
+// Deterministic 三分流永遠先跑（純函式，不碰 LINE / Notion / LLM）。
+// LLM enrichment（問法潤飾／行程草稿閘鏈）只在三閘全開時實打（mirror
+// refine-smoke 的 gate 慣例）：
+//   1. `AI_AGENT_CASE_INTAKE_LLM_ENABLED === 'true'`（feature gate）
+//   2. `AI_AGENT_CASE_INTAKE_LLM_RUNTIME === 'real'`（real-connection gate）
+//   3. `ANTHROPIC_API_KEY` present（credential）
+// 之外還有 daily cost cap（cap env 未設或 KV 未接 ⇒ adapter fail-closed 不打）。
 
 /**
  * GUARD-loaded dynamic import of the pure TS triage core — same pattern as
@@ -981,13 +987,69 @@ export async function loadCaseIntakeKit(ctx = {}) {
   }
 }
 
+/** 三閘判定（fine-grained reason codes，operator 能看出差哪一閘）。 */
+export function caseIntakeLlmGateStatus(env) {
+  if (String(env?.AI_AGENT_CASE_INTAKE_LLM_ENABLED ?? '').trim() !== 'true') return 'disabled'
+  if (String(env?.AI_AGENT_CASE_INTAKE_LLM_RUNTIME ?? '').trim() !== 'real') return 'runtime_not_real'
+  if (String(env?.ANTHROPIC_API_KEY ?? '').trim() === '') return 'missing_key'
+  return 'wired'
+}
+
+const CASE_INTAKE_LLM_GATE_LABELS = {
+  disabled: 'AI_AGENT_CASE_INTAKE_LLM_ENABLED 未開啟',
+  runtime_not_real: 'AI_AGENT_CASE_INTAKE_LLM_RUNTIME 不是 real',
+  missing_key: 'ANTHROPIC_API_KEY 未設定',
+}
+
+/**
+ * GUARD-loaded dynamic import of the enrichment kit（enrichment 純函式 +
+ * adapter + cost cap + kv client）。任一缺 ⇒ null，命令回 wiring 訊息不爆。
+ * Loading 本身零網路；真打發生在 enrichCaseIntakeReply 內被 cost cap 守住。
+ */
+export async function loadCaseIntakeLlmKit(ctx = {}) {
+  const {
+    importEnrichmentModule = () =>
+      import('../src/lib/line-agent/partner-group/case-intake-enrichment.ts'),
+    importAdapterModule = () =>
+      import('../src/lib/line-agent/partner-group/case-intake-llm-adapter.ts'),
+    importCostCapModule = () =>
+      import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+  } = ctx
+  try {
+    const enrichmentMod = await importEnrichmentModule()
+    const adapterMod = await importAdapterModule()
+    const costCapMod = await importCostCapModule()
+    const kvMod = await importKvModule()
+    const kit = {
+      enrich: enrichmentMod?.enrichCaseIntakeReply ?? null,
+      createSources: adapterMod?.createAnthropicCaseIntakeSources ?? null,
+      resolveModel: adapterMod?.resolveCaseIntakeLlmModel ?? null,
+      createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+    }
+    if (
+      !kit.enrich ||
+      !kit.createSources ||
+      !kit.resolveModel ||
+      !kit.createDailyCostCap ||
+      !kit.createKvClientFromEnv
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
 const CASE_INTAKE_FLOW_LABELS = {
   insufficient: '資訊不足（缺項模式）',
   sufficient: '資訊已齊',
   tricky: '需 Eric 確認',
 }
 
-/** Run the case-intake command offline. `kit` is injected in tests. */
+/** Run the case-intake command. `kit` / `llmKit` are injected in tests. */
 export async function runCaseIntakeCommand(options = {}) {
   const text = String(options.query ?? '').trim()
   if (!text) {
@@ -1008,6 +1070,45 @@ export async function runCaseIntakeCommand(options = {}) {
     lines.push(`棘手原因：${result.trickyReasons.join('；')}`)
   }
   lines.push('--- 回覆草稿（夥伴群 would-be reply）---', result.replyText)
+
+  // ── LLM enrichment（三閘 + cost cap；任何一閘關 ⇒ 上面 deterministic 結果就是全部）──
+  const env = options.env ?? process.env
+  const gate = caseIntakeLlmGateStatus(env)
+  if (gate !== 'wired') {
+    lines.push(`LLM enrichment：未啟用（${CASE_INTAKE_LLM_GATE_LABELS[gate] ?? gate}）`)
+    return lines.join('\n')
+  }
+
+  const llmKit = options.llmKit ?? (await loadCaseIntakeLlmKit())
+  if (!llmKit) {
+    lines.push('LLM enrichment：未啟用（enrichment 模組未載入，請用 tsx 執行）')
+    return lines.join('\n')
+  }
+
+  const transport = options.transport ?? fetch
+  const costCap = llmKit.createDailyCostCap({
+    env,
+    kv: llmKit.createKvClientFromEnv(env),
+  })
+  const sources = llmKit.createSources({
+    transport,
+    apiKey: String(env.ANTHROPIC_API_KEY).trim(),
+    costCap,
+    env,
+  })
+  const enriched = await llmKit.enrich({
+    triage: result,
+    requirementText: text,
+    sources,
+  })
+  lines.push(
+    `LLM enrichment：${enriched.enrichment}` +
+      (enriched.degradedReason ? `（degraded：${enriched.degradedReason}）` : '') +
+      `（model=${llmKit.resolveModel({ env })}）`
+  )
+  if (enriched.enrichment !== 'none') {
+    lines.push('--- enriched 回覆（夥伴群 would-be reply）---', enriched.replyText)
+  }
   return lines.join('\n')
 }
 
@@ -1032,7 +1133,7 @@ export async function runAgentCommand(args, options = {}) {
     return runPartnerRagPathTraceCommand({ env: options.env ?? process.env, query })
   }
   if (commandText === 'case-intake') {
-    return runCaseIntakeCommand({ query })
+    return runCaseIntakeCommand({ query, env: options.env ?? process.env })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

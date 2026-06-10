@@ -15,9 +15,11 @@
  *   && isCaseIntakeEnabled(env)       // env gate exactly "true", default OFF
  * Any missing precondition ⇒ the existing responder runs, intake never fires.
  *
- * LLM enrichment（充足度判斷潤飾／行程草稿 JSON → composer → lint →
- * round-trip 閘）is a LATER slice layered on top — gate-closed degrade path is
- * the deterministic triage below, per design「閘關退 deterministic 缺項檢查」.
+ * LLM enrichment（問法潤飾／行程草稿 JSON → composer → lint → round-trip 閘）
+ * layers ON TOP via `createCaseIntakeResponder({ enrichment })`：每次 respond
+ * 先跑 deterministic triage，再（且僅在 `AI_AGENT_CASE_INTAKE_LLM_ENABLED`
+ * gate 開、sources 有接時）嘗試 enrich；enrich 任何失敗都退回 deterministic
+ * replyText — 閘關退 deterministic 缺項檢查，per design。
  */
 
 import type {
@@ -27,6 +29,10 @@ import type {
 } from './responder'
 import type { AgentSourceChannel } from '../types'
 import { triageCaseIntake } from './case-intake-triage'
+import {
+  enrichCaseIntakeReply,
+  type CaseIntakeEnrichmentSources,
+} from './case-intake-enrichment'
 
 // ---------------------------------------------------------------------------
 // Fixed phrasing
@@ -66,6 +72,17 @@ export function isCaseIntakeEnabled(
   return (env.AI_AGENT_CASE_INTAKE_ENABLED ?? '').trim() === 'true'
 }
 
+/**
+ * LLM enrichment gate — 疊在 surfacing gate 之上的第二道閘（同 convention，
+ * default off）。閘關 ⇒ responder 連 enrichment source 都不呼叫，行為與
+ * deterministic 刀完全相同。
+ */
+export function isCaseIntakeLlmEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return (env.AI_AGENT_CASE_INTAKE_LLM_ENABLED ?? '').trim() === 'true'
+}
+
 export interface ShouldUseCaseIntakeInput {
   sourceChannel: AgentSourceChannel
   /** mentionsBot OR quote-to-bot, resolved by the caller（router botDirected）. */
@@ -91,32 +108,95 @@ export function shouldUseCaseIntake(input: ShouldUseCaseIntakeInput): boolean {
 // Intake responder — deterministic, text-only
 // ---------------------------------------------------------------------------
 
+export interface CreateCaseIntakeResponderInput {
+  /**
+   * LLM enrichment sources（adapter 蓋 transport + cost cap）。Absent ⇒
+   * deterministic-only（與 LLM 刀落地前行為 byte-identical）。
+   */
+  enrichment?: CaseIntakeEnrichmentSources
+  /** Env record for the LLM gate（defaults to process.env, read PER respond）. */
+  env?: Record<string, string | undefined>
+}
+
 /**
- * Deterministic 三分流 responder. Only produces text; whether it is sent stays
+ * 三分流 responder factory. Only produces text; whether it is sent stays
  * owned by the router / webhook send gate. On any internal error it fails
  * closed with a fixed reply（degraded + error meta, NEVER a half-built draft）.
+ *
+ * Enrichment 失敗永遠不會讓 deterministic 回覆消失：enrichCaseIntakeReply
+ * 本身 fail-closed；外層 try/catch 再兜一層（哪怕 enrichment 模組炸了，
+ * deterministic triage 結果照樣回）。
  */
-export const caseIntakeResponder: PartnerGroupResponder = {
-  async respond(
-    input: PartnerGroupRespondInput
-  ): Promise<PartnerGroupRespondResult> {
-    try {
-      const triage = triageCaseIntake(input.text)
+export function createCaseIntakeResponder(
+  opts: CreateCaseIntakeResponderInput = {}
+): PartnerGroupResponder {
+  const { enrichment } = opts
+  return {
+    async respond(
+      input: PartnerGroupRespondInput
+    ): Promise<PartnerGroupRespondResult> {
+      let triage: ReturnType<typeof triageCaseIntake>
+      try {
+        triage = triageCaseIntake(input.text)
+      } catch {
+        // Loud + observable; code-only so no raw content reaches the log.
+        input.log?.('route_decision', {
+          path: 'case_intake',
+          reason: 'case_intake_triage_failed',
+        })
+        return {
+          text: CASE_INTAKE_UNAVAILABLE_REPLY,
+          meta: { responder: 'intake', degraded: true, error: 'case_intake_triage_failed' },
+        }
+      }
+
+      // LLM enrichment — gate 每次 respond 重讀；閘關／無 sources ⇒ 純 deterministic。
+      if (enrichment && isCaseIntakeLlmEnabled(opts.env)) {
+        try {
+          const enriched = await enrichCaseIntakeReply({
+            triage,
+            requirementText: input.text,
+            sources: enrichment,
+          })
+          input.log?.('route_decision', {
+            path: 'case_intake',
+            flow: triage.flow,
+            enrichment: enriched.enrichment,
+            ...(enriched.degradedReason !== undefined
+              ? { degradedReason: enriched.degradedReason }
+              : {}),
+          })
+          return {
+            text: enriched.replyText,
+            meta: {
+              responder: 'intake',
+              confidence: triage.flow,
+              enrichment: enriched.enrichment,
+            },
+          }
+        } catch {
+          // enrichCaseIntakeReply 設計上不 throw — 這層只是最後保險。
+          input.log?.('route_decision', {
+            path: 'case_intake',
+            flow: triage.flow,
+            enrichment: 'none',
+            degradedReason: 'enrichment_crashed',
+          })
+          return {
+            text: triage.replyText,
+            meta: { responder: 'intake', confidence: triage.flow, enrichment: 'none' },
+          }
+        }
+      }
+
       input.log?.('route_decision', { path: 'case_intake', flow: triage.flow })
       return {
         text: triage.replyText,
         meta: { responder: 'intake', confidence: triage.flow },
       }
-    } catch {
-      // Loud + observable; code-only so no raw content reaches the log.
-      input.log?.('route_decision', {
-        path: 'case_intake',
-        reason: 'case_intake_triage_failed',
-      })
-      return {
-        text: CASE_INTAKE_UNAVAILABLE_REPLY,
-        meta: { responder: 'intake', degraded: true, error: 'case_intake_triage_failed' },
-      }
-    }
-  },
+    },
+  }
 }
+
+/** Deterministic-only default（LLM 刀前的既有 export，行為不變）。 */
+export const caseIntakeResponder: PartnerGroupResponder = createCaseIntakeResponder()

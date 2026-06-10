@@ -15,6 +15,7 @@ import {
   isCaseIntakeEnabled,
   shouldUseCaseIntake,
   caseIntakeResponder,
+  createCaseIntakeResponder,
 } from '../partner-group/case-intake-surfacing'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { CommandIntent } from '../commands/intent'
@@ -121,5 +122,94 @@ describe('caseIntakeResponder', () => {
     })
     expect(result.text).toContain('Eric')
     expect(result.text).toContain('過敏')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createCaseIntakeResponder — LLM enrichment gate（design §1 LLM 刀）
+// ---------------------------------------------------------------------------
+
+describe('createCaseIntakeResponder — enrichment gate', () => {
+  const INSUFFICIENT = '客需：客人說 12 月想去清邁玩'
+
+  function trackedSources() {
+    const calls: string[] = []
+    return {
+      calls,
+      sources: {
+        questionSource: async (req: { missingFields: string[] }) => {
+          calls.push('question')
+          return JSON.stringify(
+            req.missingFields.map((field) => ({
+              field,
+              question: '想跟您確認一下，方便提供嗎？',
+            }))
+          )
+        },
+        draftSource: async () => {
+          calls.push('draft')
+          return '{}'
+        },
+      },
+    }
+  }
+
+  it('gate OFF（default）→ deterministic reply，sources 永不被呼叫', async () => {
+    const { calls, sources } = trackedSources()
+    const responder = createCaseIntakeResponder({ enrichment: sources, env: {} })
+    const result = await responder.respond({
+      event: makeEvent(INSUFFICIENT),
+      intent: INTENT,
+      text: INSUFFICIENT,
+    })
+    expect(result.text).toContain('資訊還不足')
+    expect(result.meta?.enrichment).toBeUndefined()
+    expect(calls).toEqual([])
+  })
+
+  it('gate ON → 潤飾問句被採用，meta 標 enrichment', async () => {
+    const { calls, sources } = trackedSources()
+    const responder = createCaseIntakeResponder({
+      enrichment: sources,
+      env: { AI_AGENT_CASE_INTAKE_LLM_ENABLED: 'true' },
+    })
+    const result = await responder.respond({
+      event: makeEvent(INSUFFICIENT),
+      intent: INTENT,
+      text: INSUFFICIENT,
+    })
+    expect(result.text).toContain('想跟您確認一下')
+    expect(result.meta?.enrichment).toBe('llm_questions')
+    expect(calls).toEqual(['question'])
+  })
+
+  it('gate ON 但 enrichment 失敗 → fail-closed 回 deterministic reply', async () => {
+    const responder = createCaseIntakeResponder({
+      enrichment: {
+        questionSource: async () => {
+          throw new Error('boom')
+        },
+        draftSource: async () => '{}',
+      },
+      env: { AI_AGENT_CASE_INTAKE_LLM_ENABLED: 'true' },
+    })
+    const result = await responder.respond({
+      event: makeEvent(INSUFFICIENT),
+      intent: INTENT,
+      text: INSUFFICIENT,
+    })
+    expect(result.text).toContain('資訊還不足')
+    expect(result.meta?.enrichment).toBe('none')
+  })
+
+  it('無 enrichment deps → 行為與既有 caseIntakeResponder 相同', async () => {
+    const responder = createCaseIntakeResponder()
+    const result = await responder.respond({
+      event: makeEvent(INSUFFICIENT),
+      intent: INTENT,
+      text: INSUFFICIENT,
+    })
+    expect(result.text).toContain('資訊還不足')
+    expect(result.meta?.responder).toBe('intake')
   })
 })

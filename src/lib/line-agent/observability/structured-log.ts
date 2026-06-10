@@ -34,9 +34,15 @@ export interface AgentLogFieldsByEvent {
     botDirected?: boolean
   }
   route_decision: {
-    path?: 'rag_composer' | 'quoted_draft' | 'base' | 'no_reply'
+    path?: 'rag_composer' | 'quoted_draft' | 'base' | 'no_reply' | 'case_intake'
     /** Gate STATE words only（enabled/disabled）— never an env var value. */
     ragDraftGate?: 'enabled' | 'disabled'
+    /** case_intake 三分流結果（fixed vocabulary, never content）。 */
+    flow?: 'insufficient' | 'sufficient' | 'tricky'
+    /** case_intake LLM enrichment 採用狀態（fixed vocabulary）。 */
+    enrichment?: 'llm_questions' | 'llm_draft' | 'none'
+    /** Fixed degraded code（e.g. roundtrip_failed）— never content. */
+    degradedReason?: string
     reason?: string
   }
   llm_call: {

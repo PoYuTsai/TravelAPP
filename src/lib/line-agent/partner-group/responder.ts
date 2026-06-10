@@ -76,6 +76,8 @@ export interface PartnerGroupRespondResult {
     confidence?: string
     degraded?: boolean
     error?: string
+    /** case-intake LLM enrichment 採用狀態（design 2026-06-10 §1 LLM 刀）。 */
+    enrichment?: 'llm_questions' | 'llm_draft' | 'none'
   }
 }
 

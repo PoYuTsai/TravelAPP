@@ -99,7 +99,8 @@ function detectTrickyReasons(text: string): string[] {
 // Field labels + forwardable questions（fixed templates, deterministic）
 // ---------------------------------------------------------------------------
 
-const FIELD_LABELS: Record<string, string> = {
+/** Exported：enrichment（LLM 問法潤飾）的 coverage guard 要對照同一張表。 */
+export const CASE_INTAKE_FIELD_LABELS: Record<string, string> = {
   travelDates: '日期',
   partySize: '人數',
   childAges: '小孩年齡',
@@ -107,8 +108,10 @@ const FIELD_LABELS: Record<string, string> = {
   flightOrPickupInfo: '航班／接送資訊',
   hotelOrPickupLocation: '住宿地點',
 }
+const FIELD_LABELS = CASE_INTAKE_FIELD_LABELS
 
-const FIELD_QUESTIONS: Record<string, string> = {
+/** Exported：deterministic 基準問法，也是 LLM 潤飾 prompt 的素材。 */
+export const CASE_INTAKE_FIELD_QUESTIONS: Record<string, string> = {
   travelDates: '請問預計的出發與回程日期是？（還沒確定的話，大概的月份也可以）',
   partySize: '請問同行人數？大人幾位、小孩幾位？',
   childAges: '請問小孩的年齡分別是幾歲？（方便安排行程節奏與座椅）',
@@ -116,9 +119,15 @@ const FIELD_QUESTIONS: Record<string, string> = {
   flightOrPickupInfo: '請問航班資訊（航空公司、航班號與抵達時間）方便提供嗎？',
   hotelOrPickupLocation: '請問住宿地點（飯店名稱或區域）確定了嗎？',
 }
+const FIELD_QUESTIONS = CASE_INTAKE_FIELD_QUESTIONS
 
 /** Stable question order = template order above. */
 const FIELD_ORDER = Object.keys(FIELD_QUESTIONS)
+
+/** Exported：enrichment 用同一順序 render 潤飾後問句，順序永遠 deterministic。 */
+export function orderCaseIntakeFields(fields: string[]): string[] {
+  return orderFields(fields)
+}
 
 function orderFields(fields: string[]): string[] {
   return [...fields].sort((a, b) => FIELD_ORDER.indexOf(a) - FIELD_ORDER.indexOf(b))
@@ -128,7 +137,8 @@ function orderFields(fields: string[]): string[] {
 // Reply rendering — one fixed template per flow
 // ---------------------------------------------------------------------------
 
-const ERIC_BOUNDARY_LINE = '正式報價、特殊承諾或例外狀況仍需 Eric 最終確認。'
+/** Exported：每一種 case-intake 回覆（含 enrichment 草稿）都必須以這行收尾。 */
+export const ERIC_BOUNDARY_LINE = '正式報價、特殊承諾或例外狀況仍需 Eric 最終確認。'
 
 function renderQuestionBlock(missing: string[]): string {
   const known = missing.filter((f) => FIELD_QUESTIONS[f] !== undefined)
@@ -136,15 +146,27 @@ function renderQuestionBlock(missing: string[]): string {
   return lines.join('\n')
 }
 
-function renderInsufficientReply(summary: string, missing: string[]): string {
+/**
+ * Insufficient 回覆 renderer。`questionLines` 注入＝LLM 潤飾後的問句（enrichment
+ * 已通過 coverage / leak guard）；省略＝deterministic 模板。模板骨架（標題行、
+ * 已知行、boundary line）兩種情況都固定 — LLM 永遠只能換問句，不能換骨架。
+ */
+export function renderInsufficientReply(
+  summary: string,
+  missing: string[],
+  questionLines?: string[]
+): string {
   const labeled = missing
     .filter((f) => FIELD_LABELS[f] !== undefined)
     .map((f) => FIELD_LABELS[f])
+  const questionBlock = questionLines
+    ? questionLines.map((q, i) => `${i + 1}. ${q}`).join('\n')
+    : renderQuestionBlock(missing)
   return [
     `【客需整理】目前資訊還不足，缺少：${labeled.join('、')}`,
     `已知：${summary}`,
     '建議可以這樣問客人（以下可直接轉傳）：',
-    renderQuestionBlock(missing),
+    questionBlock,
     ERIC_BOUNDARY_LINE,
   ].join('\n')
 }

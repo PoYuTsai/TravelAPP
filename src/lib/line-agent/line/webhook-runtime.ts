@@ -38,6 +38,8 @@ import { sanitizeQuotedBotContext } from '@/lib/line-agent/partner-group/quoted-
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
 import { createDailyCostCap } from '@/lib/line-agent/observability/daily-cost-cap'
 import { createKvClientFromEnv } from '@/lib/line-agent/storage/kv-store'
+import { createCaseIntakeResponder } from '@/lib/line-agent/partner-group/case-intake-surfacing'
+import { createAnthropicCaseIntakeSources } from '@/lib/line-agent/partner-group/case-intake-llm-adapter'
 import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
 import { randomUUID } from 'node:crypto'
 
@@ -371,19 +373,37 @@ export function setPartnerGroupResponder(responder: PartnerGroupResponder): void
  */
 export function getPartnerGroupResponder(): PartnerGroupResponder {
   if (_partnerGroupResponder === null) {
-    const base = createPartnerGroupResponder({
-      models: getPartnerResponderConfig(),
-      transport: fetch,
-      // P0-A 刀 2 — daily LLM cost cap, KV-backed, 雙 fail-closed：cap env 未設
-      // 或 KV 未接/壞掉 ⇒ the adapter degrades to the stub and the LLM is never
-      // called. Constructing the KV client here is network-free.
-      costCap: createDailyCostCap({
-        env: process.env,
-        kv: createKvClientFromEnv(),
-      }),
+    const models = getPartnerResponderConfig()
+    // P0-A 刀 2 — daily LLM cost cap, KV-backed, 雙 fail-closed：cap env 未設
+    // 或 KV 未接/壞掉 ⇒ the adapter degrades to the stub and the LLM is never
+    // called. Constructing the KV client here is network-free. ONE shared
+    // instance：base responder 與 case-intake enrichment 共用同一個每日預算。
+    const costCap = createDailyCostCap({
+      env: process.env,
+      kv: createKvClientFromEnv(),
     })
+    const base = createPartnerGroupResponder({
+      models,
+      transport: fetch,
+      costCap,
+    })
+    // 客需三分流 LLM enrichment（design 2026-06-10 §1 LLM 刀）— 有 key 才組
+    // enriched responder；無 key ⇒ deterministic-only（factory default）。
+    // Gate `AI_AGENT_CASE_INTAKE_LLM_ENABLED` 由 responder 每次 respond 重讀，
+    // default off ⇒ sources 永不被呼叫，零行為改變。
+    const caseIntake = models.anthropicApiKey
+      ? createCaseIntakeResponder({
+          enrichment: createAnthropicCaseIntakeSources({
+            transport: fetch,
+            apiKey: models.anthropicApiKey,
+            costCap,
+            env: process.env,
+          }),
+        })
+      : undefined
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
       base,
+      caseIntake,
       // Late-bound thunk: always calls the CURRENTLY registered source, so a test
       // injecting a fake via setPartnerRagAnswerSource is honoured even though
       // this dispatcher singleton was built earlier.
