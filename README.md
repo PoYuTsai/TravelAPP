@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-06-11 客需三分流 LLM enrichment（gate off） -->
+<!-- Last build trigger: 2026-06-11 OA 超時提醒刀1（dry-run + @bot done） -->

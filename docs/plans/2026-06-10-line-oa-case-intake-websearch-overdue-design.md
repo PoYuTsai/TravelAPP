@@ -12,7 +12,11 @@
 > - 已上：`case-intake-enrichment.ts`（純函式 guards：insufficient→問法潤飾走 coverage/format/leak 閘、sufficient→草稿閘鏈 schema→composer/lint→真 parser round-trip→leak、tricky 零 LLM）；`case-intake-llm-adapter.ts`（transport 注入無 SDK、cost cap 前 check 後 record、fixed-code error）；`createCaseIntakeResponder({enrichment})` + webhook 接線（與 base responder 共用 daily cost cap）；CLI 三閘（`AI_AGENT_CASE_INTAKE_LLM_ENABLED` + `AI_AGENT_CASE_INTAKE_LLM_RUNTIME=real` + `ANTHROPIC_API_KEY`）。
 > - 閘：webhook 路徑 `AI_AGENT_CASE_INTAKE_LLM_ENABLED=true` 每次 respond 重讀，**default off，尚未開**；潤飾問句只能替換模板編號區，骨架（缺項行/已知行/Eric boundary）永遠 deterministic。
 > - 模型：Haiku default（`AI_AGENT_CASE_INTAKE_LLM_MODEL` 可換）；問句 1024 tokens、草稿 2048。
-> - 未做：real smoke（夥伴群實測）、§3 超時提醒、§2 web search。
+>
+> **實作進度（2026-06-11）**：§3 刀1 已完成（commit `691e360`）。
+> - 已上：`AgentCase` 新欄位 handledAt/handledBy/reminderCount/lastReminderAt（handled 是 derived：`handledAt >= lastCustomerMessageAt`，客人再發訊息自動失效＋reducer 把 reminderCount 歸零）；reducer event `case_handled`；`overdue-reminder.ts` 純函式狀態機（門檻預設 2h、單案上限 3 次、瀏覽寒暄/terminal/idle 不催）＋dry-run 報告；群內 `@bot done <caseId>`（B1 tagged 路徑、router `mark_handled`、send gate 放行 ack）；CLI `agent:overdue-dry-run`（read-only）/`agent:case-done`（同 handler）。
+> - 邊界守住：dry-run 永不主動送出、ack 回覆只回夥伴群、OA 客人訊息結構上進不了 done 路徑。
+> - 未做：§3 刀2（cron 真推＋安靜時段＋每日上限，需 Eric 批 standing send intent）、§1 real smoke（夥伴群實測）、§2 web search。
 > 核心修正（兩次踩到同一個盲點）：**操作者是夥伴，不是 Eric**。客服／排行程／報價／銷售已外包給夥伴；任何要 Eric 動手輸入的形態（CLI 產品化）都是把工作收回來，一律否決。CLI 只能當 CC 的開發驗證 harness。
 
 ## 北極星（Eric 的產品方向）
