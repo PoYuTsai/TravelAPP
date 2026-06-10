@@ -17,6 +17,15 @@
 > - 已上：`AgentCase` 新欄位 handledAt/handledBy/reminderCount/lastReminderAt（handled 是 derived：`handledAt >= lastCustomerMessageAt`，客人再發訊息自動失效＋reducer 把 reminderCount 歸零）；reducer event `case_handled`；`overdue-reminder.ts` 純函式狀態機（門檻預設 2h、單案上限 3 次、瀏覽寒暄/terminal/idle 不催）＋dry-run 報告；群內 `@bot done <caseId>`（B1 tagged 路徑、router `mark_handled`、send gate 放行 ack）；CLI `agent:overdue-dry-run`（read-only）/`agent:case-done`（同 handler）。
 > - 邊界守住：dry-run 永不主動送出、ack 回覆只回夥伴群、OA 客人訊息結構上進不了 done 路徑。
 > - 未做：§3 刀2（cron 真推＋安靜時段＋每日上限，需 Eric 批 standing send intent）、§1 real smoke（夥伴群實測）、§2 web search。
+>
+> **實作進度（2026-06-11）**：圖片刀A＋刀B 已完成（commits `10b33f9` 刀A、`2f0ce93` 刀B）。
+> - 背景：正式群實測 Chun 傳客人對話截圖 @bot → bot 讀不到，且先前亂承諾「可以上傳圖片給我」＝誠實性漏洞（同台北夜市/web_search 類型）。
+> - 刀A：system prompt 圖片誠實條款（明說讀不到圖片、請貼客人文字）＋tripwire 雙向鎖（`not.toContain('上傳圖片給我')`）。
+> - 刀B：「@bot 讀取這張圖」（Eric 拍板：夥伴零學習成本）→ `content-client`（**api-data.line.me**，host 與 api.line.me 不同）→ `vision-intake-adapter`（Haiku 看截圖抽客人文字；checkBudget→打→recordSpend、fixed-code、誠實抽取 prompt 不腦補）→ `triageCaseIntake` 三分流（與 §1 直接接軌）。
+> - 「這張圖」解析：引用圖片優先 → 群內最近一張（webhook 記 `putPartnerGroupImageMsg`，30 分鐘 freshness 窗由讀取端判斷、KV TTL 當 GC、舊 timestamp 永不回退）。
+> - 閘：M3-0 ocr tool-gate **第一個真消費者** — `AI_AGENT_OCR_ENABLED=true` ＋ `AI_AGENT_TOOL_COST_CAP_USD>0` 雙閘，**default off，尚未開**；與 enrichment 共用同一個 daily cost cap。模型 `AI_AGENT_VISION_INTAKE_MODEL`（default Haiku）。
+> - dispatch 順序：quoted_draft → vision_intake → case_intake → rag → base（「客需 讀取這張圖」走 vision，抽完文字本來就進三分流）。
+> - fail-closed：找不到圖／content 404／vision 失敗 → 固定誠實回覆；store 壞掉視同沒圖；OA 永不入 vision 路徑。測試 1477 全綠（本刀 ~60 新測）。
 > 核心修正（兩次踩到同一個盲點）：**操作者是夥伴，不是 Eric**。客服／排行程／報價／銷售已外包給夥伴；任何要 Eric 動手輸入的形態（CLI 產品化）都是把工作收回來，一律否決。CLI 只能當 CC 的開發驗證 harness。
 
 ## 北極星（Eric 的產品方向）
