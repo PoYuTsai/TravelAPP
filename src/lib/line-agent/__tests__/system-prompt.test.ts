@@ -174,4 +174,13 @@ describe('buildPartnerGroupSystemPrompt', () => {
   it('self-intro honestly admits it cannot browse the web (web_search not wired)', () => {
     expect(prompt).toContain('還不能上網')
   })
+
+  // 2026-06-11 正式群實測: Chun 傳客人對話截圖 @bot，bot 讀不到圖片，先前
+  // 卻回「可以上傳圖片給我，我會幫忙看」— 與台北夜市/web_search 同型的誠實性
+  // 漏洞。在 vision 真接上之前，prompt 必須明說讀不到圖片、請貼文字。
+  it('honestly admits it cannot read image content and asks for pasted text instead', () => {
+    expect(prompt).toContain('讀不到圖片內容')
+    expect(prompt).toContain('請把客人的文字訊息直接貼上來')
+    expect(prompt).not.toContain('上傳圖片給我')
+  })
 })
