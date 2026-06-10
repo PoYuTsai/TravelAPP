@@ -40,6 +40,7 @@ import {
 } from './handlers'
 import type { AgentSourceChannel } from '../types'
 import type { CaseStore } from '../storage/store'
+import { parseCaseDoneCommand, markCaseHandled } from '../cases/handled-command'
 import { createQuote, type CreateQuoteResult } from '../quote/create-quote'
 import {
   stubPartnerGroupResponder,
@@ -147,6 +148,7 @@ export type RouterAction =
   | 'post_to_partner_group'// Send to LINE partner group (B4 + sendTarget)
   | 'list_cases'           // Private/operator read: recent active OA cases
   | 'create_quote_dryrun'  // Phase C: dry-run quote build (DC/operator only)
+  | 'mark_handled'         // §3 刀1: @bot done <caseId> — 超時提醒 ack
   | 'denied'               // Permission denied (B5 dev action from partner group)
 
 export interface RouterDecision {
@@ -274,6 +276,38 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
       // B1: Is the bot addressed (tag or quote-to-bot)? → intent already resolved
       const tagPerm = canRespondToPartnerGroupTag(event, botDirected)
       if (tagPerm.allowed) {
+        // §3 刀1 — `@bot done <caseId>` ack（超時提醒解除）。Checked BEFORE the
+        // responder：這是唯一會寫 store 的 partner-group 路徑（responder 是
+        // text-only），所以走 handler 而不是 responder。explicit token（done）
+        // ＋tagged 才會進來；permission 是現成的 B1 tagged-message gate。
+        const doneCaseId = parseCaseDoneCommand(event.text ?? '')
+        if (doneCaseId !== null) {
+          if (!store) {
+            throw new Error(
+              '[router] done command requires a store to mark the case handled. ' +
+                'Pass `store` in RouterInput.'
+            )
+          }
+          const ack = await markCaseHandled({
+            store,
+            caseId: doneCaseId,
+            actor: event.lineUserId ?? 'partner',
+            now: new Date(event.timestamp).toISOString(),
+          })
+          return {
+            action: 'mark_handled',
+            source,
+            denied: false,
+            handlerResult: {
+              handler: 'markCaseHandled',
+              status: ack.ok ? 'stub_ok' : 'error',
+              outboundText: ack.replyText,
+              meta: { caseId: doneCaseId, handled: ack.ok },
+            },
+            intent: earlyIntent,
+          }
+        }
+
         // Permission granted — respond in the group. The responder only
         // produces text; it never sends (the router owns that decision).
         const handlerResult = await handleRespondToPartnerGroup(

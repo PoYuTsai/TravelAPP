@@ -116,6 +116,18 @@ interface IdleTimeoutEvent {
   now: string
 }
 
+/**
+ * Explicit ack（design 2026-06-10 §3 刀1）：`@bot done <caseId>` — webhook 看
+ * 不到 OA 後台手動回覆，所以「已處理」只能由夥伴顯式標記。status 不變；只記
+ * handledAt/handledBy。客人之後再發訊息 ⇒ lastCustomerMessageAt 前進，derived
+ * handled 判定自動失效（重開計時）。
+ */
+interface CaseHandledEvent {
+  type: 'case_handled'
+  actor: string
+  now: string
+}
+
 export type CaseEvent =
   | LineOAMessageEvent
   | NeedsInfoEvent
@@ -127,6 +139,7 @@ export type CaseEvent =
   | ConvertedEvent
   | LostEvent
   | IdleTimeoutEvent
+  | CaseHandledEvent
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -204,6 +217,10 @@ export function caseReducer(
             source: 'line_oa' as const,
           },
         ].slice(-MAX_CUSTOMER_MESSAGES),
+        // 超時提醒（§3）：新客人訊息＝新一輪計時 → 提醒次數歸零。
+        // handledAt 不動 — handled 是 derived（handledAt >= lastCustomerMessageAt），
+        // lastCustomerMessageAt 前進後自動回到未處理。
+        reminderCount: 0,
       }
       break
     }
@@ -286,6 +303,16 @@ export function caseReducer(
     // -- Idle timeout -------------------------------------------------------
     case 'idle_timeout': {
       nextStatus = 'idle'
+      break
+    }
+
+    // -- Explicit handled ack（§3 刀1）---------------------------------------
+    case 'case_handled': {
+      // status 不變 — handled 是提醒層的標記，不是案件階段的轉移。
+      caseUpdates = {
+        handledAt: event.now,
+        handledBy: event.actor,
+      }
       break
     }
   }

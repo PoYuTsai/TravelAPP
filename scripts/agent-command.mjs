@@ -110,9 +110,17 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'case-intake', query }
   }
+  if (command === 'overdue-dry-run' || command === '/overdue-dry-run') {
+    return { commandText: 'overdue-dry-run' }
+  }
+  if (command === 'case-done' || command === '/case-done') {
+    // The remaining arg is the caseId to ack.
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'case-done', query }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done'
   )
 }
 
@@ -1112,6 +1120,78 @@ export async function runCaseIntakeCommand(options = {}) {
   return lines.join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// overdue-dry-run / case-done — OA 超時提醒刀1 dev harness（design 2026-06-10 §3）
+// ---------------------------------------------------------------------------
+// dry-run 是 READ-ONLY：從 store 列 would-remind cases，不寫 KV、不發 LINE。
+// case-done 與夥伴群 `@bot done <caseId>` 共用同一個 handler（CLI 僅為 CC 的
+// dev 驗證 harness；產品 ack 入口是群內指令）。有 KV env 時打的是真 store。
+
+/** GUARD-loaded dynamic import of the overdue kit（同 loadCaseIntakeKit 慣例）。 */
+export async function loadOverdueKit(ctx = {}) {
+  const {
+    importOverdueModule = () => import('../src/lib/line-agent/cases/overdue-reminder.ts'),
+    importHandledModule = () => import('../src/lib/line-agent/cases/handled-command.ts'),
+    importStoreModule = () => import('../src/lib/line-agent/storage/select-store.ts'),
+  } = ctx
+  try {
+    const overdueMod = await importOverdueModule()
+    const handledMod = await importHandledModule()
+    const storeMod = await importStoreModule()
+    const kit = {
+      listWouldRemindCases: overdueMod?.listWouldRemindCases ?? null,
+      formatOverdueDryRunReport: overdueMod?.formatOverdueDryRunReport ?? null,
+      markCaseHandled: handledMod?.markCaseHandled ?? null,
+      selectStore: storeMod?.selectStore ?? null,
+    }
+    if (
+      !kit.listWouldRemindCases ||
+      !kit.formatOverdueDryRunReport ||
+      !kit.markCaseHandled ||
+      !kit.selectStore
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/** READ-ONLY dry-run：列 would-remind cases。`kit`/`store`/`now` 注入供測試。 */
+export async function runOverdueDryRunCommand(options = {}) {
+  const kit = options.kit ?? (await loadOverdueKit())
+  if (!kit) {
+    return 'OA 超時 dry-run · 失敗（overdue 模組未載入，請用 tsx 執行）'
+  }
+  const store = options.store ?? kit.selectStore()
+  const now = options.now ?? new Date().toISOString()
+  const cases = await store.listAll()
+  const wouldRemind = kit.listWouldRemindCases(cases, now)
+  return kit.formatOverdueDryRunReport(wouldRemind)
+}
+
+/** Ack 一個 case（與群內 @bot done 同 handler）。WRITES the store. */
+export async function runCaseDoneCommand(options = {}) {
+  const caseId = String(options.query ?? '').trim()
+  if (!caseId) {
+    return 'case-done · 失敗（請帶 caseId：npm run agent:case-done -- CW-0601-001）'
+  }
+  const kit = options.kit ?? (await loadOverdueKit())
+  if (!kit) {
+    return 'case-done · 失敗（overdue 模組未載入，請用 tsx 執行）'
+  }
+  const store = options.store ?? kit.selectStore()
+  const now = options.now ?? new Date().toISOString()
+  const result = await kit.markCaseHandled({
+    store,
+    caseId,
+    actor: options.actor ?? 'cli-operator',
+    now,
+  })
+  return result.replyText
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
@@ -1134,6 +1214,12 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'case-intake') {
     return runCaseIntakeCommand({ query, env: options.env ?? process.env })
+  }
+  if (commandText === 'overdue-dry-run') {
+    return runOverdueDryRunCommand({})
+  }
+  if (commandText === 'case-done') {
+    return runCaseDoneCommand({ query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

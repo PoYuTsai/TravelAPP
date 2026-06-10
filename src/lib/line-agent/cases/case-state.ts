@@ -148,6 +148,27 @@ export interface AgentCase {
 
   /** ISO-8601 time the above classification was computed. */
   latestClassifiedAt?: string
+
+  // ── OA 超時提醒（design 2026-06-10 §3 刀1）──────────────────────────────
+  // LINE webhook 看不到 OA 後台手動回覆 → 「回了沒」只能靠顯式 ack。
+  // handled 的判定是 DERIVED：handledAt >= lastCustomerMessageAt 才算已處理；
+  // 客人再發新訊息（lastCustomerMessageAt 前進）⇒ 自動回到未處理、重開計時。
+
+  /** ISO-8601 time of the last explicit `@bot done <caseId>` ack. */
+  handledAt?: string
+
+  /** Who acked（partner lineUserId or operator label）。 */
+  handledBy?: string
+
+  /**
+   * 本輪（自 lastCustomerMessageAt 起）已 surfaced 的提醒數 — 單 case 提醒
+   * 上限用（防無限重複）。新客人訊息到達時由 reducer 歸零。刀1 dry-run 只讀
+   * 不增；刀2 cron 真推時每推一次 +1。
+   */
+  reminderCount?: number
+
+  /** ISO-8601 time the last reminder was surfaced（刀2 安靜時段／每日上限用）。 */
+  lastReminderAt?: string
 }
 
 // ---------------------------------------------------------------------------

@@ -84,8 +84,9 @@ const REASON_ACTION: Record<ReminderReason, string> = {
 
 /**
  * Categories that must NEVER produce a reminder (守門：瀏覽不催 / 寒暄不催).
+ * Exported：overdue-reminder（§3 超時提醒）共用同一張表，兩層不得漂移。
  */
-const NON_REMINDABLE_CATEGORIES: ReadonlySet<CustomerEventCategory> =
+export const NON_REMINDABLE_CATEGORIES: ReadonlySet<CustomerEventCategory> =
   new Set<CustomerEventCategory>(['menu_browsing', 'non_actionable'])
 
 // ---------------------------------------------------------------------------
