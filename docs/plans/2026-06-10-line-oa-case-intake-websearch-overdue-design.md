@@ -1,6 +1,12 @@
 # LINE Agent 三方向設計 — 客需三分流／web search／OA 超時提醒
 
 > 日期：2026-06-10 · branch `codex/line-oa-agent-mvp` · 狀態：design 已過 Eric 確認
+>
+> **實作進度（2026-06-10）**：§1 deterministic 刀已完成（commits `38c3dab` 刀1 核心三模組、`e7f47ef` 刀2 接線+CLI）。
+> - 已上：三分流核心（`case-intake-triage`）、parser round-trip 閘（`customer-itinerary-roundtrip`，golden 7D6N 迴歸基準）、surfacing（`case-intake-surfacing`，觸發詞=客需/客人需求/整理需求/需求整理）、dispatcher 接線、`npm run agent:case-intake` dev harness。
+> - 閘：`AI_AGENT_CASE_INTAKE_ENABLED=true` 才會觸發，**default off，尚未開**。
+> - Spike 結論：`parseItineraryText` 對 golden 完美 round-trip；`parseBasicInfoText` 行首錨定吃不到 emoji header → 閘內前置剝 emoji，共用 parser 未動。
+> - 未做（下一刀=LLM enrichment，過三閘+cost cap）：充足度判斷潤飾、問法生成、行程草稿 JSON→composer→lint→round-trip 閘。已知 v1 瑕疵：日期摘要挑迄日、住宿地名誤入興趣清單。
 > 核心修正（兩次踩到同一個盲點）：**操作者是夥伴，不是 Eric**。客服／排行程／報價／銷售已外包給夥伴；任何要 Eric 動手輸入的形態（CLI 產品化）都是把工作收回來，一律否決。CLI 只能當 CC 的開發驗證 harness。
 
 ## 北極星（Eric 的產品方向）
