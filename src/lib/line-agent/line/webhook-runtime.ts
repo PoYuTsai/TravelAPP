@@ -36,6 +36,10 @@ import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ens
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { sanitizeQuotedBotContext } from '@/lib/line-agent/partner-group/quoted-draft-customer-reply'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
+import { createDailyCostCap } from '@/lib/line-agent/observability/daily-cost-cap'
+import { createKvClientFromEnv } from '@/lib/line-agent/storage/kv-store'
+import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
+import { randomUUID } from 'node:crypto'
 
 // ---------------------------------------------------------------------------
 // Routing seam — injectable handler
@@ -165,11 +169,23 @@ function mayProducePartnerGroupReply(
 }
 
 const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
+  // 0. P0-A 刀 2 — one requestId per inbound event; every log line this message
+  //    produces（收件→路由→LLM→送出）joins on it. The logger's field shapes are a
+  //    closed union（codes/numbers only）so a token / message body / PII has no
+  //    slot to leak through.
+  const log = createAgentLogger({ requestId: randomUUID() })
+
   // 1. Derive the runtime bot-addressed signal: mentionsBot OR a quote-reply to
   //    a bot-authored partner-group message (quote-to-bot plan §3).  Fail-safe
   //    inside (store read failure → false); the customer OA plane is always
   //    false, so a customer can never be auto-replied.
   const botDirected = await deriveBotDirected(event, store)
+
+  log('webhook_received', {
+    channel: event.sourceChannel === 'line_partner_group' ? 'partner_group' : 'oa',
+    messageKind: event.kind,
+    botDirected,
+  })
 
   // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
   //     the quoted bot draft (fail-safe inside) so the responder can turn it into
@@ -195,7 +211,10 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   //    replies.
   if (replyCandidate && event.messageId !== '') {
     const claimed = await store.claimPartnerReply(event.messageId)
-    if (!claimed) return
+    if (!claimed) {
+      log('reply_skipped', { sendOutcome: 'skipped', reason: 'duplicate_claim' })
+      return
+    }
   }
 
   // 4. Resolve the REAL (possibly billed) responder ONLY when this event could
@@ -213,6 +232,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     botDirected,
     quotedBotContent,
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
+    log,
   })
 
   // 5. Full send gate (post-routing) — the only place a reply is authorised.
@@ -222,30 +242,26 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
       const sentIds = await getReplyClient()(event.replyToken!, [
         { type: 'text', text: outboundText },
       ])
+      log('reply_sent', { sendOutcome: 'ok' })
       // 6. Record the bot-authored ids so a future quote-reply to THIS message
       //    is itself botDirected (quote-to-bot plan §4).  M3.6c also caches the
       //    OUTBOUND text so a later quote can carry this reply's content into the
       //    responder context.  Best-effort: a store write failure must NOT disturb
       //    the already-sent reply, so each write is guarded — the worst case is the
-      //    partner has to re-tag (and paste the draft) next time.
+      //    partner has to re-tag (and paste the draft) next time.  Code-only log:
+      //    the raw store error could echo a KV url.
       for (const id of sentIds) {
         try {
           await store.putBotAuthoredPartnerMsg(id, outboundText)
-        } catch (err) {
-          console.error(
-            '[line-agent] failed to record bot-authored partner msg id; reply already sent:',
-            err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-          )
+        } catch {
+          log('store_write_failed', { reason: 'bot_msg_record_failed' })
         }
       }
-    } catch (err) {
+    } catch {
       // §5: a reply failure must NOT propagate (no 500) and must NOT fall back
-      // to the customer plane or push.  Log a readable (non-minified) error and
-      // let the webhook ack 200.
-      console.error(
-        '[line-agent] partner-group reply failed; suppressed to keep webhook 200:',
-        err instanceof Error ? `${err.name}: ${err.message}` : String(err)
-      )
+      // to the customer plane or push.  Code-only log（the raw LINE error could
+      // echo the channel token）; the webhook still acks 200.
+      log('reply_sent', { sendOutcome: 'error', reason: 'line_reply_failed' })
     }
     return
   }
@@ -257,10 +273,17 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     !event.replyToken &&
     shouldReplyToPartnerGroup({ ...event, replyToken: 'probe' }, decision, botDirected)
   ) {
-    console.warn(
-      '[line-agent] partner-group respond decision had no replyToken; skipping reply'
-    )
+    log('reply_skipped', { sendOutcome: 'skipped', reason: 'missing_reply_token' })
+    return
   }
+
+  // Anything else that produced no send: not a reply candidate（OA / untagged /
+  // no token from the start）or a non-respond routing decision. One line so a
+  // message's trace always terminates in reply_sent OR reply_skipped.
+  log('reply_skipped', {
+    sendOutcome: 'skipped',
+    reason: replyCandidate ? 'send_gate' : 'not_reply_candidate',
+  })
 }
 
 let _eventHandler: NormalizedEventHandler = defaultEventHandler
@@ -351,6 +374,13 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
     const base = createPartnerGroupResponder({
       models: getPartnerResponderConfig(),
       transport: fetch,
+      // P0-A 刀 2 — daily LLM cost cap, KV-backed, 雙 fail-closed：cap env 未設
+      // 或 KV 未接/壞掉 ⇒ the adapter degrades to the stub and the LLM is never
+      // called. Constructing the KV client here is network-free.
+      costCap: createDailyCostCap({
+        env: process.env,
+        kv: createKvClientFromEnv(),
+      }),
     })
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
       base,

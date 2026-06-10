@@ -53,6 +53,12 @@ export interface KvClient {
    * existed.  This is the atomic primitive behind the partner-reply claim.
    */
   setIfAbsent(key: string, value: unknown): Promise<boolean>
+  /**
+   * INCRBY key by — integer accumulate; attach a TTL (seconds) when this call
+   * CREATES the key.  Resolves to the post-increment total.  This is the
+   * metering primitive behind the daily LLM cost cap（P0-A 刀 2）.
+   */
+  incrByWithTtl(key: string, by: number, ttlSeconds: number): Promise<number>
   del(...keys: string[]): Promise<unknown>
   /** RPUSH — append values to a Redis list */
   rpush(key: string, ...values: string[]): Promise<unknown>
@@ -96,6 +102,14 @@ function createUpstashKvClient(url: string, token: string): KvClient {
       const res = await redis.set(key, JSON.stringify(value), { nx: true })
       return res === 'OK'
     },
+    async incrByWithTtl(key: string, by: number, ttlSeconds: number): Promise<number> {
+      const total = await redis.incrby(key, by)
+      // The key was just CREATED iff the post-increment total equals this
+      // increment — only then attach the TTL.  Two concurrent first increments
+      // race benignly: exactly one of them observes total === by.
+      if (total === by) await redis.expire(key, ttlSeconds)
+      return total
+    },
     del(...keys: string[]): Promise<unknown> {
       return redis.del(...keys)
     },
@@ -109,6 +123,23 @@ function createUpstashKvClient(url: string, token: string): KvClient {
       return redis.keys(pattern)
     },
   }
+}
+
+/**
+ * Build a real Upstash-backed KvClient from env, or null when either
+ * `AGENT_KV_URL` / `AGENT_KV_TOKEN` is missing（fail closed — callers must
+ * treat null as "KV not wired"）.  Construction is network-free; only method
+ * calls hit the wire.  Shared by KvStore's env fallback and the daily cost
+ * cap（P0-A 刀 2）.
+ */
+export function createKvClientFromEnv(
+  env: Record<string, string | undefined> = typeof process !== 'undefined'
+    ? process.env
+    : {},
+): KvClient | null {
+  const url = (env.AGENT_KV_URL ?? '').trim()
+  const token = (env.AGENT_KV_TOKEN ?? '').trim()
+  return url !== '' && token !== '' ? createUpstashKvClient(url, token) : null
 }
 
 // ---------------------------------------------------------------------------
@@ -177,9 +208,7 @@ export class KvStore implements CaseStore {
     // KvNotConfiguredError (fail closed) instead of making surprise network
     // calls during env-less test runs.  Importing @upstash/redis has no side
     // effects; only constructing the client + calling methods hits the network.
-    const url = typeof process !== 'undefined' ? process.env.AGENT_KV_URL : undefined
-    const token = typeof process !== 'undefined' ? process.env.AGENT_KV_TOKEN : undefined
-    this.client = url && token ? createUpstashKvClient(url, token) : null
+    this.client = createKvClientFromEnv()
   }
 
   private ensureClient(): KvClient {

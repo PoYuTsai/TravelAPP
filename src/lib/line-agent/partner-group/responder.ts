@@ -19,6 +19,7 @@
 
 import type { CommandIntent } from '../commands/intent'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
+import type { AgentLogger } from '../observability/structured-log'
 
 export interface PartnerGroupRespondInput {
   /** The normalized partner-group event that mentioned the bot. */
@@ -49,6 +50,13 @@ export interface PartnerGroupRespondInput {
   quotedBotContent?: string
   /** Reserved — NOT wired to Notion/Google in this batch. */
   context?: unknown
+  /**
+   * Per-request structured logger（P0-A 刀 2）— bound to the inbound webhook
+   * event's requestId so every log entry this message produces can be joined on
+   * one id. Type-only import: the responder still performs no I/O of its own.
+   * Optional — consumers fall back to a '-' requestId logger when absent.
+   */
+  log?: AgentLogger
 }
 
 export interface PartnerGroupRespondResult {

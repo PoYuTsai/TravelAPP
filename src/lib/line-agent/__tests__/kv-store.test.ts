@@ -10,7 +10,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { KvStore, KvNotConfiguredError, type KvClient } from '../storage/kv-store'
+import {
+  KvStore,
+  KvNotConfiguredError,
+  createKvClientFromEnv,
+  type KvClient,
+} from '../storage/kv-store'
 import { runCaseStoreContract } from './case-store-contract'
 
 // ---------------------------------------------------------------------------
@@ -48,6 +53,12 @@ function makeMockKvClient(): KvClient {
       kv.set(key, JSON.stringify(value))
       return true
     },
+    async incrByWithTtl(key: string, by: number): Promise<number> {
+      // TTL not enforced in this in-memory mock (mirrors setWithTtl above).
+      const next = Number(kv.get(key) ?? 0) + by
+      kv.set(key, String(next))
+      return next
+    },
     async del(...keys: string[]): Promise<unknown> {
       let removed = 0
       for (const k of keys) {
@@ -84,6 +95,29 @@ function makeMockKvClient(): KvClient {
 // ---------------------------------------------------------------------------
 
 runCaseStoreContract('KvStore (mock client)', () => new KvStore(makeMockKvClient()))
+
+// ---------------------------------------------------------------------------
+// createKvClientFromEnv（P0-A 刀 2 — daily cost cap 的 env→client factory）
+// ---------------------------------------------------------------------------
+
+describe('createKvClientFromEnv', () => {
+  it('returns null when AGENT_KV_URL / AGENT_KV_TOKEN are missing (fail closed)', () => {
+    expect(createKvClientFromEnv({})).toBeNull()
+    expect(createKvClientFromEnv({ AGENT_KV_URL: 'https://x.upstash.io' })).toBeNull()
+    expect(createKvClientFromEnv({ AGENT_KV_TOKEN: 't' })).toBeNull()
+  })
+
+  it('returns a KvClient exposing incrByWithTtl when both env vars are present', () => {
+    // Constructing @upstash/redis is network-free; only method calls hit the wire.
+    const client = createKvClientFromEnv({
+      AGENT_KV_URL: 'https://example.upstash.io',
+      AGENT_KV_TOKEN: 'test-token',
+    })
+    expect(client).not.toBeNull()
+    expect(typeof client!.incrByWithTtl).toBe('function')
+    expect(typeof client!.get).toBe('function')
+  })
+})
 
 // ---------------------------------------------------------------------------
 // Bot-authored partner-group message store (quote-to-bot plan §2 / Task 1)

@@ -13,6 +13,7 @@
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { OperatorCommand } from '../operator/operator-command'
 import type { CommandIntent } from './intent'
+import type { AgentLogger } from '../observability/structured-log'
 import {
   stubPartnerGroupResponder,
   type PartnerGroupResponder,
@@ -113,7 +114,8 @@ export async function handleRespondToPartnerGroup(
   intent: CommandIntent,
   responder: PartnerGroupResponder = stubPartnerGroupResponder,
   botDirected?: boolean,
-  quotedBotContent?: string
+  quotedBotContent?: string,
+  log?: AgentLogger
 ): Promise<HandlerResult> {
   // The responder ONLY produces text; it never sends. Whether outboundText
   // actually reaches the group is decided by the router + permission layer.
@@ -134,6 +136,7 @@ export async function handleRespondToPartnerGroup(
     actor: { lineUserId: event.lineUserId },
     ...(botDirected !== undefined ? { botDirected } : {}),
     ...(quotedBotContent !== undefined ? { quotedBotContent } : {}),
+    ...(log !== undefined ? { log } : {}),
   })
 
   return {

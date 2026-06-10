@@ -45,6 +45,7 @@ import {
   stubPartnerGroupResponder,
   type PartnerGroupResponder,
 } from '../partner-group/responder'
+import type { AgentLogger } from '../observability/structured-log'
 
 // ---------------------------------------------------------------------------
 // Phase C dry-run quote payload
@@ -124,6 +125,12 @@ export interface RouterInput {
    * customer-summary path can fire. Absent ⇒ the responder fails closed.
    */
   quotedBotContent?: string
+  /**
+   * Per-request structured logger（P0-A 刀 2）— bound by the webhook to this
+   * event's requestId and threaded through to the responder so its llm_call /
+   * cost_cap / route_decision entries join the same trace. Optional.
+   */
+  log?: AgentLogger
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +281,8 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
           earlyIntent,
           input.partnerGroupResponder ?? stubPartnerGroupResponder,
           botDirected,
-          input.quotedBotContent
+          input.quotedBotContent,
+          input.log
         )
         return { action: 'respond', source, handlerResult, intent: earlyIntent }
       }

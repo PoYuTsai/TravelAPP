@@ -135,13 +135,14 @@ export function createRagPartnerGroupResponder(
           text: `${PARTNER_RAG_DRAFT_BANNER}\n${draft.text}`,
           meta: { responder: 'rag' },
         }
-      } catch (error) {
-        // Loud + observable (design §5) — non-minified so it can be traced.
-        const message = error instanceof Error ? error.message : String(error)
-        console.warn(
-          '[partner-rag-draft] internal case lookup failed — failing closed to ' +
-            `unavailable reply (no RAG draft produced): ${message}`,
-        )
+      } catch {
+        // Loud + observable (design §5), folded into the structured trace
+        // （P0-A 刀 2）. Code-only: the raw source error could echo a token /
+        // db id / notion.so url, so it never reaches the log.
+        respondInput.log?.('route_decision', {
+          path: 'rag_composer',
+          reason: 'partner_rag_source_failed',
+        })
         return {
           text: PARTNER_RAG_UNAVAILABLE_REPLY,
           meta: { responder: 'rag', degraded: true, error: 'partner_rag_source_failed' },

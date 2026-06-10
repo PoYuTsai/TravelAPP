@@ -16,6 +16,17 @@ import { stubPartnerGroupResponder } from '@/lib/line-agent/partner-group/respon
 import { AnthropicPartnerGroupResponder } from '@/lib/line-agent/partner-group/anthropic-responder'
 import type { PartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
+import type { DailyCostCap } from '@/lib/line-agent/observability/daily-cost-cap'
+
+/** Allow-all cost cap fake（P0-A 刀 2）— the factory itself never reads env. */
+const allowAllCostCap: DailyCostCap = {
+  async checkBudget() {
+    return { outcome: 'ok', dailySpendMicroUsd: 0 }
+  },
+  async recordSpend() {
+    return { recorded: true }
+  },
+}
 
 const ANTHROPIC_MODELS: PartnerResponderConfig = {
   partnerResponderMode: 'anthropic',
@@ -53,6 +64,7 @@ describe('createPartnerGroupResponder', () => {
     const responder = createPartnerGroupResponder({
       models: { ...ANTHROPIC_MODELS, partnerResponderMode: 'stub' },
       transport: neverCalledTransport,
+      costCap: allowAllCostCap,
     })
     expect(responder).toBe(stubPartnerGroupResponder)
   })
@@ -63,6 +75,7 @@ describe('createPartnerGroupResponder', () => {
     const responder = createPartnerGroupResponder({
       models: ANTHROPIC_MODELS,
       transport: neverCalledTransport,
+      costCap: allowAllCostCap,
     })
     expect(responder).toBeInstanceOf(AnthropicPartnerGroupResponder)
   })
@@ -75,6 +88,7 @@ describe('createPartnerGroupResponder', () => {
       const responder = createPartnerGroupResponder({
         models: { ...ANTHROPIC_MODELS, anthropicApiKey: '' },
         transport: neverCalledTransport,
+        costCap: allowAllCostCap,
       })
       // It is NOT the plain stub identity — it is a distinct degraded responder.
       expect(responder).not.toBe(stubPartnerGroupResponder)
@@ -101,6 +115,7 @@ describe('createPartnerGroupResponder', () => {
       const responder = createPartnerGroupResponder({
         models: { ...ANTHROPIC_MODELS, defaultModel: '' },
         transport: neverCalledTransport,
+        costCap: allowAllCostCap,
       })
       expect(responder).not.toBeInstanceOf(AnthropicPartnerGroupResponder)
 
@@ -121,6 +136,7 @@ describe('createPartnerGroupResponder', () => {
       const responder = createPartnerGroupResponder({
         models: { ...ANTHROPIC_MODELS, researchModel: '' },
         transport: neverCalledTransport,
+        costCap: allowAllCostCap,
       })
       expect(responder).not.toBeInstanceOf(AnthropicPartnerGroupResponder)
 
@@ -142,6 +158,7 @@ describe('createPartnerGroupResponder', () => {
       const responder = createPartnerGroupResponder({
         models: { ...ANTHROPIC_MODELS, partnerResponderMode: 'stub' },
         transport: neverCalledTransport,
+        costCap: allowAllCostCap,
       })
       // Env says anthropic, injected models say stub → must follow models.
       expect(responder).toBe(stubPartnerGroupResponder)

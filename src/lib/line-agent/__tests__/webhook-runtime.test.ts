@@ -32,6 +32,7 @@ import {
   QUOTED_DRAFT_CUSTOMER_REPLY,
   QUOTED_DRAFT_CONTENT_MISSING_REPLY,
 } from '../partner-group/quoted-draft-customer-reply'
+import { setDefaultAgentLogSink } from '../observability/structured-log'
 
 // Capture the pristine lazy defaults BEFORE any injection so afterEach can
 // restore them — the seams are module singletons and would otherwise leak.
@@ -41,6 +42,7 @@ const pristineReplyClient = getReplyClient()
 afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
+  setDefaultAgentLogSink(null)
   vi.restoreAllMocks()
 })
 
@@ -215,11 +217,12 @@ describe('webhook-runtime partner-group send gate', () => {
     expect(calls).toHaveLength(0)
   })
 
-  it('skips the reply (with a warning) when a respond decision has no replyToken', async () => {
+  it('skips the reply (with a structured reply_skipped log) when a respond decision has no replyToken', async () => {
     setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
     const { client, calls } = recordingReplyClient()
     setReplyClient(client)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
 
     await getEventHandler()(
       taggedPartnerGroupEvent({ replyToken: undefined }),
@@ -227,7 +230,8 @@ describe('webhook-runtime partner-group send gate', () => {
     )
 
     expect(calls).toHaveLength(0)
-    expect(warnSpy).toHaveBeenCalled()
+    const skipped = lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')
+    expect(skipped?.reason).toBe('missing_reply_token')
   })
 
   it('does not invoke the real responder for a tagged event with no replyToken (no wasted model call)', async () => {
@@ -243,7 +247,8 @@ describe('webhook-runtime partner-group send gate', () => {
     })
     const { client, calls } = recordingReplyClient()
     setReplyClient(client)
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
 
     await getEventHandler()(
       taggedPartnerGroupEvent({ replyToken: undefined }),
@@ -252,10 +257,12 @@ describe('webhook-runtime partner-group send gate', () => {
 
     expect(responderCalls).toBe(0)
     expect(calls).toHaveLength(0)
-    expect(warnSpy).toHaveBeenCalled()
+    expect(
+      lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')?.reason
+    ).toBe('missing_reply_token')
   })
 
-  it('suppresses a reply failure: no throw, keeps the webhook ack, logs a readable error', async () => {
+  it('suppresses a reply failure: no throw, keeps the webhook ack, logs a structured code-only error', async () => {
     setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
     setReplyClient(async () => {
       throw new LineApiError(
@@ -264,16 +271,18 @@ describe('webhook-runtime partner-group send gate', () => {
         'replyMessage failed with status 429: rate limited'
       )
     })
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
 
     await expect(
       getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
     ).resolves.toBeUndefined()
 
-    expect(errSpy).toHaveBeenCalled()
-    // Non-minified: the readable status/message must reach the log.
-    const logged = errSpy.mock.calls.flat().map(String).join(' ')
-    expect(logged).toContain('429')
+    // P0-A 刀 2 收編：traceable as a structured reply_sent error with a FIXED
+    // code — the raw LINE error (which could echo tokens) never reaches the log.
+    const sent = lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_sent')
+    expect(sent?.sendOutcome).toBe('error')
+    expect(sent?.reason).toBe('line_reply_failed')
   })
 })
 
@@ -429,13 +438,16 @@ describe('quote-to-bot runtime control flow', () => {
     setReplyClient(client)
     const spy = vi.fn()
     setPartnerGroupResponder(spyResponder(spy))
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
 
     await getEventHandler()(quoteEvent({ replyToken: undefined }), store)
 
     expect(calls).toHaveLength(0)
     expect(spy).not.toHaveBeenCalled()
-    expect(warn).toHaveBeenCalled()
+    expect(
+      lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')?.reason
+    ).toBe('missing_reply_token')
   })
 })
 
@@ -674,6 +686,9 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
     // `botDirected` is a documented PartnerGroupRespondInput key (mentionsBot OR
     // quote-to-bot), threaded by the router for the M3.2 dispatcher. It is a bare
     // boolean signal — NOT a send capability — so it does not weaken §6.6.
+    // `log` is a documented PartnerGroupRespondInput key（P0-A 刀 2）— a
+    // write-only telemetry sink with closed field shapes, NOT a send capability,
+    // so it does not weaken §6.6.
     const allowed = new Set([
       'event',
       'intent',
@@ -682,6 +697,7 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
       'caseId',
       'context',
       'botDirected',
+      'log',
     ])
     expect(capturedKeys.length).toBeGreaterThan(0)
     for (const key of capturedKeys) {

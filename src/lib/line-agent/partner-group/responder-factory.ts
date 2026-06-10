@@ -23,8 +23,10 @@ import {
 } from './responder'
 import { AnthropicPartnerGroupResponder } from './anthropic-responder'
 import type { PartnerResponderConfig } from './responder-config'
+import type { DailyCostCap } from '../observability/daily-cost-cap'
 import {
   shouldUsePartnerRagDraft,
+  isPartnerRagDraftEnabled,
   createRagPartnerGroupResponder,
   type PartnerRagDraftSource,
 } from './rag-draft-surfacing'
@@ -38,6 +40,12 @@ export interface CreatePartnerGroupResponderInput {
   models: PartnerResponderConfig
   /** Injected fetch-shaped transport for the real adapter. */
   transport: typeof fetch
+  /**
+   * Daily LLM cost cap（P0-A 刀 2）— REQUIRED and built by the caller（the
+   * factory still never reads env）. The stub paths ignore it; the real adapter
+   * fails closed on anything but `ok`.
+   */
+  costCap: DailyCostCap
 }
 
 /**
@@ -59,7 +67,7 @@ function createDegradedStubResponder(error: string): PartnerGroupResponder {
 export function createPartnerGroupResponder(
   input: CreatePartnerGroupResponderInput
 ): PartnerGroupResponder {
-  const { models, transport } = input
+  const { models, transport, costCap } = input
 
   if (models.partnerResponderMode !== 'anthropic') {
     return stubPartnerGroupResponder
@@ -90,6 +98,7 @@ export function createPartnerGroupResponder(
     apiKey: models.anthropicApiKey,
     defaultModel: models.defaultModel,
     researchModel: models.researchModel,
+    costCap,
   })
 }
 
@@ -144,6 +153,7 @@ export function createPartnerGroupResponderWithRagDraft(
           text: respondInput.text,
         })
       ) {
+        respondInput.log?.('route_decision', { path: 'quoted_draft' })
         return quotedDraftCustomerResponder.respond(respondInput)
       }
 
@@ -152,6 +162,12 @@ export function createPartnerGroupResponderWithRagDraft(
         botDirected,
         text: respondInput.text,
         env,
+      })
+      // P0-A 刀 2 — M3.6b 觀察缺口（gate-off 靜默落回 base）在這裡補上：path +
+      // gate STATE words only（enabled/disabled）— never an env var value.
+      respondInput.log?.('route_decision', {
+        path: useRag ? 'rag_composer' : 'base',
+        ragDraftGate: isPartnerRagDraftEnabled(env) ? 'enabled' : 'disabled',
       })
       return useRag
         ? ragResponder.respond(respondInput)

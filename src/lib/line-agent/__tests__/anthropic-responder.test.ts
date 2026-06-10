@@ -12,15 +12,41 @@
 import { describe, it, expect, vi } from 'vitest'
 import { AnthropicPartnerGroupResponder } from '@/lib/line-agent/partner-group/anthropic-responder'
 import { PARTNER_GROUP_SYSTEM_PROMPT } from '@/lib/line-agent/partner-group/system-prompt'
+import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
+import type { DailyCostCap, CostCapCheckOutcome } from '@/lib/line-agent/observability/daily-cost-cap'
 import type {
   PartnerGroupRespondInput,
 } from '@/lib/line-agent/partner-group/responder'
 import type { IntentAction } from '@/lib/line-agent/commands/intent'
 
+/** Allow-all cost cap fake — budget always ok; records every spend（P0-A 刀 2）. */
+function makeCostCap(outcome: CostCapCheckOutcome = 'ok', recorded = true) {
+  const spends: number[] = []
+  const costCap: DailyCostCap = {
+    async checkBudget() {
+      return { outcome, dailySpendMicroUsd: 0 }
+    },
+    async recordSpend(usd: number) {
+      spends.push(usd)
+      return { recorded }
+    },
+  }
+  return { costCap, spends }
+}
+
+/** Collecting structured logger bound to a fixed requestId. */
+function makeLog() {
+  const lines: string[] = []
+  const log = createAgentLogger({ requestId: 'req-test', sink: (l) => lines.push(l) })
+  const entries = () => lines.map((l) => JSON.parse(l))
+  return { log, entries }
+}
+
 const DEPS = {
   apiKey: 'sk-ant-test',
   defaultModel: 'claude-default',
   researchModel: 'claude-research',
+  costCap: makeCostCap().costCap,
 }
 
 function makeInput(action: IntentAction = 'analyze', text = '@bot 看一下這團'): PartnerGroupRespondInput {
@@ -109,60 +135,133 @@ describe('AnthropicPartnerGroupResponder — request contract', () => {
 })
 
 describe('AnthropicPartnerGroupResponder — safe-default error paths (never throws)', () => {
-  it('transport throw → stub text + degraded + error=anthropic_api_error', async () => {
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const transport = (async () => {
-        throw new Error('network down')
-      }) as unknown as typeof fetch
-      const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+  it('transport throw → stub text + degraded + error=anthropic_api_error（structured llm_call log）', async () => {
+    const transport = (async () => {
+      throw new Error('network down')
+    }) as unknown as typeof fetch
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+    const { log, entries } = makeLog()
 
-      const result = await responder.respond(makeInput('analyze'))
+    const result = await responder.respond({ ...makeInput('analyze'), log })
 
-      expect(result.text).toContain('收到，我先記下來')
-      expect(result.meta?.responder).toBe('stub')
-      expect(result.meta?.degraded).toBe(true)
-      expect(result.meta?.error).toBe('anthropic_api_error')
-      expect(result.meta?.model).toBe('claude-default') // the attempted model
-      expect(err).toHaveBeenCalled()
-    } finally {
-      err.mockRestore()
-    }
+    expect(result.text).toContain('收到，我先記下來')
+    expect(result.meta?.responder).toBe('stub')
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('anthropic_api_error')
+    expect(result.meta?.model).toBe('claude-default') // the attempted model
+    const llm = entries().find((e) => e.event === 'llm_call')
+    expect(llm?.outcome).toBe('degraded')
+    expect(llm?.degradedReason).toBe('anthropic_api_error')
   })
 
-  it('non-200 → stub text + degraded + error=anthropic_non_200', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const { transport } = fakeTransport({ ok: false, status: 500, jsonValue: {} })
-      const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+  it('non-200 → stub text + degraded + error=anthropic_non_200（log 帶 httpStatus）', async () => {
+    const { transport } = fakeTransport({ ok: false, status: 500, jsonValue: {} })
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+    const { log, entries } = makeLog()
 
-      const result = await responder.respond(makeInput('analyze'))
+    const result = await responder.respond({ ...makeInput('analyze'), log })
 
-      expect(result.text).toContain('收到，我先記下來')
-      expect(result.meta?.degraded).toBe(true)
-      expect(result.meta?.error).toBe('anthropic_non_200')
-    } finally {
-      warn.mockRestore()
-      errSpy.mockRestore()
-    }
+    expect(result.text).toContain('收到，我先記下來')
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('anthropic_non_200')
+    const llm = entries().find((e) => e.event === 'llm_call')
+    expect(llm?.degradedReason).toBe('anthropic_non_200')
+    expect(llm?.httpStatus).toBe(500)
   })
 
   it('unparseable success body → stub text + degraded + error=anthropic_parse_error', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    try {
-      const { transport } = fakeTransport({ ok: true, status: 200, jsonValue: { content: [] } })
-      const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+    const { transport } = fakeTransport({ ok: true, status: 200, jsonValue: { content: [] } })
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+    const { log, entries } = makeLog()
 
-      const result = await responder.respond(makeInput('analyze'))
+    const result = await responder.respond({ ...makeInput('analyze'), log })
 
-      expect(result.text).toContain('收到，我先記下來')
-      expect(result.meta?.degraded).toBe(true)
-      expect(result.meta?.error).toBe('anthropic_parse_error')
-    } finally {
-      warn.mockRestore()
-      errSpy.mockRestore()
-    }
+    expect(result.text).toContain('收到，我先記下來')
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('anthropic_parse_error')
+    expect(entries().find((e) => e.event === 'llm_call')?.degradedReason).toBe(
+      'anthropic_parse_error',
+    )
+  })
+})
+
+describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 fail-closed）', () => {
+  const OK_BODY_WITH_USAGE = {
+    content: [{ type: 'text', text: '建議先確認人數與日期。' }],
+    usage: { input_tokens: 421, output_tokens: 96 },
+  }
+
+  it.each([
+    ['over_cap', 'cost_cap_exceeded'],
+    ['disabled', 'cost_cap_disabled'],
+    ['kv_unavailable', 'cost_cap_kv_unavailable'],
+  ] as const)('checkBudget=%s → transport NOT called, degraded error=%s', async (outcome, error) => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY_WITH_USAGE })
+    const { costCap, spends } = makeCostCap(outcome)
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS, costCap })
+    const { log, entries } = makeLog()
+
+    const result = await responder.respond({ ...makeInput('analyze'), log })
+
+    expect(calls).toHaveLength(0) // LLM 沒被打 — fail-closed
+    expect(spends).toHaveLength(0)
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe(error)
+    expect(result.text).toContain('收到，我先記下來')
+    const cap = entries().find((e) => e.event === 'cost_cap')
+    expect(cap?.checkOutcome).toBe(outcome)
+  })
+
+  it('budget ok → calls LLM, then records the usage-estimated spend', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY_WITH_USAGE })
+    const { costCap, spends } = makeCostCap('ok')
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS, costCap })
+    const { log, entries } = makeLog()
+
+    const result = await responder.respond({ ...makeInput('analyze'), log })
+
+    expect(calls).toHaveLength(1)
+    expect(result.meta?.responder).toBe('llm')
+    // 'claude-default' 不在 family 表 → 最貴費率（sonnet $3/$15）
+    const expected = (421 / 1_000_000) * 3 + (96 / 1_000_000) * 15
+    expect(spends).toHaveLength(1)
+    expect(spends[0]).toBeCloseTo(expected, 12)
+
+    const llm = entries().find((e) => e.event === 'llm_call')
+    expect(llm?.outcome).toBe('ok')
+    expect(llm?.model).toBe('claude-default')
+    expect(llm?.inputTokens).toBe(421)
+    expect(llm?.outputTokens).toBe(96)
+    expect(llm?.costUsd).toBeCloseTo(expected, 12)
+    expect(typeof llm?.latencyMs).toBe('number')
+  })
+
+  it('usage missing from the response → conservative estimate is still recorded（usageMissing 標記）', async () => {
+    const { transport } = fakeTransport({ jsonValue: OK_BODY }) // 無 usage 欄位
+    const { costCap, spends } = makeCostCap('ok')
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS, costCap })
+    const { log, entries } = makeLog()
+
+    const result = await responder.respond({ ...makeInput('analyze'), log })
+
+    expect(result.meta?.responder).toBe('llm')
+    expect(spends).toHaveLength(1)
+    expect(spends[0]).toBeGreaterThan(0) // 保守估值，絕不記 0
+    expect(entries().find((e) => e.event === 'llm_call')?.usageMissing).toBe(true)
+  })
+
+  it('recordSpend failure → reply is NOT dropped; cost_cap log carries reason=record_failed', async () => {
+    const { transport } = fakeTransport({ jsonValue: OK_BODY_WITH_USAGE })
+    const { costCap } = makeCostCap('ok', /* recorded */ false)
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS, costCap })
+    const { log, entries } = makeLog()
+
+    const result = await responder.respond({ ...makeInput('analyze'), log })
+
+    // 已付費的回覆照常送出
+    expect(result.text).toBe('建議先確認人數與日期。')
+    expect(result.meta?.responder).toBe('llm')
+    const capEvents = entries().filter((e) => e.event === 'cost_cap')
+    expect(capEvents.some((e) => e.reason === 'record_failed')).toBe(true)
   })
 })

@@ -1,0 +1,115 @@
+/**
+ * structured-log.ts — P0-A 刀 2 minimal observability（design
+ * docs/plans/2026-06-10-p0a-cut2-minimal-observability-design.md）。
+ *
+ * Single-line JSON logger for the LINE agent webhook chain. One logger instance
+ * per inbound webhook event carries ONE requestId, so every entry a message
+ * produces（收件 → 路由決策 → LLM 結果 → 送出）can be joined on that id.
+ *
+ * MASKED BY CONSTRUCTION：`AgentLogFields` is a closed union of per-event field
+ * shapes — enum-ish codes, counts, and numbers only. There is no free-text
+ * field, so a token / db id / message body / PII has no slot to leak through.
+ * Never widen a field to `string` carrying user content; add a new code value
+ * instead.
+ *
+ * The sink is injected (tests collect lines); default is `console.log`, which
+ * Vercel captures as one structured log line per call.
+ */
+
+/** Closed set of log events（design 表格 + store_write_failed bookkeeping）。 */
+export type AgentLogEvent =
+  | 'webhook_received'
+  | 'route_decision'
+  | 'llm_call'
+  | 'cost_cap'
+  | 'reply_sent'
+  | 'reply_skipped'
+  | 'store_write_failed'
+
+/** Per-event closed field shapes. All values are codes / numbers / booleans. */
+export interface AgentLogFieldsByEvent {
+  webhook_received: {
+    channel?: 'oa' | 'partner_group'
+    messageKind?: string
+    botDirected?: boolean
+  }
+  route_decision: {
+    path?: 'rag_composer' | 'quoted_draft' | 'base' | 'no_reply'
+    /** Gate STATE words only（enabled/disabled）— never an env var value. */
+    ragDraftGate?: 'enabled' | 'disabled'
+    reason?: string
+  }
+  llm_call: {
+    model?: string
+    latencyMs?: number
+    inputTokens?: number
+    outputTokens?: number
+    costUsd?: number
+    outcome?: 'ok' | 'degraded'
+    /** Fixed sanitized code（e.g. cost_cap_exceeded / anthropic_api_error）。 */
+    degradedReason?: string
+    /** HTTP status of a non-200 Anthropic response（a number, never a body）。 */
+    httpStatus?: number
+    /** True when the response carried no usage and tokens were estimated. */
+    usageMissing?: boolean
+  }
+  cost_cap: {
+    checkOutcome?: 'ok' | 'over_cap' | 'kv_unavailable' | 'disabled'
+    /** 當日累計（micro-USD 整數）— a count, never a secret. */
+    dailySpendMicroUsd?: number
+    reason?: string
+  }
+  reply_sent: {
+    sendOutcome?: 'ok' | 'error'
+    reason?: string
+  }
+  reply_skipped: {
+    sendOutcome?: 'skipped'
+    reason?: string
+  }
+  store_write_failed: {
+    /** Fixed code（e.g. bot_msg_record_failed）— never the raw store error. */
+    reason?: string
+  }
+}
+
+export type AgentLogger = <E extends AgentLogEvent>(
+  event: E,
+  fields?: AgentLogFieldsByEvent[E],
+) => void
+
+export interface CreateAgentLoggerDeps {
+  /** Correlation id：webhook 收件時生成，貫穿該則訊息所有 log 行。 */
+  requestId: string
+  /** Line sink。預設 console.log；測試注入收集器。 */
+  sink?: (line: string) => void
+}
+
+/**
+ * Module-level default-sink override. Lets a test capture the lines a
+ * deep-in-the-chain logger (built without an explicit sink) would print to
+ * console.log. Production never calls this; pass null to restore the default.
+ */
+let _defaultSink: ((line: string) => void) | null = null
+
+/** Override the default sink (tests only — restore with null in afterEach). */
+export function setDefaultAgentLogSink(sink: ((line: string) => void) | null): void {
+  _defaultSink = sink
+}
+
+/** Build a logger bound to one requestId. Each call emits ONE JSON line. */
+export function createAgentLogger(deps: CreateAgentLoggerDeps): AgentLogger {
+  const sink = deps.sink ?? _defaultSink ?? ((line: string) => console.log(line))
+  const requestId = deps.requestId
+
+  return (event, fields) => {
+    sink(
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        requestId,
+        event,
+        ...(fields ?? {}),
+      }),
+    )
+  }
+}
