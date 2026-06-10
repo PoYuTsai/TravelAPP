@@ -34,6 +34,10 @@ import {
   shouldUseQuotedDraftCustomerReply,
   quotedDraftCustomerResponder,
 } from './quoted-draft-customer-reply'
+import {
+  shouldUseCaseIntake,
+  caseIntakeResponder,
+} from './case-intake-surfacing'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -155,6 +159,21 @@ export function createPartnerGroupResponderWithRagDraft(
       ) {
         respondInput.log?.('route_decision', { path: 'quoted_draft' })
         return quotedDraftCustomerResponder.respond(respondInput)
+      }
+
+      // 客需三分流（design 2026-06-10 §1）— deterministic intake triage. Checked
+      // AFTER quoted_draft（quote-to-bot 語意更明確）、BEFORE rag（intake 純函式
+      // 零 I/O，且兩邊觸發詞彙刻意不重疊）. Gate default off ⇒ 完全不影響現行
+      // 行為；responder 自己 log path + flow.
+      if (
+        shouldUseCaseIntake({
+          sourceChannel: respondInput.event.sourceChannel,
+          botDirected,
+          text: respondInput.text,
+          env,
+        })
+      ) {
+        return caseIntakeResponder.respond(respondInput)
       }
 
       const useRag = shouldUsePartnerRagDraft({

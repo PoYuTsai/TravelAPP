@@ -105,9 +105,14 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'partner-rag-path-trace', query }
   }
+  if (command === 'case-intake' || command === '/case-intake') {
+    // The remaining args form the raw customer requirement text.
+    const query = args.slice(1).join(' ').trim()
+    return { commandText: 'case-intake', query }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake'
   )
 }
 
@@ -952,6 +957,60 @@ export async function runPartnerRagPathTraceCommand(options = {}) {
   return traceKit.formatPartnerRagPathTrace(trace, text)
 }
 
+// ---------------------------------------------------------------------------
+// case-intake — OFFLINE 客需三分流 dev harness（design 2026-06-10 §1）
+// ---------------------------------------------------------------------------
+// CLI 僅為 CC 的開發驗證 harness（非產品；產品形態是夥伴群 @bot）。純函式：
+// 不碰 LINE / Notion / LLM / gate，吃裸客需文字，回三分流結果＋回覆草稿。
+
+/**
+ * GUARD-loaded dynamic import of the pure TS triage core — same pattern as
+ * loadPartnerRagPathTraceKit: under plain `node` the `.ts` import throws and is
+ * swallowed → null, so the command surfaces a wiring message rather than crash.
+ */
+export async function loadCaseIntakeKit(ctx = {}) {
+  const {
+    importModule = () => import('../src/lib/line-agent/partner-group/case-intake-triage.ts'),
+  } = ctx
+  try {
+    const mod = await importModule()
+    if (!mod?.triageCaseIntake) return null
+    return { triageCaseIntake: mod.triageCaseIntake }
+  } catch {
+    return null
+  }
+}
+
+const CASE_INTAKE_FLOW_LABELS = {
+  insufficient: '資訊不足（缺項模式）',
+  sufficient: '資訊已齊',
+  tricky: '需 Eric 確認',
+}
+
+/** Run the case-intake command offline. `kit` is injected in tests. */
+export async function runCaseIntakeCommand(options = {}) {
+  const text = String(options.query ?? '').trim()
+  if (!text) {
+    return '客需三分流 · 失敗（請帶客需文字：npm run agent:case-intake -- "客需內容"）'
+  }
+
+  const kit = options.kit ?? (await loadCaseIntakeKit())
+  if (!kit?.triageCaseIntake) {
+    return '客需三分流 · 失敗（triage 模組未載入，請用 tsx 執行）'
+  }
+
+  const result = kit.triageCaseIntake(text)
+  const lines = [
+    `客需三分流 · ${CASE_INTAKE_FLOW_LABELS[result.flow] ?? result.flow}（flow=${result.flow}）`,
+    result.missingFields.length > 0 ? `缺項：${result.missingFields.join('、')}` : '缺項：無',
+  ]
+  if (result.trickyReasons.length > 0) {
+    lines.push(`棘手原因：${result.trickyReasons.join('；')}`)
+  }
+  lines.push('--- 回覆草稿（夥伴群 would-be reply）---', result.replyText)
+  return lines.join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
@@ -971,6 +1030,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'partner-rag-path-trace') {
     return runPartnerRagPathTraceCommand({ env: options.env ?? process.env, query })
+  }
+  if (commandText === 'case-intake') {
+    return runCaseIntakeCommand({ query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
