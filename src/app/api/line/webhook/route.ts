@@ -110,6 +110,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   let persistenceFailed = false
   for (const rawEvent of rawEvents) {
     try {
+      // TEMP(P0-A 刀4): capture unmatched group ids for the partner-group
+      // switchover. Log-only — routing below is unchanged (unmatched groups
+      // are still dropped by normalizeLineEvent). REVERT after capture.
+      const tempSrc = (rawEvent as Record<string, any>)?.source
+      if (tempSrc?.type === 'group' && tempSrc.groupId && tempSrc.groupId !== partnerGroupId) {
+        console.log(JSON.stringify({ event: 'temp_group_capture', groupId: tempSrc.groupId }))
+      }
+
       const normalized = normalizeLineEvent(rawEvent as Record<string, any>, partnerGroupId, botUserId)
       if (normalized === null) continue // skip non-actionable / non-partner / room events
 
