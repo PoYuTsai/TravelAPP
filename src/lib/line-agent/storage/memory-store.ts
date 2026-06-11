@@ -11,6 +11,7 @@
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
+import type { DistillPendingBatch } from '../distill/pending'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -55,6 +56,12 @@ export class MemoryStore implements CaseStore {
    * In-memory 不模擬 TTL（同其他 marker 的慣例）；30 天滾動窗只在 KV 層成立。
    */
   private readonly transcriptEntries = new Map<string, TranscriptEntry>()
+
+  /**
+   * 沉澱過目 pending batch（刀2，NOT case state）— groupId → batch。
+   * Singleton per groupId、覆寫語意；in-memory 不模擬 TTL（同上慣例）。
+   */
+  private readonly distillPending = new Map<string, DistillPendingBatch>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -197,5 +204,25 @@ export class MemoryStore implements CaseStore {
 
   async listTranscriptEntries(): Promise<TranscriptEntry[]> {
     return Array.from(this.transcriptEntries.values()).map((e) => ({ ...e }))
+  }
+
+  // ── 沉澱刀2：markTranscriptDistilled＋pending batch ─────────────────────────
+
+  async markTranscriptDistilled(messageId: string): Promise<void> {
+    const existing = this.transcriptEntries.get(messageId)
+    if (!existing) return
+    this.transcriptEntries.set(messageId, { ...existing, distilled: true })
+  }
+
+  async putDistillPending(batch: DistillPendingBatch): Promise<void> {
+    if (batch.groupId === '') return
+    // Deep copy（structuredClone）— batch 有巢狀 candidates/resolved，
+    // shallow copy 擋不住呼叫端透過引用改已存紀錄。
+    this.distillPending.set(batch.groupId, structuredClone(batch))
+  }
+
+  async getDistillPending(groupId: string): Promise<DistillPendingBatch | null> {
+    if (groupId === '') return null
+    return structuredClone(this.distillPending.get(groupId) ?? null)
   }
 }

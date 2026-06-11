@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { CaseStore } from '../storage/store'
 import { createInitialCase, type AgentCase } from '../cases/case-state'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
+import type { DistillPendingBatch } from '../distill/pending'
 
 const T0 = '2026-06-01T08:00:00.000Z'
 const T1 = '2026-06-01T09:00:00.000Z'
@@ -337,6 +338,89 @@ export function runCaseStoreContract(
     it('transcript entries never leak into the case plane (listAll)', async () => {
       await store.putTranscriptEntry(makeTranscriptEntry())
       expect(await store.listAll()).toEqual([])
+    })
+
+    // ── 沉澱刀2：markTranscriptDistilled ─────────────────────────────────────
+    // 批次沉澱掃過的 entry 標 distilled=true（避免重複掃）。標記絕不重設
+    // TTL — 隱私滾動窗不得因掃描而延長（KV 層另有專測）。
+
+    it('markTranscriptDistilled sets distilled=true and keeps every other field', async () => {
+      const entry = makeTranscriptEntry({ quotedMessageId: 'MQ9' })
+      await store.putTranscriptEntry(entry)
+      await store.markTranscriptDistilled('MT001')
+      const got = await store.getTranscriptEntry('MT001')
+      expect(got).toEqual({ ...entry, distilled: true })
+    })
+
+    it('markTranscriptDistilled on an unknown messageId is a no-op (no throw)', async () => {
+      await expect(
+        store.markTranscriptDistilled('M_NOPE')
+      ).resolves.not.toThrow()
+      expect(await store.listTranscriptEntries()).toEqual([])
+    })
+
+    it('markTranscriptDistilled with empty messageId is a no-op', async () => {
+      await expect(store.markTranscriptDistilled('')).resolves.not.toThrow()
+    })
+
+    // ── 沉澱刀2：distill pending batch（過目清單）────────────────────────────
+    // singleton per groupId、覆寫語意 — 同一群同時只有一份待過目清單。
+
+    function makePendingBatch(
+      overrides: Partial<DistillPendingBatch> = {}
+    ): DistillPendingBatch {
+      return {
+        groupId: 'G_partner',
+        createdAt: 1_700_000_000_000,
+        candidates: [
+          {
+            id: 1,
+            question: '高山行程2月可以走嗎',
+            answer: '2月乾季可以走，建議帶薄外套',
+            sourceMessageIds: ['MT001', 'MT002'],
+            occurrences: 3,
+            status: 'pending',
+            missedCount: 0,
+          },
+        ],
+        resolved: [
+          {
+            id: 2,
+            question: '機場接送幾點前要訂',
+            answer: '前一天 18:00 前',
+            sourceMessageIds: ['MT003'],
+            occurrences: 2,
+            status: 'modified',
+            modifiedAnswer: '前一天 20:00 前都可以',
+            missedCount: 1,
+          },
+        ],
+        ...overrides,
+      }
+    }
+
+    it('putDistillPending then getDistillPending round-trips the batch (nested fields intact)', async () => {
+      const batch = makePendingBatch()
+      await store.putDistillPending(batch)
+      const got = await store.getDistillPending('G_partner')
+      expect(got).toEqual(batch)
+      expect(got?.candidates[0].sourceMessageIds).toEqual(['MT001', 'MT002'])
+      expect(got?.resolved[0].modifiedAnswer).toBe('前一天 20:00 前都可以')
+    })
+
+    it('getDistillPending returns null for unknown and empty groupId', async () => {
+      expect(await store.getDistillPending('G_NOPE')).toBeNull()
+      expect(await store.getDistillPending('')).toBeNull()
+    })
+
+    it('a second putDistillPending for the same groupId overwrites (singleton)', async () => {
+      await store.putDistillPending(makePendingBatch())
+      await store.putDistillPending(
+        makePendingBatch({ createdAt: 1_700_000_999_000, resolved: [] })
+      )
+      const got = await store.getDistillPending('G_partner')
+      expect(got?.createdAt).toBe(1_700_000_999_000)
+      expect(got?.resolved).toEqual([])
     })
   })
 }

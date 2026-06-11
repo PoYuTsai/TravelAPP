@@ -8,6 +8,7 @@
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
+import type { DistillPendingBatch } from '../distill/pending'
 
 /**
  * Max characters of bot-authored message content cached for quote-to-bot
@@ -154,4 +155,18 @@ export interface CaseStore {
    * KV 實作走 keys-scan — 不在 webhook 熱路徑上呼叫。
    */
   listTranscriptEntries(): Promise<TranscriptEntry[]>
+
+  // ── 沉澱刀2：批次沉澱＋過目 pending batch ─────────────────────────────────
+
+  /**
+   * 把一筆 transcript entry 標為已沉澱（distilled=true），**保留剩餘 TTL** —
+   * 絕不重設 30 天（隱私滾動窗不得因掃描而延長）。entry 不存在/已過期＝no-op。
+   */
+  markTranscriptDistilled(messageId: string): Promise<void>
+
+  /** 寫入該群的沉澱過目 pending batch（singleton per groupId，覆寫語意）。 */
+  putDistillPending(batch: DistillPendingBatch): Promise<void>
+
+  /** 讀該群 pending batch；不存在回 null。 */
+  getDistillPending(groupId: string): Promise<DistillPendingBatch | null>
 }

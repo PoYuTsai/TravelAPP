@@ -18,6 +18,7 @@ import { Redis } from '@upstash/redis'
 import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
+import type { DistillPendingBatch } from '../distill/pending'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -70,6 +71,8 @@ export interface KvClient {
   lrange(key: string, start: number, stop: number): Promise<string[]>
   /** KEYS — match keys by pattern (avoid in hot paths; used for listAll) */
   keys(pattern: string): Promise<string[]>
+  /** TTL key — 剩餘秒數；無 TTL 回 -1、key 不存在回 -2（Redis 語意）。 */
+  ttl(key: string): Promise<number>
 }
 
 // ---------------------------------------------------------------------------
@@ -126,6 +129,9 @@ function createUpstashKvClient(url: string, token: string): KvClient {
     keys(pattern: string): Promise<string[]> {
       return redis.keys(pattern)
     },
+    ttl(key: string): Promise<number> {
+      return redis.ttl(key)
+    },
   }
 }
 
@@ -177,6 +183,10 @@ const PARTNER_GROUP_IMG_TTL_SECONDS = 604800 // 7 days
 // 覆寫＝LINE at-least-once 冪等。
 const TRANSCRIPT_PREFIX = 'line-agent:transcript:'
 const TRANSCRIPT_TTL_SECONDS = 2_592_000 // 30 days
+// 沉澱過目 pending batch（刀2）— singleton per groupId。TTL 30 天：candidates
+// 的源頭 transcript 最多也只活 30 天，掛更久沒有意義。
+const DISTILL_PENDING_PREFIX = 'line-agent:distill-pending:'
+const DISTILL_PENDING_TTL_SECONDS = 2_592_000 // 30 days
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -396,5 +406,36 @@ export class KvStore implements CaseStore {
     if (keys.length === 0) return []
     const entries = await Promise.all(keys.map((k) => kv.get<TranscriptEntry>(k)))
     return entries.filter((e): e is TranscriptEntry => e !== null)
+  }
+
+  // ── 沉澱刀2：markTranscriptDistilled＋pending batch ─────────────────────────
+
+  async markTranscriptDistilled(messageId: string): Promise<void> {
+    if (messageId === '') return
+    const kv = this.ensureClient()
+    const key = transcriptKey(messageId)
+    const entry = await kv.get<TranscriptEntry>(key)
+    if (entry === null) return
+    // 保留剩餘 TTL：先讀 TTL 再以同值覆寫。讀寫間若恰好過期（ttl ≤ 0），
+    // 跳過 — 寧可漏標（重掃一次）也絕不把 30 天窗變永久。
+    const remaining = await kv.ttl(key)
+    if (remaining <= 0) return
+    await kv.setWithTtl(key, { ...entry, distilled: true }, remaining)
+  }
+
+  async putDistillPending(batch: DistillPendingBatch): Promise<void> {
+    if (batch.groupId === '') return
+    const kv = this.ensureClient()
+    await kv.setWithTtl(
+      `${DISTILL_PENDING_PREFIX}${batch.groupId}`,
+      batch,
+      DISTILL_PENDING_TTL_SECONDS,
+    )
+  }
+
+  async getDistillPending(groupId: string): Promise<DistillPendingBatch | null> {
+    if (groupId === '') return null
+    const kv = this.ensureClient()
+    return kv.get<DistillPendingBatch>(`${DISTILL_PENDING_PREFIX}${groupId}`)
   }
 }

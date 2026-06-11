@@ -86,6 +86,12 @@ function makeMockKvClient(): KvClient {
       }
       return Array.from(kv.keys()).filter((k) => k === pattern)
     },
+    async ttl(key: string): Promise<number> {
+      // TTL is not tracked in this mock: existing key → a positive remainder
+      // (so markTranscriptDistilled's preserve-TTL rewrite proceeds); missing
+      // key → -2 (Redis semantics).
+      return kv.has(key) ? 999 : -2
+    },
   }
 }
 
@@ -238,6 +244,73 @@ describe('bot-authored partner message content cache', () => {
     }
     expect(await new KvStore(client).getBotAuthoredPartnerMsgContent('')).toBeNull()
     expect(getCalls).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// markTranscriptDistilled — TTL 保留語意（沉澱刀2）
+// 標記絕不延長 30 天滾動窗：先讀剩餘 TTL，再以同值覆寫；讀寫間恰好過期
+// （ttl ≤ 0）就跳過 — 寧可漏標也絕不把滾動窗變永久。
+// ---------------------------------------------------------------------------
+
+describe('markTranscriptDistilled TTL preservation (KvStore)', () => {
+  it('rewrites the entry with the REMAINING ttl, not a fresh 30 days', async () => {
+    const calls: Array<{ key: string; value: unknown; ttl: number }> = []
+    const base = makeMockKvClient()
+    const client: KvClient = {
+      ...base,
+      async setWithTtl(key, value, ttl) {
+        calls.push({ key, value, ttl })
+        return base.setWithTtl(key, value, ttl)
+      },
+      async ttl() {
+        return 12345 // 剩 12345 秒（遠小於 30 天）
+      },
+    }
+    const store = new KvStore(client)
+    await store.putTranscriptEntry({
+      messageId: 'MT001',
+      groupId: 'G_partner',
+      lineUserId: 'U_tsai',
+      timestamp: 1_700_000_000_000,
+      kind: 'text',
+      text: '高山行程2月可以走嗎',
+    })
+    calls.length = 0 // 只看 mark 那次寫入
+
+    await store.markTranscriptDistilled('MT001')
+    expect(calls).toHaveLength(1)
+    expect(calls[0].key).toBe('line-agent:transcript:MT001')
+    expect(calls[0].ttl).toBe(12345)
+    expect((calls[0].value as { distilled?: boolean }).distilled).toBe(true)
+  })
+
+  it('skips the write when the key expired between read and ttl (ttl = -2)', async () => {
+    const writes: string[] = []
+    const base = makeMockKvClient()
+    const client: KvClient = {
+      ...base,
+      async setWithTtl(key, value, ttl) {
+        writes.push(key)
+        return base.setWithTtl(key, value, ttl)
+      },
+      async ttl() {
+        return -2 // Redis：key 不存在
+      },
+    }
+    const store = new KvStore(client)
+    // 直接塞底層 base，繞過 setWithTtl 記錄（模擬「get 還讀得到、ttl 已 -2」）
+    await base.setWithTtl('line-agent:transcript:MT001', {
+      messageId: 'MT001',
+      groupId: 'G_partner',
+      lineUserId: 'U_tsai',
+      timestamp: 1_700_000_000_000,
+      kind: 'text',
+      text: 'x',
+    }, 1)
+
+    await store.markTranscriptDistilled('MT001')
+    expect(writes).toHaveLength(0) // 絕不覆寫
   })
 })
 
