@@ -250,4 +250,27 @@ describe('webhook distill seam（沉澱刀2 接線）', () => {
       (await store.getBotAuthoredPartnerMsgContent('M_bot_list'))?.startsWith('📚')
     ).toBe(true)
   })
+
+  it('7. OA 客訊 → seam builder 不跑 — 閘開＋key 缺的錯誤部署下零 distill log 噪音', async () => {
+    // 重現 review 點名的場景：閘開＋key 缺。夥伴群事件會印一行
+    // distill_api_key_missing（test 3）；OA 客訊則必須一行都沒有 —
+    // sourceChannel 短路讓 getDistillSeams 對 OA 面根本不執行。
+    vi.stubEnv('AI_AGENT_DISTILL_ENABLED', 'true')
+    vi.stubEnv('ANTHROPIC_API_KEY', '')
+    const store = new MemoryStore()
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await getEventHandler()(
+      groupEvent('hi', {
+        kind: 'oa_text',
+        sourceChannel: 'line_oa',
+        groupId: undefined,
+        mentionsBot: false,
+      }),
+      store
+    )
+
+    expect(lines.some((l) => l.includes('distill_api_key_missing'))).toBe(false)
+  })
 })

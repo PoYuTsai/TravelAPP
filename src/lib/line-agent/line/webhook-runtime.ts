@@ -325,7 +325,13 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
     // 沉澱刀2 — distill seam：閘（AI_AGENT_DISTILL_ENABLED, default off）開＋
     // key 齊才注入；undefined ⇒ router 整條沉澱路徑不存在（ship 零行為改變）。
-    distill: getDistillSeams(store, log),
+    // 夥伴群限定 — 沉澱只對 partner group 有意義；OA 客訊一律不跑 seam
+    // builder（零 overhead，閘開＋key 缺的錯誤部署下也不會每則客訊都多一行
+    // distill_api_key_missing 噪音）。
+    distill:
+      event.sourceChannel === 'line_partner_group'
+        ? getDistillSeams(store, log)
+        : undefined,
     log,
   })
 
