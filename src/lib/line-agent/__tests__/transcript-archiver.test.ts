@@ -151,6 +151,43 @@ describe('archivePartnerGroupMessage', () => {
     expect(await store.listTranscriptEntries()).toHaveLength(1)
   })
 
+  it('OCR 進行中重送不二次 OCR（placeholder 先佔位）', async () => {
+    const store = new MemoryStore()
+    // 手動 resolve 的 deferred — 模擬 OCR 還在飛的窗口
+    let resolveOcr!: (text: string) => void
+    const deferred = new Promise<string>((resolve) => {
+      resolveOcr = resolve
+    })
+    const ocr = vi.fn().mockReturnValue(deferred)
+    const event = groupTextEvent({
+      kind: 'image',
+      messageId: 'M107',
+      text: undefined,
+    })
+
+    // 第一次：不 await — OCR pending 期間 placeholder 應已佔位
+    const first = archivePartnerGroupMessage(event, store, {
+      env: GATE_ON,
+      ocr,
+    })
+    await new Promise((r) => setTimeout(r, 0)) // flush microtasks 到 OCR await 點
+    const placeholder = await store.getTranscriptEntry('M107')
+    expect(placeholder).not.toBeNull()
+    expect(placeholder?.text).toBe('')
+
+    // LINE 重送（OCR 還沒回來）→ 冪等檢查擋下，不二次 OCR
+    await archivePartnerGroupMessage(event, store, { env: GATE_ON, ocr })
+    expect(ocr).toHaveBeenCalledTimes(1)
+
+    // OCR 回來 → 同 messageId 覆寫成轉錄文字
+    resolveOcr('OCR 結果')
+    await first
+    const entry = await store.getTranscriptEntry('M107')
+    expect(entry?.text).toBe('OCR 結果')
+    expect(ocr).toHaveBeenCalledTimes(1)
+    expect(await store.listTranscriptEntries()).toHaveLength(1)
+  })
+
   it('OA 客人面事件 → 永不入檔（隱私邊界）', async () => {
     const store = new MemoryStore()
     await archivePartnerGroupMessage(

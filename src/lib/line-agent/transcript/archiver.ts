@@ -105,31 +105,39 @@ export async function archivePartnerGroupMessage(
     // 這同時是雙重 OCR 的防線（重送的 image 不再花一次 vision 錢）。
     if ((await store.getTranscriptEntry(event.messageId)) !== null) return
 
-    // 截圖：進群當下 OCR。失敗（或無 seam）→ text=''，如實留缺 —
-    // 刀2 沉澱時據此報告「有一張圖讀不到」。
-    let text: string
-    if (kind === 'image') {
-      try {
-        text = deps.ocr ? await deps.ocr(event.messageId) : ''
-      } catch {
-        deps.log?.('store_write_failed', { reason: 'transcript_ocr_failed' })
-        text = ''
-      }
-    } else {
-      text = event.text ?? ''
-    }
-
     const entry: TranscriptEntry = {
       messageId: event.messageId,
       groupId: event.groupId,
       lineUserId: event.lineUserId,
       timestamp: event.timestamp,
       kind,
-      text: text.slice(0, TRANSCRIPT_TEXT_MAX_CHARS),
+      text: '',
       ...(event.quotedRef?.quotedMessageId
         ? { quotedMessageId: event.quotedRef.quotedMessageId }
         : {}),
     }
+
+    if (kind === 'image') {
+      // 截圖：先寫 placeholder（text=''）佔位再 OCR — OCR 在飛期間 LINE
+      // 重送會被上面的冪等檢查擋下，絕不二次 OCR（錢）。OCR 成功後以同
+      // messageId 覆寫（put 同 key 即 store 的冪等覆寫語意）；失敗（或無
+      // seam）→ placeholder 留下 text=''，如實留缺 — 刀2 沉澱時據此報告
+      // 「有一張圖讀不到」。
+      await store.putTranscriptEntry(entry)
+      if (!deps.ocr) return
+      try {
+        const text = await deps.ocr(event.messageId)
+        await store.putTranscriptEntry({
+          ...entry,
+          text: text.slice(0, TRANSCRIPT_TEXT_MAX_CHARS),
+        })
+      } catch {
+        deps.log?.('store_write_failed', { reason: 'transcript_ocr_failed' })
+      }
+      return
+    }
+
+    entry.text = (event.text ?? '').slice(0, TRANSCRIPT_TEXT_MAX_CHARS)
     await store.putTranscriptEntry(entry)
   } catch {
     // FAIL-SAFE：存檔失敗 → 丟該則，絕不堵 webhook（design 錯誤處理節）。
