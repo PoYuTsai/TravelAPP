@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-06-11 沉澱刀2 完成（@bot 沉澱+過目批准 dry-run＋CLI 預覽，DISTILL閘 default off） -->
+<!-- Last build trigger: 2026-06-12 沉澱刀3 完成（批准寫入 Notion 沉澱問答 DB＋CLI distill-flush，KNOWLEDGE_WRITE 閘 default off） -->

@@ -1405,7 +1405,7 @@ export async function runDistillFlushCommand(options = {}) {
     throw new Error('distill-flush · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（KV 未接）')
   }
 
-  // ② --write 先驗閘（fail-fast，省一趟 KV）— 不 enabled 就 exit 1，CLI 不繞閘
+  // ② --write 先驗閘（fail-fast，省一趟 KV 讀取）— 不 enabled 就 exit 1，CLI 不繞閘
   const config = write ? kit.resolveKnowledgeWriteConfig(env) : null
   if (write && !config.enabled) {
     throw new Error(

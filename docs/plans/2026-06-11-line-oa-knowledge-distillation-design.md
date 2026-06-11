@@ -124,6 +124,12 @@ Eric 的必要動作只有兩個：偶爾打「沉澱」、看清單回一句。
   - 欄位對齊現有 RAG schema → 寫入後立刻可被現有檢索撈到，閉環即生效。
   - 上 `KNOWLEDGE_WRITE_ENABLED` 環境閘，預設關。
 
+**檢索閉環缺口（2026-06-12 實查）**：QA DB 目前**尚非** RAG 檢索源——
+現有 rag-index 是 case-shaped（天數/地區/成本欄位），沉澱問答頁塞不進
+現有 index 結構。⑥ 自動草擬要吃到沉澱知識需另開一刀（QA 檢索 source
+或 prompt 注入）。上方「欄位對齊→立刻可被檢索撈到」的原句**不成立**，
+以本缺口註記取代。
+
 ### 錯誤處理（全部 fail-safe）
 
 - 存檔失敗 → 丟該則，絕不堵 webhook 主流程（回覆優先於記錄）。
@@ -150,7 +156,7 @@ Eric 的必要動作只有兩個：偶爾打「沉澱」、看清單回一句。
 
 1. 刀1：① 旁聽存檔（含截圖 OCR 入存檔）——純記錄，零對外行為，風險最低 ✅ done（2026-06-11，store d2f2ec5 / archiver d5bf5d8 / OCR prompt 3257c9d+d09cb56 / 接線 47567b0＋placeholder fix 44ed0f6）
 2. 刀2：③ 沉澱 + ④ 過目（dry-run：先只貼候選，不寫 Notion）✅ done（2026-06-11，store cdca52e / weaver f4e910c / candidates 3ef24f7 / adapter 233fff4 / orchestrator 6f1d7f5 / approval 0b7ea4d / router c7eac19 / webhook d76fb4c）
-3. 刀3：⑤ Notion 寫入（開 `KNOWLEDGE_WRITE_ENABLED`）
+3. 刀3：⑤ Notion 寫入（開 `KNOWLEDGE_WRITE_ENABLED`）✅ done（2026-06-12，schema 驗證 5ba31e7 / writer adapter 46b5fa8 / approval 接寫入 03ea194+e827da4 / 冪等標記 189908e / 守門測試 b91ea0c+ed2ad26 / webhook 接線 0ee6ac5+441eb53 / CLI distill-flush fdc4b79）
 4. 刀4：② 隨手標（nice-to-have，最後）
 
 每刀獨立可驗收；煙測與正式群驗收優先於本管線動工。
