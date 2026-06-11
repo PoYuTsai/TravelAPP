@@ -66,7 +66,8 @@ function candidateProperties(
   const provenance = [
     'LINE 夥伴群沉澱',
     `出處訊息 ${c.sourceMessageIds.length} 則：${c.sourceMessageIds.join(', ')}`,
-    ...(c.status === 'modified' ? [`原候選答案：${c.answer}`] : []),
+    // 上游 parser 已 cap 500，這裡防衛性重申 — 出處 audit trail 不得被超長原答案擠掉
+    ...(c.status === 'modified' ? [`原候選答案：${c.answer.slice(0, 500)}`] : []),
   ].join('｜')
 
   return {
@@ -103,8 +104,10 @@ export function createDistilledQaWriter(deps: {
           properties: candidateProperties(candidate, nowMs),
         })
         return page.id
-      } catch {
-        // 吞掉 raw SDK error（可能夾 token / db id / url）→ fixed error
+      } catch (error) {
+        // 結構性失敗已是 sanitized error — 保留原 stack；其餘吞掉 raw SDK
+        // error（可能夾 token / db id / url）→ fixed error
+        if (error instanceof DistilledQaWriteError) throw error
         throw new DistilledQaWriteError()
       }
     },

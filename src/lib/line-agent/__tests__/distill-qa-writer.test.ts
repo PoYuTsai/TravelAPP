@@ -269,4 +269,26 @@ describe('createDistilledQaWriter — rich_text cap', () => {
       richTextContent(createCalls2[0].properties['出處']).length
     ).toBeLessThanOrEqual(1900)
   })
+
+  it('caps the interpolated original answer so the 出處 label and message ids survive', async () => {
+    // 3000-char original answer (beyond the upstream 500 cap) must NOT push
+    // the audit-trail label or the message-id list out of the 1900 window.
+    const { sdk, createCalls } = fakeSdk()
+    const writer = createDistilledQaWriter({ sdk, databaseId: DB_ID })
+
+    await writer.write(
+      approvedCandidate({
+        answer: 'y'.repeat(3000),
+        status: 'modified',
+        modifiedAnswer: '短版',
+      }),
+      NOW_MS
+    )
+
+    const provenance = richTextContent(createCalls[0].properties['出處'])
+    expect(provenance).toContain('原候選答案：')
+    expect(provenance).toContain('msg-100')
+    expect(provenance).toContain('msg-104')
+    expect(provenance.length).toBeLessThanOrEqual(1900)
+  })
 })
