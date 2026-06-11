@@ -16,6 +16,11 @@ export interface DistillCandidate {
   status: DistillCandidateStatus
   /** 「2 改成XXX再收」時存 Eric 改寫的答案；status='modified' 才有。 */
   modifiedAnswer?: string
+  /**
+   * 刀3：寫入 Notion 成功後落的 page id — 有值＝已寫入，flush 跳過（冪等）。
+   * resolved 清單裡才會有；undefined ＝ 還沒寫（含刀2 dry-run 期的 backlog）。
+   */
+  notionPageId?: string
   /** 被貼出但 Eric 沒回應的次數；≥2 不再提（行動即投票）。 */
   missedCount: number
 }

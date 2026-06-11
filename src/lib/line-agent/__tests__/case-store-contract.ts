@@ -392,6 +392,7 @@ export function runCaseStoreContract(
             occurrences: 2,
             status: 'modified',
             modifiedAnswer: '前一天 20:00 前都可以',
+            notionPageId: 'page-abc',
             missedCount: 1,
           },
         ],
@@ -406,6 +407,7 @@ export function runCaseStoreContract(
       expect(got).toEqual(batch)
       expect(got?.candidates[0].sourceMessageIds).toEqual(['MT001', 'MT002'])
       expect(got?.resolved[0].modifiedAnswer).toBe('前一天 20:00 前都可以')
+      expect(got?.resolved[0].notionPageId).toBe('page-abc')
     })
 
     it('getDistillPending returns null for unknown and empty groupId', async () => {
