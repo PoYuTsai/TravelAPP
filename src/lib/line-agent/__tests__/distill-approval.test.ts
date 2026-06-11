@@ -57,6 +57,11 @@ describe('parseDistillApproval', () => {
     expect(parseDistillApproval('1,3 要')).toEqual({ type: 'approve', indices: [1, 3] })
   })
 
+  it("'1，3 要' → approve [1,3]（全形逗號——中文輸入法直打）", () => {
+    expect(parseDistillApproval('1，3 要')).toEqual({ type: 'approve', indices: [1, 3] })
+    expect(parseDistillApproval('1，3要')).toEqual({ type: 'approve', indices: [1, 3] })
+  })
+
   it("'@bot 1 3 要' → approve [1,3]（mention 剝除，同 isDistillCommand 剝法）", () => {
     expect(parseDistillApproval('@bot 1 3 要')).toEqual({ type: 'approve', indices: [1, 3] })
   })
@@ -170,7 +175,43 @@ describe('applyDistillApproval', () => {
       { id: 1, status: 'approved' },
       { id: 3, status: 'approved' },
     ])
-    expect(batch?.createdAt).toBe(NOW)
+    // 批准不是建立新 batch — createdAt 保留原值（orchestrator 每輪沉澱才刷新）
+    expect(batch?.createdAt).toBe(NOW - 1000)
+  })
+
+  it("殘批非連續 id（[2,4]）→ '2 要' 收 id 2、剩 id 4（Map-by-id，絕非陣列序位）", async () => {
+    const store = new MemoryStore()
+    await store.putDistillPending({
+      groupId: GROUP,
+      createdAt: NOW - 1000,
+      candidates: [
+        candidate({ id: 2, question: '問2', answer: '答2' }),
+        candidate({ id: 4, question: '問4', answer: '答4' }),
+      ],
+      resolved: [],
+    })
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [2] },
+      now: NOW,
+    })
+
+    expect(result?.status).toBe('stub_ok')
+    expect(result?.outboundText).toBe(
+      [
+        '✅ 已收：2',
+        '仍掛著：4',
+        '（dry-run：刀3 開閘後才寫入 Notion）',
+      ].join('\n')
+    )
+
+    const batch = await store.getDistillPending(GROUP)
+    expect(batch?.candidates.map((c) => c.id)).toEqual([4])
+    expect(batch?.resolved.map((c) => ({ id: c.id, status: c.status }))).toEqual([
+      { id: 2, status: 'approved' },
+    ])
   })
 
   it("超界 index（'9 要'、batch 只有 3 條）→ 整批拒絕：不動狀態、不寫 store、提示「沒有第 9 條」", async () => {

@@ -11,6 +11,9 @@
  *   - 超界 index 整批拒絕（含部分超界）— 保守：避免 Eric 打錯行號收錯條。
  *   - store 寫失敗收斂成 errorResult（fixed code）— 照 run-distillation.ts 慣例，
  *     不裸 throw。
+ *   - mention 剝除限制：`/@\S+/g` 會把 modify 答案裡的 @人名 也剝掉（與
+ *     isDistillCommand 一致的取捨）；答案要 @人 的情境，用「改成」前先把人名
+ *     寫成純文字。
  */
 
 import type { CaseStore } from '../storage/store'
@@ -29,7 +32,7 @@ export type DistillApproval =
 
 /** 全句 match（「都要喔」不算）— 防一般聊天誤觸。 */
 const APPROVE_ALL_RE = /^(都要|全部要|全要)$/
-const APPROVE_RE = /^([\d\s,、]+)要$/
+const APPROVE_RE = /^([\d\s,，、]+)要$/ // ，＝全形逗號（中文輸入法直打）
 const MODIFY_RE = /^(\d+)\s*改成([\s\S]+?)再收$/
 
 /** 不是批准語句 → null（router 落回 responder）。 */
@@ -51,7 +54,7 @@ export function parseDistillApproval(text: string): DistillApproval | null {
     const indices = [
       ...new Set(
         approve[1]
-          .split(/[\s,、]+/)
+          .split(/[\s,，、]+/)
           .filter((s) => s !== '')
           .map(Number)
           .filter((n) => n >= 1)
@@ -94,7 +97,10 @@ export interface ApplyDistillApprovalInput {
   store: CaseStore
   groupId: string
   approval: DistillApproval
-  /** ms since epoch — injected for determinism. */
+  /**
+   * ms since epoch — injected for determinism。批准寫回保留原 batch.createdAt
+   * （批准不是建立新 batch），此值目前僅保留給未來時間戳需求。
+   */
   now: number
   log?: AgentLogger
 }
@@ -112,7 +118,7 @@ function errorResult(reason: string): HandlerResult {
 export async function applyDistillApproval(
   input: ApplyDistillApprovalInput
 ): Promise<HandlerResult | null> {
-  const { store, groupId, approval, now, log } = input
+  const { store, groupId, approval, log } = input
 
   const batch = await store.getDistillPending(groupId)
   if (!batch || batch.candidates.length === 0) return null
@@ -152,7 +158,8 @@ export async function applyDistillApproval(
   try {
     await store.putDistillPending({
       groupId,
-      createdAt: now,
+      // 批准不是建立新 batch — createdAt 保留原值（orchestrator 每輪沉澱才刷新）
+      createdAt: batch.createdAt,
       candidates: remaining,
       resolved: [...batch.resolved, ...moved],
     })
