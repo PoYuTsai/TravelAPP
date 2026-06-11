@@ -121,9 +121,13 @@ export function parseAgentCommandArgs(args) {
   if (command === 'distill-dry-run' || command === '/distill-dry-run') {
     return { commandText: 'distill-dry-run' }
   }
+  if (command === 'distill-flush' || command === '/distill-flush') {
+    // default 唯讀列 backlog；唯一 flag 是 --write（走閘真寫 Notion）。
+    return { commandText: 'distill-flush', write: args.slice(1).includes('--write') }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush'
   )
 }
 
@@ -1322,8 +1326,149 @@ export async function runDistillDryRunCommand(options = {}) {
   return lines.join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// distill-flush — 沉澱刀3 backlog 手動補寫／驗收工具（design 2026-06-11 §3 ⑤）
+// ---------------------------------------------------------------------------
+// default（唯讀）：真 KV getDistillPending → 列 resolved 中未寫入（無
+// notionPageId）的 backlog — 零寫入，跑幾次都不留痕。
+// --write：閘照規矩走（resolveKnowledgeWriteConfig 不 enabled ⇒ exit 1，
+// **CLI 不繞閘**）→ buildDefaultDistilledQaWriter → flushResolvedToNotion。
+// memory 教訓：CLI 載 .env.local — 三件齊＋--write ＝**真寫 Notion**。
+
+/** GUARD-loaded dynamic import of the flush kit（同 loadDistillKit 慣例）。 */
+export async function loadDistillFlushKit(ctx = {}) {
+  const {
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+    importConfigModule = () =>
+      import('../src/lib/line-agent/distill/knowledge-write-config.ts'),
+    importFlushModule = () =>
+      import('../src/lib/line-agent/distill/knowledge-flush.ts'),
+  } = ctx
+  try {
+    const kvMod = await importKvModule()
+    const configMod = await importConfigModule()
+    const flushMod = await importFlushModule()
+    const kit = {
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+      KvStore: kvMod?.KvStore ?? null,
+      resolveKnowledgeWriteConfig: configMod?.resolveKnowledgeWriteConfig ?? null,
+      flushResolvedToNotion: flushMod?.flushResolvedToNotion ?? null,
+    }
+    if (
+      !kit.createKvClientFromEnv ||
+      !kit.KvStore ||
+      !kit.resolveKnowledgeWriteConfig ||
+      !kit.flushResolvedToNotion
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/** Writer builder 只在 --write 且閘 enabled 才載 — 唯讀路徑零 Notion SDK。 */
+async function loadDistilledQaWriterBuilder() {
+  try {
+    const mod = await import(
+      '../src/lib/line-agent/line/install-default-distilled-qa-writer.ts'
+    )
+    return mod?.buildDefaultDistilledQaWriter ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Backlog 預覽（default）／走閘真寫（--write）。throws ⇒ main 印訊息＋exit 1
+ * （缺 env / 閘未開 / 模組未載入）；return string ⇒ exit 0。
+ * `kit`/`store`/`buildWriter` 注入供測試。
+ */
+export async function runDistillFlushCommand(options = {}) {
+  const env = options.env ?? process.env
+  const write = options.write === true
+  const kit = options.kit ?? (await loadDistillFlushKit())
+  if (!kit) {
+    throw new Error('distill-flush · 失敗（distill 模組未載入，請用 tsx 執行）')
+  }
+
+  // ① 前置檢查 — 缺哪個就明說（exit 1），絕不默默 fallback
+  const groupId = String(env.LINE_PARTNER_GROUP_ID ?? '').trim()
+  if (!groupId) {
+    throw new Error(
+      'distill-flush · 失敗：缺 LINE_PARTNER_GROUP_ID（不知道要讀哪個群的 backlog）'
+    )
+  }
+  const kvClient = options.kvClient ?? kit.createKvClientFromEnv(env)
+  if (!kvClient) {
+    throw new Error('distill-flush · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（KV 未接）')
+  }
+
+  // ② --write 先驗閘（fail-fast，省一趟 KV）— 不 enabled 就 exit 1，CLI 不繞閘
+  const config = write ? kit.resolveKnowledgeWriteConfig(env) : null
+  if (write && !config.enabled) {
+    throw new Error(
+      `distill-flush --write · 失敗：KNOWLEDGE_WRITE_ENABLED 閘未開（reason=${config.reason ?? 'disabled'}）`
+    )
+  }
+
+  // ③ 真 KV 讀 pending batch — 唯讀；無 batch ＝ 空 backlog
+  const store = options.store ?? new kit.KvStore(kvClient)
+  const batch = await store.getDistillPending(groupId)
+  const resolved = batch?.resolved ?? []
+  const unwritten = resolved.filter((c) => c.notionPageId === undefined)
+  const writtenCount = resolved.length - unwritten.length
+
+  const lines = [
+    write
+      ? 'distill-flush --write（走 KNOWLEDGE_WRITE_ENABLED 閘，真寫 Notion）'
+      : 'distill-flush（唯讀 — 列 backlog，零寫入）',
+    `backlog：${unwritten.length} 條 resolved 未寫入（已寫入 ${writtenCount} 條）`,
+  ]
+  unwritten.forEach((c) => {
+    // modify ＝ Eric 改寫版為準（同 distilled-qa-writer 寫入時的取法）
+    const answer =
+      c.status === 'modified' && c.modifiedAnswer !== undefined
+        ? c.modifiedAnswer
+        : c.answer
+    lines.push(`${c.id}. Q：${c.question}`)
+    lines.push(`   A：${answer}（status=${c.status}｜出現 ${c.occurrences} 次）`)
+  })
+
+  if (!write) {
+    lines.push('dry-run：加 --write 才真寫。')
+    return lines.join('\n')
+  }
+
+  if (unwritten.length === 0) {
+    lines.push('backlog 為空 — 沒東西可寫，結束。')
+    return lines.join('\n')
+  }
+
+  // ④ 構建真 writer（composition root）→ flush 全部 backlog → 印 written/failed
+  const buildWriter = options.buildWriter ?? (await loadDistilledQaWriterBuilder())
+  if (!buildWriter) {
+    throw new Error('distill-flush --write · 失敗（writer 模組未載入，請用 tsx 執行）')
+  }
+  const built = buildWriter(env)
+  if (!built.writer) {
+    throw new Error(
+      `distill-flush --write · 失敗：writer 構建失敗（reason=${built.reason ?? 'unknown'}）`
+    )
+  }
+  const result = await kit.flushResolvedToNotion({
+    store,
+    groupId,
+    writer: built.writer,
+    now: options.now ?? Date.now(),
+  })
+  lines.push(`flush 完成：written=${result.written} · failed=${result.failed}`)
+  return lines.join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
-  const { commandText, query } = parseAgentCommandArgs(args)
+  const { commandText, query, write } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
     return runRefineSmokeCommand({ env: options.env ?? process.env })
   }
@@ -1353,6 +1498,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'distill-dry-run') {
     return runDistillDryRunCommand({ env: options.env ?? process.env })
+  }
+  if (commandText === 'distill-flush') {
+    return runDistillFlushCommand({ env: options.env ?? process.env, write })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
