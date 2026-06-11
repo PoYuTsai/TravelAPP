@@ -557,3 +557,5 @@ npx vitest run src/lib/line-agent/ && npx next lint --dir src/lib/line-agent
 - **ack 延遲**：沉澱是 inline await（KV scan ＋ Sonnet 呼叫，估 5–15s）。手動觸發、月跑數次，先接受；與刀1 OCR 同列「開閘前量延遲」項目，超時就改 post-ack。LINE 重送由 `claimPartnerReply` 擋（claim 在 responder/distill 之前）。
 - **KV `keys()` scan**：`listTranscriptEntries` 走 keys-scan，30 天訊息量級（百則）沒問題；已在 store 註解標明不進熱路徑。
 - **OCR 覆寫 race**：剛進群的截圖若 OCR 在飛時被沉澱掃到，`markTranscriptDistilled` 與 OCR 覆寫可能互洗（後寫贏）。機率極低（手動觸發），最壞情況＝該則下次重掃或 distilled 標丟失一次，自癒。
+- **Mention 剝法對含空白顯示名失效**（final review Important）：`isDistillCommand`/`parseDistillApproval` 用 `/@\S+/g` 剝 mention——若 bot 顯示名含空白（如「@清微 Bot」），剝完殘留尾段 → 指令靜默落回 responder。**私測群實測時優先驗證**；命中再改 mention offset 結構化剝除。quote-to-bot 路徑免 mention 可繞過。
+- **兩個近距離「沉澱」指令不互斥**：`claimPartnerReply` 只擋同 messageId 重送；連打兩次（不同訊息）會雙重計費＋pending 互洗。手動觸發月跑數次，與 OCR race 同級，接受。
