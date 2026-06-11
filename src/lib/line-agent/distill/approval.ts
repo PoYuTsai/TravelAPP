@@ -1,0 +1,178 @@
+/**
+ * approval.ts — 沉澱刀2：過目批准（design 2026-06-11 §3 ④）.
+ *
+ * 候選清單貼群後，Eric（或任何夥伴）回「1 3 要」「都要」「2 改成〇〇再收」→
+ * 解析＋更新 pending batch。
+ *
+ * 紀律：
+ *   - dry-run：只記狀態，絕不寫 Notion — 那是刀3；resolved 清單就是刀3 的輸入。
+ *   - id 不重編：清單已貼出，編號對 Eric 是穩定的 — 收掉 1、3 之後，2、4
+ *     必須還叫 2、4（下次「沉澱」才由 orchestrator 重編 1..N）。
+ *   - 超界 index 整批拒絕（含部分超界）— 保守：避免 Eric 打錯行號收錯條。
+ *   - store 寫失敗收斂成 errorResult（fixed code）— 照 run-distillation.ts 慣例，
+ *     不裸 throw。
+ */
+
+import type { CaseStore } from '../storage/store'
+import type { AgentLogger } from '../observability/structured-log'
+import type { HandlerResult } from '../commands/handlers'
+import type { DistillCandidate } from './pending'
+
+// ---------------------------------------------------------------------------
+// 解析 — 純函式，剝 @mention（同 isDistillCommand 剝法）＋trim 後全句 match
+// ---------------------------------------------------------------------------
+
+export type DistillApproval =
+  | { type: 'approve'; indices: number[] }
+  | { type: 'approve_all' }
+  | { type: 'modify'; index: number; newAnswer: string }
+
+/** 全句 match（「都要喔」不算）— 防一般聊天誤觸。 */
+const APPROVE_ALL_RE = /^(都要|全部要|全要)$/
+const APPROVE_RE = /^([\d\s,、]+)要$/
+const MODIFY_RE = /^(\d+)\s*改成([\s\S]+?)再收$/
+
+/** 不是批准語句 → null（router 落回 responder）。 */
+export function parseDistillApproval(text: string): DistillApproval | null {
+  const stripped = text.replace(/@\S+/g, '').trim()
+
+  if (APPROVE_ALL_RE.test(stripped)) return { type: 'approve_all' }
+
+  const modify = stripped.match(MODIFY_RE)
+  if (modify) {
+    const newAnswer = modify[2].trim()
+    if (newAnswer === '') return null
+    return { type: 'modify', index: Number(modify[1]), newAnswer }
+  }
+
+  const approve = stripped.match(APPROVE_RE)
+  if (approve) {
+    // 去重（保留輸入順序）＋過濾 <1；全空 → null（「0 要」不是有效批准）
+    const indices = [
+      ...new Set(
+        approve[1]
+          .split(/[\s,、]+/)
+          .filter((s) => s !== '')
+          .map(Number)
+          .filter((n) => n >= 1)
+      ),
+    ]
+    if (indices.length === 0) return null
+    return { type: 'approve', indices }
+  }
+
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// 固定文案（exported for tests — 排版以測試鎖定）
+// ---------------------------------------------------------------------------
+
+export const DISTILL_APPROVAL_FAILURE_TEXT = '批准失敗，請稍後重試'
+const DRY_RUN_NOTE = '（dry-run：刀3 開閘後才寫入 Notion）'
+
+function joinIds(candidates: DistillCandidate[]): string {
+  return candidates.map((c) => c.id).join('、')
+}
+
+function composeAck(
+  headline: string,
+  remaining: DistillCandidate[]
+): string {
+  return [
+    headline,
+    remaining.length > 0 ? `仍掛著：${joinIds(remaining)}` : '候選已全部處理完',
+    DRY_RUN_NOTE,
+  ].join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// 套用 — 更新 pending batch（dry-run 狀態記錄）
+// ---------------------------------------------------------------------------
+
+export interface ApplyDistillApprovalInput {
+  store: CaseStore
+  groupId: string
+  approval: DistillApproval
+  /** ms since epoch — injected for determinism. */
+  now: number
+  log?: AgentLogger
+}
+
+function errorResult(reason: string): HandlerResult {
+  return {
+    handler: 'applyDistillApproval',
+    status: 'error',
+    outboundText: DISTILL_APPROVAL_FAILURE_TEXT,
+    meta: { reason },
+  }
+}
+
+/** 無 pending batch（或 candidates 全空）→ 回 null（router 落回 responder）。 */
+export async function applyDistillApproval(
+  input: ApplyDistillApprovalInput
+): Promise<HandlerResult | null> {
+  const { store, groupId, approval, now, log } = input
+
+  const batch = await store.getDistillPending(groupId)
+  if (!batch || batch.candidates.length === 0) return null
+
+  // ① 對行號：超界（含部分超界）整批拒絕、零寫入 — 打錯行號寧可重打，
+  //    絕不收錯條。
+  const wantedIds =
+    approval.type === 'approve_all'
+      ? batch.candidates.map((c) => c.id)
+      : approval.type === 'approve'
+        ? approval.indices
+        : [approval.index]
+  const byId = new Map(batch.candidates.map((c) => [c.id, c]))
+  const missing = wantedIds.filter((id) => !byId.has(id))
+  if (missing.length > 0) {
+    return {
+      handler: 'applyDistillApproval',
+      status: 'stub_ok',
+      outboundText: `沒有第 ${missing.join('、')} 條（目前掛著：${joinIds(batch.candidates)}），這次回覆整批未生效，請重打`,
+      meta: { reason: 'distill_approval_index_not_found' },
+    }
+  }
+
+  // ② 移動：被點名的 → resolved（append，原 resolved 是刀3 的輸入，絕不洗掉）；
+  //    其餘留在 candidates、id 不重編（編號對 Eric 是穩定的）。
+  const wantedSet = new Set(wantedIds)
+  const moved: DistillCandidate[] = batch.candidates
+    .filter((c) => wantedSet.has(c.id))
+    .map((c) =>
+      approval.type === 'modify'
+        ? // 原 answer 保留 — 刀3 寫 Notion 時兩版都看得到
+          { ...c, status: 'modified' as const, modifiedAnswer: approval.newAnswer }
+        : { ...c, status: 'approved' as const }
+    )
+  const remaining = batch.candidates.filter((c) => !wantedSet.has(c.id))
+
+  try {
+    await store.putDistillPending({
+      groupId,
+      createdAt: now,
+      candidates: remaining,
+      resolved: [...batch.resolved, ...moved],
+    })
+  } catch {
+    log?.('store_write_failed', { reason: 'distill_pending_write_failed' })
+    return errorResult('distill_pending_write_failed')
+  }
+
+  const headline =
+    approval.type === 'modify'
+      ? `✏️ 第 ${approval.index} 條已改收，A：${approval.newAnswer}`
+      : `✅ 已收：${joinIds(moved)}`
+
+  return {
+    handler: 'applyDistillApproval',
+    status: 'stub_ok',
+    outboundText: composeAck(headline, remaining),
+    meta: {
+      resolvedCount: moved.length,
+      remainingCount: remaining.length,
+    },
+  }
+}
