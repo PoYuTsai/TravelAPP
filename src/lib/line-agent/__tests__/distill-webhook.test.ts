@@ -24,6 +24,7 @@ import {
   getReplyClient,
   setReplyClient,
   setDistillSource,
+  setDistilledQaWriter,
   type ReplyClient,
 } from '../line/webhook-runtime'
 import { MemoryStore } from '../storage/memory-store'
@@ -31,6 +32,7 @@ import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { PartnerGroupResponder } from '../partner-group/responder'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
 import type { DistillCandidate } from '../distill/pending'
+import type { DistilledQaWriter } from '../distill/distilled-qa-writer'
 import { setDefaultAgentLogSink } from '../observability/structured-log'
 import type { LineMessage } from '../line/message-client'
 
@@ -43,6 +45,7 @@ afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
   setDistillSource(null) // null ⇒ 重置回 lazy default — singleton 不串味
+  setDistilledQaWriter(null) // 刀3 writer 同理 — lazy cache（含「definitively off」）不串味
   setDefaultAgentLogSink(null)
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
@@ -272,5 +275,104 @@ describe('webhook distill seam（沉澱刀2 接線）', () => {
     )
 
     expect(lines.some((l) => l.includes('distill_api_key_missing'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 沉澱刀3 — KNOWLEDGE_WRITE_ENABLED 閘住的 lazy knowledge writer
+// ---------------------------------------------------------------------------
+
+describe('webhook knowledge writer seam（沉澱刀3 接線）', () => {
+  /** 批准語句要走到 approve seam 的前置：distill 閘＋key 齊。 */
+  function distillGateOn(): void {
+    vi.stubEnv('AI_AGENT_DISTILL_ENABLED', 'true')
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+  }
+
+  async function presetBatch(store: MemoryStore): Promise<void> {
+    await store.putDistillPending({
+      groupId: GROUP_ID,
+      createdAt: 1_700_000_000_000,
+      candidates: [pendingCandidate(1), pendingCandidate(2), pendingCandidate(3)],
+      resolved: [],
+    })
+  }
+
+  it('8. KNOWLEDGE_WRITE_ENABLED 未設＋批准 → ack 仍 dry-run 文案（刀2 零行為改變）', async () => {
+    distillGateOn()
+    vi.stubEnv('KNOWLEDGE_WRITE_ENABLED', '') // 防宿主環境殘留 — 視同未設
+    const store = new MemoryStore()
+    await presetBatch(store)
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(groupEvent('@bot 1 3 要'), store)
+
+    expect(calls).toHaveLength(1)
+    const text = calls[0].messages[0].text
+    expect(text).toContain('（dry-run：刀3 開閘後才寫入 Notion）')
+    expect(text).not.toContain('已寫入 Notion')
+  })
+
+  it('9. setDistilledQaWriter 注入 fake → ack 含「已寫入 Notion 知識庫」；重置後不串味', async () => {
+    distillGateOn()
+    const written: number[] = []
+    const fakeWriter: DistilledQaWriter = {
+      async write(candidate) {
+        written.push(candidate.id)
+        return `page_${candidate.id}`
+      },
+    }
+    setDistilledQaWriter(fakeWriter)
+    const store = new MemoryStore()
+    await presetBatch(store)
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(groupEvent('@bot 1 3 要'), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toContain('📥 已寫入 Notion 知識庫 2 條')
+    expect(calls[0].messages[0].text).not.toContain('dry-run')
+    expect(written).toEqual([1, 3])
+    // flush 落標：resolved 兩條都帶 notionPageId（冪等標記）
+    const batch = await store.getDistillPending(GROUP_ID)
+    expect(batch?.resolved.map((c) => c.notionPageId)).toEqual(['page_1', 'page_3'])
+
+    // 重置（teardown 語意）：回 lazy default — 閘未設 ⇒ 下一則批准回 dry-run
+    setDistilledQaWriter(null)
+    vi.stubEnv('KNOWLEDGE_WRITE_ENABLED', '')
+    await getEventHandler()(
+      // 換 messageId — claimPartnerReply 對同 id 的重投遞會 dedup
+      groupEvent('@bot 2 要', { messageId: 'M_distill_2', replyToken: 'rt_d2' }),
+      store
+    )
+    expect(calls).toHaveLength(2)
+    expect(calls[1].messages[0].text).toContain('（dry-run：刀3 開閘後才寫入 Notion）')
+    expect(written).toEqual([1, 3]) // fake writer 不再被呼叫 — 不串味
+  })
+
+  it('10. 閘開但 writer build 回 reason → 一行 fixed code、ack 仍 dry-run、不炸 webhook', async () => {
+    distillGateOn()
+    vi.stubEnv('KNOWLEDGE_WRITE_ENABLED', 'true')
+    vi.stubEnv('NOTION_KNOWLEDGE_TOKEN', '') // 缺 token — build 回 fixed reason
+    vi.stubEnv('NOTION_DISTILLED_QA_DB', '')
+    const store = new MemoryStore()
+    await presetBatch(store)
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await expect(
+      getEventHandler()(groupEvent('@bot 1 3 要'), store)
+    ).resolves.toBeUndefined()
+
+    // 形同閘關：ack 仍 dry-run 文案＋一行可追的 fixed code
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toContain('（dry-run：刀3 開閘後才寫入 Notion）')
+    expect(
+      lines.some((l) => l.includes('distill_write_missing_knowledge_token'))
+    ).toBe(true)
   })
 })

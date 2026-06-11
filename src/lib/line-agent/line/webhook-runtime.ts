@@ -62,6 +62,9 @@ import {
   createAnthropicDistillSource,
   type DistillSource,
 } from '@/lib/line-agent/distill/distill-llm-adapter'
+// type-only — 靜態圖不拉 @notionhq/client；真 SDK 只在 composition root
+// （install-default-distilled-qa-writer）dynamic import 時構建。
+import type { DistilledQaWriter } from '@/lib/line-agent/distill/distilled-qa-writer'
 import {
   createAgentLogger,
   type AgentLogger,
@@ -710,6 +713,36 @@ function getDistillSource(): DistillSource {
 }
 
 /**
+ * 刀3 knowledge writer — LAZY singleton（mirror getDistillSource）：批准語句
+ * 真的來才 dynamic import composition root（靜態圖零 @notionhq/client）。
+ * 「definitively off」（閘關/缺 config）也 cache — env 在 instance 生命週期
+ * 內不變，不用每則批准都重 resolve。
+ */
+let _distilledQaWriter: DistilledQaWriter | null | undefined // undefined＝未解析
+
+/** Override（測試注入 fake；null ⇒ 重置回 lazy default）。 */
+export function setDistilledQaWriter(writer: DistilledQaWriter | null): void {
+  _distilledQaWriter = writer ?? undefined
+}
+
+async function getDistilledQaWriter(
+  log: AgentLogger
+): Promise<DistilledQaWriter | undefined> {
+  if (_distilledQaWriter !== undefined) return _distilledQaWriter ?? undefined
+  const mod = await import('./install-default-distilled-qa-writer')
+  const result = mod.buildDefaultDistilledQaWriter()
+  if (!result.writer) {
+    if (result.reason !== 'disabled') {
+      log('route_decision', { reason: `distill_write_${result.reason}` })
+    }
+    _distilledQaWriter = null // 終態 cache — 形同閘關
+    return undefined
+  }
+  _distilledQaWriter = result.writer
+  return result.writer
+}
+
+/**
  * 組 router 的 distill seam（RouterInput['distill']）— 每事件呼叫，但只做
  * 兩個 env 讀（網路零、構建零）：
  *   - 閘（AI_AGENT_DISTILL_ENABLED, default off）關 ⇒ undefined — router
@@ -741,7 +774,15 @@ function getDistillSeams(
       // 純函式先擋（parse-first）— 非批准語句在這裡就回 null，不碰 store。
       const approval = parseDistillApproval(text)
       if (approval === null) return null
-      return applyDistillApproval({ store, groupId, approval, now: Date.now(), log })
+      return applyDistillApproval({
+        store,
+        groupId,
+        approval,
+        now: Date.now(),
+        log,
+        // 刀3：閘關/缺 config ⇒ undefined ⇒ dry-run 文案逐字不變
+        knowledgeWriter: await getDistilledQaWriter(log),
+      })
     },
   }
 }
