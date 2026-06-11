@@ -22,6 +22,8 @@ import {
   mergeCaseRecords,
   dedupeCaseRecords,
   toPartnerSafeView,
+  buildRagIndex,
+  queryRagIndex,
   type RagCaseFacts,
   type RagIndexRecord,
 } from '../notion/rag-index'
@@ -178,6 +180,62 @@ describe('source priority', () => {
     expect(merged.fingerprint).toBe(priv.fingerprint)
     expect(merged.identity.sourceTables.sort()).toEqual(['private_2026', 'team_2026'])
     expect(merged.identity.sourceRecordIds.sort()).toEqual(['priv-100', 'team-100'])
+  })
+
+  it('merges private_2027 + team_2027 and keeps private_2027 as the canonical facts source（2027 同 2026 家族規則）', () => {
+    const priv = rec({
+      canonicalCaseId: 'CW-2027-001',
+      sourceRecordId: 'priv27-1',
+      sourceTable: 'private_2027',
+      facts: {
+        travelDateRange: '2027-02-10 ~ 2027-02-14',
+        itinerarySnippet: 'Day 1｜清邁古城（2027 完整私人行程）',
+      },
+      privateContext: { cost: 45000 },
+    })
+    const team = rec({
+      canonicalCaseId: 'CW-2027-001',
+      sourceRecordId: 'team27-1',
+      sourceTable: 'team_2027',
+      facts: {
+        travelDateRange: '2027-02-10 ~ 2027-02-14',
+        itinerarySnippet: 'Day 1｜清邁古城（2027 精簡）',
+      },
+    })
+
+    const merged = mergeCaseRecords(team, priv)
+    expect(merged.facts.itinerarySnippet).toBe('Day 1｜清邁古城（2027 完整私人行程）')
+    expect(merged.identity.sourceTables.sort()).toEqual(['private_2027', 'team_2027'])
+  })
+
+  it('queryRagIndex orders by the locked source priority: private_2026 > private_2025 > private_2027 > team_2026 > team_2027', () => {
+    // 同一查詢命中五個來源各一筆（descriptive match 數相同）→ 排序只由
+    // source rank 決定（Eric 2026-06-11 拍板：2025 實績 > 2027 未發生）。
+    const mk = (sourceTable: RagIndexRecord['identity']['sourceTables'][number], id: string) =>
+      rec({
+        sourceRecordId: id,
+        sourceTable,
+        // travelDateRange 各自不同 → fingerprint 不同 → 不會被 dedupe 合併
+        facts: { travelDateRange: `range-${id}` },
+      })
+    const index = buildRagIndex([
+      mk('team_2027', 't27'),
+      mk('private_2025', 'p25'),
+      mk('team_2026', 't26'),
+      mk('private_2027', 'p27'),
+      mk('private_2026', 'p26'),
+    ])
+
+    const ordered = queryRagIndex(index, { themes: ['親子'] }).map(
+      (r) => r.identity.sourceTables[0]
+    )
+    expect(ordered).toEqual([
+      'private_2026',
+      'private_2025',
+      'private_2027',
+      'team_2026',
+      'team_2027',
+    ])
   })
 
   it('does NOT merge private_2025 with a 2026 record even when the fingerprint is identical', () => {

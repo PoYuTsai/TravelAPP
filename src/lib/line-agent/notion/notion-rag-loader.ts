@@ -23,7 +23,12 @@ import { buildRagIndex, type RagIndex, type RagIndexRecord } from './rag-index'
  * is a first-layer corpus merged later by the index builder, never a Notion
  * loader source.
  */
-export type NotionRagSourceTable = 'private_2025' | 'private_2026' | 'team_2026'
+export type NotionRagSourceTable =
+  | 'private_2025'
+  | 'private_2026'
+  | 'team_2026'
+  | 'private_2027'
+  | 'team_2027'
 
 /**
  * Injected port. Pagination/cursor loops are a future real-client internal

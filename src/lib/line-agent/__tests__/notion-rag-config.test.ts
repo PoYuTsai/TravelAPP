@@ -211,6 +211,32 @@ describe('resolveNotionRagConfig — database id normalisation', () => {
   })
 })
 
+describe('resolveNotionRagConfig — 2027 sources', () => {
+  it('resolves private_2027 / team_2027 with their dedicated env keys', () => {
+    const { config, issues } = resolveNotionRagConfig({
+      AI_AGENT_NOTION_RAG_ENABLED: 'true',
+      AI_AGENT_NOTION_RAG_ACTIVE_SOURCES: 'private_2027,team_2027',
+      NOTION_PRIVATE_2027_DATABASE_ID: 'a'.repeat(32),
+      NOTION_TEAM_2027_DATABASE_ID: 'b'.repeat(32),
+    })
+    expect(issues).toEqual([])
+    expect(config.activeSources).toEqual(['private_2027', 'team_2027'])
+    expect(config.databaseIds.private_2027).toBe('a'.repeat(32))
+    expect(config.databaseIds.team_2027).toBe('b'.repeat(32))
+  })
+
+  it('an active 2027 source with a missing db id is reported, not dropped', () => {
+    const { config, issues } = resolveNotionRagConfig({
+      AI_AGENT_NOTION_RAG_ENABLED: 'true',
+      AI_AGENT_NOTION_RAG_ACTIVE_SOURCES: 'private_2027',
+    })
+    expect(config.activeSources).toEqual(['private_2027'])
+    expect(issues).toEqual([
+      expect.objectContaining({ code: 'missing_database_id', source: 'private_2027' }),
+    ])
+  })
+})
+
 describe('resolveNotionRagConfig — leak guard', () => {
   it('never embeds a token / db id / Notion url in issue messages', () => {
     const { issues } = resolveNotionRagConfig({

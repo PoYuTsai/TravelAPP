@@ -33,6 +33,8 @@ export type RagSourceTable =
   | 'private_2026'
   | 'team_2026'
   | 'private_2025'
+  | 'private_2027'
+  | 'team_2027'
   | 'markdown_template'
 
 export interface RagCaseIdentity {
@@ -186,10 +188,15 @@ export function resolveCaseKey(record: RagIndexRecord): string {
 // Source priority + merge
 // ---------------------------------------------------------------------------
 
+// Locked order（Eric 2026-06-11 拍板）：private_2026 > private_2025 >
+// private_2027 > team_2026 > team_2027。2025 是已發生的實績，比 2027 的
+// 未來預訂可信；private 永遠壓過 team（team 是 private 的精簡重複子集）。
 const SOURCE_RANK: Record<RagSourceTable, number> = {
-  private_2026: 3, // fullest itinerary + private context → canonical facts
+  private_2026: 5, // fullest itinerary + private context → canonical facts
+  private_2025: 4, // frozen 歷史實績 — 比未發生的 2027 可信
+  private_2027: 3, // 未來年度（預訂中），事實尚未驗證
   team_2026: 2, // duplicate subset of the private 2026 case
-  private_2025: 1,
+  team_2027: 1, // duplicate subset of the private 2027 case
   markdown_template: 0,
 }
 

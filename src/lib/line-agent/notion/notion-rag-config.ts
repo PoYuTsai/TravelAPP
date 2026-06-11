@@ -29,6 +29,8 @@ const KNOWN_SOURCES: readonly NotionRagSourceTable[] = [
   'private_2025',
   'private_2026',
   'team_2026',
+  'private_2027',
+  'team_2027',
 ]
 
 /** Each active source resolves its db id from exactly one env key. */
@@ -36,6 +38,8 @@ const DATABASE_ID_ENV_KEYS: Record<NotionRagSourceTable, string> = {
   private_2025: 'NOTION_PRIVATE_2025_DATABASE_ID',
   private_2026: 'NOTION_PRIVATE_2026_DATABASE_ID',
   team_2026: 'NOTION_TEAM_2026_DATABASE_ID',
+  private_2027: 'NOTION_PRIVATE_2027_DATABASE_ID',
+  team_2027: 'NOTION_TEAM_2027_DATABASE_ID',
 }
 
 export interface NotionRagConfigIssue {
