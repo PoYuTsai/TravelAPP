@@ -15,6 +15,7 @@ import {
   resolveVisionIntakeModel,
   VISION_INTAKE_MODEL_DEFAULT,
   VISION_EXTRACTION_SYSTEM_INSTRUCTION,
+  EXTRACTION_USER_TEXT,
   VisionIntakeError,
 } from '../partner-group/vision-intake-adapter'
 import type { DailyCostCap } from '../observability/daily-cost-cap'
@@ -191,7 +192,47 @@ describe('createAnthropicVisionIntakeSource', () => {
     const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit]
     const body = JSON.parse(String(init.body))
     expect(body.system).toBe(VISION_EXTRACTION_SYSTEM_INSTRUCTION)
-    expect(body.messages[0].content[1].text).toBe('請整理這張截圖中客人表達的需求。')
+    expect(body.messages[0].content[1].text).toBe(EXTRACTION_USER_TEXT)
+  })
+
+  it('maxTokens override 進到 body.max_tokens（沉澱刀1 全文轉錄調高用）', async () => {
+    const transport = vi.fn(async () => anthropicOkResponse('整段轉錄'))
+    const source = createAnthropicVisionIntakeSource({
+      transport: transport as unknown as typeof fetch,
+      apiKey: 'k',
+      costCap: okCostCap(),
+      maxTokens: 2048,
+    })
+    await source(IMAGE)
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit]
+    const body = JSON.parse(String(init.body))
+    expect(body.max_tokens).toBe(2048)
+  })
+
+  it('stop_reason=max_tokens：截斷只標記不致命 — 部分文字照樣回傳', async () => {
+    const transport = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            content: [{ text: '轉錄到一半被切' }],
+            stop_reason: 'max_tokens',
+            usage: { input_tokens: 1500, output_tokens: 1024 },
+          }),
+          { status: 200 }
+        )
+    )
+    const logs: Array<{ event: string; fields: Record<string, unknown> }> = []
+    const source = createAnthropicVisionIntakeSource({
+      transport: transport as unknown as typeof fetch,
+      apiKey: 'k',
+      costCap: okCostCap(),
+      log: (event, fields) => logs.push({ event, fields: fields as Record<string, unknown> }),
+    })
+    const text = await source(IMAGE)
+    expect(text).toBe('轉錄到一半被切')
+    const llmLog = logs.find((l) => l.event === 'llm_call')
+    expect(llmLog?.fields.outcome).toBe('ok')
+    expect(llmLog?.fields.degradedReason).toBe('max_tokens_truncated')
   })
 
   it('maps an empty extraction to fixed code anthropic_parse_error (spend still recorded)', async () => {

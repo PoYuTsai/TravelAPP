@@ -11,6 +11,8 @@
  * Prompt 誠實邊界：vision 只「轉錄」截圖中實際出現的客人文字，不得腦補、
  * 不得提價格；看不清楚要標註（無法辨識）。錯誤一律 fixed code，永不帶
  * key / 圖片內容 / 模型回應。
+ *
+ * Prompt 可由呼叫端 override（沉澱刀1 全文轉錄用），預設仍是刀B 客需抽取。
  */
 
 import type { LineImageContent } from '../line/content-client'
@@ -62,7 +64,7 @@ export const VISION_EXTRACTION_SYSTEM_INSTRUCTION = [
   '只輸出整理後的純文字，不要任何前綴、後綴或說明。',
 ].join('\n')
 
-const EXTRACTION_USER_TEXT = '請整理這張截圖中客人表達的需求。'
+export const EXTRACTION_USER_TEXT = '請整理這張截圖中客人表達的需求。'
 
 // ---------------------------------------------------------------------------
 // Source factory — transport + cost cap；錯誤一律 fixed code
@@ -95,6 +97,11 @@ export interface AnthropicVisionIntakeSourceDeps {
   systemInstruction?: string
   /** 可選 user text override — 同上。 */
   userText?: string
+  /**
+   * 可選 max_tokens override（全文轉錄比客需抽取長，沉澱刀1 接線時調高）。
+   * 省略 ⇒ 既有 EXTRACTION_MAX_TOKENS（圖片刀B 行為不變）。
+   */
+  maxTokens?: number
 }
 
 export function createAnthropicVisionIntakeSource(
@@ -105,6 +112,7 @@ export function createAnthropicVisionIntakeSource(
   const systemInstruction =
     deps.systemInstruction ?? VISION_EXTRACTION_SYSTEM_INSTRUCTION
   const userText = deps.userText ?? EXTRACTION_USER_TEXT
+  const maxTokens = deps.maxTokens ?? EXTRACTION_MAX_TOKENS
 
   return async function extract(image: LineImageContent): Promise<string> {
     // BUDGET GATE — 同 case-intake adapter：非 ok 一律不打。
@@ -130,7 +138,7 @@ export function createAnthropicVisionIntakeSource(
         },
         body: JSON.stringify({
           model,
-          max_tokens: EXTRACTION_MAX_TOKENS,
+          max_tokens: maxTokens,
           system: systemInstruction,
           messages: [
             {
@@ -174,13 +182,16 @@ export function createAnthropicVisionIntakeSource(
 
     let text: unknown
     let usage: { input_tokens?: unknown; output_tokens?: unknown } | undefined
+    let stopReason: unknown
     try {
       const data = (await response.json()) as {
         content?: Array<{ text?: unknown }>
         usage?: { input_tokens?: unknown; output_tokens?: unknown }
+        stop_reason?: unknown
       }
       text = data?.content?.[0]?.text
       usage = data?.usage
+      stopReason = data?.stop_reason
     } catch {
       log('llm_call', {
         model,
@@ -199,7 +210,7 @@ export function createAnthropicVisionIntakeSource(
     const inputTokens = usageMissing
       ? FALLBACK_IMAGE_INPUT_TOKENS
       : (inputTokensRaw as number)
-    const outputTokens = usageMissing ? EXTRACTION_MAX_TOKENS : (outputTokensRaw as number)
+    const outputTokens = usageMissing ? maxTokens : (outputTokensRaw as number)
     const costUsd = estimateCostUsd(model, inputTokens, outputTokens)
 
     const { recorded } = await deps.costCap.recordSpend(costUsd)
@@ -219,6 +230,8 @@ export function createAnthropicVisionIntakeSource(
       throw new VisionIntakeError('anthropic_parse_error')
     }
 
+    // 截斷偵測：max_tokens 截斷只標記不致命 — 部分文字仍有價值，照樣回傳。
+    const truncated = stopReason === 'max_tokens'
     log('llm_call', {
       model,
       latencyMs: Date.now() - startedAt,
@@ -226,6 +239,7 @@ export function createAnthropicVisionIntakeSource(
       outputTokens,
       costUsd,
       outcome: 'ok',
+      ...(truncated ? { degradedReason: 'max_tokens_truncated' } : {}),
       ...(usageMissing ? { usageMissing: true } : {}),
     })
     return text.trim()
