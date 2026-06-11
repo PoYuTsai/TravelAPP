@@ -27,6 +27,11 @@
 > - dispatch 順序：quoted_draft → vision_intake → case_intake → rag → base（「客需 讀取這張圖」走 vision，抽完文字本來就進三分流）。
 > - fail-closed：找不到圖／content 404／vision 失敗 → 固定誠實回覆；store 壞掉視同沒圖；OA 永不入 vision 路徑。測試 1477 全綠（本刀 ~60 新測）。
 > 核心修正（兩次踩到同一個盲點）：**操作者是夥伴，不是 Eric**。客服／排行程／報價／銷售已外包給夥伴；任何要 Eric 動手輸入的形態（CLI 產品化）都是把工作收回來，一律否決。CLI 只能當 CC 的開發驗證 harness。
+>
+> **實作進度（2026-06-11 深夜，真機煙測後兩刀）**：
+> - **case-triage 三 bug 修復**（commit `020a518`）：煙測截圖揪出 ①「30-50分鐘」誤當日期（修法：月日合理性＋尾隨單位 guard）②「2人」裸人數不認（新增 `partySize` 欄位，「10人座」「10-15人」不誤取）③ 含「住宿」字即當已知（改逐句判斷，問句／還沒訂／求推薦不算）。煙測場景入 fixture `case-triage-extraction.test.ts`。
+> - **圖片刀B 觸發改版**（commit `b8d72bf`）：Eric 拍板「引用圖＋tag 即觸發、去關鍵詞」。觸發詞 lexicon 與「最近一張圖」30 分鐘窗 fallback 除役；store 改 per-message image marker（`isPartnerGroupImageMsg`，KV TTL 7 天對齊 bot-authored marker）；`quotedImage` 沿 `quotedBotContent` 同路徑線入 respondInput。引用非圖訊息／marker 過期／store 壞 → 一律不觸發（fail-closed），base 刀A 誠實條款收尾。
+> - **RAG 加 2027**（commit `0d29c8e`）：`private_2027`/`team_2027` 來源＋env keys；排序鎖定 private_2026 > private_2025 > private_2027 > team_2026 > team_2027（2025 已發生實績 > 2027 未來預訂；private 永遠壓過 team）。
 
 ## 北極星（Eric 的產品方向）
 
