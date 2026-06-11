@@ -191,21 +191,29 @@ export async function applyDistillApproval(
   // batch、自己處理單條失敗 — 這裡只決定 ack 的第三行。
   let writeLine = DRY_RUN_NOTE
   if (input.knowledgeWriter) {
-    const flush = await flushResolvedToNotion({
-      store,
-      groupId,
-      writer: input.knowledgeWriter,
-      now: input.now,
-      log,
-    })
-    writeLine = [
-      `📥 已寫入 Notion 知識庫 ${flush.written} 條`,
-      ...(flush.failed > 0
-        ? [`⚠️ ${flush.failed} 條寫入失敗，下次批准補寫`]
-        : []),
-    ].join('\n')
-    meta.written = flush.written
-    meta.writeFailed = flush.failed
+    // 包 try/catch：flush 外層自己也會讀 store（可能 KV down throw）——批准狀態
+    // 已落地，例外絕不能裸丟出去吞掉 ack（fail-safe：批准是 Eric 的決定，
+    // 落地失敗下次 flush 自癒，不回滾）。
+    try {
+      const flush = await flushResolvedToNotion({
+        store,
+        groupId,
+        writer: input.knowledgeWriter,
+        now: input.now,
+        log,
+      })
+      writeLine = [
+        `📥 已寫入 Notion 知識庫 ${flush.written} 條`,
+        ...(flush.failed > 0
+          ? [`⚠️ ${flush.failed} 條寫入失敗，下次批准補寫`]
+          : []),
+      ].join('\n')
+      meta.written = flush.written
+      meta.writeFailed = flush.failed
+    } catch {
+      log?.('store_write_failed', { reason: 'distill_flush_unexpected_error' })
+      writeLine = '⚠️ 寫入 Notion 時發生未預期錯誤，下次批准補寫'
+    }
   }
 
   return {

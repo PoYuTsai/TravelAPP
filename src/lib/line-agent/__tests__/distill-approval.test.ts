@@ -498,6 +498,53 @@ describe('applyDistillApproval × knowledgeWriter（刀3 seam）', () => {
     expect(put).not.toHaveBeenCalled()
   })
 
+  it('flush 階段 getDistillPending throw（KV down）→ 不裸 throw：ack 仍送出（批准 headline＋⚠️ 未預期錯誤）、批准狀態已落地、log 收 distill_flush_unexpected_error', async () => {
+    const store = new MemoryStore()
+    await seedBatch(store, 3)
+    const { writer } = fakeWriter()
+    // 第一次 get（applyDistillApproval 開頭）正常、第二次（flush 內）throw
+    const originalGet = store.getDistillPending.bind(store)
+    let getCalls = 0
+    vi.spyOn(store, 'getDistillPending').mockImplementation(async (groupId) => {
+      getCalls += 1
+      if (getCalls === 2) throw new Error('kv down')
+      return originalGet(groupId)
+    })
+    const logged: string[] = []
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [1, 3] },
+      now: NOW,
+      knowledgeWriter: writer,
+      log: (event, fields) => logged.push(JSON.stringify({ event, ...fields })),
+    })
+
+    // (a) 不裸 throw、回傳 HandlerResult；(b) ack 含批准 headline＋fail-safe 文案
+    expect(result?.status).toBe('stub_ok')
+    expect(result?.outboundText).toBe(
+      [
+        '✅ 已收：1、3',
+        '仍掛著：2',
+        '⚠️ 寫入 Notion 時發生未預期錯誤，下次批准補寫',
+      ].join('\n')
+    )
+    // meta 不設 written/writeFailed
+    expect(result?.meta).toEqual({ resolvedCount: 2, remainingCount: 1 })
+
+    // (c) 批准狀態已落地（不回滾）
+    const batch = await originalGet(GROUP)
+    expect(batch?.candidates.map((c) => c.id)).toEqual([2])
+    expect(batch?.resolved.map((c) => ({ id: c.id, status: c.status }))).toEqual([
+      { id: 1, status: 'approved' },
+      { id: 3, status: 'approved' },
+    ])
+
+    // (d) log 收到 fixed reason
+    expect(logged.some((l) => l.includes('distill_flush_unexpected_error'))).toBe(true)
+  })
+
   it('modify 路徑＋writer → 同樣 flush、ack headline 不變', async () => {
     const store = new MemoryStore()
     await seedBatch(store, 3)
