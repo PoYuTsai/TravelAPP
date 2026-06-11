@@ -19,7 +19,7 @@
 import type { NormalizedLineEvent } from '@/lib/line-agent/line/event-normalizer'
 import type { CaseStore } from '@/lib/line-agent/storage/store'
 import { selectStore } from '@/lib/line-agent/storage/select-store'
-import { routeCommand } from '@/lib/line-agent/commands/router'
+import { routeCommand, type RouterInput } from '@/lib/line-agent/commands/router'
 import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
 import type { PartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
 import {
@@ -50,7 +50,22 @@ import {
   TRANSCRIPT_OCR_USER_TEXT,
   type TranscriptOcr,
 } from '@/lib/line-agent/transcript/archiver'
-import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
+import {
+  isDistillEnabled,
+  runDistillation,
+} from '@/lib/line-agent/distill/run-distillation'
+import {
+  parseDistillApproval,
+  applyDistillApproval,
+} from '@/lib/line-agent/distill/approval'
+import {
+  createAnthropicDistillSource,
+  type DistillSource,
+} from '@/lib/line-agent/distill/distill-llm-adapter'
+import {
+  createAgentLogger,
+  type AgentLogger,
+} from '@/lib/line-agent/observability/structured-log'
 import { randomUUID } from 'node:crypto'
 
 // ---------------------------------------------------------------------------
@@ -308,6 +323,9 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     quotedBotContent,
     quotedImage,
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
+    // 沉澱刀2 — distill seam：閘（AI_AGENT_DISTILL_ENABLED, default off）開＋
+    // key 齊才注入；undefined ⇒ router 整條沉澱路徑不存在（ship 零行為改變）。
+    distill: getDistillSeams(store, log),
     log,
   })
 
@@ -652,4 +670,72 @@ export function getTranscriptOcr(): TranscriptOcr | null {
     }
   }
   return _transcriptOcr
+}
+
+// ---------------------------------------------------------------------------
+// Distill seam — 沉澱刀2（「沉澱」指令＋批准語句的 webhook 接線）
+// ---------------------------------------------------------------------------
+
+/**
+ * 沉澱 LLM source（織好的 promptText → raw model text）。LAZY singleton
+ * （mirror getTranscriptOcr）：沉澱指令真的來才建 — 平日訊息流零 adapter
+ * 構建、零 KV client 構建。transport 用全域 fetch；cost cap 走同一個
+ * daily 工廠（KV 計量跨 instance，與其他 LLM 路徑共用每日預算池）。
+ * adapter 內部 log 用它的 default（requestId '-'）— singleton 不能綁第一
+ * 個 request 的 logger（同 getTranscriptOcr 前例）。
+ */
+let _distillSource: DistillSource | null = null
+
+/** Override（測試注入 fake；null ⇒ 重置回 lazy default — 測試間不串味）。 */
+export function setDistillSource(source: DistillSource | null): void {
+  _distillSource = source
+}
+
+function getDistillSource(): DistillSource {
+  if (_distillSource === null) {
+    _distillSource = createAnthropicDistillSource({
+      transport: fetch,
+      apiKey: getPartnerResponderConfig().anthropicApiKey,
+      costCap: createDailyCostCap({ env: process.env, kv: createKvClientFromEnv() }),
+      env: process.env,
+    })
+  }
+  return _distillSource
+}
+
+/**
+ * 組 router 的 distill seam（RouterInput['distill']）— 每事件呼叫，但只做
+ * 兩個 env 讀（網路零、構建零）：
+ *   - 閘（AI_AGENT_DISTILL_ENABLED, default off）關 ⇒ undefined — router
+ *     整條沉澱路徑不存在，ship 零行為改變。
+ *   - 閘開但 ANTHROPIC_API_KEY 缺 ⇒ undefined＋一行 fixed-code log（形同
+ *     閘關 — 絕不炸 webhook，部署缺 key 可從 log 追到）。
+ *   - approve 是 PARSE-FIRST：純函式 parseDistillApproval 先擋，非批准語句
+ *     零 store 讀取 — KV 故障絕不劫持日常問答路徑（Task 7 review 契約）。
+ */
+function getDistillSeams(
+  store: CaseStore,
+  log: AgentLogger
+): RouterInput['distill'] | undefined {
+  if (!isDistillEnabled(process.env)) return undefined
+  if (getPartnerResponderConfig().anthropicApiKey === '') {
+    log('route_decision', { reason: 'distill_api_key_missing' })
+    return undefined
+  }
+  return {
+    run: (groupId) =>
+      runDistillation({
+        groupId,
+        store,
+        source: getDistillSource(),
+        now: Date.now(),
+        log,
+      }),
+    approve: async (groupId, text) => {
+      // 純函式先擋（parse-first）— 非批准語句在這裡就回 null，不碰 store。
+      const approval = parseDistillApproval(text)
+      if (approval === null) return null
+      return applyDistillApproval({ store, groupId, approval, now: Date.now(), log })
+    },
+  }
 }
