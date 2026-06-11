@@ -20,6 +20,7 @@ import {
   setPartnerGroupResponder,
   getReplyClient,
   setReplyClient,
+  setTranscriptOcr,
   deriveBotDirected,
   type ReplyClient,
 } from '../line/webhook-runtime'
@@ -42,7 +43,9 @@ const pristineReplyClient = getReplyClient()
 afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
+  setTranscriptOcr(null) // null ⇒ 無 OCR 退化；閘 default off，對其他測試零影響
   setDefaultAgentLogSink(null)
+  vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
@@ -824,5 +827,44 @@ describe('partner-group image event recording（圖片刀B）', () => {
     const failureLine = lines.find((l) => l.includes('store_write_failed'))
     expect(failureLine).toBeDefined()
     expect(failureLine).toContain('partner_image_record_failed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 沉澱管線刀1 — 旁聽存檔接線（transcript capture wiring）
+// ---------------------------------------------------------------------------
+
+describe('partner-group transcript capture（沉澱管線刀1）', () => {
+  it('閘開時 group_text 被旁聽存檔（不影響回覆行為）', async () => {
+    vi.stubEnv('AI_AGENT_TRANSCRIPT_ENABLED', 'true')
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ mentionsBot: false, text: '高山2月可以嗎', replyToken: undefined }),
+      store
+    )
+    const got = await store.getTranscriptEntry('M001')
+    expect(got?.kind).toBe('text')
+    expect(got?.text).toBe('高山2月可以嗎')
+  })
+
+  it('閘開時 image 經注入 OCR 入檔，且既有 image-marker 行為不變', async () => {
+    vi.stubEnv('AI_AGENT_TRANSCRIPT_ENABLED', 'true')
+    setTranscriptOcr(async () => '客人：兩大一小')
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ kind: 'image', mentionsBot: false, text: undefined, replyToken: undefined }),
+      store
+    )
+    expect((await store.getTranscriptEntry('M001'))?.text).toBe('客人：兩大一小')
+    expect(await store.isPartnerGroupImageMsg('M001')).toBe(true) // 1a 不受影響
+  })
+
+  it('閘關（default）→ 完全不入檔（現行行為零改變）', async () => {
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ mentionsBot: false, replyToken: undefined }),
+      store
+    )
+    expect(await store.listTranscriptEntries()).toEqual([])
   })
 })

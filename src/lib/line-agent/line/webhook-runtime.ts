@@ -43,6 +43,13 @@ import { createAnthropicCaseIntakeSources } from '@/lib/line-agent/partner-group
 import { createVisionIntakeResponder } from '@/lib/line-agent/partner-group/vision-intake-surfacing'
 import { createAnthropicVisionIntakeSource } from '@/lib/line-agent/partner-group/vision-intake-adapter'
 import { fetchLineImageContent } from '@/lib/line-agent/line/content-client'
+import {
+  archivePartnerGroupMessage,
+  isTranscriptCaptureEnabled,
+  TRANSCRIPT_OCR_SYSTEM_INSTRUCTION,
+  TRANSCRIPT_OCR_USER_TEXT,
+  type TranscriptOcr,
+} from '@/lib/line-agent/transcript/archiver'
 import { createAgentLogger } from '@/lib/line-agent/observability/structured-log'
 import { randomUUID } from 'node:crypto'
 
@@ -237,6 +244,18 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     } catch {
       log('store_write_failed', { reason: 'partner_image_record_failed' })
     }
+  }
+
+  // 1a-2. 沉澱管線刀1 — 旁聽存檔：夥伴群文字/截圖被動入 KV（TTL 30 天），
+  //       截圖進群當下 OCR。閘 default off ⇒ 此行為不存在。archiver 內部
+  //       fail-safe（吞錯）— 回覆優先於記錄，絕不堵 webhook。閘先查再取
+  //       OCR seam，閘關時連 adapter 都不建。
+  if (isTranscriptCaptureEnabled(process.env)) {
+    await archivePartnerGroupMessage(event, store, {
+      ocr: getTranscriptOcr(),
+      env: process.env,
+      log,
+    })
   }
 
   // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
@@ -584,4 +603,53 @@ export function getReplyClient(): ReplyClient {
       replyMessage(replyToken, messages, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '')
   }
   return _replyClient
+}
+
+// ---------------------------------------------------------------------------
+// Transcript OCR seam — 沉澱管線刀1（旁聽存檔的截圖轉錄）
+// ---------------------------------------------------------------------------
+
+/**
+ * 旁聽存檔的截圖 OCR（messageId → 轉錄文字）。LAZY：首讀才建；無 Anthropic
+ * key ⇒ null（截圖仍入檔但 text=''）。與圖片刀B 共用 content-client 與
+ * daily cost cap 工廠（同一個每日預算池 — KV 計量是跨 instance 的），但
+ * prompt 是沉澱專用的全文轉錄版、max_tokens 調高（全文轉錄比客需抽取長，
+ * 截斷偵測在 adapter 內 log）。閘（AI_AGENT_TRANSCRIPT_ENABLED）由 handler
+ * 把守，這裡只負責「能不能轉錄」。
+ */
+const TRANSCRIPT_OCR_MAX_TOKENS = 2048
+
+let _transcriptOcr: TranscriptOcr | null | undefined = undefined
+
+/** Override（測試注入 fake；null ⇒ 無 OCR 退化）。 */
+export function setTranscriptOcr(ocr: TranscriptOcr | null): void {
+  _transcriptOcr = ocr
+}
+
+/** Read the current transcript OCR（handler 在閘開時呼叫）。 */
+export function getTranscriptOcr(): TranscriptOcr | null {
+  if (_transcriptOcr === undefined) {
+    const models = getPartnerResponderConfig()
+    if (!models.anthropicApiKey) {
+      _transcriptOcr = null
+    } else {
+      const vision = createAnthropicVisionIntakeSource({
+        transport: fetch,
+        apiKey: models.anthropicApiKey,
+        costCap: createDailyCostCap({ env: process.env, kv: createKvClientFromEnv() }),
+        systemInstruction: TRANSCRIPT_OCR_SYSTEM_INSTRUCTION,
+        userText: TRANSCRIPT_OCR_USER_TEXT,
+        maxTokens: TRANSCRIPT_OCR_MAX_TOKENS,
+      })
+      _transcriptOcr = async (messageId) => {
+        // Channel token 在 CALL time 讀（mirror reply client）。
+        const image = await fetchLineImageContent(
+          messageId,
+          process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
+        )
+        return vision(image)
+      }
+    }
+  }
+  return _transcriptOcr
 }
