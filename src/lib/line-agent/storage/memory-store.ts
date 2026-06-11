@@ -209,6 +209,7 @@ export class MemoryStore implements CaseStore {
   // ── 沉澱刀2：markTranscriptDistilled＋pending batch ─────────────────────────
 
   async markTranscriptDistilled(messageId: string): Promise<void> {
+    if (messageId === '') return
     const existing = this.transcriptEntries.get(messageId)
     if (!existing) return
     this.transcriptEntries.set(messageId, { ...existing, distilled: true })
