@@ -88,6 +88,13 @@ export interface AnthropicVisionIntakeSourceDeps {
   model?: string
   env?: Record<string, string | undefined>
   log?: AgentLogger
+  /**
+   * 可選 system instruction override（沉澱刀1 的全文轉錄 prompt 用）。
+   * 省略 ⇒ 既有 VISION_EXTRACTION_SYSTEM_INSTRUCTION（圖片刀B 行為不變）。
+   */
+  systemInstruction?: string
+  /** 可選 user text override — 同上。 */
+  userText?: string
 }
 
 export function createAnthropicVisionIntakeSource(
@@ -95,6 +102,9 @@ export function createAnthropicVisionIntakeSource(
 ): VisionIntakeSource {
   const model = resolveVisionIntakeModel({ model: deps.model, env: deps.env })
   const log = deps.log ?? createAgentLogger({ requestId: '-' })
+  const systemInstruction =
+    deps.systemInstruction ?? VISION_EXTRACTION_SYSTEM_INSTRUCTION
+  const userText = deps.userText ?? EXTRACTION_USER_TEXT
 
   return async function extract(image: LineImageContent): Promise<string> {
     // BUDGET GATE — 同 case-intake adapter：非 ok 一律不打。
@@ -121,7 +131,7 @@ export function createAnthropicVisionIntakeSource(
         body: JSON.stringify({
           model,
           max_tokens: EXTRACTION_MAX_TOKENS,
-          system: VISION_EXTRACTION_SYSTEM_INSTRUCTION,
+          system: systemInstruction,
           messages: [
             {
               role: 'user',
@@ -134,7 +144,7 @@ export function createAnthropicVisionIntakeSource(
                     data: image.base64,
                   },
                 },
-                { type: 'text', text: EXTRACTION_USER_TEXT },
+                { type: 'text', text: userText },
               ],
             },
           ],

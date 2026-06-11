@@ -163,6 +163,37 @@ describe('createAnthropicVisionIntakeSource', () => {
     expect(costCap.spends[0]).toBeGreaterThan(0)
   })
 
+  it('systemInstruction/userText override 進到 request body', async () => {
+    // 沉澱刀1：transcript archiver 注入全文轉錄 prompt — override 必須真的送出去。
+    const transport = vi.fn(async () => anthropicOkResponse('客人：你好\n夥伴：您好'))
+    const source = createAnthropicVisionIntakeSource({
+      transport: transport as unknown as typeof fetch,
+      apiKey: 'k',
+      costCap: okCostCap(),
+      systemInstruction: '請完整轉錄',
+      userText: '轉錄這張圖',
+    })
+    await source(IMAGE)
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit]
+    const body = JSON.parse(String(init.body))
+    expect(body.system).toBe('請完整轉錄')
+    expect(body.messages[0].content[1].text).toBe('轉錄這張圖')
+  })
+
+  it('未傳 override 時維持既有抽取 prompt（圖片刀B 零改變）', async () => {
+    const transport = vi.fn(async () => anthropicOkResponse('客人：12/20 出發'))
+    const source = createAnthropicVisionIntakeSource({
+      transport: transport as unknown as typeof fetch,
+      apiKey: 'k',
+      costCap: okCostCap(),
+    })
+    await source(IMAGE)
+    const [, init] = transport.mock.calls[0] as unknown as [string, RequestInit]
+    const body = JSON.parse(String(init.body))
+    expect(body.system).toBe(VISION_EXTRACTION_SYSTEM_INSTRUCTION)
+    expect(body.messages[0].content[1].text).toBe('請整理這張截圖中客人表達的需求。')
+  })
+
   it('maps an empty extraction to fixed code anthropic_parse_error (spend still recorded)', async () => {
     const costCap = okCostCap()
     const transport = vi.fn(async () => anthropicOkResponse('   '))
