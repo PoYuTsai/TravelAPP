@@ -19,7 +19,6 @@ import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/cas
 import type { AuditEntry } from '../audit/audit-log'
 import {
   type CaseStore,
-  type PartnerGroupImageMsg,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
 } from './store'
 
@@ -165,12 +164,13 @@ const PARTNER_BOT_MSG_PREFIX = 'line-agent:partner-bot-msg:'
 // flag and the content have independent lifecycles and neither matches case:*.
 const PARTNER_BOT_MSG_CONTENT_PREFIX = 'line-agent:partner-bot-msg-content:'
 const BOT_AUTHORED_TTL_SECONDS = 604800 // 7 days
-// Dedicated namespace for the latest user-sent image per partner group
-// （圖片刀B）.  Written ONLY by the webhook's partner-group image path; the
-// customer OA plane never writes here.  TTL is garbage collection — the
-// 30-minute freshness POLICY lives in the vision responder (timestamp window).
-const PARTNER_GROUP_IMG_PREFIX = 'line-agent:partner-group-img:'
-const PARTNER_GROUP_IMG_TTL_SECONDS = 1800 // 30 minutes
+// Dedicated namespace for per-message image markers in the partner group
+// （圖片刀B：引用圖＋tag 即觸發）.  Written ONLY by the webhook's partner-group
+// image path; the customer OA plane never writes here.  TTL mirrors the
+// bot-authored marker（7 天）— both answer「被引用的那則訊息是什麼」; a quote
+// to an expired marker simply does not trigger vision（fail-closed）.
+const PARTNER_GROUP_IMG_PREFIX = 'line-agent:partner-group-img-msg:'
+const PARTNER_GROUP_IMG_TTL_SECONDS = 604800 // 7 days
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -188,8 +188,8 @@ function partnerBotMsgContentKey(messageId: string): string {
   return `${PARTNER_BOT_MSG_CONTENT_PREFIX}${messageId}`
 }
 
-function partnerGroupImgKey(groupId: string): string {
-  return `${PARTNER_GROUP_IMG_PREFIX}${groupId}`
+function partnerGroupImgKey(messageId: string): string {
+  return `${PARTNER_GROUP_IMG_PREFIX}${messageId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -353,30 +353,16 @@ export class KvStore implements CaseStore {
 
   // ── Partner-group image tracking（圖片刀B）──────────────────────────────────
 
-  async putPartnerGroupImageMsg(
-    groupId: string,
-    messageId: string,
-    timestamp: number
-  ): Promise<void> {
-    if (groupId === '' || messageId === '') return
+  async putPartnerGroupImageMsg(messageId: string): Promise<void> {
+    if (messageId === '') return
     const kv = this.ensureClient()
-    // Read-then-write so an OLDER timestamp never regresses the latest (LINE
-    // redelivery may reorder).  The race window between two NEW images is
-    // acceptable: worst case the "latest" is off by one very recent image.
-    const existing = await kv.get<PartnerGroupImageMsg>(partnerGroupImgKey(groupId))
-    if (existing && existing.timestamp > timestamp) return
-    await kv.setWithTtl(
-      partnerGroupImgKey(groupId),
-      { messageId, timestamp },
-      PARTNER_GROUP_IMG_TTL_SECONDS
-    )
+    // Idempotent marker: a LINE redelivery overwrites the same key.
+    await kv.setWithTtl(partnerGroupImgKey(messageId), '1', PARTNER_GROUP_IMG_TTL_SECONDS)
   }
 
-  async getLatestPartnerGroupImageMsg(
-    groupId: string
-  ): Promise<PartnerGroupImageMsg | null> {
-    if (groupId === '') return null
+  async isPartnerGroupImageMsg(messageId: string): Promise<boolean> {
+    if (messageId === '') return false
     const kv = this.ensureClient()
-    return (await kv.get<PartnerGroupImageMsg>(partnerGroupImgKey(groupId))) ?? null
+    return (await kv.get(partnerGroupImgKey(messageId))) !== null
   }
 }

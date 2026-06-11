@@ -115,7 +115,8 @@ export async function handleRespondToPartnerGroup(
   responder: PartnerGroupResponder = stubPartnerGroupResponder,
   botDirected?: boolean,
   quotedBotContent?: string,
-  log?: AgentLogger
+  log?: AgentLogger,
+  quotedImage?: boolean
 ): Promise<HandlerResult> {
   // The responder ONLY produces text; it never sends. Whether outboundText
   // actually reaches the group is decided by the router + permission layer.
@@ -129,6 +130,10 @@ export async function handleRespondToPartnerGroup(
   // `quotedBotContent` (M3.6c) is the cached content of the quoted bot draft,
   // resolved + sanitized by the webhook. It lets the customer-summary path fire;
   // absent, that path fails closed (asks the partner to paste the draft).
+  //
+  // `quotedImage`（圖片刀B）marks that this message quotes a recorded
+  // partner-group image — the vision path's ONLY trigger（引用圖＋tag，無關鍵
+  // 詞）. Resolved fail-safe by the webhook; absent ⇒ vision never fires.
   const result = await responder.respond({
     event,
     intent,
@@ -137,6 +142,7 @@ export async function handleRespondToPartnerGroup(
     ...(botDirected !== undefined ? { botDirected } : {}),
     ...(quotedBotContent !== undefined ? { quotedBotContent } : {}),
     ...(log !== undefined ? { log } : {}),
+    ...(quotedImage !== undefined ? { quotedImage } : {}),
   })
 
   return {

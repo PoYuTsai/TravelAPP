@@ -1,24 +1,24 @@
 /**
  * vision-intake-surfacing.test.ts — 圖片刀B 的 surfacing decision + responder.
  *
- * 鎖住：
- *   - 觸發詞：讀取這張圖／看圖／截圖系自然語（與 客需/RAG 詞彙不重疊）
+ * 鎖住（2026-06-11 真機煙測後改版：引用圖＋tag 即觸發、去關鍵詞）：
+ *   - 觸發＝「引用一張圖片＋tag bot」：quotedImage 由 webhook 以 store 判定後
+ *     傳入；無關鍵詞需求 — 夥伴零學習成本
  *   - shouldUseVisionIntake 走 M3-0 tool-gate（ocr）：OA 永不、未 tag 永不、
  *     AI_AGENT_OCR_ENABLED default off、cost cap 未設（0）也擋 — 雙閘
- *   - 「這張圖」解析：引用優先 → 群內最近一張（30 分鐘 freshness 窗）
+ *   - 「這張圖」解析：只認引用（無引用＝surfacing 不會觸發；responder 防衛性
+ *     地回固定誠實回覆）
  *   - fail-closed：找不到圖／content 404／vision 失敗 → 固定誠實回覆，
- *     絕不腦補；store 讀取失敗視同沒圖
+ *     絕不腦補
  *   - 成功：抽取文字 → triageCaseIntake → 三分流回覆（與客需刀直接接軌）
  */
 
 import { describe, expect, it, vi } from 'vitest'
 import {
-  detectVisionIntakeIntent,
   shouldUseVisionIntake,
   createVisionIntakeResponder,
   VISION_INTAKE_NO_IMAGE_REPLY,
   VISION_INTAKE_UNAVAILABLE_REPLY,
-  VISION_IMAGE_FRESHNESS_MS,
 } from '../partner-group/vision-intake-surfacing'
 import { LineContentError } from '../line/content-client'
 import { VisionIntakeError } from '../partner-group/vision-intake-adapter'
@@ -34,14 +34,15 @@ const T_EVENT = 1_700_000_600_000
 
 function makeEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
   return {
-    kind: 'group_text',
+    kind: 'group_quoted',
     sourceChannel: 'line_partner_group',
     lineUserId: 'U_chun',
     groupId: 'G_partner',
     messageId: 'M_text1',
-    text: '@bot 讀取這張圖',
+    text: '@bot',
     mentionsBot: true,
     timestamp: T_EVENT,
+    quotedRef: { quotedMessageId: 'M_img_quoted' },
     ...overrides,
   }
 }
@@ -55,6 +56,7 @@ function makeInput(
     intent: { action: 'analyze', confidence: 'high', source: 'llm' },
     text: event.text ?? '',
     botDirected: true,
+    quotedImage: true,
     ...overrides,
   }
 }
@@ -62,7 +64,6 @@ function makeInput(
 interface ResponderFakes {
   fetchImage: ReturnType<typeof vi.fn>
   vision: ReturnType<typeof vi.fn>
-  getLatestImage: ReturnType<typeof vi.fn>
 }
 
 function makeResponder(
@@ -78,44 +79,13 @@ function makeResponder(
         async () =>
           '客人：12/20 出發，12/26 回，2大2小（5歲、8歲），航班 CI851 10:20 抵達清邁機場，住古城民宿'
       ),
-    getLatestImage:
-      overrides.getLatestImage ??
-      vi.fn(async () => ({ messageId: 'M_img_latest', timestamp: T_EVENT - 60_000 })),
   }
   const responder = createVisionIntakeResponder({
     fetchImage: fakes.fetchImage as never,
     vision: fakes.vision as never,
-    getLatestImage: fakes.getLatestImage as never,
   })
   return { responder, fakes }
 }
-
-// ---------------------------------------------------------------------------
-// Intent lexicon
-// ---------------------------------------------------------------------------
-
-describe('detectVisionIntakeIntent', () => {
-  it.each([
-    '@bot 讀取這張圖',
-    '@bot 幫我看一下這張圖',
-    '@bot 看圖整理一下',
-    '@bot 這張截圖的客人需求',
-    '@bot 讀取圖片',
-    'bot 讀一下截圖',
-  ])('fires on %s', (text) => {
-    expect(detectVisionIntakeIntent(text)).toBe(true)
-  })
-
-  it.each([
-    '@bot 客需 12/20 2大2小',
-    '@bot 查內部案例 清萊一日遊',
-    '@bot 你是誰',
-    '我傳了一張圖給客人',
-    '',
-  ])('stays silent on %s', (text) => {
-    expect(detectVisionIntakeIntent(text)).toBe(false)
-  })
-})
 
 // ---------------------------------------------------------------------------
 // Surfacing gate（M3-0 tool-gate 'ocr' 真消費者）
@@ -125,11 +95,17 @@ describe('shouldUseVisionIntake', () => {
   const base = {
     sourceChannel: 'line_partner_group' as const,
     botDirected: true,
-    text: '@bot 讀取這張圖',
+    quotedImage: true,
   }
 
-  it('true only with partner group + tag + intent + BOTH gates on', () => {
+  it('true only with partner group + tag + quoted image + BOTH gates on', () => {
     expect(shouldUseVisionIntake({ ...base, env: GATE_ON_ENV })).toBe(true)
+  })
+
+  it('no quoted image never fires（關鍵詞已除役 — 引用是唯一觸發）', () => {
+    expect(
+      shouldUseVisionIntake({ ...base, quotedImage: false, env: GATE_ON_ENV })
+    ).toBe(false)
   })
 
   it('OA customer plane never fires (even with gates on)', () => {
@@ -140,12 +116,6 @@ describe('shouldUseVisionIntake', () => {
 
   it('untagged message never fires', () => {
     expect(shouldUseVisionIntake({ ...base, botDirected: false, env: GATE_ON_ENV })).toBe(false)
-  })
-
-  it('no vision intent never fires', () => {
-    expect(
-      shouldUseVisionIntake({ ...base, text: '@bot 客需 整理一下', env: GATE_ON_ENV })
-    ).toBe(false)
   })
 
   it('default env (gate off) never fires', () => {
@@ -164,67 +134,32 @@ describe('shouldUseVisionIntake', () => {
 // ---------------------------------------------------------------------------
 
 describe('createVisionIntakeResponder', () => {
-  it('quoted image wins: fetches the QUOTED messageId, never reads the store', async () => {
+  it('fetches the QUOTED messageId', async () => {
     const { responder, fakes } = makeResponder()
-    const event = makeEvent({
-      kind: 'group_quoted',
-      quotedRef: { quotedMessageId: 'M_img_quoted' },
-    })
-    const result = await responder.respond(makeInput(event))
+    const result = await responder.respond(makeInput(makeEvent()))
 
     expect(fakes.fetchImage).toHaveBeenCalledWith('M_img_quoted')
-    expect(fakes.getLatestImage).not.toHaveBeenCalled()
     expect(result.meta?.responder).toBe('vision_intake')
     // 抽取文字有進回覆，且三分流結果接在後面（sufficient: 摘要句式）
     expect(result.text).toContain('12/20')
   })
 
-  it('no quote: falls back to the latest fresh group image', async () => {
+  it('no quote（防衛性：surfacing 不該放行）→ honest no-image reply, zero spend', async () => {
     const { responder, fakes } = makeResponder()
-    await responder.respond(makeInput(makeEvent()))
-    expect(fakes.getLatestImage).toHaveBeenCalledWith('G_partner')
-    expect(fakes.fetchImage).toHaveBeenCalledWith('M_img_latest')
-  })
-
-  it('stale latest image (outside the freshness window) → honest no-image reply, zero spend', async () => {
-    const stale = vi.fn(async () => ({
-      messageId: 'M_old',
-      timestamp: T_EVENT - VISION_IMAGE_FRESHNESS_MS - 1,
-    }))
-    const { responder, fakes } = makeResponder({ getLatestImage: stale })
-    const result = await responder.respond(makeInput(makeEvent()))
+    const event = makeEvent({ kind: 'group_text', quotedRef: undefined })
+    const result = await responder.respond(makeInput(event, { quotedImage: false }))
     expect(result.text).toBe(VISION_INTAKE_NO_IMAGE_REPLY)
     expect(result.meta?.degraded).toBe(true)
     expect(fakes.fetchImage).not.toHaveBeenCalled()
     expect(fakes.vision).not.toHaveBeenCalled()
   })
 
-  it('no image recorded → honest no-image reply', async () => {
-    const none = vi.fn(async () => null)
-    const { responder } = makeResponder({ getLatestImage: none })
-    const result = await responder.respond(makeInput(makeEvent()))
-    expect(result.text).toBe(VISION_INTAKE_NO_IMAGE_REPLY)
-  })
-
-  it('store read failure is fail-safe: treated as no image, never throws', async () => {
-    const boom = vi.fn(async () => {
-      throw new Error('kv down')
-    })
-    const { responder } = makeResponder({ getLatestImage: boom })
-    const result = await responder.respond(makeInput(makeEvent()))
-    expect(result.text).toBe(VISION_INTAKE_NO_IMAGE_REPLY)
-  })
-
-  it('content 404 (quoted a text message / expired) → honest no-image reply', async () => {
+  it('content 404 (quoted message expired / not an image) → honest no-image reply', async () => {
     const notFound = vi.fn(async () => {
       throw new LineContentError('content_not_found', 404)
     })
     const { responder, fakes } = makeResponder({ fetchImage: notFound })
-    const event = makeEvent({
-      kind: 'group_quoted',
-      quotedRef: { quotedMessageId: 'M_textmsg' },
-    })
-    const result = await responder.respond(makeInput(event))
+    const result = await responder.respond(makeInput(makeEvent()))
     expect(result.text).toBe(VISION_INTAKE_NO_IMAGE_REPLY)
     expect(fakes.vision).not.toHaveBeenCalled()
   })

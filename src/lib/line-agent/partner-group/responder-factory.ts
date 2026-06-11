@@ -176,17 +176,18 @@ export function createPartnerGroupResponderWithRagDraft(
       }
 
       // 讀圖（圖片刀B）— vision intake. Checked AFTER quoted_draft（quote-to-bot
-      // 語意更明確）、BEFORE case_intake：同一句話帶兩種詞彙時（「客需 讀取
-      // 這張圖」）讀圖更具體 — 客需整理正是 vision 抽完文字後的下游。Surfacing
-      // 走 M3-0 ocr tool-gate（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD
-      // 雙閘 default off）⇒ 不開閘完全不影響現行行為；responder 未注入時
-      // 路徑不存在。
+      // 語意更明確 — 引用的是 bot 訊息就不可能是圖）、BEFORE case_intake：引用
+      // 圖片＋tag 即觸發（無關鍵詞，2026-06-11 拍板），帶客需詞彙時讀圖更具體 —
+      // 客需整理正是 vision 抽完文字後的下游。quotedImage 由 webhook 以 store
+      // 的 image marker 判定後線進來。Surfacing 走 M3-0 ocr tool-gate
+      // （AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD 雙閘 default off）
+      // ⇒ 不開閘完全不影響現行行為；responder 未注入時路徑不存在。
       if (
         input.visionIntake &&
         shouldUseVisionIntake({
           sourceChannel: respondInput.event.sourceChannel,
           botDirected,
-          text: respondInput.text,
+          quotedImage: respondInput.quotedImage === true,
           env,
         })
       ) {

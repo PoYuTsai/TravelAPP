@@ -127,6 +127,13 @@ export interface RouterInput {
    */
   quotedBotContent?: string
   /**
+   * True iff this event quotes a recorded partner-group IMAGE message（圖片
+   * 刀B：引用圖＋tag 即觸發）. Resolved fail-safe by the webhook against the
+   * store's image marker; threaded to the responder so the vision path can
+   * fire without any keyword.
+   */
+  quotedImage?: boolean
+  /**
    * Per-request structured logger（P0-A 刀 2）— bound by the webhook to this
    * event's requestId and threaded through to the responder so its llm_call /
    * cost_cap / route_decision entries join the same trace. Optional.
@@ -316,7 +323,8 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
           input.partnerGroupResponder ?? stubPartnerGroupResponder,
           botDirected,
           input.quotedBotContent,
-          input.log
+          input.log,
+          input.quotedImage
         )
         return { action: 'respond', source, handlerResult, intent: earlyIntent }
       }

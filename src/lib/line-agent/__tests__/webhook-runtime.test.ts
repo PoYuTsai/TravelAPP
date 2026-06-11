@@ -689,6 +689,8 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
     // `log` is a documented PartnerGroupRespondInput key（P0-A 刀 2）— a
     // write-only telemetry sink with closed field shapes, NOT a send capability,
     // so it does not weaken §6.6.
+    // `quotedImage`（圖片刀B）is a derived boolean signal — NOT a send
+    // capability — so it does not weaken §6.6.
     const allowed = new Set([
       'event',
       'intent',
@@ -697,6 +699,7 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
       'caseId',
       'context',
       'botDirected',
+      'quotedImage',
       'log',
     ])
     expect(capturedKeys.length).toBeGreaterThan(0)
@@ -723,11 +726,11 @@ describe('quote-to-bot invariants (design §6 regression band)', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 圖片刀B — partner-group image tracking（「@bot 讀取這張圖」沒引用時的來源）
+// 圖片刀B — partner-group image markers（引用圖＋tag 即觸發的判定來源）
 // ---------------------------------------------------------------------------
 
 describe('partner-group image event recording（圖片刀B）', () => {
-  it('records a partner-group image event so the vision path can resolve 最近一張圖', async () => {
+  it('marks a partner-group image event so a later quote to it can trigger vision', async () => {
     const store = new MemoryStore()
     const event = taggedPartnerGroupEvent({
       kind: 'image',
@@ -738,10 +741,7 @@ describe('partner-group image event recording（圖片刀B）', () => {
     })
     await getEventHandler()(event, store)
 
-    expect(await store.getLatestPartnerGroupImageMsg('G_partner')).toEqual({
-      messageId: 'M_img_001',
-      timestamp: 1_700_000_111_000,
-    })
+    expect(await store.isPartnerGroupImageMsg('M_img_001')).toBe(true)
   })
 
   it('never records an OA customer image（customer plane never feeds the vision path）', async () => {
@@ -749,9 +749,52 @@ describe('partner-group image event recording（圖片刀B）', () => {
     const event = oaEvent({ kind: 'image', messageId: 'M_oa_img', text: undefined })
     await getEventHandler()(event, store)
 
-    // OA events have no groupId — nothing may appear under ANY group key, and
-    // the store must stay image-free.
-    expect(await store.getLatestPartnerGroupImageMsg('G_partner')).toBeNull()
+    expect(await store.isPartnerGroupImageMsg('M_oa_img')).toBe(false)
+  })
+
+  it('a quote to a recorded image threads quotedImage=true to the responder（引用圖＋tag 即觸發）', async () => {
+    const store = new MemoryStore()
+    await store.putPartnerGroupImageMsg('M_img_001')
+
+    let capturedQuotedImage: boolean | undefined
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedQuotedImage = input.quotedImage
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(async () => ['M_sent'])
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'group_quoted',
+      messageId: 'M_quoting_img',
+      quotedRef: { quotedMessageId: 'M_img_001' },
+    })
+    await getEventHandler()(event, store)
+
+    expect(capturedQuotedImage).toBe(true)
+  })
+
+  it('a quote to a NON-image message never threads quotedImage=true', async () => {
+    const store = new MemoryStore()
+
+    let capturedQuotedImage: boolean | undefined
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedQuotedImage = input.quotedImage
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(async () => ['M_sent'])
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'group_quoted',
+      messageId: 'M_quoting_text',
+      quotedRef: { quotedMessageId: 'M_some_text_msg' },
+    })
+    await getEventHandler()(event, store)
+
+    expect(capturedQuotedImage).not.toBe(true)
   })
 
   it('a store write failure is best-effort: logged, never thrown（webhook 還是 200）', async () => {

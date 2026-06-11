@@ -161,6 +161,34 @@ async function resolveQuotedBotContent(
   }
 }
 
+/**
+ * True iff a bot-directed partner-group event quotes a recorded partner-group
+ * IMAGE message（圖片刀B：引用圖＋tag 即觸發）. FAIL-SAFE: a store read failure
+ * returns false — vision simply does not trigger and the base responder's 刀A
+ * honest clause owns the reply. The OA plane is never botDirected, so a
+ * customer message can never reach this read.
+ */
+async function resolveQuotedImage(
+  event: NormalizedLineEvent,
+  store: CaseStore,
+  botDirected: boolean
+): Promise<boolean> {
+  if (
+    !botDirected ||
+    event.sourceChannel !== 'line_partner_group' ||
+    event.kind !== 'group_quoted'
+  ) {
+    return false
+  }
+  const qid = event.quotedRef?.quotedMessageId
+  if (typeof qid !== 'string' || qid === '') return false
+  try {
+    return await store.isPartnerGroupImageMsg(qid)
+  } catch {
+    return false // fail-safe: cannot confirm it is an image → no vision trigger
+  }
+}
+
 function mayProducePartnerGroupReply(
   event: NormalizedLineEvent,
   botDirected: boolean
@@ -192,22 +220,20 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     botDirected,
   })
 
-  // 1a. 圖片刀B — record partner-group image messageIds so a later
-  //     「@bot 讀取這張圖」 without a quote can resolve 最近一張圖.  Best-effort:
-  //     a store failure must never 500 the webhook (LINE would redeliver) —
-  //     worst case the partner has to quote the image explicitly.  Code-only
+  // 1a. 圖片刀B — mark partner-group image messageIds so a later quote-reply
+  //     to one of them is recognised as「引用了一張圖」（引用圖＋tag 即觸發）.
+  //     Best-effort: a store failure must never 500 the webhook (LINE would
+  //     redeliver) — worst case the partner re-sends the image.  Code-only
   //     log: the raw store error could echo a KV url.  OA events never reach
-  //     this branch (no partner-group sourceChannel / no groupId), so the
-  //     customer plane never feeds the vision path.
+  //     this branch (no partner-group sourceChannel), so the customer plane
+  //     never feeds the vision path.
   if (
     event.kind === 'image' &&
     event.sourceChannel === 'line_partner_group' &&
-    typeof event.groupId === 'string' &&
-    event.groupId !== '' &&
     event.messageId !== ''
   ) {
     try {
-      await store.putPartnerGroupImageMsg(event.groupId, event.messageId, event.timestamp)
+      await store.putPartnerGroupImageMsg(event.messageId)
     } catch {
       log('store_write_failed', { reason: 'partner_image_record_failed' })
     }
@@ -218,6 +244,10 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   //     a customer-safe summary. undefined ⇒ the responder fails closed and asks
   //     the partner to paste the draft; it never fabricates the quoted content.
   const quotedBotContent = await resolveQuotedBotContent(event, store, botDirected)
+
+  // 1c. 圖片刀B — does this bot-directed message quote a recorded partner-group
+  //     image?（引用圖＋tag 即觸發 vision、無關鍵詞）fail-safe ⇒ false.
+  const quotedImage = await resolveQuotedImage(event, store, botDirected)
 
   // 2. Cheap precondition (a SUBSET of the full send gate): could this event
   //    even produce a reply? — partner group, addressed, live reply token.
@@ -257,6 +287,7 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
     llmClassifier: safeDefaultLlmClassifier,
     botDirected,
     quotedBotContent,
+    quotedImage,
     partnerGroupResponder: replyCandidate ? getPartnerGroupResponder() : undefined,
     log,
   })
@@ -427,9 +458,9 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
       : undefined
     // 圖片刀B — 讀圖 responder：有 key 才組；無 key ⇒ 路徑不存在。Surfacing
     // 走 M3-0 ocr 雙閘（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD，
-    // default off）⇒ 不開閘完全不影響現行行為。fetchImage 的 channel token
-    // 在 CALL time 讀（mirror reply client）；getLatestImage 走 seam getter，
-    // 與 handler 共用同一個 store。共用同一個 daily cost cap。
+    // default off）⇒ 不開閘完全不影響現行行為。觸發＝引用圖＋tag（quotedImage
+    // 由 handler 以 store 判定後線入 respondInput）。fetchImage 的 channel
+    // token 在 CALL time 讀（mirror reply client）。共用同一個 daily cost cap。
     const visionIntake = models.anthropicApiKey
       ? createVisionIntakeResponder({
           fetchImage: (messageId) =>
@@ -440,7 +471,6 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
             costCap,
             env: process.env,
           }),
-          getLatestImage: (groupId) => getStore().getLatestPartnerGroupImageMsg(groupId),
         })
       : undefined
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({

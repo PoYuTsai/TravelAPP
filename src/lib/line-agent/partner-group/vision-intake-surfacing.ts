@@ -1,21 +1,22 @@
 /**
  * vision-intake-surfacing.ts — 圖片刀B 的 surfacing decision + responder.
  *
- * 「@bot 讀取這張圖」→ LINE content API 抓圖 → Claude vision 抽客人對話文字
- * → triageCaseIntake 三分流（與客需刀直接接軌）。
+ * 「引用一張圖＋tag bot」→ LINE content API 抓圖 → Claude vision 抽客人對話
+ * 文字 → triageCaseIntake 三分流（與客需刀直接接軌）。
  *
  * 本模組是 M3-0 tool-gate（'ocr'）的第一個真消費者：surfacing 走
  * `canUseExternalTool`，所以 OA 永不、未 tag 永不、`AI_AGENT_OCR_ENABLED`
  * default off、`AI_AGENT_TOOL_COST_CAP_USD` 未設也擋（雙閘）。daily cost cap
  * 則由 vision adapter 內的 checkBudget/recordSpend 把守 — 兩層預算互不取代。
  *
- * 「這張圖」解析（Eric 拍板：夥伴體驗優先，零學習成本）：
- *   1. 引用圖片＋tag（精準）→ quotedMessageId 直接餵 content API
- *   2. 沒引用 → 該群最近一張圖（webhook 記錄；30 分鐘 freshness 窗，
- *      由本模組用 event.timestamp 判斷 — KV TTL 只是垃圾回收）
+ * 「這張圖」解析（Eric 2026-06-11 真機煙測後拍板：引用即觸發、去關鍵詞）：
+ *   引用圖片＋tag → 即觸發，無需任何觸發詞 — 夥伴零學習成本。
+ *   「引用的是圖片」由 webhook 以 store 的 image-marker 判定（quotedImage），
+ *   本模組不讀 store；無引用圖 ⇒ surfacing 不放行，base responder 的刀A
+ *   誠實條款負責回覆。舊版關鍵詞 lexicon＋「群內最近一張圖」fallback 已除役。
  *
- * Fail-closed 紀律：找不到圖／content 404／vision 失敗 → 固定誠實回覆；
- * store 讀取失敗視同沒圖（永不 throw、永不腦補）。錯誤碼 fixed-code only。
+ * Fail-closed 紀律：找不到圖／content 404／vision 失敗 → 固定誠實回覆
+ * （永不 throw、永不腦補）。錯誤碼 fixed-code only。
  */
 
 import type {
@@ -24,8 +25,6 @@ import type {
   PartnerGroupRespondResult,
 } from './responder'
 import type { AgentSourceChannel } from '../types'
-import type { NormalizedLineEvent } from '../line/event-normalizer'
-import type { PartnerGroupImageMsg } from '../storage/store'
 import { LineContentError, type LineImageContent } from '../line/content-client'
 import { VisionIntakeError, type VisionIntakeSource } from './vision-intake-adapter'
 import { canUseExternalTool } from '../tools/tool-gate'
@@ -45,48 +44,6 @@ export const VISION_INTAKE_UNAVAILABLE_REPLY =
 /** 回覆中轉述抽取文字的長度上限 — 截圖轉錄不該洗版。 */
 const EXTRACTION_ECHO_MAX_CHARS = 1000
 
-/**
- * 「最近一張圖」的新鮮度窗（ms）。超窗的圖不讀 — 寧可請夥伴引用，也不要
- * 讀到三天前不相干的圖。與 KV 的 30 分鐘 TTL 對齊（policy 在這裡，TTL 是 GC）。
- */
-export const VISION_IMAGE_FRESHNESS_MS = 30 * 60 * 1000
-
-// ---------------------------------------------------------------------------
-// Intent lexicon
-// ---------------------------------------------------------------------------
-
-/**
- * 自然語觸發詞（Eric 2026-06-11 拍板：「@bot 讀取這張圖」就要動）。
- * 刻意不與 客需（客需／整理需求…）、RAG（查內部案例…）詞彙重疊，
- * 三條路徑可獨立觸發。
- */
-const VISION_INTAKE_INTENT_TOKENS = [
-  '讀取這張圖',
-  '讀取圖片',
-  '讀取截圖',
-  '讀這張圖',
-  '讀一下圖',
-  '讀一下截圖',
-  '讀圖',
-  '看一下這張圖',
-  '看這張圖',
-  '看一下圖',
-  '看一下截圖',
-  '看圖',
-  '看截圖',
-  '這張圖',
-  '這張截圖',
-  '圖片內容',
-  '圖裡',
-  '圖中',
-] as const
-
-/** True iff `text` 明確要求讀圖（夥伴的 explicit external-data request）。 */
-export function detectVisionIntakeIntent(text: string): boolean {
-  if (!text) return false
-  return VISION_INTAKE_INTENT_TOKENS.some((token) => text.includes(token))
-}
-
 // ---------------------------------------------------------------------------
 // Surfacing decision — M3-0 tool-gate 'ocr' 真消費者
 // ---------------------------------------------------------------------------
@@ -95,24 +52,29 @@ export interface ShouldUseVisionIntakeInput {
   sourceChannel: AgentSourceChannel
   /** mentionsBot OR quote-to-bot, resolved by the caller（router botDirected）. */
   botDirected: boolean
-  text: string
+  /**
+   * True iff this event quotes a recorded partner-group IMAGE message —
+   * resolved by the webhook against the store（fail-safe ⇒ false）。引用文字
+   * 訊息、引用過期、store 壞掉都是 false ⇒ 不觸發。
+   */
+  quotedImage: boolean
   env?: Record<string, string | undefined>
 }
 
 /**
- * The surfacing decision. True ONLY when partner group + tagged + explicit
- * 讀圖 intent + the M3-0 ocr gate allows（enabled AND a positive cost cap）.
+ * The surfacing decision. True ONLY when partner group + tagged + quoted an
+ * image + the M3-0 ocr gate allows（enabled AND a positive cost cap）.
  * Any missing precondition ⇒ the existing responder runs；gate off 時 base
  * responder 的刀A 誠實條款負責回「目前讀不到圖片」。
  */
 export function shouldUseVisionIntake(input: ShouldUseVisionIntakeInput): boolean {
-  if (!detectVisionIntakeIntent(input.text)) return false
+  if (!input.quotedImage) return false
   const gate = canUseExternalTool(
     {
       tool: 'ocr',
       sourceChannel: input.sourceChannel,
       botDirected: input.botDirected,
-      // 觸發詞本身就是「明確要求讀外部資料」— intent 已在上面確認。
+      // 對著一張圖 tag bot 本身就是「明確要求讀外部資料」的手勢。
       userRequestedExternalData: true,
       // Per-turn spend：vision 每訊息至多一次呼叫，turn 起點恆為 0；每日
       // 累計預算由 adapter 的 DailyCostCap 把守。
@@ -124,35 +86,6 @@ export function shouldUseVisionIntake(input: ShouldUseVisionIntakeInput): boolea
 }
 
 // ---------------------------------------------------------------------------
-// Target image resolution（引用優先 → 群內最近一張）
-// ---------------------------------------------------------------------------
-
-async function resolveTargetImageMessageId(
-  event: NormalizedLineEvent,
-  getLatestImage: (groupId: string) => Promise<PartnerGroupImageMsg | null>
-): Promise<string | null> {
-  // 1. 引用優先：夥伴明確指了某則訊息。若引用的是文字訊息，content API 會
-  //    404 → 誠實回「找不到圖」，絕不悄悄改讀別張。
-  const quotedId = event.quotedRef?.quotedMessageId
-  if (typeof quotedId === 'string' && quotedId !== '') return quotedId
-
-  // 2. 群內最近一張圖（fail-safe：store 壞掉視同沒圖）。
-  const groupId = event.groupId
-  if (typeof groupId !== 'string' || groupId === '') return null
-  let latest: PartnerGroupImageMsg | null
-  try {
-    latest = await getLatestImage(groupId)
-  } catch {
-    return null
-  }
-  if (!latest) return null
-
-  // Freshness 窗：超窗的「最近」其實是陳年舊圖 — 不讀。
-  if (event.timestamp - latest.timestamp > VISION_IMAGE_FRESHNESS_MS) return null
-  return latest.messageId
-}
-
-// ---------------------------------------------------------------------------
 // Vision intake responder
 // ---------------------------------------------------------------------------
 
@@ -161,8 +94,6 @@ export interface CreateVisionIntakeResponderDeps {
   fetchImage: (messageId: string) => Promise<LineImageContent>
   /** Claude vision 抽取（adapter 蓋 transport + daily cost cap）。 */
   vision: VisionIntakeSource
-  /** 群內最近一張圖（webhook 端 close over store）。 */
-  getLatestImage: (groupId: string) => Promise<PartnerGroupImageMsg | null>
 }
 
 /**
@@ -177,11 +108,11 @@ export function createVisionIntakeResponder(
     async respond(
       input: PartnerGroupRespondInput
     ): Promise<PartnerGroupRespondResult> {
-      // 1. 解析「這張圖」
-      const messageId = await resolveTargetImageMessageId(
-        input.event,
-        deps.getLatestImage
-      )
+      // 1. 解析「這張圖」＝引用的那一則。Surfacing 已要求 quotedImage，這裡
+      //    是防衛性檢查（dispatcher 之外的直接呼叫也 fail-closed）。
+      const quotedId = input.event.quotedRef?.quotedMessageId
+      const messageId =
+        typeof quotedId === 'string' && quotedId !== '' ? quotedId : null
       if (messageId === null) {
         input.log?.('route_decision', {
           path: 'vision_intake',
@@ -200,7 +131,7 @@ export function createVisionIntakeResponder(
       } catch (err) {
         const code = err instanceof LineContentError ? err.code : 'content_fetch_failed'
         input.log?.('route_decision', { path: 'vision_intake', degradedReason: code })
-        // 404 ＝ 引用的不是圖片或內容已過期 → 與「找不到圖」同一句誠實回覆。
+        // 404 ＝ 引用的內容已過期或實際上不是圖片 → 與「找不到圖」同一句誠實回覆。
         return {
           text:
             code === 'content_not_found'

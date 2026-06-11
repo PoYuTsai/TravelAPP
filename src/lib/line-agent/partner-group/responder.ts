@@ -48,6 +48,13 @@ export interface PartnerGroupRespondInput {
    * fabricate the quoted content.
    */
   quotedBotContent?: string
+  /**
+   * True iff this event quotes a recorded partner-group IMAGE message（圖片
+   * 刀B 觸發訊號）。Resolved by the webhook against the store's image marker，
+   * fail-safe ⇒ absent/false（引用文字訊息、marker 過期、store 壞掉都不算）。
+   * 引用圖＋tag 即觸發 vision intake — 無關鍵詞需求。
+   */
+  quotedImage?: boolean
   /** Reserved — NOT wired to Notion/Google in this batch. */
   context?: unknown
   /**
