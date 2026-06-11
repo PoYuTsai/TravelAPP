@@ -7,6 +7,7 @@
 
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
+import type { TranscriptEntry } from '../transcript/transcript-entry'
 
 /**
  * Max characters of bot-authored message content cached for quote-to-bot
@@ -131,4 +132,26 @@ export interface CaseStore {
    * the marker has not expired.  Empty messageId returns false with no I/O.
    */
   isPartnerGroupImageMsg(messageId: string): Promise<boolean>
+
+  // ── 旁聽存檔層（沉澱管線刀1）───────────────────────────────────────────────
+
+  /**
+   * Persist one partner-group transcript entry（旁聽存檔，design 2026-06-11 §2 ①）.
+   * Idempotent per messageId — LINE at-least-once 重送覆寫同 key，絕不重複記。
+   * KV 實作帶 TTL 30 天（滾動窗）；empty messageId 是 no-op。
+   * 獨立 key namespace — 永不出現在 listAll()/案件面，OA 客人面永不寫入。
+   */
+  putTranscriptEntry(entry: TranscriptEntry): Promise<void>
+
+  /**
+   * Read one transcript entry by messageId；不存在（或已過期）回 null。
+   * Empty messageId 回 null、零 I/O。冪等防雙重 OCR 的前置檢查用。
+   */
+  getTranscriptEntry(messageId: string): Promise<TranscriptEntry | null>
+
+  /**
+   * List all live transcript entries（刀2 批次沉澱掃描＋CLI dry-run 驗證用）。
+   * KV 實作走 keys-scan — 不在 webhook 熱路徑上呼叫。
+   */
+  listTranscriptEntries(): Promise<TranscriptEntry[]>
 }

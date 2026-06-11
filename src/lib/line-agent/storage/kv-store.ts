@@ -17,6 +17,7 @@
 import { Redis } from '@upstash/redis'
 import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
+import type { TranscriptEntry } from '../transcript/transcript-entry'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -171,6 +172,11 @@ const BOT_AUTHORED_TTL_SECONDS = 604800 // 7 days
 // to an expired marker simply does not trigger vision（fail-closed）.
 const PARTNER_GROUP_IMG_PREFIX = 'line-agent:partner-group-img-msg:'
 const PARTNER_GROUP_IMG_TTL_SECONDS = 604800 // 7 days
+// 旁聽存檔（沉澱管線刀1）— 獨立 namespace，永不 match case:* 。TTL 30 天
+// 滾動窗（design 2026-06-11：不永久留存夥伴對話—隱私重量）；同 messageId
+// 覆寫＝LINE at-least-once 冪等。
+const TRANSCRIPT_PREFIX = 'line-agent:transcript:'
+const TRANSCRIPT_TTL_SECONDS = 2_592_000 // 30 days
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -190,6 +196,10 @@ function partnerBotMsgContentKey(messageId: string): string {
 
 function partnerGroupImgKey(messageId: string): string {
   return `${PARTNER_GROUP_IMG_PREFIX}${messageId}`
+}
+
+function transcriptKey(messageId: string): string {
+  return `${TRANSCRIPT_PREFIX}${messageId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -364,5 +374,27 @@ export class KvStore implements CaseStore {
     if (messageId === '') return false
     const kv = this.ensureClient()
     return (await kv.get(partnerGroupImgKey(messageId))) !== null
+  }
+
+  // ── 旁聽存檔（沉澱管線刀1）─────────────────────────────────────────────────
+
+  async putTranscriptEntry(entry: TranscriptEntry): Promise<void> {
+    if (entry.messageId === '') return
+    const kv = this.ensureClient()
+    await kv.setWithTtl(transcriptKey(entry.messageId), entry, TRANSCRIPT_TTL_SECONDS)
+  }
+
+  async getTranscriptEntry(messageId: string): Promise<TranscriptEntry | null> {
+    if (messageId === '') return null
+    const kv = this.ensureClient()
+    return kv.get<TranscriptEntry>(transcriptKey(messageId))
+  }
+
+  async listTranscriptEntries(): Promise<TranscriptEntry[]> {
+    const kv = this.ensureClient()
+    const keys = await kv.keys(`${TRANSCRIPT_PREFIX}*`)
+    if (keys.length === 0) return []
+    const entries = await Promise.all(keys.map((k) => kv.get<TranscriptEntry>(k)))
+    return entries.filter((e): e is TranscriptEntry => e !== null)
   }
 }

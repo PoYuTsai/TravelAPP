@@ -10,6 +10,7 @@
 
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
+import type { TranscriptEntry } from '../transcript/transcript-entry'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -48,6 +49,12 @@ export class MemoryStore implements CaseStore {
    * to it counts as「引用了一張圖」and can trigger the vision path.
    */
   private readonly partnerGroupImageMsgs = new Set<string>()
+
+  /**
+   * 旁聽存檔（沉澱管線刀1，NOT case state）— messageId → TranscriptEntry。
+   * In-memory 不模擬 TTL（同其他 marker 的慣例）；30 天滾動窗只在 KV 層成立。
+   */
+  private readonly transcriptEntries = new Map<string, TranscriptEntry>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -172,5 +179,23 @@ export class MemoryStore implements CaseStore {
   async isPartnerGroupImageMsg(messageId: string): Promise<boolean> {
     if (messageId === '') return false
     return this.partnerGroupImageMsgs.has(messageId)
+  }
+
+  // ── 旁聽存檔（沉澱管線刀1）─────────────────────────────────────────────────
+
+  async putTranscriptEntry(entry: TranscriptEntry): Promise<void> {
+    if (entry.messageId === '') return
+    // Shallow copy 防呼叫端透過引用改已存紀錄（同 put 的慣例）。
+    this.transcriptEntries.set(entry.messageId, { ...entry })
+  }
+
+  async getTranscriptEntry(messageId: string): Promise<TranscriptEntry | null> {
+    if (messageId === '') return null
+    const entry = this.transcriptEntries.get(messageId)
+    return entry ? { ...entry } : null
+  }
+
+  async listTranscriptEntries(): Promise<TranscriptEntry[]> {
+    return Array.from(this.transcriptEntries.values()).map((e) => ({ ...e }))
   }
 }

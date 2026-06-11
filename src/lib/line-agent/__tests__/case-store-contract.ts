@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { CaseStore } from '../storage/store'
 import { createInitialCase, type AgentCase } from '../cases/case-state'
+import type { TranscriptEntry } from '../transcript/transcript-entry'
 
 const T0 = '2026-06-01T08:00:00.000Z'
 const T1 = '2026-06-01T09:00:00.000Z'
@@ -36,6 +37,20 @@ function makeBob(): AgentCase {
     customerDisplayName: 'Bob',
     now: T0,
   })
+}
+
+function makeTranscriptEntry(
+  overrides: Partial<TranscriptEntry> = {}
+): TranscriptEntry {
+  return {
+    messageId: 'MT001',
+    groupId: 'G_partner',
+    lineUserId: 'U_tsai',
+    timestamp: 1_700_000_000_000,
+    kind: 'text',
+    text: '高山行程2月可以走嗎',
+    ...overrides,
+  }
 }
 
 /**
@@ -276,6 +291,52 @@ export function runCaseStoreContract(
         timestamp: T1,
       })
       expect(await store.getAudit(bob.caseId)).toHaveLength(0)
+    })
+
+    // ── 旁聽存檔層（沉澱管線刀1）─────────────────────────────────────────────
+    // 夥伴群每則文字/截圖一筆 TranscriptEntry；messageId 為 primary key，
+    // LINE at-least-once 重送覆寫同 key（冪等）。獨立 namespace — 絕不漏進
+    // 案件面（listAll/get），OA 客人面永不寫入。
+
+    it('putTranscriptEntry then getTranscriptEntry round-trips the entry', async () => {
+      const entry = makeTranscriptEntry({ quotedMessageId: 'MQ9' })
+      await store.putTranscriptEntry(entry)
+      const got = await store.getTranscriptEntry('MT001')
+      expect(got).toEqual(entry)
+    })
+
+    it('getTranscriptEntry returns null for unknown and empty messageId', async () => {
+      expect(await store.getTranscriptEntry('M_NOPE')).toBeNull()
+      expect(await store.getTranscriptEntry('')).toBeNull()
+    })
+
+    it('putTranscriptEntry with empty messageId is a no-op', async () => {
+      await store.putTranscriptEntry(makeTranscriptEntry({ messageId: '' }))
+      expect(await store.listTranscriptEntries()).toEqual([])
+    })
+
+    it('a second put with the same messageId overwrites (no duplicate)', async () => {
+      await store.putTranscriptEntry(makeTranscriptEntry())
+      await store.putTranscriptEntry(makeTranscriptEntry({ text: '改寫後' }))
+      const all = await store.listTranscriptEntries()
+      expect(all).toHaveLength(1)
+      expect(all[0].text).toBe('改寫後')
+    })
+
+    it('listTranscriptEntries returns every stored entry', async () => {
+      await store.putTranscriptEntry(makeTranscriptEntry())
+      await store.putTranscriptEntry(
+        makeTranscriptEntry({ messageId: 'MT002', kind: 'image', text: '' })
+      )
+      const ids = (await store.listTranscriptEntries())
+        .map((e) => e.messageId)
+        .sort()
+      expect(ids).toEqual(['MT001', 'MT002'])
+    })
+
+    it('transcript entries never leak into the case plane (listAll)', async () => {
+      await store.putTranscriptEntry(makeTranscriptEntry())
+      expect(await store.listAll()).toEqual([])
     })
   })
 }
