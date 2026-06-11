@@ -148,7 +148,7 @@ Eric 的必要動作只有兩個：偶爾打「沉澱」、看清單回一句。
 
 ## 實作順序（建議，未排程）
 
-1. 刀1：① 旁聽存檔（含截圖 OCR 入存檔）——純記錄，零對外行為，風險最低
+1. 刀1：① 旁聽存檔（含截圖 OCR 入存檔）——純記錄，零對外行為，風險最低 ✅ done（2026-06-11，store d2f2ec5 / archiver d5bf5d8 / OCR prompt 3257c9d+d09cb56 / 接線 47567b0＋placeholder fix 44ed0f6）
 2. 刀2：③ 沉澱 + ④ 過目（dry-run：先只貼候選，不寫 Notion）
 3. 刀3：⑤ Notion 寫入（開 `KNOWLEDGE_WRITE_ENABLED`）
 4. 刀4：② 隨手標（nice-to-have，最後）
