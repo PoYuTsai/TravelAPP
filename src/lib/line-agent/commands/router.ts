@@ -77,6 +77,16 @@ export interface QuoteDryRunInput {
 }
 
 // ---------------------------------------------------------------------------
+// 沉澱刀2 — distill seam failure copy
+// ---------------------------------------------------------------------------
+
+/**
+ * Outbound text when the distill seam throws past its own error handling.
+ * Exported so tests assert against the constant, not a string literal.
+ */
+export const DISTILL_SEAM_FAILURE_TEXT = '沉澱處理失敗，請稍後重試。'
+
+// ---------------------------------------------------------------------------
 // Router input — either an event (LINE) or a command (DC/operator)
 // ---------------------------------------------------------------------------
 
@@ -341,13 +351,16 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
               return { action: 'distill', source, handlerResult: approval, intent: earlyIntent }
             }
           } catch {
+            // Code-only log（structured-log 紀律）：raw error 可能 echo KV
+            // url/secret，絕不放 err.message——固定 reason code 就夠 join trace。
+            input.log?.('store_write_failed', { reason: 'distill_seam_failed' })
             return {
               action: 'distill',
               source,
               handlerResult: {
                 handler: 'distill',
                 status: 'error',
-                outboundText: '沉澱處理失敗，請稍後重試。',
+                outboundText: DISTILL_SEAM_FAILURE_TEXT,
                 meta: { reason: 'distill_seam_failed' },
               },
               intent: earlyIntent,

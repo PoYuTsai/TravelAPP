@@ -11,7 +11,12 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
-import { routeCommand, type RouterInput } from '../commands/router'
+import {
+  routeCommand,
+  DISTILL_SEAM_FAILURE_TEXT,
+  type RouterInput,
+} from '../commands/router'
+import type { AgentLogger } from '../observability/structured-log'
 import { safeDefaultLlmClassifier } from '../commands/intent'
 import { shouldReplyToPartnerGroup } from '../line/partner-reply-gate'
 import { MemoryStore } from '../storage/memory-store'
@@ -201,8 +206,62 @@ describe('routeCommand — 沉澱刀2 B1 distill 攔截', () => {
 
     expect(decision.action).toBe('distill')
     expect(decision.handlerResult?.status).toBe('error')
-    expect(decision.handlerResult?.outboundText).toBe('沉澱處理失敗，請稍後重試。')
+    expect(decision.handlerResult?.outboundText).toBe(DISTILL_SEAM_FAILURE_TEXT)
     expect(decision.handlerResult?.meta?.reason).toBe('distill_seam_failed')
+  })
+
+  it('seam throw → log 收到 store_write_failed 固定 code，絕不含 error 內文', async () => {
+    const distill = fakeDistillSeam({
+      run: async () => {
+        throw new Error('SECRET kv url leaked in message')
+      },
+    })
+    const log = vi.fn() as AgentLogger & ReturnType<typeof vi.fn>
+    const decision = await routeCommand(
+      baseInput(groupEvent('@bot 沉澱'), { distill, log })
+    )
+
+    expect(decision.action).toBe('distill')
+    expect(log).toHaveBeenCalledTimes(1)
+    expect(log).toHaveBeenCalledWith('store_write_failed', {
+      reason: 'distill_seam_failed',
+    })
+    // code-only 紀律：所有 log 呼叫序列化後不得含 raw error 內文
+    expect(JSON.stringify(log.mock.calls)).not.toContain('SECRET')
+  })
+
+  it('approve 裸 throw 同樣收斂＋log（兩條 seam 路徑同一最後防線）', async () => {
+    const distill = fakeDistillSeam({
+      approve: async () => {
+        throw new Error('approve store exploded')
+      },
+    })
+    const log = vi.fn() as AgentLogger & ReturnType<typeof vi.fn>
+    const decision = await routeCommand(
+      baseInput(groupEvent('@bot 1 3 要'), { distill, log })
+    )
+
+    expect(decision.action).toBe('distill')
+    expect(decision.handlerResult?.status).toBe('error')
+    expect(decision.handlerResult?.outboundText).toBe(DISTILL_SEAM_FAILURE_TEXT)
+    expect(log).toHaveBeenCalledWith('store_write_failed', {
+      reason: 'distill_seam_failed',
+    })
+    expect(JSON.stringify(log.mock.calls)).not.toContain('exploded')
+  })
+
+  it('seam throw ＋ 未注入 log → 照樣收斂、不炸（log optional）', async () => {
+    const distill = fakeDistillSeam({
+      run: async () => {
+        throw new Error('boom')
+      },
+    })
+    const decision = await routeCommand(
+      baseInput(groupEvent('@bot 沉澱'), { distill })
+    )
+
+    expect(decision.action).toBe('distill')
+    expect(decision.handlerResult?.outboundText).toBe(DISTILL_SEAM_FAILURE_TEXT)
   })
 })
 
