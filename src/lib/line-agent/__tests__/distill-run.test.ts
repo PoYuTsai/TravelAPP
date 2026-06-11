@@ -141,6 +141,13 @@ describe('runDistillation', () => {
 
     expect(source).not.toHaveBeenCalled()
     expect(result.status).toBe('stub_ok')
+    // meta 與主路徑對稱（scannedCount 0 — 本輪沒掃新訊息）
+    expect(result.meta).toEqual({
+      scannedCount: 0,
+      candidateCount: 1,
+      carryoverCount: 1,
+      unreadableImageCount: 0,
+    })
     const batch = await store.getDistillPending(GROUP)
     expect(batch?.candidates).toHaveLength(1)
     expect(batch?.candidates[0].missedCount).toBe(1)
@@ -400,6 +407,88 @@ describe('runDistillation', () => {
     const batch = await store.getDistillPending(GROUP)
     expect(batch?.candidates.map((c) => c.id)).toEqual([1])
     expect(batch?.candidates[0].missedCount).toBe(1)
+  })
+
+  it('零新訊息＋舊 batch 存在＋putDistillPending throw → errorResult、不裸 throw', async () => {
+    const store = new MemoryStore()
+    await store.putDistillPending({
+      groupId: GROUP,
+      createdAt: NOW - 1000,
+      // missedCount 1 → 本輪 +1 達 2 即棄 → carryover 空 → 走 writeBatch([]) 分支
+      candidates: [pendingCandidate({ missedCount: 1 })],
+      resolved: [],
+    })
+    vi.spyOn(store, 'putDistillPending').mockRejectedValue(new Error('kv down'))
+    const source = sourceReturning('[]')
+    const logged: string[] = []
+
+    const result = await runDistillation({
+      groupId: GROUP,
+      store,
+      source,
+      now: NOW,
+      log: (event, fields) => logged.push(JSON.stringify({ event, ...fields })),
+    })
+
+    expect(result.status).toBe('error')
+    expect(result.outboundText).toBe(DISTILL_FAILURE_TEXT)
+    expect(result.meta).toEqual({ reason: 'distill_pending_write_failed' })
+    expect(logged.some((l) => l.includes('distill_pending_write_failed'))).toBe(true)
+  })
+
+  it('零新訊息＋carryover＋putDistillPending throw → errorResult、不裸 throw', async () => {
+    const store = new MemoryStore()
+    await store.putDistillPending({
+      groupId: GROUP,
+      createdAt: NOW - 1000,
+      candidates: [pendingCandidate({ missedCount: 0 })], // 留下 → carryover-only 分支
+      resolved: [],
+    })
+    vi.spyOn(store, 'putDistillPending').mockRejectedValue(new Error('kv down'))
+    const source = sourceReturning('[]')
+
+    const result = await runDistillation({ groupId: GROUP, store, source, now: NOW })
+
+    expect(source).not.toHaveBeenCalled()
+    expect(result.status).toBe('error')
+    expect(result.outboundText).toBe(DISTILL_FAILURE_TEXT)
+    expect(result.meta).toEqual({ reason: 'distill_pending_write_failed' })
+  })
+
+  it('主路徑 putDistillPending throw → entries 未標 distilled＋errorResult（順序鐵律：pending 先、distilled 後）', async () => {
+    const store = new MemoryStore()
+    await seed(store, [entry({ messageId: 'M1' })])
+    vi.spyOn(store, 'putDistillPending').mockRejectedValue(new Error('kv down'))
+    const source = sourceReturning(
+      candidateJson([{ question: 'Q', answer: 'A', sourceLines: [1] }])
+    )
+
+    const result = await runDistillation({ groupId: GROUP, store, source, now: NOW })
+
+    expect(result.status).toBe('error')
+    expect(result.outboundText).toBe(DISTILL_FAILURE_TEXT)
+    expect(result.meta).toEqual({ reason: 'distill_pending_write_failed' })
+    // pending 寫失敗 → 絕不標 distilled（下次重掃即可；反過來會永遠丟掉這批）
+    expect((await store.getTranscriptEntry('M1'))?.distilled).toBeUndefined()
+  })
+
+  it('fresh 全是讀不到的截圖（空 prompt）→ 不叫 source、照標 distilled、文案報 2 張讀不到', async () => {
+    const store = new MemoryStore()
+    await seed(store, [
+      entry({ messageId: 'M1', kind: 'image', text: '' }),
+      entry({ messageId: 'M2', kind: 'image', text: '', timestamp: 1_700_000_001_000 }),
+    ])
+    const source = sourceReturning('[]')
+
+    const result = await runDistillation({ groupId: GROUP, store, source, now: NOW })
+
+    expect(source).not.toHaveBeenCalled() // 空 prompt 絕不打 LLM（必 400 死循環）
+    expect(result.status).toBe('stub_ok')
+    expect(result.outboundText).toContain(DISTILL_NO_CANDIDATES_TEXT)
+    expect(result.outboundText).toContain('⚠️ 有 2 張截圖讀不到，已略過')
+    // 掃過了就要標 distilled — 否則每輪重掃同批死循環
+    expect((await store.getTranscriptEntry('M1'))?.distilled).toBe(true)
+    expect((await store.getTranscriptEntry('M2'))?.distilled).toBe(true)
   })
 
   it('markTranscriptDistilled 單筆 throw → 其餘照標、整體仍成功（漏標只是下次重掃）', async () => {

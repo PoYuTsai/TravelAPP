@@ -61,7 +61,11 @@ export const DISTILL_MISSED_DROP_AT = 2
 
 const EMOJI_DIGITS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣']
 
-/** 1-9 用 emoji 編號；>9 用「10.」普通編號（防衛 — 正常 cap 後到不了）。 */
+/**
+ * 1-9 用 emoji 編號；>9 用「10.」普通編號。
+ * 10 是可達常態（carryover 上限 5＋新候選上限 5）；成長有界 —
+ * missedCount 達 2 即棄，carryover 不會無限堆積。
+ */
 function numberLabel(id: number): string {
   return id >= 1 && id <= 9 ? EMOJI_DIGITS[id - 1] : `${id}.`
 }
@@ -137,7 +141,12 @@ export async function runDistillation(
   if (fresh.length === 0) {
     if (carryover.length === 0) {
       // 被略過的事實要記錄 — 但舊 batch 不存在就不無中生有寫入。
-      if (oldBatch) await writeBatch([])
+      try {
+        if (oldBatch) await writeBatch([])
+      } catch {
+        log?.('store_write_failed', { reason: 'distill_pending_write_failed' })
+        return errorResult('distill_pending_write_failed')
+      }
       return {
         handler: 'runDistillation',
         status: 'stub_ok',
@@ -146,30 +155,47 @@ export async function runDistillation(
     }
     // 沒新訊息但有 carryover → 只重貼 carryover（不掃、不標 distilled）
     const renumbered = renumber(carryover)
-    await writeBatch(renumbered)
+    try {
+      await writeBatch(renumbered)
+    } catch {
+      log?.('store_write_failed', { reason: 'distill_pending_write_failed' })
+      return errorResult('distill_pending_write_failed')
+    }
     return {
       handler: 'runDistillation',
       status: 'stub_ok',
       outboundText: composeCandidateReply(renumbered, 0),
+      meta: {
+        scannedCount: 0,
+        candidateCount: renumbered.length,
+        carryoverCount: carryover.length,
+        unreadableImageCount: 0,
+      },
     }
   }
 
   // ④ 織串 → 一次 LLM → zero-trust 解析。throw → 零副作用、固定文案。
+  //    空 prompt（fresh 全是 OCR 失敗截圖 — 刀1 閘關時的常態）絕不打 LLM：
+  //    API 必 400 → error → 不標 distilled → 每輪重複失敗死循環。視同零候選。
   const woven = weaveTranscript(fresh)
-  let raw: string
-  try {
-    raw = await source(woven.promptText)
-  } catch {
-    // Raw error 可能帶 transport 細節 — 吞掉只留 fixed code。
-    return errorResult('distill_source_failed')
-  }
   let parsed: ParsedCandidate[]
-  try {
-    parsed = parseDistillCandidates(raw)
-  } catch (e) {
-    return errorResult(
-      e instanceof DistillParseError ? `distill_parse_${e.code}` : 'distill_parse_failed'
-    )
+  if (woven.promptText === '') {
+    parsed = []
+  } else {
+    let raw: string
+    try {
+      raw = await source(woven.promptText)
+    } catch {
+      // Raw error 可能帶 transport 細節 — 吞掉只留 fixed code。
+      return errorResult('distill_source_failed')
+    }
+    try {
+      parsed = parseDistillCandidates(raw)
+    } catch (e) {
+      return errorResult(
+        e instanceof DistillParseError ? `distill_parse_${e.code}` : 'distill_parse_failed'
+      )
+    }
   }
 
   // ⑤ sourceLines → sourceMessageIds（去重；無效行號跳過）；合併 carryover。
@@ -210,11 +236,19 @@ export async function runDistillation(
   }
 
   if (combined.length === 0) {
+    // 讀不到的截圖照報（含空 prompt 整批讀不到的情境）— 沉默會讓人以為被吃掉。
+    const lines = [DISTILL_NO_CANDIDATES_TEXT]
+    if (woven.unreadableImageCount > 0) {
+      lines.push(`⚠️ 有 ${woven.unreadableImageCount} 張截圖讀不到，已略過`)
+    }
     return {
       handler: 'runDistillation',
       status: 'stub_ok',
-      outboundText: DISTILL_NO_CANDIDATES_TEXT,
-      meta: { scannedCount: woven.scannedMessageIds.length },
+      outboundText: lines.join('\n'),
+      meta: {
+        scannedCount: woven.scannedMessageIds.length,
+        unreadableImageCount: woven.unreadableImageCount,
+      },
     }
   }
 
