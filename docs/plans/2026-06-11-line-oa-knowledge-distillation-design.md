@@ -138,6 +138,14 @@ Eric 的必要動作只有兩個：偶爾打「沉澱」、看清單回一句。
 - 沉澱：fake LLM adapter fixture。
 - 上線前：CLI dry-run 一次真資料。
 
+### 沉澱問答 db（2026-06-11 已建）
+
+- 已用「清微旅行知識庫」integration（讀+寫）在知識庫主頁下建立，id 存
+  `.env.local` 的 `NOTION_DISTILLED_QA_DB`（`.env.example` 有註解條目）。
+- 欄位：問題（title）/ 答案 / 地區（multi-select）/ 主題（multi-select）/
+  出處 / 出現次數（number）/ 狀態（候選→已批准/已略過）/ 收錄日期。
+- 已插一筆「（示範）」資料示意格式；刀3 寫入時 `狀態=候選` 由過目流程晉升。
+
 ## 實作順序（建議，未排程）
 
 1. 刀1：① 旁聽存檔（含截圖 OCR 入存檔）——純記錄，零對外行為，風險最低
