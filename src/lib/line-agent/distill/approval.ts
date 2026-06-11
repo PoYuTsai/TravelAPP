@@ -5,7 +5,8 @@
  * 解析＋更新 pending batch。
  *
  * 紀律：
- *   - dry-run：只記狀態，絕不寫 Notion — 那是刀3；resolved 清單就是刀3 的輸入。
+ *   - 刀3 writer seam：knowledgeWriter 未注入 ⇒ dry-run（只記狀態，絕不寫
+ *     Notion，ack 逐字同刀2）；注入 ⇒ 批准落地後 flush 全部 resolved backlog。
  *   - id 不重編：清單已貼出，編號對 Eric 是穩定的 — 收掉 1、3 之後，2、4
  *     必須還叫 2、4（下次「沉澱」才由 orchestrator 重編 1..N）。
  *   - 超界 index 整批拒絕（含部分超界）— 保守：避免 Eric 打錯行號收錯條。
@@ -20,6 +21,8 @@ import type { CaseStore } from '../storage/store'
 import type { AgentLogger } from '../observability/structured-log'
 import type { HandlerResult } from '../commands/handlers'
 import type { DistillCandidate } from './pending'
+import type { DistilledQaWriter } from './distilled-qa-writer'
+import { flushResolvedToNotion } from './knowledge-flush'
 
 // ---------------------------------------------------------------------------
 // 解析 — 純函式，剝 @mention（同 isDistillCommand 剝法）＋trim 後全句 match
@@ -80,12 +83,13 @@ function joinIds(candidates: DistillCandidate[]): string {
 
 function composeAck(
   headline: string,
-  remaining: DistillCandidate[]
+  remaining: DistillCandidate[],
+  writeLine: string
 ): string {
   return [
     headline,
     remaining.length > 0 ? `仍掛著：${joinIds(remaining)}` : '候選已全部處理完',
-    DRY_RUN_NOTE,
+    writeLine,
   ].join('\n')
 }
 
@@ -103,6 +107,11 @@ export interface ApplyDistillApprovalInput {
    */
   now: number
   log?: AgentLogger
+  /**
+   * 刀3 seam — webhook 在 KNOWLEDGE_WRITE_ENABLED（＋token＋db id）齊時注入；
+   * 未注入 ⇒ 刀2 dry-run 行為逐字不變（ship 零行為改變）。
+   */
+  knowledgeWriter?: DistilledQaWriter
 }
 
 function errorResult(reason: string): HandlerResult {
@@ -173,13 +182,36 @@ export async function applyDistillApproval(
       ? `✏️ 第 ${approval.index} 條已改收，A：${approval.newAnswer}`
       : `✅ 已收：${joinIds(moved)}`
 
+  const meta: Record<string, unknown> = {
+    resolvedCount: moved.length,
+    remainingCount: remaining.length,
+  }
+
+  // 刀3：批准狀態落地後 flush（含 dry-run 期 backlog）。flush 自己讀最新
+  // batch、自己處理單條失敗 — 這裡只決定 ack 的第三行。
+  let writeLine = DRY_RUN_NOTE
+  if (input.knowledgeWriter) {
+    const flush = await flushResolvedToNotion({
+      store,
+      groupId,
+      writer: input.knowledgeWriter,
+      now: input.now,
+      log,
+    })
+    writeLine = [
+      `📥 已寫入 Notion 知識庫 ${flush.written} 條`,
+      ...(flush.failed > 0
+        ? [`⚠️ ${flush.failed} 條寫入失敗，下次批准補寫`]
+        : []),
+    ].join('\n')
+    meta.written = flush.written
+    meta.writeFailed = flush.failed
+  }
+
   return {
     handler: 'applyDistillApproval',
     status: 'stub_ok',
-    outboundText: composeAck(headline, remaining),
-    meta: {
-      resolvedCount: moved.length,
-      remainingCount: remaining.length,
-    },
+    outboundText: composeAck(headline, remaining, writeLine),
+    meta,
   }
 }

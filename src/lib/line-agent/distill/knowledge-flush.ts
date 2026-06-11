@@ -7,6 +7,9 @@
  *     就是刀3 的輸入（approval.ts:8 的承諾）。
  *   - 每條寫成功**立刻** putDistillPending 落標 — 把「頁建了標丟了」的重複窗
  *     縮到單條；落標失敗 log 後繼續（頁已存在，回滾只會更糟）。
+ *   - 後寫贏的另一面：落標 put 用的是迴圈開頭那份 batch snapshot — 若沉澱
+ *     orchestrator 並發改寫 batch，這裡會以 stale candidates 蓋回去（plan
+ *     已知風險「flush 與下一輪沉澱互洗」，接受）。
  *   - 單條寫失敗跳過續寫其他條 — Notion 抖動不該扣住整批。
  *   - 絕不動 candidates（仍 pending 的）— 那是過目流程的狀態。
  */

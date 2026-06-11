@@ -371,3 +371,159 @@ describe('applyDistillApproval', () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// applyDistillApproval × knowledgeWriter — 刀3 writer seam（批准即 flush）
+// ---------------------------------------------------------------------------
+
+/** fake writer — 記錄被寫的 candidate id；failIds 內的 id 模擬 Notion 抖動。 */
+function fakeWriter(failIds: number[] = []) {
+  const calls: number[] = []
+  return {
+    calls,
+    writer: {
+      write: async (c: DistillCandidate) => {
+        calls.push(c.id)
+        if (failIds.includes(c.id)) throw new Error('notion down')
+        return `page-${c.id}`
+      },
+    },
+  }
+}
+
+describe('applyDistillApproval × knowledgeWriter（刀3 seam）', () => {
+  it('守門：knowledgeWriter 未注入 → ack 逐字同刀2（含 dry-run note）、meta 無 written/writeFailed', async () => {
+    const store = new MemoryStore()
+    await seedBatch(store, 4)
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [1, 3] },
+      now: NOW,
+    })
+
+    expect(result?.outboundText).toBe(
+      [
+        '✅ 已收：1、3',
+        '仍掛著：2、4',
+        '（dry-run：刀3 開閘後才寫入 Notion）',
+      ].join('\n')
+    )
+    expect(result?.meta).toEqual({ resolvedCount: 2, remainingCount: 2 })
+  })
+
+  it('writer 注入＋approve 2 條（resolved 已有 1 條 dry-run backlog 未寫）→ flush 寫 3 條、ack 含 📥、不含 dry-run note', async () => {
+    const store = new MemoryStore()
+    // 刀2 dry-run 期累積的 backlog（無 notionPageId）— flush 必須一併補寫
+    await seedBatch(store, 3, [
+      candidate({ id: 7, question: '更早批的', status: 'approved' }),
+    ])
+    const { calls, writer } = fakeWriter()
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [1, 3] },
+      now: NOW,
+      knowledgeWriter: writer,
+    })
+
+    expect(result?.outboundText).toBe(
+      ['✅ 已收：1、3', '仍掛著：2', '📥 已寫入 Notion 知識庫 3 條'].join('\n')
+    )
+    expect(result?.outboundText).not.toContain('dry-run')
+    expect(calls).toEqual([7, 1, 3]) // backlog 在前（resolved append 順序）
+    expect(result?.meta).toEqual({
+      resolvedCount: 2,
+      remainingCount: 1,
+      written: 3,
+      writeFailed: 0,
+    })
+
+    // notionPageId 已落標（冪等防重）
+    const batch = await store.getDistillPending(GROUP)
+    expect(batch?.resolved.map((c) => ({ id: c.id, notionPageId: c.notionPageId }))).toEqual([
+      { id: 7, notionPageId: 'page-7' },
+      { id: 1, notionPageId: 'page-1' },
+      { id: 3, notionPageId: 'page-3' },
+    ])
+  })
+
+  it('writer 注入＋flush 部分失敗（written 2 / failed 1）→ ack 加 ⚠️ 補寫提示', async () => {
+    const store = new MemoryStore()
+    await seedBatch(store, 3)
+    const { writer } = fakeWriter([2]) // 第 2 條模擬 Notion 抖動
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve_all' },
+      now: NOW,
+      knowledgeWriter: writer,
+    })
+
+    expect(result?.outboundText).toBe(
+      [
+        '✅ 已收：1、2、3',
+        '候選已全部處理完',
+        '📥 已寫入 Notion 知識庫 2 條',
+        '⚠️ 1 條寫入失敗，下次批准補寫',
+      ].join('\n')
+    )
+    expect(result?.meta).toEqual({
+      resolvedCount: 3,
+      remainingCount: 0,
+      written: 2,
+      writeFailed: 1,
+    })
+  })
+
+  it('writer 注入＋超界 index 整批拒絕 → writer 零呼叫（沒有狀態變化就沒有 flush）', async () => {
+    const store = new MemoryStore()
+    await seedBatch(store, 3)
+    const { calls, writer } = fakeWriter()
+    const put = vi.spyOn(store, 'putDistillPending')
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [9] },
+      now: NOW,
+      knowledgeWriter: writer,
+    })
+
+    expect(result?.outboundText).toContain('沒有第 9 條')
+    expect(calls).toEqual([])
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it('modify 路徑＋writer → 同樣 flush、ack headline 不變', async () => {
+    const store = new MemoryStore()
+    await seedBatch(store, 3)
+    const { calls, writer } = fakeWriter()
+
+    const result = await applyDistillApproval({
+      store,
+      groupId: GROUP,
+      approval: { type: 'modify', index: 2, newAnswer: '包含保險' },
+      now: NOW,
+      knowledgeWriter: writer,
+    })
+
+    expect(result?.outboundText).toBe(
+      [
+        '✏️ 第 2 條已改收，A：包含保險',
+        '仍掛著：1、3',
+        '📥 已寫入 Notion 知識庫 1 條',
+      ].join('\n')
+    )
+    expect(calls).toEqual([2])
+    expect(result?.meta).toEqual({
+      resolvedCount: 1,
+      remainingCount: 2,
+      written: 1,
+      writeFailed: 0,
+    })
+  })
+})
