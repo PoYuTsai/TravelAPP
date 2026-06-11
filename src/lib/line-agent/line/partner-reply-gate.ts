@@ -10,8 +10,9 @@
  *   1. event.sourceChannel === 'line_partner_group'
  *   2. decision.source === 'line_partner_group'
  *   3. botDirected === true (tag OR quote-to-bot)
- *   4. decision.action === 'respond' OR 'mark_handled'（§3 刀1：done ack 的
- *      確認回覆也送回夥伴群 — 仍是 operator 側，永不觸及 OA 客人）
+ *   4. decision.action === 'respond' OR 'mark_handled' OR 'distill'（§3 刀1：
+ *      done ack；沉澱刀2：沉澱候選清單/批准 ack — 都送回夥伴群，仍是 operator
+ *      側，永不觸及 OA 客人）
  *   5. decision.denied !== true
  *   6. decision.handlerResult.outboundText is a non-empty (trimmed) string
  *   7. event.replyToken is a non-empty string
@@ -37,7 +38,7 @@ export function shouldReplyToPartnerGroup(
     event.sourceChannel === 'line_partner_group' &&
     decision.source === 'line_partner_group' &&
     botDirected === true && // ← was event.mentionsBot === true
-    (decision.action === 'respond' || decision.action === 'mark_handled') &&
+    (decision.action === 'respond' || decision.action === 'mark_handled' || decision.action === 'distill') &&
     decision.denied !== true &&
     typeof outboundText === 'string' &&
     outboundText.trim() !== '' &&

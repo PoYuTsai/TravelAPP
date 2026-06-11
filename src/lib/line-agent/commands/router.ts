@@ -47,6 +47,7 @@ import {
   type PartnerGroupResponder,
 } from '../partner-group/responder'
 import type { AgentLogger } from '../observability/structured-log'
+import { isDistillCommand } from '../distill/run-distillation'
 
 // ---------------------------------------------------------------------------
 // Phase C dry-run quote payload
@@ -139,6 +140,15 @@ export interface RouterInput {
    * cost_cap / route_decision entries join the same trace. Optional.
    */
   log?: AgentLogger
+  /**
+   * 沉澱刀2 seam — webhook 在 AI_AGENT_DISTILL_ENABLED 開時注入；未注入 ⇒
+   * 整條路徑不存在（ship 零行為改變）。run/approve 都回 HandlerResult；
+   * approve 回 null ＝ 不是批准語句或無 pending → 落回 responder。
+   */
+  distill?: {
+    run(groupId: string): Promise<HandlerResult>
+    approve(groupId: string, text: string): Promise<HandlerResult | null>
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +166,7 @@ export type RouterAction =
   | 'list_cases'           // Private/operator read: recent active OA cases
   | 'create_quote_dryrun'  // Phase C: dry-run quote build (DC/operator only)
   | 'mark_handled'         // §3 刀1: @bot done <caseId> — 超時提醒 ack
+  | 'distill'              // 沉澱刀2: @bot 沉澱 / 批准語句 — 知識沉澱管線
   | 'denied'               // Permission denied (B5 dev action from partner group)
 
 export interface RouterDecision {
@@ -312,6 +323,35 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
               meta: { caseId: doneCaseId, handled: ack.ok },
             },
             intent: earlyIntent,
+          }
+        }
+
+        // 沉澱刀2 — explicit-token 指令（同 done 前例：parser 攔截、不走
+        // intent）。seam 未注入（閘關）⇒ 此 if 不存在，行為與 ship 前相同。
+        // seam 內部已各自收斂錯誤；這裡再包一層是 webhook 不被裸 throw 炸掉
+        // 的最後防線（store 讀路徑仍可能 throw）。
+        if (input.distill && event.groupId) {
+          try {
+            if (isDistillCommand(event.text ?? '')) {
+              const handlerResult = await input.distill.run(event.groupId)
+              return { action: 'distill', source, handlerResult, intent: earlyIntent }
+            }
+            const approval = await input.distill.approve(event.groupId, event.text ?? '')
+            if (approval !== null) {
+              return { action: 'distill', source, handlerResult: approval, intent: earlyIntent }
+            }
+          } catch {
+            return {
+              action: 'distill',
+              source,
+              handlerResult: {
+                handler: 'distill',
+                status: 'error',
+                outboundText: '沉澱處理失敗，請稍後重試。',
+                meta: { reason: 'distill_seam_failed' },
+              },
+              intent: earlyIntent,
+            }
           }
         }
 
