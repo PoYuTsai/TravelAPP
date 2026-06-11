@@ -715,8 +715,11 @@ function getDistillSource(): DistillSource {
 /**
  * 刀3 knowledge writer — LAZY singleton（mirror getDistillSource）：批准語句
  * 真的來才 dynamic import composition root（靜態圖零 @notionhq/client）。
- * 「definitively off」（閘關/缺 config）也 cache — env 在 instance 生命週期
- * 內不變，不用每則批准都重 resolve。
+ * 三態：undefined＝未解析（下一則批准會重 resolve）、null＝config 終態 off
+ * （閘關/缺 token/缺 db — env 在 instance 生命週期內不變，cache 免每則批准
+ * 重 resolve）、writer＝on。例外：`sdk_init_failed` 不 cache —— 那是 runtime
+ * 構建失敗而非 config，transient 失敗不得永久關閘；留 undefined 讓下一則
+ * 批准重試（log 照發、ack 照 dry-run）。
  */
 let _distilledQaWriter: DistilledQaWriter | null | undefined // undefined＝未解析
 
@@ -735,7 +738,10 @@ async function getDistilledQaWriter(
     if (result.reason !== 'disabled') {
       log('route_decision', { reason: `distill_write_${result.reason}` })
     }
-    _distilledQaWriter = null // 終態 cache — 形同閘關
+    if (result.reason !== 'sdk_init_failed') {
+      _distilledQaWriter = null // config 終態 cache — 形同閘關
+    }
+    // sdk_init_failed ⇒ 不 cache（_distilledQaWriter 留 undefined）— 下一則批准重試
     return undefined
   }
   _distilledQaWriter = result.writer

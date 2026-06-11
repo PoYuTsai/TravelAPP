@@ -45,8 +45,10 @@ afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
   setDistillSource(null) // null ⇒ 重置回 lazy default — singleton 不串味
+  // 同時重置 test override 與 config 終態 off cache（null）— 回 undefined 未解析
   setDistilledQaWriter(null) // 刀3 writer 同理 — lazy cache（含「definitively off」）不串味
   setDefaultAgentLogSink(null)
+  vi.doUnmock('../line/install-default-distilled-qa-writer') // test 11 的 doMock 不殘留
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
@@ -374,5 +376,57 @@ describe('webhook knowledge writer seam（沉澱刀3 接線）', () => {
     expect(
       lines.some((l) => l.includes('distill_write_missing_knowledge_token'))
     ).toBe(true)
+  })
+
+  it('11. sdk_init_failed 不 cache 終態 — 第一則批准 dry-run＋log，修復後同 instance 第二則批准會寫入', async () => {
+    distillGateOn()
+    vi.stubEnv('KNOWLEDGE_WRITE_ENABLED', 'true')
+    vi.stubEnv('NOTION_KNOWLEDGE_TOKEN', 'secret_test')
+    vi.stubEnv('NOTION_DISTILLED_QA_DB', 'db_test')
+    // Mock composition root（webhook 的 dynamic import 會命中同一 resolved
+    // module）：factory 讀 closure 變數 — 先回 transient 失敗，「修復」後回
+    // 可用 fake writer。若 sdk_init_failed 被 cache 成終態 null，第二則批准
+    // 根本不會重呼叫 build，永遠停在 dry-run — 本測試就會抓到。
+    const written: number[] = []
+    const fakeWriter: DistilledQaWriter = {
+      async write(candidate) {
+        written.push(candidate.id)
+        return `page_${candidate.id}`
+      },
+    }
+    let buildResult: { reason?: 'sdk_init_failed'; writer?: DistilledQaWriter } = {
+      reason: 'sdk_init_failed',
+    }
+    vi.doMock('../line/install-default-distilled-qa-writer', () => ({
+      buildDefaultDistilledQaWriter: () => buildResult,
+    }))
+    const store = new MemoryStore()
+    await presetBatch(store)
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    // 第一則批准：build 回 sdk_init_failed → ack 仍 dry-run＋一行 fixed code、不炸
+    await expect(
+      getEventHandler()(groupEvent('@bot 1 要'), store)
+    ).resolves.toBeUndefined()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toContain('（dry-run：刀3 開閘後才寫入 Notion）')
+    expect(lines.some((l) => l.includes('distill_write_sdk_init_failed'))).toBe(true)
+
+    // 同 instance 內「修復」：build 改回可用 writer。第二則批准必須重試構建
+    // 而非沿用終態 off — ack 含「已寫入」，且 flush 連同失敗期 backlog
+    // （候選 1，dry-run 時 resolved 但無 notionPageId）一起補寫。
+    buildResult = { writer: fakeWriter }
+    await getEventHandler()(
+      // 換 messageId — claimPartnerReply 對同 id 的重投遞會 dedup
+      groupEvent('@bot 2 要', { messageId: 'M_distill_3', replyToken: 'rt_d3' }),
+      store
+    )
+    expect(calls).toHaveLength(2)
+    expect(calls[1].messages[0].text).toContain('📥 已寫入 Notion 知識庫 2 條')
+    expect(calls[1].messages[0].text).not.toContain('dry-run')
+    expect(written).toEqual([1, 2])
   })
 })
