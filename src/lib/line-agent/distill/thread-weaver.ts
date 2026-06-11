@@ -33,6 +33,11 @@ export function weaveTranscript(entries: TranscriptEntry[]): WovenTranscript {
       unreadableImageCount += 1
       continue
     }
+    if (e.kind === 'text' && e.text === '') {
+      // 純防衛：刀1 不會存空文字。跳過不入文（不佔行號、不計 unreadableImageCount），
+      // 但照進 scannedMessageIds（sorted 全量收）。
+      continue
+    }
     if (!alias.has(e.lineUserId)) {
       // 夥伴A..Z，超過 26 人回繞補數字（防衛性；實際群遠小於此）
       const n = alias.size
@@ -44,6 +49,8 @@ export function weaveTranscript(entries: TranscriptEntry[]): WovenTranscript {
     const lineNo = lines.length + 1
     lineNoByMessageId.set(e.messageId, lineNo)
     lineToMessageId[lineNo] = e.messageId
+    // 刻意行為：引用目標若是被跳過的訊息（OCR 失敗截圖/空文字），不在 lineNoByMessageId
+    // → 與「id 不存在於存檔」同路徑，靜默不註記（LLM 看不到的行，註記只會誤導）。
     const quotedLineNo =
       e.quotedMessageId !== undefined
         ? lineNoByMessageId.get(e.quotedMessageId)

@@ -163,6 +163,39 @@ describe('weaveTranscript', () => {
     expect(woven.lineToMessageId).toEqual({ 1: 'M1', 2: 'M3' })
   })
 
+  it('text 含 \\n（多行 OCR 內容）→ 換行原樣保留，#n 邏輯行數不受實體行數影響', () => {
+    const woven = weaveTranscript([
+      entry({
+        messageId: 'M1',
+        timestamp: 1_000,
+        kind: 'image',
+        text: '價目表：\n包車一日 2500\n導遊一日 1500',
+      }),
+      entry({ messageId: 'M2', timestamp: 2_000, text: '收到' }),
+    ])
+    // 內文換行原樣保留 → promptText 實體行數（4）> #n 邏輯行數（2）
+    expect(woven.promptText).toBe(
+      '#1 [夥伴A] （截圖） 價目表：\n包車一日 2500\n導遊一日 1500\n#2 [夥伴A] 收到'
+    )
+    expect(woven.promptText.split('\n')).toHaveLength(4)
+    // 下一則訊息的 #n 標記照常正確（邏輯行號不被內文換行撐大）
+    expect(woven.lineToMessageId).toEqual({ 1: 'M1', 2: 'M2' })
+  })
+
+  it("kind: 'text' 且 text 空（防衛）→ 跳過不入文、不計 unreadableImageCount、照進 scannedMessageIds", () => {
+    const woven = weaveTranscript([
+      entry({ messageId: 'M1', timestamp: 1_000, text: '前一句' }),
+      entry({ messageId: 'M_empty', timestamp: 2_000, text: '' }),
+      entry({ messageId: 'M3', timestamp: 3_000, text: '後一句' }),
+    ])
+    expect(woven.promptText).toBe(
+      ['#1 [夥伴A] 前一句', '#2 [夥伴A] 後一句'].join('\n')
+    )
+    expect(woven.unreadableImageCount).toBe(0)
+    expect(woven.scannedMessageIds).toEqual(['M1', 'M_empty', 'M3'])
+    expect(woven.lineToMessageId).toEqual({ 1: 'M1', 2: 'M3' })
+  })
+
   it('scannedMessageIds ＝ 所有輸入 entry 的 messageId', () => {
     const woven = weaveTranscript([
       entry({ messageId: 'Mb', timestamp: 2_000 }),
