@@ -74,7 +74,7 @@ function isKnownSource(token: string): token is NotionRagSourceTable {
  * unparseable ⇒ '' (the caller reports it as `missing_database_id`). Returns no
  * part of the raw input on failure, so a leak-prone URL never reaches an issue.
  */
-function normaliseDatabaseId(raw: string): string {
+export function normaliseDatabaseId(raw: string): string {
   const pathOnly = raw.split(/[?#]/, 1)[0]
   const hex = pathOnly.replace(/[^0-9a-fA-F]/g, '')
   return hex.length >= 32 ? hex.slice(-32).toLowerCase() : ''
