@@ -118,9 +118,12 @@ export function parseAgentCommandArgs(args) {
     const query = args.slice(1).join(' ').trim()
     return { commandText: 'case-done', query }
   }
+  if (command === 'distill-dry-run' || command === '/distill-dry-run') {
+    return { commandText: 'distill-dry-run' }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run'
   )
 }
 
@@ -1192,6 +1195,133 @@ export async function runCaseDoneCommand(options = {}) {
   return result.replyText
 }
 
+// ---------------------------------------------------------------------------
+// distill-dry-run — 沉澱刀2 dev harness（design 2026-06-11 §2）
+// ---------------------------------------------------------------------------
+// 唯讀 dry-run：上線前驗 LLM 候選品質用。真 KV 掃檔 → 織串 → 一次真 LLM →
+// 印候選 — 但**絕不** markTranscriptDistilled、**絕不** putDistillPending、
+// **絕不**貼群。跑幾次都不留痕：transcript 不標、pending 不寫、LINE 零訊息。
+// 產品入口是夥伴群「@bot 沉澱」；這裡只是 CC 的離線品質檢查 harness。
+
+/** GUARD-loaded dynamic import of the distill kit（同 loadOverdueKit 慣例）。 */
+export async function loadDistillKit(ctx = {}) {
+  const {
+    importRunModule = () => import('../src/lib/line-agent/distill/run-distillation.ts'),
+    importWeaverModule = () => import('../src/lib/line-agent/distill/thread-weaver.ts'),
+    importAdapterModule = () => import('../src/lib/line-agent/distill/distill-llm-adapter.ts'),
+    importCandidatesModule = () => import('../src/lib/line-agent/distill/candidates.ts'),
+    importCostCapModule = () =>
+      import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+  } = ctx
+  try {
+    const runMod = await importRunModule()
+    const weaverMod = await importWeaverModule()
+    const adapterMod = await importAdapterModule()
+    const candidatesMod = await importCandidatesModule()
+    const costCapMod = await importCostCapModule()
+    const kvMod = await importKvModule()
+    const kit = {
+      isDistillEnabled: runMod?.isDistillEnabled ?? null,
+      weaveTranscript: weaverMod?.weaveTranscript ?? null,
+      createSource: adapterMod?.createAnthropicDistillSource ?? null,
+      resolveModel: adapterMod?.resolveDistillModel ?? null,
+      parseCandidates: candidatesMod?.parseDistillCandidates ?? null,
+      createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+      KvStore: kvMod?.KvStore ?? null,
+    }
+    if (
+      !kit.isDistillEnabled ||
+      !kit.weaveTranscript ||
+      !kit.createSource ||
+      !kit.resolveModel ||
+      !kit.parseCandidates ||
+      !kit.createDailyCostCap ||
+      !kit.createKvClientFromEnv ||
+      !kit.KvStore
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/**
+ * READ-ONLY distill dry-run。throws ⇒ main 印訊息＋exit 1（缺閘/缺 env/LLM 失敗）；
+ * return string ⇒ exit 0。`kit`/`store`/`transport` 注入供測試。
+ */
+export async function runDistillDryRunCommand(options = {}) {
+  const env = options.env ?? process.env
+  const kit = options.kit ?? (await loadDistillKit())
+  if (!kit) {
+    throw new Error('distill-dry-run · 失敗（distill 模組未載入，請用 tsx 執行）')
+  }
+
+  // ① 前置檢查 — 缺哪個就明說（exit 1），絕不默默 fallback
+  if (!kit.isDistillEnabled(env)) {
+    throw new Error(
+      'distill-dry-run · 失敗：AI_AGENT_DISTILL_ENABLED 未開（.env.local 設 true 才跑）'
+    )
+  }
+  if (!String(env.ANTHROPIC_API_KEY ?? '').trim()) {
+    throw new Error('distill-dry-run · 失敗：缺 ANTHROPIC_API_KEY')
+  }
+  const groupId = String(env.LINE_PARTNER_GROUP_ID ?? '').trim()
+  if (!groupId) {
+    throw new Error('distill-dry-run · 失敗：缺 LINE_PARTNER_GROUP_ID（不知道要掃哪個群）')
+  }
+  const kvClient = options.kvClient ?? kit.createKvClientFromEnv(env)
+  if (!kvClient) {
+    throw new Error('distill-dry-run · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（KV 未接）')
+  }
+
+  // ② 真 KV 掃檔 — 同 runDistillation ① 的 filter（本群＋未 distilled）
+  const store = options.store ?? new kit.KvStore(kvClient)
+  const all = await store.listTranscriptEntries()
+  const fresh = all.filter((e) => e.groupId === groupId && e.distilled !== true)
+
+  // ③ 織串＋統計；零訊息就不打 LLM（沒得織就沒得花錢）
+  const woven = kit.weaveTranscript(fresh)
+  const lines = [
+    'distill-dry-run（唯讀 — 不標 distilled、不寫 pending、不貼群）',
+    `掃到 ${fresh.length} 則未沉澱訊息（存檔共 ${all.length} 則）`,
+  ]
+  if (woven.unreadableImageCount > 0) {
+    lines.push(`⚠️ 有 ${woven.unreadableImageCount} 張截圖讀不到，已略過`)
+  }
+  if (woven.promptText === '') {
+    lines.push('沒有可沉澱訊息 — 不打 LLM，結束。')
+    return lines.join('\n')
+  }
+
+  // ④ 一次真 LLM（costCap 必接 — 同 webhook getDistillSource 組法）→ zero-trust 解析
+  const costCap = kit.createDailyCostCap({ env, kv: kvClient })
+  const source = kit.createSource({
+    transport: options.transport ?? fetch,
+    apiKey: String(env.ANTHROPIC_API_KEY).trim(),
+    costCap,
+    env,
+  })
+  lines.push(`model=${kit.resolveModel({ env })} · 沉澱估 $0.05–0.15/次`)
+  const raw = await source(woven.promptText)
+  const candidates = kit.parseCandidates(raw)
+
+  // ⑤ 印候選 — 看品質用；這裡刻意零寫入（唯讀 harness 鐵律，見檔頭註解）
+  if (candidates.length === 0) {
+    lines.push('LLM 沒有找到重複的常規問答（0 條候選）。')
+    return lines.join('\n')
+  }
+  lines.push(`--- 候選（${candidates.length} 條）---`)
+  candidates.forEach((c, i) => {
+    lines.push(`${i + 1}. Q：${c.question}`)
+    lines.push(`   A：${c.answer}（出現 ${c.occurrences} 次｜出處行號 #${c.sourceLines.join(' #')}）`)
+  })
+  return lines.join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
@@ -1220,6 +1350,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'case-done') {
     return runCaseDoneCommand({ query })
+  }
+  if (commandText === 'distill-dry-run') {
+    return runDistillDryRunCommand({ env: options.env ?? process.env })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

@@ -26,6 +26,7 @@
     "agent:case-intake": "tsx --env-file=.env.local scripts/agent-command.mjs case-intake",
     "agent:overdue-dry-run": "tsx --env-file=.env.local scripts/agent-command.mjs overdue-dry-run",
     "agent:case-done": "tsx --env-file=.env.local scripts/agent-command.mjs case-done",
+    "agent:distill-dry-run": "tsx --env-file=.env.local scripts/agent-command.mjs distill-dry-run",
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
