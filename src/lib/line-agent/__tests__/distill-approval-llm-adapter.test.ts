@@ -335,8 +335,17 @@ describe('APPROVAL_INTENT_SYSTEM_INSTRUCTION', () => {
     expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('not_approval')
     expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('modify')
     expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('不得腦補')
-    expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('行號只能用候選清單裡存在的編號')
+    expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('編號只能用候選清單裡存在的編號')
     expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('confidence')
     expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('code fence')
+  })
+
+  it('三動作必帶 confidence 是明文規則（零信任 parser 缺 confidence 即 fallback）', () => {
+    expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('必須帶 confidence')
+    expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).toContain('not_approval 不需要 confidence')
+  })
+
+  it('沉澱語境裡「行號」指 transcript 行 — 本 prompt 一律用「編號」', () => {
+    expect(APPROVAL_INTENT_SYSTEM_INSTRUCTION).not.toContain('行號')
   })
 })
