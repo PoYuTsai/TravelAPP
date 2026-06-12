@@ -159,7 +159,16 @@ export function parseAgentCommandArgs(args) {
   if (command === 'partner-respond' || command === '/partner-respond') {
     // 檢索閉環刀 CLI 黑箱驗收（design 2026-06-12 §2 驗收）：一句話直打真
     // anthropic responder（含沉澱知識源，若閘開）。不碰真 store、不貼群。
-    const query = args.slice(1).filter((a) => !a.startsWith('--')).join(' ').trim()
+    const rest = args.slice(1)
+    // flag 紀律（mirror approve-parse）：絕不默默丟 flag 留值 — 「問題 --quoted
+    // 草稿」會把「問題 草稿」併進 query 餵付費 LLM。不支援就明確 throw。
+    const badFlag = rest.find((a) => a.startsWith('--'))
+    if (badFlag !== undefined) {
+      throw new Error(
+        `partner-respond · 用法：不支援 flag（收到 ${badFlag}）— 一句話直接接在指令後`
+      )
+    }
+    const query = rest.join(' ').trim()
     if (query === '') {
       throw new Error(
         'partner-respond · 失敗：請帶要問的話（npm run agent:partner-respond -- "兩大兩小小車會不會擠"）'
@@ -1745,6 +1754,16 @@ export async function runPartnerRespondCommand(options = {}) {
   }
   if (!models.anthropicApiKey) {
     throw new Error('partner-respond · 失敗：缺 ANTHROPIC_API_KEY')
+  }
+  // 驗收 CLI 絕不 exit 0 印 stub：model 缺 ⇒ adapter 會降級 stub，必須擋在閘①
+  if (!models.defaultModel || !models.researchModel) {
+    throw new Error('partner-respond · 失敗：缺 AI_AGENT_DEFAULT_MODEL / AI_AGENT_RESEARCH_MODEL')
+  }
+  // cap env 缺/空 ⇒ daily-cost-cap 靜默 disabled（不擋花費），同樣不得當過關
+  if ((env.AI_AGENT_DAILY_COST_CAP_USD ?? '').trim() === '') {
+    throw new Error(
+      'partner-respond · 失敗：缺 AI_AGENT_DAILY_COST_CAP_USD（cost cap 未設會靜默 disabled）'
+    )
   }
 
   // ② costCap 必接 KV（KV 缺就 throw，cost 紀律不豁免）

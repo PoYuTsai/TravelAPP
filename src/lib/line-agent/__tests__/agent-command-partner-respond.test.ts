@@ -17,6 +17,9 @@ import { getPartnerResponderConfig } from '../partner-group/responder-config'
 const ENV_OK = {
   AI_AGENT_PARTNER_RESPONDER_MODE: 'anthropic',
   ANTHROPIC_API_KEY: 'sk-test',
+  AI_AGENT_DEFAULT_MODEL: 'claude-test-default',
+  AI_AGENT_RESEARCH_MODEL: 'claude-test-research',
+  AI_AGENT_DAILY_COST_CAP_USD: '5',
 }
 
 /** 真 config selector＋fake 周邊（不應被走到時就爆）。 */
@@ -55,10 +58,16 @@ describe('parseAgentCommandArgs partner-respond', () => {
     expect(() => parseAgentCommandArgs(['partner-respond'])).toThrow('請帶要問的話')
   })
 
-  it('只有 flag 沒有話 → throw（flag 不得被當 query）', () => {
+  it('只有 flag 沒有話 → throw 不支援 flag（mirror approve-parse 的 flag 紀律）', () => {
     expect(() => parseAgentCommandArgs(['partner-respond', '--foo'])).toThrow(
-      '請帶要問的話'
+      '不支援 flag'
     )
+  })
+
+  it('一句話＋flag → throw 不支援 flag（絕不默默丟 flag、把值併進 query 送 API）', () => {
+    expect(() =>
+      parseAgentCommandArgs(['partner-respond', '問題', '--quoted', '草稿'])
+    ).toThrow('不支援 flag')
   })
 })
 
@@ -81,6 +90,28 @@ describe('runPartnerRespondCommand', () => {
         query: '兩大兩小小車會不會擠',
       })
     ).rejects.toThrow('ANTHROPIC_API_KEY')
+  })
+
+  it('缺 model env → throw 明確訊息（驗收 CLI 絕不 exit 0 印 stub）', async () => {
+    const { AI_AGENT_DEFAULT_MODEL: _d, AI_AGENT_RESEARCH_MODEL: _r, ...env } = ENV_OK
+    await expect(
+      runPartnerRespondCommand({
+        env,
+        kit: realKit(),
+        query: '兩大兩小小車會不會擠',
+      })
+    ).rejects.toThrow('缺 AI_AGENT_DEFAULT_MODEL / AI_AGENT_RESEARCH_MODEL')
+  })
+
+  it('缺 cap env → throw 明確訊息（cap 未設會靜默 disabled，不得當過關）', async () => {
+    const { AI_AGENT_DAILY_COST_CAP_USD: _c, ...env } = ENV_OK
+    await expect(
+      runPartnerRespondCommand({
+        env,
+        kit: realKit(),
+        query: '兩大兩小小車會不會擠',
+      })
+    ).rejects.toThrow('缺 AI_AGENT_DAILY_COST_CAP_USD')
   })
 
   it('缺 KV → throw（cost cap 紀律不豁免）', async () => {
