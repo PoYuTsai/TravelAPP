@@ -214,7 +214,7 @@ describe('AnthropicPartnerGroupResponder — 檢索閉環刀 knowledgeSource', (
     expect(JSON.parse(calls[0].init.body as string).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
   })
 
-  it('knowledgeSource throw ⇒ fail-open：照常回覆 llm、原 prompt', async () => {
+  it('knowledgeSource throw ⇒ fail-open：照常回覆 llm、原 prompt＋qa_knowledge_unavailable log', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
     const responder = new AnthropicPartnerGroupResponder({
       transport,
@@ -223,11 +223,32 @@ describe('AnthropicPartnerGroupResponder — 檢索閉環刀 knowledgeSource', (
         throw new Error('boom')
       },
     })
+    const { log, entries } = makeLog()
 
-    const result = await responder.respond(makeInput())
+    const result = await responder.respond({ ...makeInput(), log })
 
     expect(result.meta?.responder).toBe('llm')
     expect(JSON.parse(calls[0].init.body as string).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    expect(entries().some((e) => e.event === 'qa_knowledge_unavailable')).toBe(true)
+  })
+
+  it('costCap over_cap ⇒ knowledgeSource 零呼叫（budget gate 先於知識讀取）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const { costCap } = makeCostCap('over_cap')
+    const knowledgeSource = vi.fn(async () => '【清微旅行沉澱問答】\nQ：q\nA：a')
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      costCap,
+      knowledgeSource,
+    })
+
+    const result = await responder.respond(makeInput())
+
+    expect(knowledgeSource).not.toHaveBeenCalled() // 沒預算 ⇒ 連 Notion 讀都不發生
+    expect(calls).toHaveLength(0)
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('cost_cap_exceeded')
   })
 })
 

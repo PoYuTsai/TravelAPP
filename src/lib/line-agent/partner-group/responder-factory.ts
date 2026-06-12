@@ -39,6 +39,7 @@ import {
   caseIntakeResponder,
 } from './case-intake-surfacing'
 import { shouldUseVisionIntake } from './vision-intake-surfacing'
+import type { QaKnowledgeSource } from './qa-knowledge-source'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -51,6 +52,11 @@ export interface CreatePartnerGroupResponderInput {
    * fails closed on anything but `ok`.
    */
   costCap: DailyCostCap
+  /**
+   * 沉澱 QA 知識源（檢索閉環刀）— optional：閘關時 caller 不接線，
+   * adapter 行為與本刀落地前 byte-identical。
+   */
+  knowledgeSource?: QaKnowledgeSource
 }
 
 /**
@@ -104,6 +110,7 @@ export function createPartnerGroupResponder(
     defaultModel: models.defaultModel,
     researchModel: models.researchModel,
     costCap,
+    knowledgeSource: input.knowledgeSource,
   })
 }
 

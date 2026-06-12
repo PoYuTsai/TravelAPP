@@ -66,6 +66,10 @@ import {
 // type-only — 靜態圖不拉 @notionhq/client；真 SDK 只在 composition root
 // （install-default-distilled-qa-writer）dynamic import 時構建。
 import type { DistilledQaWriter } from '@/lib/line-agent/distill/distilled-qa-writer'
+import { resolveQaKnowledgeReadConfig } from '@/lib/line-agent/partner-group/qa-knowledge-config'
+// type-only — 同上紀律：讀取 SDK 只在 install-default-qa-knowledge-source
+// dynamic import 時構建，靜態圖零 @notionhq/client。
+import type { QaKnowledgeSource } from '@/lib/line-agent/partner-group/qa-knowledge-source'
 import {
   createAgentLogger,
   type AgentLogger,
@@ -484,10 +488,29 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
       env: process.env,
       kv: createKvClientFromEnv(),
     })
+    // 檢索閉環刀 — 沉澱 QA 知識源。閘（QA_KNOWLEDGE_READ_ENABLED 三件齊）在
+    // 這裡同步判：閘關 ⇒ undefined ⇒ adapter 行為 byte-identical、零 Notion 讀。
+    // 閘開 ⇒ lazy thunk：首次呼叫才 dynamic import installer（靜態圖零 SDK，
+    // mirror distilled-qa-writer 的 lazy seam）；installer 失敗 ⇒ 永久 null
+    // source（fail-open，adapter 端照常 try-catch）。singleton scope：thunk 與
+    // installed source 都掛在 responder singleton 上 — TTL 快取跨請求生效。
+    const qaKnowledgeConfig = resolveQaKnowledgeReadConfig(process.env)
+    let installedQaKnowledgeSource: QaKnowledgeSource | null = null
+    const knowledgeSource = qaKnowledgeConfig.enabled
+      ? async () => {
+          if (installedQaKnowledgeSource === null) {
+            const mod = await import('./install-default-qa-knowledge-source')
+            const built = mod.buildDefaultQaKnowledgeSource()
+            installedQaKnowledgeSource = built.source ?? (async () => null)
+          }
+          return installedQaKnowledgeSource()
+        }
+      : undefined
     const base = createPartnerGroupResponder({
       models,
       transport: fetch,
       costCap,
+      knowledgeSource,
     })
     // 客需三分流 LLM enrichment（design 2026-06-10 §1 LLM 刀）— 有 key 才組
     // enriched responder；無 key ⇒ deterministic-only（factory default）。
