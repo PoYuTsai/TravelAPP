@@ -252,6 +252,50 @@ describe('AnthropicPartnerGroupResponder — 檢索閉環刀 knowledgeSource', (
   })
 })
 
+describe('AnthropicPartnerGroupResponder — 外部佐證刀 web_search tool', () => {
+  it('webSearchEnabled 省略 ⇒ body 無 tools key（與現行 byte-identical）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(makeInput())
+    const body = JSON.parse(calls[0].init.body as string)
+    expect('tools' in body).toBe(false)
+    expect(body.system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+  })
+
+  it('webSearchEnabled=true ⇒ body 掛 web_search_20250305（max_uses 3）＋搜證條款進 system', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(makeInput())
+    const body = JSON.parse(calls[0].init.body as string)
+    expect(body.tools).toEqual([
+      { type: 'web_search_20250305', name: 'web_search', max_uses: 3 },
+    ])
+    expect(body.system).toContain('【外部佐證｜web_search 已開啟】')
+  })
+
+  it('webSearchEnabled=true 但 event 是 line_oa ⇒ 防衛性不掛 tool（OA 永不）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const input = makeInput()
+    input.event.sourceChannel = 'line_oa'
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(input)
+    const body = JSON.parse(calls[0].init.body as string)
+    expect('tools' in body).toBe(false)
+  })
+
+  it('webSearchEnabled=true 但非 botDirected ⇒ 不掛 tool', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const input = makeInput()
+    input.event.mentionsBot = false
+    input.botDirected = false
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(input)
+    expect('tools' in JSON.parse(calls[0].init.body as string)).toBe(false)
+  })
+})
+
 describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 fail-closed）', () => {
   const OK_BODY_WITH_USAGE = {
     content: [{ type: 'text', text: '建議先確認人數與日期。' }],

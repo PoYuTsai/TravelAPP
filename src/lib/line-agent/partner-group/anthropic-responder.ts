@@ -37,6 +37,9 @@ const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
 const MAX_TOKENS = 1024
 
+/** 外部佐證刀 — 每題搜尋次數上限（design §3 成本：3 × $0.01 ≈ $0.03/題）。 */
+const WEB_SEARCH_MAX_USES = 3
+
 /** Safe-default fallback: stub text, observably tagged with the error code. */
 function degraded(model: string, error: string): PartnerGroupRespondResult {
   return {
@@ -73,6 +76,12 @@ export interface AnthropicPartnerGroupResponderDeps {
    * a fake.
    */
   costCap: DailyCostCap
+  /**
+   * 外部佐證刀 — web_search server tool 開關。composition root（webhook /
+   * CLI）用 canUseExternalTool 判定後注入；responder 不讀 env 鐵律不破。
+   * 省略 / false ⇒ request body 與現行 byte-identical。
+   */
+  webSearchEnabled?: boolean
 }
 
 export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
@@ -82,6 +91,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly researchModel: string
   private readonly knowledgeSource?: QaKnowledgeSource
   private readonly costCap: DailyCostCap
+  private readonly webSearchEnabled: boolean
 
   constructor(deps: AnthropicPartnerGroupResponderDeps) {
     this.transport = deps.transport
@@ -90,6 +100,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.researchModel = deps.researchModel
     this.knowledgeSource = deps.knowledgeSource
     this.costCap = deps.costCap
+    this.webSearchEnabled = deps.webSearchEnabled === true
   }
 
   async respond(input: PartnerGroupRespondInput): Promise<PartnerGroupRespondResult> {
@@ -125,7 +136,17 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       }
     }
 
-    const system = buildPartnerGroupSystemPrompt(input, knowledge)
+    // 外部佐證刀 — per-request 防衛性收窄：deps 開閘之外，本則訊息還要確實
+    // 是 bot-directed 且不在 OA 客人面（tool-gate 第 1/4 關在最後一哩重判，
+    // 只會收窄、永不放寬）。
+    const allowWebSearch =
+      this.webSearchEnabled &&
+      input.event.sourceChannel !== 'line_oa' &&
+      (input.botDirected ?? input.event.mentionsBot) === true
+
+    const system = buildPartnerGroupSystemPrompt(input, knowledge, {
+      webSearchEnabled: allowWebSearch,
+    })
     const startedAt = Date.now()
 
     let response: Response
@@ -142,6 +163,13 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
           max_tokens: MAX_TOKENS,
           system,
           messages: [{ role: 'user', content: input.text }],
+          ...(allowWebSearch
+            ? {
+                tools: [
+                  { type: 'web_search_20250305', name: 'web_search', max_uses: WEB_SEARCH_MAX_USES },
+                ],
+              }
+            : {}),
         }),
       })
     } catch {

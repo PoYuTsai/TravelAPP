@@ -9,6 +9,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildPartnerGroupSystemPrompt,
   PARTNER_GROUP_SYSTEM_PROMPT,
+  PARTNER_GROUP_WEB_SEARCH_PROMPT,
 } from '@/lib/line-agent/partner-group/system-prompt'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
 
@@ -263,15 +264,10 @@ describe('buildPartnerGroupSystemPrompt', () => {
       ).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
     })
 
-    it('開閘 ⇒ frozen persona 開頭＋搜證條款各句逐字在場', () => {
+    it('開閘 ⇒ frozen persona 開頭＋搜證條款整段逐字在場（任一句被刪即炸）', () => {
       const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
       expect(prompt.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
-      expect(prompt).toContain('【外部佐證｜web_search 已開啟】')
-      expect(prompt).toContain('本區塊優先於前面「不得聲稱你已查到任何即時資料」與「我目前還不能上網即時查資料」兩條')
-      expect(prompt).toContain('實質問題（景點開放時間、節慶日期、交通、票價、規定等）內部知識不足時，必須用 web_search 查公開網頁')
-      expect(prompt).toContain('回覆格式：先給結論，再列來源連結，文末固定加一句「以上為網路資料供參考，重要細節建議再與導遊確認」')
-      expect(prompt).toContain('內部沉澱案例優先：沉澱知識已有答案時以內部為準，web 結果只佐證不覆蓋')
-      expect(prompt).toContain('搜不到就誠實說搜不到，絕不腦補來源、絕不編造連結')
+      expect(prompt).toContain(PARTNER_GROUP_WEB_SEARCH_PROMPT)
     })
 
     it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
