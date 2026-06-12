@@ -1151,3 +1151,22 @@ git push
 - [ ] 閘關→不接線（Task 2/6 測試）
 - [ ] CLI 黑箱「兩大兩小小車會不會擠」→「會擠、建議大車」方向（Task 8）
 - [ ] 真群 Chun 場景重測（Task 8 Step 3，Eric 拍板後）
+
+---
+
+## 驗收結果（2026-06-12，CC subagent-driven 執行）
+
+**Commits（Task 1→7＋加固）**：`0f47424` cached-loader 抽取 → `0ba111b` 讀取閘 → `b9e4060` qa-knowledge-source → `72b11e6` system-prompt 知識區塊 → `9a1a6cf` responder 注入 → `ddf4dc6` 接線＋installer → `3859d12` CLI 入口 → `12ac841` 驗收閘加固。每 task 過雙段 review（spec＋quality），全套 124 檔 / 1629 tests 綠。
+
+**CLI 黑箱（真 API，claude-sonnet-4-6，共 ~$0.013）**：
+
+- 對照組（閘關）：`知識源：未接（disabled）` → 答「兩大兩小 OK，不會太擠」（prompt 硬規則：帶小朋友可坐 4 位）
+- 實驗組（`QA_KNOWLEDGE_READ_ENABLED=true` inline）：`知識源：已接` → 答「**會擠，不建議。建議直接升大車（Toyota Commuter 10 人座 Van）**」— 命中 design §2 驗收方向；input tokens 1425→1587（知識區塊 ~160 tokens）；cost cap 兩次都正常記帳
+
+**判定：通過。** 真群 Chun 場景重測排在 Eric 拍板後（Vercel env 補 `QA_KNOWLEDGE_READ_ENABLED=true`）。
+
+**計畫偏離（皆 review 認可的改良）**：installer 加 Notion Client `timeoutMs: 5000`（讀取在 reply 關鍵路徑，SDK 預設 60s 不可接受）；CLI `intent` 用 `CommandIntent` 物件（plan 草稿字串版型別不合法）；CLI 拒收 flag＋缺 model/cap env 明確 throw（驗收絕不 exit 0 印 stub）；webhook install 失敗 log fixed reason。
+
+**Prod 行為註記**：若 `AI_AGENT_NOTION_RAG_ENABLED` 雙閘開，符合 rag 觸發詞的訊息走 rag 路徑、不經 anthropic adapter ⇒ 該則無沉澱知識注入（設計內：rag 路徑自帶檢索）。排查「為何這則沒帶知識」時先看 `route_decision` log。
+
+**遞延 Minor（下一刀順手清，不值單獨 commit）**：`qa_knowledge_unavailable.reason` 死欄位（無法區分 retrieve/query/timeout 失敗）；`qa_knowledge_truncated` 在 has_more 時 `total===kept` 語意模糊；leak-guard 測試缺「不含 secret」反向斷言。
