@@ -6,7 +6,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { buildPartnerGroupSystemPrompt } from '@/lib/line-agent/partner-group/system-prompt'
+import {
+  buildPartnerGroupSystemPrompt,
+  PARTNER_GROUP_SYSTEM_PROMPT,
+} from '@/lib/line-agent/partner-group/system-prompt'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
 
 function makeInput(): PartnerGroupRespondInput {
@@ -182,5 +185,29 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('讀不到圖片內容')
     expect(prompt).toContain('請把客人的文字訊息直接貼上來')
     expect(prompt).not.toContain('上傳圖片給我')
+  })
+
+  // 2026-06-12 刀A: quote-to-bot (M3.6c) 的引用內容進 prompt 尾端 —
+  // 口語詞（「保險一點」「再大一點」）靠引用脈絡消歧；guardrails 一字不少。
+  describe('quotedBotContent context (knife A)', () => {
+    it('returns the frozen prompt verbatim when no quote', () => {
+      expect(buildPartnerGroupSystemPrompt(makeInput())).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    })
+
+    it('appends the quoted-context section when quotedBotContent is present', () => {
+      const built = buildPartnerGroupSystemPrompt({
+        ...makeInput(),
+        quotedBotContent: '大車後排放球袋比較穩',
+      })
+      expect(built).toContain(PARTNER_GROUP_SYSTEM_PROMPT) // guardrails 一字不少
+      expect(built).toContain('【引用脈絡】')
+      expect(built).toContain('大車後排放球袋比較穩')
+    })
+
+    it('ignores a whitespace-only quotedBotContent', () => {
+      expect(
+        buildPartnerGroupSystemPrompt({ ...makeInput(), quotedBotContent: '  ' })
+      ).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    })
   })
 })

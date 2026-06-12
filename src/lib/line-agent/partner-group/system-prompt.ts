@@ -49,10 +49,17 @@ export const PARTNER_GROUP_SYSTEM_PROMPT = [
 ].join('\n')
 
 /**
- * Lightweight assembly hook (design §5 step 2).  Today it returns the frozen
- * prompt; the input is reserved for light future context (actor/case) without
- * loosening any guardrail.
+ * Lightweight assembly hook (design §5 step 2).  Frozen persona + guardrails
+ * verbatim；刀A：當事件引用了 bot 訊息（M3.6c quote-to-bot），把引用內容附在
+ * prompt 尾端 — 口語詞（「保險一點」「再大一點」）靠引用脈絡消歧。
  */
-export function buildPartnerGroupSystemPrompt(_input: PartnerGroupRespondInput): string {
-  return PARTNER_GROUP_SYSTEM_PROMPT
+export function buildPartnerGroupSystemPrompt(input: PartnerGroupRespondInput): string {
+  const quoted = input.quotedBotContent?.trim()
+  if (!quoted) return PARTNER_GROUP_SYSTEM_PROMPT
+  return [
+    PARTNER_GROUP_SYSTEM_PROMPT,
+    '',
+    '【引用脈絡】使用者引用了你之前說的這句話，他的訊息是針對這句的回應；解讀口語、代稱與省略時，以這段引用為脈絡：',
+    `「${quoted}」`,
+  ].join('\n')
 }
