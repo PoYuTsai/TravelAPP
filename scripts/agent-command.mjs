@@ -125,9 +125,30 @@ export function parseAgentCommandArgs(args) {
     // default 唯讀列 backlog；唯一 flag 是 --write（走閘真寫 Notion）。
     return { commandText: 'distill-flush', write: args.slice(1).includes('--write') }
   }
+  if (command === 'approve-parse' || command === '/approve-parse') {
+    // 刀A CLI 黑箱內測（design 2026-06-12 §4）：一句話＋fixture 候選清單，
+    // 不碰真 store、不貼群。--quoted 模擬「引用 bot 訊息」、--fixture 換候選檔。
+    const rest = args.slice(1)
+    const takeFlag = (flag) => {
+      const i = rest.indexOf(flag)
+      if (i === -1) return undefined
+      const value = String(rest[i + 1] ?? '').trim()
+      rest.splice(i, 2)
+      return value
+    }
+    const quoted = takeFlag('--quoted')
+    const fixture = takeFlag('--fixture')
+    const query = rest.join(' ').trim()
+    if (query === '') {
+      throw new Error(
+        'approve-parse · 用法：npm run agent:approve-parse -- "一句話" [--quoted "引用內容"] [--fixture path.json]'
+      )
+    }
+    return { commandText: 'approve-parse', query, quoted, fixture }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush、approve-parse'
   )
 }
 
@@ -1467,8 +1488,177 @@ export async function runDistillFlushCommand(options = {}) {
   return lines.join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// approve-parse — 刀A CLI 黑箱內測入口（design 2026-06-12 §4）
+// ---------------------------------------------------------------------------
+// 一句話 → 層1 regex → （miss 時）層2 真 LLM intent parser → deterministic
+// 驗證 vs fixture 候選清單。鐵律：**不碰真 store（不讀不寫 pending/
+// confirmation）、不貼群** — KV 只接 cost cap（cost 紀律不因離線而豁免——
+// memory 教訓：CLI 載 .env.local，閘＋key 齊就是真打 API、真花錢）。
+
+/** GUARD-loaded dynamic import（同 loadDistillKit 慣例）。 */
+export async function loadApproveParseKit(ctx = {}) {
+  const {
+    importApprovalModule = () => import('../src/lib/line-agent/distill/approval.ts'),
+    importIntentModule = () => import('../src/lib/line-agent/distill/approval-intent.ts'),
+    importAdapterModule = () =>
+      import('../src/lib/line-agent/distill/approval-llm-adapter.ts'),
+    importRunModule = () => import('../src/lib/line-agent/distill/run-distillation.ts'),
+    importCostCapModule = () =>
+      import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+  } = ctx
+  try {
+    const approvalMod = await importApprovalModule()
+    const intentMod = await importIntentModule()
+    const adapterMod = await importAdapterModule()
+    const runMod = await importRunModule()
+    const costCapMod = await importCostCapModule()
+    const kvMod = await importKvModule()
+    const kit = {
+      parseDistillApproval: approvalMod?.parseDistillApproval ?? null,
+      parseApprovalIntentJson: intentMod?.parseApprovalIntentJson ?? null,
+      createAnthropicApprovalIntentSource:
+        adapterMod?.createAnthropicApprovalIntentSource ?? null,
+      resolveApprovalIntentModel: adapterMod?.resolveApprovalIntentModel ?? null,
+      isDistillEnabled: runMod?.isDistillEnabled ?? null,
+      createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+    }
+    if (
+      !kit.parseDistillApproval ||
+      !kit.parseApprovalIntentJson ||
+      !kit.createAnthropicApprovalIntentSource ||
+      !kit.resolveApprovalIntentModel ||
+      !kit.isDistillEnabled ||
+      !kit.createDailyCostCap ||
+      !kit.createKvClientFromEnv
+    ) {
+      return null
+    }
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Deterministic 驗證 vs fixture — 同 applyDistillApproval ① 的 wantedIds 邏輯
+ * （層1 regex 給 `type`、層2 intent 給 `action`，兩種 shape 都收）。
+ * 超界（含部分超界）＝整批拒絕，與真機行為一致。
+ */
+export function validateAgainstFixture(parsed, candidates) {
+  const kind = parsed.type ?? parsed.action
+  const wantedIds =
+    kind === 'approve_all'
+      ? candidates.map((c) => c.id)
+      : kind === 'approve'
+        ? parsed.indices
+        : [parsed.index]
+  const idSet = new Set(candidates.map((c) => c.id))
+  const missing = wantedIds.filter((id) => !idSet.has(id))
+  if (missing.length > 0) {
+    return `驗證失敗：沒有第 ${missing.join('、')} 條（整批拒絕）`
+  }
+  return `驗證通過：會收 ${wantedIds.join('、')}`
+}
+
+/**
+ * 刀A 黑箱內測：throws ⇒ main 印訊息＋exit 1（缺閘/缺 env/fixture 壞）；
+ * return string ⇒ exit 0。`kit`/`intentSource`/`kvClient`/`transport` 注入供測試。
+ */
+export async function runApproveParseCommand(options = {}) {
+  const env = options.env ?? process.env
+  const kit = options.kit ?? (await loadApproveParseKit())
+  if (!kit) {
+    throw new Error('approve-parse · 失敗（模組未載入，請用 tsx 執行）')
+  }
+
+  // ① 前置閘（同 distill-dry-run：缺哪個就明說，絕不默默 fallback）
+  if (!kit.isDistillEnabled(env)) {
+    throw new Error(
+      'approve-parse · 失敗：AI_AGENT_DISTILL_ENABLED 未開（.env.local 設 true 才跑）'
+    )
+  }
+  if (!String(env.ANTHROPIC_API_KEY ?? '').trim()) {
+    throw new Error('approve-parse · 失敗：缺 ANTHROPIC_API_KEY')
+  }
+
+  // ② fixture 候選（不碰真 pending — 候選清單一律來自檔案）
+  const fixturePath = options.fixture ?? 'scripts/fixtures/distill-approve-candidates.json'
+  let candidates
+  try {
+    candidates = JSON.parse(fs.readFileSync(fixturePath, 'utf8'))
+  } catch {
+    throw new Error(`approve-parse · 失敗：fixture 讀取/解析失敗（${fixturePath}）`)
+  }
+  if (
+    !Array.isArray(candidates) ||
+    candidates.length === 0 ||
+    !candidates.every((c) => typeof c?.id === 'number')
+  ) {
+    throw new Error(`approve-parse · 失敗：fixture 格式不對（要 [{id,question,answer}]）`)
+  }
+
+  const lines = [
+    'approve-parse（黑箱內測 — 不碰真 store、不貼群）',
+    `輸入：「${options.query}」${options.quoted ? `（引用：「${options.quoted}」）` : ''}`,
+    `候選 fixture：${candidates.map((c) => c.id).join('、')}（${fixturePath}）`,
+  ]
+
+  // ③ 層1 regex（零成本零延遲 — 命中就不打 LLM）
+  const regexHit = kit.parseDistillApproval(options.query)
+  if (regexHit !== null) {
+    lines.push(`層1 regex 命中：${JSON.stringify(regexHit)}`)
+    lines.push(validateAgainstFixture(regexHit, candidates))
+    return lines.join('\n')
+  }
+  lines.push('層1 regex miss → 層2 LLM intent parser')
+
+  // ④ 層2 真 LLM。intentSource 注入＝測試；否則組真 source — costCap 必接
+  //    （KV 缺就 throw，cost 紀律不豁免）。
+  let source = options.intentSource ?? null
+  if (!source) {
+    const kvClient = options.kvClient ?? kit.createKvClientFromEnv(env)
+    if (!kvClient) {
+      throw new Error('approve-parse · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（cost cap 要 KV）')
+    }
+    const costCap = kit.createDailyCostCap({ env, kv: kvClient })
+    source = kit.createAnthropicApprovalIntentSource({
+      transport: options.transport ?? fetch,
+      apiKey: String(env.ANTHROPIC_API_KEY).trim(),
+      costCap,
+      env,
+    })
+  }
+  lines.push(`model=${kit.resolveApprovalIntentModel({ env })} · 估 <$0.01/次`)
+  const raw = await source({
+    text: options.query,
+    candidates,
+    ...(options.quoted ? { quotedBotContent: options.quoted } : {}),
+  })
+  const intent = kit.parseApprovalIntentJson(raw)
+
+  // ⑤ 印結果＋deterministic 驗證（純對照 fixture，零寫入）
+  if (intent === null) {
+    lines.push(
+      `LLM 回傳解析失敗（raw：${raw}）→ 真機會回防呆兜底：「看不懂這句，要收哪幾條？例：1 3 要」`
+    )
+  } else if (intent.action === 'not_approval') {
+    lines.push('LLM 判定 not_approval → 真機會落回 responder（日常問答不受劫持）')
+  } else {
+    lines.push(`LLM intent：${JSON.stringify(intent)}`)
+    lines.push(validateAgainstFixture(intent, candidates))
+    // 真機 resolveDistillApproval：low confidence（含 approve_all）一律走複述確認
+    if (intent.confidence === 'low') {
+      lines.push('信心 low → 真機會走複述確認（引用複述句回「對」才收）')
+    }
+  }
+  return lines.join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
-  const { commandText, query, write } = parseAgentCommandArgs(args)
+  const { commandText, query, write, quoted, fixture } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
     return runRefineSmokeCommand({ env: options.env ?? process.env })
   }
@@ -1501,6 +1691,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'distill-flush') {
     return runDistillFlushCommand({ env: options.env ?? process.env, write })
+  }
+  if (commandText === 'approve-parse') {
+    return runApproveParseCommand({ env: options.env ?? process.env, query, quoted, fixture })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
