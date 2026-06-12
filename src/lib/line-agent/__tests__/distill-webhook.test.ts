@@ -7,11 +7,13 @@
  *   2. 閘開＋key 齊 →「@bot 沉澱」→ reply client 收到候選清單文字（📚 開頭）
  *   3. 閘開＋ANTHROPIC_API_KEY 缺 → seam 不注入（形同閘關）、一行 fixed-code
  *      log、不炸 webhook
- *   4. parse-first 契約（Task 7 review 點名）：普通 botDirected 文字 → approve
- *      純函式短路、store 零讀取 — KV 故障絕不劫持日常問答
+ *   4. parse-first 契約（刀A 演化，design 2026-06-12 §1）：regex miss＋無
+ *      pending → 一次 KV 讀即落回 responder — 日常問答零 LLM 成本
  *   5. 批准語句「@bot 1 3 要」（pending batch 預置）→ 批准 ack（含 dry-run 註記）
  *   6. 沉澱回覆送出後照常 putBotAuthoredPartnerMsg — Eric 之後 quote 候選清單
  *      回「1 3 要」免重 tag（既有 step 6 邏輯，測試固定它）
+ *   12-14. 刀A 三層接話接線：free-form 批准走 Haiku intent（引用 context 進
+ *      prompt）、regex 命中零 LLM、無 pending 落回 responder 零 LLM
  *
  * 全部用 MemoryStore＋fake source/responder/reply client — 零網路、零真 key。
  */
@@ -25,8 +27,11 @@ import {
   setReplyClient,
   setDistillSource,
   setDistilledQaWriter,
+  setApprovalIntentSource,
   type ReplyClient,
 } from '../line/webhook-runtime'
+import { createAnthropicApprovalIntentSource } from '../distill/approval-llm-adapter'
+import type { DailyCostCap } from '../observability/daily-cost-cap'
 import { MemoryStore } from '../storage/memory-store'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { PartnerGroupResponder } from '../partner-group/responder'
@@ -45,6 +50,7 @@ afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
   setDistillSource(null) // null ⇒ 重置回 lazy default — singleton 不串味
+  setApprovalIntentSource(null) // 刀A 層2 singleton 同理 — 不串味
   // 同時重置 test override 與 config 終態 off cache（null）— 回 undefined 未解析
   setDistilledQaWriter(null) // 刀3 writer 同理 — lazy cache（含「definitively off」）不串味
   setDefaultAgentLogSink(null)
@@ -194,7 +200,7 @@ describe('webhook distill seam（沉澱刀2 接線）', () => {
     expect(lines.some((l) => l.includes('distill_api_key_missing'))).toBe(true)
   })
 
-  it('4. parse-first 契約：普通 botDirected 文字 → approve 短路、store 零讀取、落回 responder', async () => {
+  it('4. parse-first 契約（刀A 演化）：regex miss＋無 pending → 一次 KV 讀即落回 responder', async () => {
     vi.stubEnv('AI_AGENT_DISTILL_ENABLED', 'true')
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
     const store = new MemoryStore()
@@ -206,8 +212,10 @@ describe('webhook distill seam（沉澱刀2 接線）', () => {
 
     await getEventHandler()(groupEvent('@bot 今天行程怎麼排'), store)
 
-    // 純函式 parseDistillApproval 先擋 — KV 故障不劫持日常問答
-    expect(getPendingSpy).not.toHaveBeenCalled()
+    // 刀A 契約演化（design §1）：regex miss → 一次 getDistillPending 讀；
+    // 無 pending ⇒ 立即回 null 落回 responder（讀失敗也回 null — 故障不劫持
+    // 日常問答，由 resolve 單元測試鎖定）。
+    expect(getPendingSpy).toHaveBeenCalledTimes(1)
     expect(calls).toHaveLength(1)
     expect(calls[0].messages[0].text).toBe('RESPONDER-TEXT')
   })
@@ -277,6 +285,138 @@ describe('webhook distill seam（沉澱刀2 接線）', () => {
     )
 
     expect(lines.some((l) => l.includes('distill_api_key_missing'))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 刀A — 三層接話 orchestrator 接線（getDistillSeams 換 resolveDistillApproval）
+// ---------------------------------------------------------------------------
+
+describe('webhook approve seam（刀A 三層接話接線）', () => {
+  function distillGateOn(): void {
+    vi.stubEnv('AI_AGENT_DISTILL_ENABLED', 'true')
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+  }
+
+  async function presetBatch(store: MemoryStore): Promise<void> {
+    await store.putDistillPending({
+      groupId: GROUP_ID,
+      createdAt: 1_700_000_000_000,
+      candidates: [pendingCandidate(1), pendingCandidate(2)],
+      resolved: [],
+    })
+  }
+
+  /** 永遠 ok 的 fake cost cap — adapter 的 budget gate 不擋路。 */
+  const okCostCap: DailyCostCap = {
+    async checkBudget() {
+      return { outcome: 'ok' as const, dailySpendMicroUsd: 0 }
+    },
+    async recordSpend() {
+      return { recorded: true }
+    },
+  }
+
+  /**
+   * 真 adapter＋recording fake transport：webhook→router→seam→orchestrator→
+   * intentSource→transport 全鏈打通；非 LLM 路徑斷言 calls 為空。
+   */
+  function installRecordingIntentSource(intentJson: string): {
+    calls: Array<{ url: string; body: Record<string, unknown> }>
+  } {
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = []
+    const transport = (async (url: unknown, init?: { body?: unknown }) => {
+      calls.push({
+        url: String(url),
+        body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+      })
+      return new Response(
+        JSON.stringify({
+          content: [{ text: intentJson }],
+          usage: { input_tokens: 100, output_tokens: 20 },
+          stop_reason: 'end_turn',
+        }),
+        { status: 200 }
+      )
+    }) as typeof fetch
+    setApprovalIntentSource(
+      createAnthropicApprovalIntentSource({
+        transport,
+        apiKey: 'sk-test',
+        costCap: okCostCap,
+      })
+    )
+    return { calls }
+  }
+
+  it('12. regex miss＋pending＋botDirected → 走 LLM intent 路徑（ctx 帶 quotedBotContent）', async () => {
+    distillGateOn()
+    const store = new MemoryStore()
+    await presetBatch(store)
+    // 引用的清單訊息是 bot-authored＋content 已快取（webhook step 6 的產物）
+    await store.putBotAuthoredPartnerMsg('M_bot_list', '📚 候選清單：1. Q1 → A1')
+    const { calls: llmCalls } = installRecordingIntentSource(
+      '{"action":"approve","indices":[1],"confidence":"high"}'
+    )
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(
+      groupEvent('@bot 第一條收一下', {
+        kind: 'group_quoted',
+        quotedRef: { quotedMessageId: 'M_bot_list' },
+      }),
+      store
+    )
+
+    // 層3 deterministic 套用 — ack 同刀2 文案
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toContain('✅ 已收：1')
+    // LLM 真的被打：messages API＋Haiku＋引用 context 進 prompt
+    expect(llmCalls).toHaveLength(1)
+    expect(llmCalls[0].url).toBe('https://api.anthropic.com/v1/messages')
+    expect(String(llmCalls[0].body.model)).toContain('haiku')
+    const promptText = JSON.stringify(llmCalls[0].body.messages)
+    expect(promptText).toContain('使用者引用的 AI 訊息')
+    expect(promptText).toContain('候選清單：1. Q1 → A1')
+    // 批准真的落地：1 → resolved、2 留著
+    const batch = await store.getDistillPending(GROUP_ID)
+    expect(batch?.candidates.map((c) => c.id)).toEqual([2])
+    expect(batch?.resolved.map((c) => c.id)).toEqual([1])
+  })
+
+  it('13. regex 命中 → 零 LLM（transport 不被呼叫）', async () => {
+    distillGateOn()
+    const store = new MemoryStore()
+    await presetBatch(store)
+    const { calls: llmCalls } = installRecordingIntentSource(
+      '{"action":"not_approval"}'
+    )
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(groupEvent('@bot 1 要'), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toContain('✅ 已收：1')
+    expect(llmCalls).toHaveLength(0) // 層1 regex 命中 — LLM 一次都不打
+  })
+
+  it('14. 無 pending → null 落回 responder、transport 不被呼叫', async () => {
+    distillGateOn()
+    const store = new MemoryStore() // 沒有 pending batch
+    const { calls: llmCalls } = installRecordingIntentSource(
+      '{"action":"approve","indices":[1],"confidence":"high"}'
+    )
+    setPartnerGroupResponder(fixedResponder('RESPONDER-TEXT'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(groupEvent('@bot 這條收一下'), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toBe('RESPONDER-TEXT')
+    expect(llmCalls).toHaveLength(0) // 一次 KV 讀就落回 — 日常聊天零 LLM 成本
   })
 })
 

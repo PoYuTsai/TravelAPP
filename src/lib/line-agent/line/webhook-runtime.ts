@@ -54,14 +54,15 @@ import {
   isDistillEnabled,
   runDistillation,
 } from '@/lib/line-agent/distill/run-distillation'
-import {
-  parseDistillApproval,
-  applyDistillApproval,
-} from '@/lib/line-agent/distill/approval'
+import { resolveDistillApproval } from '@/lib/line-agent/distill/approval'
 import {
   createAnthropicDistillSource,
   type DistillSource,
 } from '@/lib/line-agent/distill/distill-llm-adapter'
+import {
+  createAnthropicApprovalIntentSource,
+  type ApprovalIntentSource,
+} from '@/lib/line-agent/distill/approval-llm-adapter'
 // type-only — 靜態圖不拉 @notionhq/client；真 SDK 只在 composition root
 // （install-default-distilled-qa-writer）dynamic import 時構建。
 import type { DistilledQaWriter } from '@/lib/line-agent/distill/distilled-qa-writer'
@@ -713,6 +714,33 @@ function getDistillSource(): DistillSource {
 }
 
 /**
+ * 刀A 層2 source — 批准語句的 LLM intent parser（Haiku）。LAZY singleton，
+ * 組法逐行 mirror getDistillSource：同 transport（全域 fetch）、同 apiKey、
+ * 同一個 daily cost cap 工廠（KV 計量跨 instance，與其他 LLM 路徑共用每日
+ * 預算池 — costCap 必接，忘了接永不等於無上限燒錢）。adapter 內部 log 用它
+ * 的 default（requestId '-'）— singleton 不能綁第一個 request 的 logger
+ * （同 getDistillSource / getTranscriptOcr 前例）。
+ */
+let _approvalIntentSource: ApprovalIntentSource | null = null
+
+/** Override（測試注入 fake；null ⇒ 重置回 lazy default — 測試間不串味）。 */
+export function setApprovalIntentSource(source: ApprovalIntentSource | null): void {
+  _approvalIntentSource = source
+}
+
+function getApprovalIntentSource(): ApprovalIntentSource {
+  if (_approvalIntentSource === null) {
+    _approvalIntentSource = createAnthropicApprovalIntentSource({
+      transport: fetch,
+      apiKey: getPartnerResponderConfig().anthropicApiKey,
+      costCap: createDailyCostCap({ env: process.env, kv: createKvClientFromEnv() }),
+      env: process.env,
+    })
+  }
+  return _approvalIntentSource
+}
+
+/**
  * 刀3 knowledge writer — LAZY singleton（mirror getDistillSource）：批准語句
  * 真的來才 dynamic import composition root（靜態圖零 @notionhq/client）。
  * 三態：undefined＝未解析（下一則批准會重 resolve）、null＝config 終態 off
@@ -755,8 +783,11 @@ async function getDistilledQaWriter(
  *     整條沉澱路徑不存在，ship 零行為改變。
  *   - 閘開但 ANTHROPIC_API_KEY 缺 ⇒ undefined＋一行 fixed-code log（形同
  *     閘關 — 絕不炸 webhook，部署缺 key 可從 log 追到）。
- *   - approve 是 PARSE-FIRST：純函式 parseDistillApproval 先擋，非批准語句
- *     零 store 讀取 — KV 故障絕不劫持日常問答路徑（Task 7 review 契約）。
+ *   - approve 是刀A 三層接話：層1 regex 仍在最前（resolveDistillApproval
+ *     內，零成本零延遲）；parse-first 契約演化（design 2026-06-12 §1）—
+ *     regex miss＋無 pending ＝ 一次 KV 讀即落回 responder（讀失敗也回
+ *     null — KV 故障絕不劫持日常問答路徑）；writer 是 lazy thunk — 非批准
+ *     路徑零初始化。
  */
 function getDistillSeams(
   store: CaseStore,
@@ -776,19 +807,19 @@ function getDistillSeams(
         now: Date.now(),
         log,
       }),
-    approve: async (groupId, text) => {
-      // 純函式先擋（parse-first）— 非批准語句在這裡就回 null，不碰 store。
-      const approval = parseDistillApproval(text)
-      if (approval === null) return null
-      return applyDistillApproval({
+    approve: async (groupId, text, ctx) =>
+      // 三層接話 orchestrator：層1 regex → 複述確認 → 層2 LLM intent →
+      // 層3 deterministic 套用（超界整批拒絕在 applyDistillApproval 裡）。
+      // ctx.quotedBotContent：複述確認比對＋free-form 消歧的引用 context。
+      resolveDistillApproval({
         store,
         groupId,
-        approval,
+        text,
+        quotedBotContent: ctx?.quotedBotContent,
         now: Date.now(),
         log,
-        // 刀3：閘關/缺 config ⇒ undefined ⇒ dry-run 文案逐字不變
-        knowledgeWriter: await getDistilledQaWriter(log),
-      })
-    },
+        getKnowledgeWriter: () => getDistilledQaWriter(log),
+        intentSource: getApprovalIntentSource(),
+      }),
   }
 }
