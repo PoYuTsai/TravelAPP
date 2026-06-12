@@ -315,6 +315,35 @@ describe('markTranscriptDistilled TTL preservation (KvStore)', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Distill confirmation TTL（刀A）— 複述確認 10 分鐘自動作廢（design §1）
+// ---------------------------------------------------------------------------
+
+describe('distill confirmation TTL (KvStore)', () => {
+  it('putDistillConfirmation writes with 10-minute TTL', async () => {
+    const calls: Array<{ key: string; value: unknown; ttl: number }> = []
+    const base = makeMockKvClient()
+    const client: KvClient = {
+      ...base,
+      async setWithTtl(key, value, ttl) {
+        calls.push({ key, value, ttl })
+        return base.setWithTtl(key, value, ttl)
+      },
+    }
+    const store = new KvStore(client)
+
+    await store.putDistillConfirmation({
+      groupId: 'G_partner',
+      approval: { type: 'approve_all' },
+      restatementText: '你是要全收對嗎？引用這句回「對」就收',
+      createdAt: 1_700_000_000_000,
+    })
+    expect(calls).toHaveLength(1)
+    expect(calls[0].key).toBe('line-agent:distill-confirm:G_partner')
+    expect(calls[0].ttl).toBe(600) // 10 minutes in seconds
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Fail-closed: no injected client AND no env → every method throws.
 // ---------------------------------------------------------------------------
 

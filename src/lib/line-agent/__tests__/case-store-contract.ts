@@ -440,6 +440,25 @@ export function runCaseStoreContract(
         expect(await store.getDistillConfirmation('G2')).toBeNull()
       })
 
+      it('a second putDistillConfirmation for the same groupId overwrites (singleton)', async () => {
+        await store.putDistillConfirmation({
+          groupId: 'G1',
+          approval: { type: 'approve' as const, indices: [1, 3] },
+          restatementText: '第一次複述',
+          createdAt: 1000,
+        })
+        await store.putDistillConfirmation({
+          groupId: 'G1',
+          approval: { type: 'approve_all' as const },
+          restatementText: '第二次複述',
+          createdAt: 2000,
+        })
+        const got = await store.getDistillConfirmation('G1')
+        expect(got?.approval).toEqual({ type: 'approve_all' })
+        expect(got?.restatementText).toBe('第二次複述')
+        expect(got?.createdAt).toBe(2000)
+      })
+
       it('delete removes the confirmation; empty groupId is a no-op', async () => {
         await store.putDistillConfirmation({
           groupId: 'G1',
