@@ -28,10 +28,10 @@ import { flushResolvedToNotion } from './knowledge-flush'
 // 解析 — 純函式，剝 @mention（同 isDistillCommand 剝法）＋trim 後全句 match
 // ---------------------------------------------------------------------------
 
-export type DistillApproval =
-  | { type: 'approve'; indices: number[] }
-  | { type: 'approve_all' }
-  | { type: 'modify'; index: number; newAnswer: string }
+// 刀A：union 搬到 pending.ts（純型別模組）— store.ts 介面要引用它，
+// 留在這裡會跟 CaseStore 循環依賴。re-export 保住既有 import 點。
+import type { DistillApproval } from './pending'
+export type { DistillApproval }
 
 /** 全句 match（「都要喔」不算）— 防一般聊天誤觸。 */
 const APPROVE_ALL_RE = /^(都要|全部要|全要)$/

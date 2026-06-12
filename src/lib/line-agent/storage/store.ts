@@ -8,7 +8,10 @@
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
-import type { DistillPendingBatch } from '../distill/pending'
+import type {
+  DistillPendingBatch,
+  DistillApprovalConfirmation,
+} from '../distill/pending'
 
 /**
  * Max characters of bot-authored message content cached for quote-to-bot
@@ -169,4 +172,15 @@ export interface CaseStore {
 
   /** 讀該群 pending batch；不存在回 null。 */
   getDistillPending(groupId: string): Promise<DistillPendingBatch | null>
+
+  // ── 刀A：複述確認狀態（KV TTL 10 分鐘）──────────────────────────────────
+
+  /** 寫入該群的複述確認狀態（singleton per groupId，覆寫語意；TTL 10 分鐘）。 */
+  putDistillConfirmation(conf: DistillApprovalConfirmation): Promise<void>
+
+  /** 讀該群確認狀態；不存在/已過期回 null。empty groupId 回 null、零 I/O。 */
+  getDistillConfirmation(groupId: string): Promise<DistillApprovalConfirmation | null>
+
+  /** 刪除該群確認狀態（講了別的＝作廢）。empty groupId 是 no-op；冪等。 */
+  deleteDistillConfirmation(groupId: string): Promise<void>
 }

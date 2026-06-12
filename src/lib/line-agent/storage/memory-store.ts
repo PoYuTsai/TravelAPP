@@ -11,7 +11,10 @@
 import type { AgentCase, CaseStatus } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
-import type { DistillPendingBatch } from '../distill/pending'
+import type {
+  DistillPendingBatch,
+  DistillApprovalConfirmation,
+} from '../distill/pending'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -62,6 +65,13 @@ export class MemoryStore implements CaseStore {
    * Singleton per groupId、覆寫語意；in-memory 不模擬 TTL（同上慣例）。
    */
   private readonly distillPending = new Map<string, DistillPendingBatch>()
+
+  /**
+   * 刀A 複述確認狀態（NOT case state）— groupId → confirmation。
+   * Singleton per groupId、覆寫語意；in-memory 不模擬 TTL（同上慣例），
+   * 10 分鐘過期只在 KV 層成立。
+   */
+  private readonly distillConfirmations = new Map<string, DistillApprovalConfirmation>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -225,5 +235,23 @@ export class MemoryStore implements CaseStore {
   async getDistillPending(groupId: string): Promise<DistillPendingBatch | null> {
     if (groupId === '') return null
     return structuredClone(this.distillPending.get(groupId) ?? null)
+  }
+
+  // ── 刀A：複述確認狀態 ───────────────────────────────────────────────────
+
+  async putDistillConfirmation(conf: DistillApprovalConfirmation): Promise<void> {
+    if (conf.groupId === '') return
+    // Deep copy — approval 是巢狀物件，shallow copy 擋不住引用改寫。
+    this.distillConfirmations.set(conf.groupId, structuredClone(conf))
+  }
+
+  async getDistillConfirmation(groupId: string): Promise<DistillApprovalConfirmation | null> {
+    if (groupId === '') return null
+    return structuredClone(this.distillConfirmations.get(groupId) ?? null)
+  }
+
+  async deleteDistillConfirmation(groupId: string): Promise<void> {
+    if (groupId === '') return
+    this.distillConfirmations.delete(groupId)
   }
 }

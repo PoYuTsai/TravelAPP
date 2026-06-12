@@ -25,6 +25,29 @@ export interface DistillCandidate {
   missedCount: number
 }
 
+/**
+ * 批准動作 union（刀2）。住在這裡（純型別模組）而非 approval.ts —
+ * store.ts 介面要引用它，放 approval.ts 會跟 CaseStore 循環依賴。
+ */
+export type DistillApproval =
+  | { type: 'approve'; indices: number[] }
+  | { type: 'approve_all' }
+  | { type: 'modify'; index: number; newAnswer: string }
+
+/**
+ * 刀A 複述確認狀態（design §1）— 信心 low 時 bot 貼複述句並掛此狀態；
+ * 確認語必須「引用那句複述」＋對/要/好。KV TTL 10 分鐘，過期自動作廢。
+ */
+export interface DistillApprovalConfirmation {
+  groupId: string
+  /** 確認成立後原樣走 applyDistillApproval 的動作。 */
+  approval: DistillApproval
+  /** bot 貼出的複述句全文 — 與 quotedBotContent 比對（cache 可能截斷，用 startsWith）。 */
+  restatementText: string
+  /** ms since epoch（injected，determinism）。 */
+  createdAt: number
+}
+
 export interface DistillPendingBatch {
   groupId: string
   /** ms since epoch — 由呼叫端注入（determinism）。 */

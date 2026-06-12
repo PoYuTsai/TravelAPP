@@ -18,7 +18,10 @@ import { Redis } from '@upstash/redis'
 import { type AgentCase, type CaseStatus, TERMINAL_STATUSES } from '../cases/case-state'
 import type { AuditEntry } from '../audit/audit-log'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
-import type { DistillPendingBatch } from '../distill/pending'
+import type {
+  DistillPendingBatch,
+  DistillApprovalConfirmation,
+} from '../distill/pending'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -187,6 +190,10 @@ const TRANSCRIPT_TTL_SECONDS = 2_592_000 // 30 days
 // 的源頭 transcript 最多也只活 30 天，掛更久沒有意義。
 const DISTILL_PENDING_PREFIX = 'line-agent:distill-pending:'
 const DISTILL_PENDING_TTL_SECONDS = 2_592_000 // 30 days
+// 刀A：複述確認狀態 — singleton per groupId。TTL 10 分鐘：複述貼出後沒人
+// 確認就自動作廢（design §1），絕不讓 stale 確認在幾小時後誤觸發收錄。
+const DISTILL_CONFIRM_PREFIX = 'line-agent:distill-confirm:'
+const DISTILL_CONFIRM_TTL_SECONDS = 600 // 10 分鐘（design §1 複述確認）
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -437,5 +444,29 @@ export class KvStore implements CaseStore {
     if (groupId === '') return null
     const kv = this.ensureClient()
     return kv.get<DistillPendingBatch>(`${DISTILL_PENDING_PREFIX}${groupId}`)
+  }
+
+  // ── 刀A：複述確認狀態（KV TTL 10 分鐘）──────────────────────────────────
+
+  async putDistillConfirmation(conf: DistillApprovalConfirmation): Promise<void> {
+    if (conf.groupId === '') return
+    const kv = this.ensureClient()
+    await kv.setWithTtl(
+      `${DISTILL_CONFIRM_PREFIX}${conf.groupId}`,
+      conf,
+      DISTILL_CONFIRM_TTL_SECONDS,
+    )
+  }
+
+  async getDistillConfirmation(groupId: string): Promise<DistillApprovalConfirmation | null> {
+    if (groupId === '') return null
+    const kv = this.ensureClient()
+    return kv.get<DistillApprovalConfirmation>(`${DISTILL_CONFIRM_PREFIX}${groupId}`)
+  }
+
+  async deleteDistillConfirmation(groupId: string): Promise<void> {
+    if (groupId === '') return
+    const kv = this.ensureClient()
+    await kv.del(`${DISTILL_CONFIRM_PREFIX}${groupId}`)
   }
 }

@@ -424,5 +424,34 @@ export function runCaseStoreContract(
       expect(got?.createdAt).toBe(1_700_000_999_000)
       expect(got?.resolved).toEqual([])
     })
+
+    // ── 刀A：複述確認狀態（KV TTL 10 分鐘）─────────────────────────────────
+
+    describe('distill confirmation (knife A)', () => {
+      it('put → get roundtrip per groupId', async () => {
+        const conf = {
+          groupId: 'G1',
+          approval: { type: 'approve' as const, indices: [1, 3] },
+          restatementText: '你是要收 1、3 對嗎？引用這句回「對」就收',
+          createdAt: 1000,
+        }
+        await store.putDistillConfirmation(conf)
+        expect(await store.getDistillConfirmation('G1')).toEqual(conf)
+        expect(await store.getDistillConfirmation('G2')).toBeNull()
+      })
+
+      it('delete removes the confirmation; empty groupId is a no-op', async () => {
+        await store.putDistillConfirmation({
+          groupId: 'G1',
+          approval: { type: 'approve_all' as const },
+          restatementText: 'x',
+          createdAt: 1000,
+        })
+        await store.deleteDistillConfirmation('G1')
+        expect(await store.getDistillConfirmation('G1')).toBeNull()
+        await expect(store.getDistillConfirmation('')).resolves.toBeNull()
+        await expect(store.deleteDistillConfirmation('')).resolves.toBeUndefined()
+      })
+    })
   })
 }
