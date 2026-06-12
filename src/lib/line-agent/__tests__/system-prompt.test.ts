@@ -223,8 +223,7 @@ describe('buildPartnerGroupSystemPrompt', () => {
     it('有知識 ⇒ 區塊接在 frozen persona 尾端', () => {
       const knowledge = '【清微旅行沉澱問答】\nQ：q\nA：a'
       const prompt = buildPartnerGroupSystemPrompt(makeInput(), knowledge)
-      expect(prompt.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
-      expect(prompt).toContain(knowledge)
+      expect(prompt).toBe([PARTNER_GROUP_SYSTEM_PROMPT, '', knowledge].join('\n'))
     })
 
     it('知識＋引用脈絡並存 ⇒ 知識在前、引用在後', () => {

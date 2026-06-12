@@ -29,6 +29,7 @@ import {
 } from './responder'
 import { routePartnerModel } from './model-routing'
 import { buildPartnerGroupSystemPrompt } from './system-prompt'
+import type { QaKnowledgeSource } from './qa-knowledge-source'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
 
@@ -61,6 +62,12 @@ export interface AnthropicPartnerGroupResponderDeps {
   /** Model for draft/parse intents. */
   researchModel: string
   /**
+   * 沉澱 QA 知識源（檢索閉環刀）— OPTIONAL＋fail-open：未注入或失敗 ⇒
+   * prompt 與現行 byte-identical。對照 costCap 的 REQUIRED fail-closed —
+   * 知識是 enhancement，預算是 brake。
+   */
+  knowledgeSource?: QaKnowledgeSource
+  /**
    * Daily cost cap（P0-A 刀 2）— REQUIRED so a forgotten wiring can never mean
    * "unlimited spend". The factory builds the real KV-backed cap; tests inject
    * a fake.
@@ -73,6 +80,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly apiKey: string
   private readonly defaultModel: string
   private readonly researchModel: string
+  private readonly knowledgeSource?: QaKnowledgeSource
   private readonly costCap: DailyCostCap
 
   constructor(deps: AnthropicPartnerGroupResponderDeps) {
@@ -80,6 +88,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.apiKey = deps.apiKey
     this.defaultModel = deps.defaultModel
     this.researchModel = deps.researchModel
+    this.knowledgeSource = deps.knowledgeSource
     this.costCap = deps.costCap
   }
 
@@ -105,7 +114,18 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       return degraded(model, error)
     }
 
-    const system = buildPartnerGroupSystemPrompt(input)
+    // 檢索閉環刀 — 沉澱知識（fail-open）：source 內部已收斂錯誤為 null，
+    // 這層 try-catch 是 belt-and-braces — 任何 throw 都不得擋住回覆。
+    let knowledge: string | null = null
+    if (this.knowledgeSource) {
+      try {
+        knowledge = await this.knowledgeSource()
+      } catch {
+        log('qa_knowledge_unavailable', {})
+      }
+    }
+
+    const system = buildPartnerGroupSystemPrompt(input, knowledge)
     const startedAt = Date.now()
 
     let response: Response

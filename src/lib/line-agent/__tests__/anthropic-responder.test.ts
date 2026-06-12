@@ -185,6 +185,52 @@ describe('AnthropicPartnerGroupResponder — safe-default error paths (never thr
   })
 })
 
+describe('AnthropicPartnerGroupResponder — 檢索閉環刀 knowledgeSource', () => {
+  it('注入 knowledgeSource ⇒ 送出的 system 含知識區塊（接在 frozen persona 之後）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      knowledgeSource: async () => '【清微旅行沉澱問答】\nQ：q\nA：a',
+    })
+
+    await responder.respond(makeInput())
+
+    const body = JSON.parse(calls[0].init.body as string)
+    expect(body.system).toContain('Q：q')
+    expect(body.system.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
+  })
+
+  it('knowledgeSource 回 null ⇒ system 與現行 byte-identical', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      knowledgeSource: async () => null,
+    })
+
+    await responder.respond(makeInput())
+
+    expect(JSON.parse(calls[0].init.body as string).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+  })
+
+  it('knowledgeSource throw ⇒ fail-open：照常回覆 llm、原 prompt', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      knowledgeSource: async () => {
+        throw new Error('boom')
+      },
+    })
+
+    const result = await responder.respond(makeInput())
+
+    expect(result.meta?.responder).toBe('llm')
+    expect(JSON.parse(calls[0].init.body as string).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+  })
+})
+
 describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 fail-closed）', () => {
   const OK_BODY_WITH_USAGE = {
     content: [{ type: 'text', text: '建議先確認人數與日期。' }],
