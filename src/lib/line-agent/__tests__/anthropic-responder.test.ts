@@ -297,6 +297,52 @@ describe('AnthropicPartnerGroupResponder — 外部佐證刀 web_search tool', (
   })
 })
 
+describe('AnthropicPartnerGroupResponder — 多 block 解析＋citations（外部佐證刀）', () => {
+  const SEARCH_BODY = {
+    content: [
+      { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: 'yi peng 2026' } },
+      { type: 'web_search_tool_result', tool_use_id: 'srvtoolu_1', content: [] },
+      { type: 'text', text: '天燈節是 11/25', citations: [{ type: 'web_search_result_location', url: 'https://a.example/yipeng', title: 'A' }] },
+      { type: 'text', text: '，建議提前訂房。', citations: [
+        { type: 'web_search_result_location', url: 'https://a.example/yipeng', title: 'A' },
+        { type: 'web_search_result_location', url: 'https://b.example/hotels', title: 'B' },
+      ] },
+    ],
+    usage: { input_tokens: 100, output_tokens: 50 },
+  }
+
+  it('串接所有 text block＋citations 去重抽 URL 附文末', async () => {
+    const { transport } = fakeTransport({ jsonValue: SEARCH_BODY })
+    const result = await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(makeInput())
+    expect(result.text).toBe(
+      '天燈節是 11/25，建議提前訂房。\n\n資料來源：\n- https://a.example/yipeng\n- https://b.example/hotels'
+    )
+    expect(result.meta?.responder).toBe('llm')
+  })
+
+  it('來源最多 3 個 URL', async () => {
+    const many = {
+      content: [{
+        type: 'text', text: 'x',
+        citations: [1, 2, 3, 4, 5].map((i) => ({ type: 'web_search_result_location', url: `https://s${i}.example/` })),
+      }],
+    }
+    const { transport } = fakeTransport({ jsonValue: many })
+    const result = await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(makeInput())
+    expect((result.text.match(/^- https:/gm) ?? []).length).toBe(3)
+  })
+
+  it('純 text 單 block（無 citations）⇒ 文末無資料來源段（現行行為不變）', async () => {
+    const { transport } = fakeTransport({ jsonValue: OK_BODY })
+    const result = await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(makeInput())
+    expect(result.text).toBe('建議先確認人數與日期。')
+  })
+})
+
 describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 fail-closed）', () => {
   const OK_BODY_WITH_USAGE = {
     content: [{ type: 'text', text: '建議先確認人數與日期。' }],

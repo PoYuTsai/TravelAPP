@@ -40,6 +40,9 @@ const MAX_TOKENS = 1024
 /** 外部佐證刀 — 每題搜尋次數上限（design §3 成本：3 × $0.01 ≈ $0.03/題）。 */
 const WEB_SEARCH_MAX_USES = 3
 
+/** 文末來源連結上限（design §1：citations 抽 1–3 個）。 */
+const MAX_SOURCE_URLS = 3
+
 /** Safe-default fallback: stub text, observably tagged with the error code. */
 function degraded(model: string, error: string): PartnerGroupRespondResult {
   return {
@@ -196,13 +199,35 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     }
 
     let text: unknown
-    let usage: { input_tokens?: unknown; output_tokens?: unknown } | undefined
+    const sourceUrls: string[] = []
+    let usage:
+      | {
+          input_tokens?: unknown
+          output_tokens?: unknown
+          server_tool_use?: { web_search_requests?: unknown }
+        }
+      | undefined
     try {
       const data = (await response.json()) as {
-        content?: Array<{ text?: unknown }>
-        usage?: { input_tokens?: unknown; output_tokens?: unknown }
+        content?: Array<{ text?: unknown; citations?: unknown }>
+        usage?: typeof usage
       }
-      text = data?.content?.[0]?.text
+      // 多 block 串接：web search 回應是 text / server_tool_use /
+      // web_search_tool_result 混排 — 只取帶 text 的 block。單 text block
+      // 時與原 content[0].text 等價（閘關行為零變化）。
+      const blocks = Array.isArray(data?.content) ? data.content : []
+      const textBlocks = blocks.filter(
+        (b): b is { text: string; citations?: unknown } => typeof b?.text === 'string'
+      )
+      text = textBlocks.length > 0 ? textBlocks.map((b) => b.text).join('') : undefined
+      for (const block of textBlocks) {
+        const citations = Array.isArray(block.citations) ? block.citations : []
+        for (const c of citations as Array<{ url?: unknown }>) {
+          if (typeof c?.url === 'string' && c.url !== '' && !sourceUrls.includes(c.url)) {
+            sourceUrls.push(c.url)
+          }
+        }
+      }
       usage = data?.usage
     } catch {
       log('llm_call', {
@@ -247,6 +272,16 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       return degraded(model, 'anthropic_parse_error')
     }
 
+    // 外部佐證刀 — citations 來源附文末（去重後最多 MAX_SOURCE_URLS 個）。
+    // 無 citations（含閘關）⇒ finalText === text，現行行為零變化。
+    const finalText =
+      sourceUrls.length > 0
+        ? `${text}\n\n資料來源：\n${sourceUrls
+            .slice(0, MAX_SOURCE_URLS)
+            .map((u) => `- ${u}`)
+            .join('\n')}`
+        : text
+
     log('llm_call', {
       model,
       latencyMs: Date.now() - startedAt,
@@ -256,6 +291,6 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       outcome: 'ok',
       ...(usageMissing ? { usageMissing: true } : {}),
     })
-    return { text, meta: { responder: 'llm', model } }
+    return { text: finalText, meta: { responder: 'llm', model } }
   }
 }
