@@ -271,4 +271,11 @@ describe('DISTILL_SYSTEM_INSTRUCTION', () => {
     expect(DISTILL_SYSTEM_INSTRUCTION).toContain('不得腦補')
     expect(DISTILL_SYSTEM_INSTRUCTION).toContain('code fence')
   })
+
+  it('locks the third admission gate: reusable boss answers (knife A)', () => {
+    expect(DISTILL_SYSTEM_INSTRUCTION).toContain('滿足任一')
+    expect(DISTILL_SYSTEM_INSTRUCTION).toContain('可重複使用')
+    expect(DISTILL_SYSTEM_INSTRUCTION).toContain('還成立嗎')
+    expect(DISTILL_SYSTEM_INSTRUCTION).toContain('只對單一客人成立的不收')
+  })
 })
