@@ -26,6 +26,8 @@ export type AgentLogEvent =
   | 'reply_skipped'
   | 'store_write_failed'
   | 'store_read_failed'
+  | 'qa_knowledge_truncated'
+  | 'qa_knowledge_unavailable'
 
 /** Per-event closed field shapes. All values are codes / numbers / booleans. */
 export interface AgentLogFieldsByEvent {
@@ -80,6 +82,16 @@ export interface AgentLogFieldsByEvent {
   }
   store_read_failed: {
     /** Fixed code（e.g. distill_pending_read_failed）— never the raw store error. */
+    reason?: string
+  }
+  qa_knowledge_truncated: {
+    /** 已批准條目總數（a count, never content）。 */
+    total?: number
+    /** 注入條目數（<= cap）。 */
+    kept?: number
+  }
+  qa_knowledge_unavailable: {
+    /** Fixed code only — never the raw Notion error（token / db id / url）。 */
     reason?: string
   }
 }
