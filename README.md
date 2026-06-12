@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-06-12 刀A 完成（批准三層接話 regex→Haiku→驗證＋收錄三門＋引用 context＋CLI approve-parse 內測） -->
+<!-- Last build trigger: 2026-06-12 mention 誤判修復（tag 同前綴人名不再觸發 bot）＋黑箱內測通過 -->
