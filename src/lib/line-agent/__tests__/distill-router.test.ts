@@ -106,8 +106,29 @@ describe('routeCommand — 沉澱刀2 B1 distill 攔截', () => {
     expect(decision.action).toBe('distill')
     expect(decision.handlerResult).toBe(APPROVE_RESULT)
     expect(distill.approve).toHaveBeenCalledTimes(1)
-    expect(distill.approve).toHaveBeenCalledWith(GROUP_ID, '@bot 1 3 要')
+    expect(distill.approve).toHaveBeenCalledWith(GROUP_ID, '@bot 1 3 要', {
+      quotedBotContent: undefined,
+    })
     expect(distill.run).not.toHaveBeenCalled()
+  })
+
+  it('刀A：quotedBotContent 線進 approve seam ctx（複述比對＋LLM 消歧 context）', async () => {
+    const distill = fakeDistillSeam({ approve: async () => null })
+    const responder = fakeResponder()
+    const decision = await routeCommand(
+      baseInput(groupEvent('@bot 大車保險一點'), {
+        distill,
+        quotedBotContent: '高爾夫球具建議用大車載',
+        partnerGroupResponder: responder,
+      })
+    )
+
+    expect(distill.approve).toHaveBeenCalledWith(GROUP_ID, '@bot 大車保險一點', {
+      quotedBotContent: '高爾夫球具建議用大車載',
+    })
+    // approve 回 null → 落回 responder
+    expect(decision.action).toBe('respond')
+    expect(responder.respond).toHaveBeenCalledTimes(1)
   })
 
   it('approve 回 null（不是批准語句/無 pending）→ 落回 responder', async () => {

@@ -157,7 +157,12 @@ export interface RouterInput {
    */
   distill?: {
     run(groupId: string): Promise<HandlerResult>
-    approve(groupId: string, text: string): Promise<HandlerResult | null>
+    approve(
+      groupId: string,
+      text: string,
+      /** 刀A：引用的 bot 訊息內容 — 複述確認比對＋LLM 消歧 context。 */
+      ctx?: { quotedBotContent?: string }
+    ): Promise<HandlerResult | null>
   }
 }
 
@@ -346,7 +351,9 @@ export async function routeCommand(input: RouterInput): Promise<RouterDecision> 
               const handlerResult = await input.distill.run(event.groupId)
               return { action: 'distill', source, handlerResult, intent: earlyIntent }
             }
-            const approval = await input.distill.approve(event.groupId, event.text ?? '')
+            const approval = await input.distill.approve(event.groupId, event.text ?? '', {
+              quotedBotContent: input.quotedBotContent,
+            })
             if (approval !== null) {
               return { action: 'distill', source, handlerResult: approval, intent: earlyIntent }
             }
