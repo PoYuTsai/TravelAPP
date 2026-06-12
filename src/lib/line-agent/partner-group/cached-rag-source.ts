@@ -20,8 +20,11 @@
  * This module is generic + pure: it imports no Notion/LLM client. The real
  * loader/answer (Notion retrieval + composeAnswer) are injected by a later slice
  * BEHIND the still-off env gate; nothing here enables production behavior.
+ *
+ * TTL + single-flight 核心已抽到 cached-loader.ts（檢索閉環刀）；本檔委派之。
  */
 
+import { createCachedLoader } from './cached-loader'
 import type { PartnerGroupRespondInput } from './responder'
 import type { PartnerRagDraftSource } from './rag-draft-surfacing'
 
@@ -48,40 +51,16 @@ export interface CachedRagAnswerSourceDeps<TIndex> {
 export function createCachedRagAnswerSource<TIndex>(
   deps: CachedRagAnswerSourceDeps<TIndex>,
 ): PartnerRagDraftSource {
-  const { loadIndex, answer, ttlMs } = deps
-  const now = deps.now ?? (() => Date.now())
-
-  let entry: { index: TIndex; builtAt: number } | null = null
-  let inFlight: Promise<TIndex> | null = null
-
-  async function getIndex(): Promise<TIndex> {
-    // Fresh cache hit — reuse, no Notion read.
-    if (entry !== null && now() - entry.builtAt < ttlMs) {
-      return entry.index
-    }
-    // A build is already running (cold start or post-expiry) — join it so a
-    // burst of tagged messages collapses into a SINGLE corpus read.
-    if (inFlight !== null) {
-      return inFlight
-    }
-    inFlight = (async () => {
-      try {
-        const index = await loadIndex()
-        // Stamp builtAt AFTER the load so the TTL covers usable-cache time only.
-        entry = { index, builtAt: now() }
-        return index
-      } finally {
-        // Always clear the in-flight latch — on success the next caller reads the
-        // fresh `entry`; on error `entry` is untouched so the failure is NOT
-        // cached and the next call retries.
-        inFlight = null
-      }
-    })()
-    return inFlight
-  }
+  // TTL + single-flight 核心抽到 cached-loader.ts（檢索閉環刀）— 行為不變：
+  // fail-closed（loadIndex error 上拋且不快取）由泛型核心同樣保證。
+  const getIndex = createCachedLoader({
+    load: deps.loadIndex,
+    ttlMs: deps.ttlMs,
+    now: deps.now,
+  })
 
   return async (input) => {
     const index = await getIndex()
-    return answer(index, input)
+    return deps.answer(index, input)
   }
 }
