@@ -20,9 +20,15 @@
 import type { CaseStore } from '../storage/store'
 import type { AgentLogger } from '../observability/structured-log'
 import type { HandlerResult } from '../commands/handlers'
-import type { DistillCandidate } from './pending'
+import type {
+  DistillCandidate,
+  DistillPendingBatch,
+  DistillApprovalConfirmation,
+} from './pending'
 import type { DistilledQaWriter } from './distilled-qa-writer'
 import { flushResolvedToNotion } from './knowledge-flush'
+import { parseApprovalIntentJson } from './approval-intent'
+import type { ApprovalIntentSource } from './approval-llm-adapter'
 
 // ---------------------------------------------------------------------------
 // 解析 — 純函式，剝 @mention（同 isDistillCommand 剝法）＋trim 後全句 match
@@ -222,4 +228,164 @@ export async function applyDistillApproval(
     outboundText: composeAck(headline, remaining, writeLine),
     meta,
   }
+}
+
+// ---------------------------------------------------------------------------
+// 刀A — 三層接話 orchestrator（design 2026-06-12 §1）
+// ---------------------------------------------------------------------------
+
+/** 防呆兜底 — LLM 掛掉/不合法 JSON/cost cap 到頂：不靜默，絕不吞批准意圖。 */
+export const DISTILL_APPROVAL_FALLBACK_TEXT = '看不懂這句，要收哪幾條？例：1 3 要'
+
+/** 確認語：剝 mention 後全句 match（同 regex 批准的防誤觸紀律）。 */
+const CONFIRM_YES_RE = /^(對|要|好)$/
+
+/** Exported for tests — 複述句排版以測試鎖定（同 composeAck 慣例）。 */
+export function composeConfirmationText(
+  approval: DistillApproval,
+  candidates: DistillCandidate[]
+): string {
+  if (approval.type === 'approve_all') {
+    return `你是要全部收（${joinIds(candidates)}）對嗎？引用這句回「對」就收`
+  }
+  if (approval.type === 'approve') {
+    return `你是要收 ${approval.indices.join('、')} 對嗎？引用這句回「對」就收`
+  }
+  return `你是要把第 ${approval.index} 條改成「${approval.newAnswer}」再收對嗎？引用這句回「對」就收`
+}
+
+/**
+ * 引用比對：quotedBotContent 是 store cache 的內容，可能被長度上限截斷 —
+ * startsWith 同時涵蓋全等與截斷前綴。Exported for tests。
+ */
+export function confirmationQuoteMatches(
+  restatementText: string,
+  quotedBotContent: string | undefined
+): boolean {
+  if (!quotedBotContent || quotedBotContent.trim() === '') return false
+  return restatementText.startsWith(quotedBotContent.trim())
+}
+
+export interface ResolveDistillApprovalInput {
+  store: CaseStore
+  groupId: string
+  /** 使用者原話（未剝 mention）。 */
+  text: string
+  /** 引用的 bot 訊息內容（webhook resolve；確認比對＋LLM context 雙用途）。 */
+  quotedBotContent?: string
+  now: number
+  log?: AgentLogger
+  /**
+   * 刀3 writer thunk — lazy：非批准路徑零 writer 初始化（保住 parse-first
+   * 的輕量契約）。未注入/resolve undefined ⇒ dry-run 文案。
+   */
+  getKnowledgeWriter?: () => Promise<DistilledQaWriter | undefined>
+  /** 層2 seam — 未注入 ⇒ regex-only（行為同刀2；CLI/測試注入 fake）。 */
+  intentSource?: ApprovalIntentSource
+}
+
+function fallbackResult(reason: string): HandlerResult {
+  return {
+    handler: 'resolveDistillApproval',
+    status: 'stub_ok',
+    outboundText: DISTILL_APPROVAL_FALLBACK_TEXT,
+    meta: { reason },
+  }
+}
+
+/** 不是批准、也無 pending → null（router 落回 responder）。 */
+export async function resolveDistillApproval(
+  input: ResolveDistillApprovalInput
+): Promise<HandlerResult | null> {
+  const { store, groupId, text, quotedBotContent, now, log } = input
+
+  const apply = async (approval: DistillApproval) =>
+    applyDistillApproval({
+      store,
+      groupId,
+      approval,
+      now,
+      log,
+      knowledgeWriter: await input.getKnowledgeWriter?.(),
+    })
+
+  // 層1 — 老格式 regex（零成本零延遲；命中行為與刀2 逐字相同）
+  const regexApproval = parseDistillApproval(text)
+  if (regexApproval !== null) {
+    // 換了批准方式 → 舊複述確認作廢（best-effort：刪失敗 TTL 兜底）
+    try { await store.deleteDistillConfirmation(groupId) } catch { /* TTL 兜底 */ }
+    return apply(regexApproval)
+  }
+
+  // regex miss → 先看 pending（無 pending ＝ 一次 KV 讀後落回 responder）。
+  // KV 讀失敗回 null — 故障絕不劫持日常問答（parse-first 契約演化，design §1）。
+  let batch: DistillPendingBatch | null
+  try {
+    batch = await store.getDistillPending(groupId)
+  } catch {
+    log?.('store_write_failed', { reason: 'distill_pending_read_failed' })
+    return null
+  }
+  if (!batch || batch.candidates.length === 0) return null
+
+  // 複述確認 — 確認語必須「引用那句複述」＋對/要/好（design §1）
+  let confirmation: DistillApprovalConfirmation | null = null
+  try {
+    confirmation = await store.getDistillConfirmation(groupId)
+  } catch { /* 讀失敗當不存在 — TTL 兜底 */ }
+  if (confirmation) {
+    const stripped = text.replace(/@\S+/g, '').trim()
+    if (
+      confirmationQuoteMatches(confirmation.restatementText, quotedBotContent) &&
+      CONFIRM_YES_RE.test(stripped)
+    ) {
+      try { await store.deleteDistillConfirmation(groupId) } catch { /* TTL 兜底 */ }
+      return apply(confirmation.approval)
+    }
+    // 講了別的 → 自動作廢，不卡任何路徑（繼續層2）
+    try { await store.deleteDistillConfirmation(groupId) } catch { /* TTL 兜底 */ }
+  }
+
+  // 層2 — LLM intent parser（未注入 ⇒ 行為同刀2）
+  if (!input.intentSource) return null
+  let intent: ReturnType<typeof parseApprovalIntentJson>
+  try {
+    const raw = await input.intentSource({
+      text,
+      candidates: batch.candidates.map(({ id, question, answer }) => ({ id, question, answer })),
+      ...(quotedBotContent !== undefined ? { quotedBotContent } : {}),
+    })
+    intent = parseApprovalIntentJson(raw)
+  } catch {
+    log?.('route_decision', { reason: 'approval_intent_llm_failed' })
+    return fallbackResult('approval_intent_llm_failed')
+  }
+  if (intent === null) return fallbackResult('approval_intent_unparseable')
+  if (intent.action === 'not_approval') return null
+
+  const approval: DistillApproval =
+    intent.action === 'approve'
+      ? { type: 'approve', indices: intent.indices }
+      : intent.action === 'approve_all'
+        ? { type: 'approve_all' }
+        : { type: 'modify', index: intent.index, newAnswer: intent.newAnswer }
+
+  if (intent.confidence === 'low') {
+    const restatementText = composeConfirmationText(approval, batch.candidates)
+    try {
+      await store.putDistillConfirmation({ groupId, approval, restatementText, createdAt: now })
+    } catch {
+      log?.('store_write_failed', { reason: 'distill_confirmation_write_failed' })
+      return fallbackResult('distill_confirmation_write_failed')
+    }
+    return {
+      handler: 'resolveDistillApproval',
+      status: 'stub_ok',
+      outboundText: restatementText,
+      meta: { reason: 'distill_approval_confirmation', confidence: 'low' },
+    }
+  }
+
+  // 層3 — deterministic 驗證＝既有 applyDistillApproval（超界整批拒絕在裡面）
+  return apply(approval)
 }
