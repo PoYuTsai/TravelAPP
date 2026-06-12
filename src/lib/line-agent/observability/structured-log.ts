@@ -25,6 +25,7 @@ export type AgentLogEvent =
   | 'reply_sent'
   | 'reply_skipped'
   | 'store_write_failed'
+  | 'store_read_failed'
 
 /** Per-event closed field shapes. All values are codes / numbers / booleans. */
 export interface AgentLogFieldsByEvent {
@@ -75,6 +76,10 @@ export interface AgentLogFieldsByEvent {
   }
   store_write_failed: {
     /** Fixed code（e.g. bot_msg_record_failed）— never the raw store error. */
+    reason?: string
+  }
+  store_read_failed: {
+    /** Fixed code（e.g. distill_pending_read_failed）— never the raw store error. */
     reason?: string
   }
 }

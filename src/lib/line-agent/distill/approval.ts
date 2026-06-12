@@ -323,7 +323,7 @@ export async function resolveDistillApproval(
   try {
     batch = await store.getDistillPending(groupId)
   } catch {
-    log?.('store_write_failed', { reason: 'distill_pending_read_failed' })
+    log?.('store_read_failed', { reason: 'distill_pending_read_failed' })
     return null
   }
   if (!batch || batch.candidates.length === 0) return null
@@ -376,7 +376,14 @@ export async function resolveDistillApproval(
       await store.putDistillConfirmation({ groupId, approval, restatementText, createdAt: now })
     } catch {
       log?.('store_write_failed', { reason: 'distill_confirmation_write_failed' })
-      return fallbackResult('distill_confirmation_write_failed')
+      // store 寫失敗收斂成 status: 'error'（同 applyDistillApproval 慣例）；
+      // 文案仍用 FALLBACK_TEXT — 刻意把使用者導回 regex 格式（層1 不經確認狀態）。
+      return {
+        handler: 'resolveDistillApproval',
+        status: 'error',
+        outboundText: DISTILL_APPROVAL_FALLBACK_TEXT,
+        meta: { reason: 'distill_confirmation_write_failed' },
+      }
     }
     return {
       handler: 'resolveDistillApproval',

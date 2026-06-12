@@ -8,6 +8,7 @@ import { MemoryStore } from '../storage/memory-store'
 import {
   resolveDistillApproval,
   composeConfirmationText,
+  confirmationQuoteMatches,
   DISTILL_APPROVAL_FALLBACK_TEXT,
 } from '../distill/approval'
 
@@ -112,6 +113,50 @@ describe('resolveDistillApproval — 三層接話', () => {
   it('intentSource 未注入 → 行為同刀2（regex-only，miss 即 null）', async () => {
     const store = new MemoryStore(); await seedPending(store)
     expect(await resolveDistillApproval({ ...base, store, text: '都收了吧' })).toBeNull()
+  })
+
+  it('pending 讀失敗 → null＋store_read_failed（不劫持日常問答）', async () => {
+    const store = new MemoryStore(); await seedPending(store)
+    vi.spyOn(store, 'getDistillPending').mockRejectedValue(new Error('kv down'))
+    const log = vi.fn()
+    const intentSource = vi.fn()
+    expect(await resolveDistillApproval({ ...base, store, text: '都收了吧', log, intentSource })).toBeNull()
+    expect(log).toHaveBeenCalledWith('store_read_failed', { reason: 'distill_pending_read_failed' })
+    expect(intentSource).not.toHaveBeenCalled()
+  })
+
+  it('low → 確認狀態寫失敗 → status error＋兜底文案（store 寫失敗慣例）', async () => {
+    const store = new MemoryStore(); await seedPending(store)
+    vi.spyOn(store, 'putDistillConfirmation').mockRejectedValue(new Error('kv down'))
+    const log = vi.fn()
+    const intentSource = vi.fn().mockResolvedValue('{"action":"approve","indices":[1],"confidence":"low"}')
+    const result = await resolveDistillApproval({ ...base, store, text: '那條應該ok', log, intentSource })
+    expect(result?.status).toBe('error')
+    expect(result?.outboundText).toBe(DISTILL_APPROVAL_FALLBACK_TEXT)
+    expect(result?.meta?.reason).toBe('distill_confirmation_write_failed')
+    expect(log).toHaveBeenCalledWith('store_write_failed', { reason: 'distill_confirmation_write_failed' })
+  })
+})
+
+describe('confirmationQuoteMatches', () => {
+  const restatement = '你是要收 1、3 對嗎？引用這句回「對」就收'
+
+  it('全等引用 → true', () => {
+    expect(confirmationQuoteMatches(restatement, restatement)).toBe(true)
+  })
+
+  it('截斷前綴（store cache 長度上限）→ true', () => {
+    expect(confirmationQuoteMatches(restatement, '你是要收 1、3 對嗎？')).toBe(true)
+  })
+
+  it('引用了別則訊息 → false', () => {
+    expect(confirmationQuoteMatches(restatement, '清萊一日遊建議早上七點出發')).toBe(false)
+  })
+
+  it('無引用 / 空字串 / 全空白 → false', () => {
+    expect(confirmationQuoteMatches(restatement, undefined)).toBe(false)
+    expect(confirmationQuoteMatches(restatement, '')).toBe(false)
+    expect(confirmationQuoteMatches(restatement, '   ')).toBe(false)
   })
 })
 

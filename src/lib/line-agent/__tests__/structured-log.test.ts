@@ -105,7 +105,8 @@ describe('createAgentLogger', () => {
       'reply_sent',
       'reply_skipped',
       'store_write_failed',
+      'store_read_failed',
     ]
-    expect(events).toHaveLength(7)
+    expect(events).toHaveLength(8)
   })
 })
