@@ -50,16 +50,25 @@ export const PARTNER_GROUP_SYSTEM_PROMPT = [
 
 /**
  * Lightweight assembly hook (design §5 step 2).  Frozen persona + guardrails
- * verbatim；刀A：當事件引用了 bot 訊息（M3.6c quote-to-bot），把引用內容附在
- * prompt 尾端 — 口語詞（「保險一點」「再大一點」）靠引用脈絡消歧。
+ * verbatim；刀A：引用脈絡接尾端；檢索閉環刀：沉澱知識區塊接 persona 之後、
+ * 引用之前（引用語意最貼近當則訊息，留最尾）。知識缺席 ⇒ 與現行 byte-identical。
  */
-export function buildPartnerGroupSystemPrompt(input: PartnerGroupRespondInput): string {
+export function buildPartnerGroupSystemPrompt(
+  input: PartnerGroupRespondInput,
+  knowledge?: string | null
+): string {
+  const sections = [PARTNER_GROUP_SYSTEM_PROMPT]
+  const trimmedKnowledge = knowledge?.trim()
+  if (trimmedKnowledge) {
+    sections.push('', trimmedKnowledge)
+  }
   const quoted = input.quotedBotContent?.trim()
-  if (!quoted) return PARTNER_GROUP_SYSTEM_PROMPT
-  return [
-    PARTNER_GROUP_SYSTEM_PROMPT,
-    '',
-    '【引用脈絡】使用者引用了你之前說的這句話，他的訊息是針對這句的回應；解讀口語、代稱與省略時，以這段引用為脈絡：',
-    `「${quoted}」`,
-  ].join('\n')
+  if (quoted) {
+    sections.push(
+      '',
+      '【引用脈絡】使用者引用了你之前說的這句話，他的訊息是針對這句的回應；解讀口語、代稱與省略時，以這段引用為脈絡：',
+      `「${quoted}」`
+    )
+  }
+  return sections.join('\n')
 }

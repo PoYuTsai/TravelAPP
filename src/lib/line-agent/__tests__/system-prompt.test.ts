@@ -210,4 +210,47 @@ describe('buildPartnerGroupSystemPrompt', () => {
       ).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
     })
   })
+
+  // 2026-06-13 檢索閉環刀: 沉澱知識區塊接 persona 之後、引用之前。
+  // 知識缺席 ⇒ 與現行輸出 byte-identical（迴歸鎖）。
+  describe('buildPartnerGroupSystemPrompt — 檢索閉環刀知識區塊', () => {
+    it('無知識（undefined/null/空白）⇒ 輸出與現行 byte-identical（迴歸鎖）', () => {
+      expect(buildPartnerGroupSystemPrompt(makeInput())).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+      expect(buildPartnerGroupSystemPrompt(makeInput(), null)).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+      expect(buildPartnerGroupSystemPrompt(makeInput(), '  ')).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    })
+
+    it('有知識 ⇒ 區塊接在 frozen persona 尾端', () => {
+      const knowledge = '【清微旅行沉澱問答】\nQ：q\nA：a'
+      const prompt = buildPartnerGroupSystemPrompt(makeInput(), knowledge)
+      expect(prompt.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
+      expect(prompt).toContain(knowledge)
+    })
+
+    it('知識＋引用脈絡並存 ⇒ 知識在前、引用在後', () => {
+      const knowledge = '【清微旅行沉澱問答】\nQ：q\nA：a'
+      const prompt = buildPartnerGroupSystemPrompt(
+        { ...makeInput(), quotedBotContent: '之前的草稿' },
+        knowledge
+      )
+      expect(prompt.indexOf(knowledge)).toBeGreaterThan(-1)
+      expect(prompt.indexOf(knowledge)).toBeLessThan(prompt.indexOf('【引用脈絡】'))
+      expect(prompt).toContain('「之前的草稿」')
+    })
+
+    it('純引用、無知識 ⇒ 輸出與現行 quote 版 byte-identical（迴歸鎖）', () => {
+      const prompt = buildPartnerGroupSystemPrompt({
+        ...makeInput(),
+        quotedBotContent: '大車後排放球袋比較穩',
+      })
+      expect(prompt).toBe(
+        [
+          PARTNER_GROUP_SYSTEM_PROMPT,
+          '',
+          '【引用脈絡】使用者引用了你之前說的這句話，他的訊息是針對這句的回應；解讀口語、代稱與省略時，以這段引用為脈絡：',
+          '「大車後排放球袋比較穩」',
+        ].join('\n')
+      )
+    })
+  })
 })
