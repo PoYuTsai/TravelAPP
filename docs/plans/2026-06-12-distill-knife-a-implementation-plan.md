@@ -1,5 +1,23 @@
 # 刀A — 輸入理解＋收錄條件刀 實作計畫
 
+> **狀態：已完成（2026-06-12）— 全部 10 個 Task 實作完畢。**
+>
+> Commits（刀A 系列）：`8e78da6`（plan）、`c74e45e`（T1 收錄三門）、`b048c07`（T2 引用 context）、
+> `1c3d012`（T3 確認狀態 store）、`47b19af`（T3 補強）、`6836680`（T4 零信任解析）、`76d5185`（T4 補強）、
+> `19921e2`（T5 adapter）、`0883f7b`（T5 補強）、`baae739`（T6 orchestrator）、`10bee9f`（T6 補強）、
+> `594320d`（T7 router seam）、`7e45cf0`（T8 webhook 接線）、`06d1c26`（T9 CLI）、`fac107b`（T9 補強）。
+>
+> Review 補強（計畫外、review 驅動）：confirmation store overwrite/TTL 契約測試、`newAnswer` 500 字上限、
+> prompt confidence-mandate＋「編號」術語統一、`store_read_failed` log event、確認寫入失敗回 status error、
+> CLI flag 解析防呆＋fixture 欄位驗證。
+>
+> 實作偏差（與計畫原文不同處，皆已在各 Task 文件化）：
+> - confirmation store 沿用 memory-store 無 TTL 慣例（TTL 由 KV 層處理）
+> - `stripCodeFence` 用 regex-match 風格（非計畫示意的 slice）
+> - `getApprovalIntentSource` 不收 log 參數（呼叫端自行記錄）
+> - low-confidence 複述確認 note 含 `approve_all` 情境
+> - KV 只在真呼叫路徑 required（gate off / regex 命中路徑不要求 KV）
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 沉澱批准從「三條全句 regex」升級為三層接話（regex → Haiku intent parser → deterministic 驗證），收錄條件放寬為三門，引用 context 進 responder prompt，並附 CLI 黑箱內測入口。

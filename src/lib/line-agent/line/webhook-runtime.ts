@@ -786,7 +786,7 @@ async function getDistilledQaWriter(
  *   - approve 是刀A 三層接話：層1 regex 仍在最前（resolveDistillApproval
  *     內，零成本零延遲）；parse-first 契約演化（design 2026-06-12 §1）—
  *     regex miss＋無 pending ＝ 一次 KV 讀即落回 responder（讀失敗也回
- *     null — KV 故障絕不劫持日常問答路徑）；writer 是 lazy thunk — 非批准
+ *     null — KV 故障時無 pending 路徑絕不劫持日常問答）；writer 是 lazy thunk — 非批准
  *     路徑零初始化。
  */
 function getDistillSeams(
