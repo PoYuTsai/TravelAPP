@@ -123,8 +123,15 @@ type RawLineEvent = Record<string, any>
 
 // @-prefixed CJK aliases (a partner formally tags the bot). The leading `@` is
 // required so the brand name (清微旅行) typed casually never counts as a tag.
-// CJK has no useful word boundary, so these are matched as literal substrings.
-const BOT_MENTION_AT_CJK = /@(?:清微旅行chiangway_travel|清微旅行|清微AI助理|清微AI)/i
+// CJK has no useful word boundary, so these are matched as literal substrings —
+// EXCEPT the bare `@清微旅行` alias, which must not continue into a longer
+// display name: colleagues' accounts share the brand prefix（「清微旅行-阿裕」），
+// and a real-group incident (2026-06-12) had the bot hijack a question tagged
+// at Eric because the prefix matched.  The negative lookahead rejects any
+// name-continuation char (dash/latin/digit/CJK); space, punctuation, or
+// end-of-text still count as a deliberate typed alias.
+const BOT_MENTION_AT_CJK =
+  /@(?:清微旅行chiangway_travel|清微AI助理|清微AI|清微旅行(?![-_.·．a-zA-Z0-9一-鿿]))/i
 // @-prefixed latin aliases — word-boundary guarded (trailing `\b`) so `@bot`
 // fires but `@botany` / `@AIGC` / `@ccc` do NOT widen the trigger.
 const BOT_MENTION_AT_LATIN = /@(?:AI|bot|cc)\b/i
@@ -151,11 +158,15 @@ function textMentionsBot(text: string): boolean {
  */
 function computeMentionsBot(message: Record<string, any>, botUserId: string): boolean {
   const mentionees = message.mention?.mentionees
-  const structural =
-    botUserId !== '' &&
-    Array.isArray(mentionees) &&
-    mentionees.some((m) => m?.userId === botUserId)
-  if (structural) return true
+  if (botUserId !== '' && Array.isArray(mentionees) && mentionees.length > 0) {
+    // Structured mention block is AUTHORITATIVE when we know our own id: a
+    // real tap-to-tag always carries mentionees, so tagging someone ELSE
+    // (e.g. "@清微旅行-阿裕") must never fall back to text aliases — that
+    // fallback is how the bot hijacked a human-directed question on
+    // 2026-06-12.  Trade-off (fail-closed): a message that tags a human AND
+    // types "@bot" gets no reply; re-tagging the bot properly always works.
+    return mentionees.some((m) => m?.userId === botUserId)
+  }
 
   const text = typeof message.text === 'string' ? message.text : ''
   return textMentionsBot(text)

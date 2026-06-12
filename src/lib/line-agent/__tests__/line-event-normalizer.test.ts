@@ -302,6 +302,46 @@ describe('normalizeLineEvent — mentionsBot detection', () => {
     expect(e.mentionsBot).toBe(true)
   })
 
+  // Regression — 2026-06-12 real-group incident: Chun tagged ERIC
+  // ("@清微旅行-阿裕"), whose display name shares the 清微旅行 prefix with the
+  // bot.  The bare `@清微旅行` text alias matched the prefix and the bot hijacked
+  // a question addressed to a human (and answered it wrong).  Two layers fix it:
+  //  1. When a structured mention block exists AND botUserId is known, the
+  //     structural verdict is AUTHORITATIVE — no text-alias fallback.  A real
+  //     tag always carries mentionees; tagging someone else is never for us.
+  //  2. The bare `@清微旅行` alias no longer matches when followed by a
+  //     name-continuation char (`-阿裕` etc.), so even the text-only fallback
+  //     (botUserId unset) cannot misfire on a colleague's display name.
+  it('REGRESSION: tagging a human whose name shares the bot prefix is NOT a bot mention (structural path)', () => {
+    const raw = makeGroupMentionEvent(
+      '@清微旅行-阿裕 2大2小（4歲跟6歲）小台車這樣會不會很擠挖',
+      ['U_eric_001']
+    )
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('REGRESSION: text-only fallback (no botUserId) also rejects "@清微旅行-阿裕"', () => {
+    const raw = makeGroupMentionEvent('@清微旅行-阿裕 小台車這樣會不會很擠')
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, '') as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('structural block is authoritative: mentioning someone else suppresses text aliases in the same message', () => {
+    // Trade-off documented: a partner who tags a human AND types "@bot" in one
+    // message gets no bot reply — fail-closed beats hijacking a human-directed
+    // question.  Re-tagging the bot properly always works.
+    const raw = makeGroupMentionEvent('@清微旅行-阿裕 你問 @bot 看看', ['U_eric_001'])
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(false)
+  })
+
+  it('bare "@清微旅行" followed by a space/end still counts as a typed alias', () => {
+    const raw = makeGroupMentionEvent('@清微旅行 在嗎')
+    const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, '') as NormalizedLineEvent
+    expect(e.mentionsBot).toBe(true)
+  })
+
   it('sets mentionsBot:false for casual partner-group chat with no wake word', () => {
     const raw = makeGroupMentionEvent('今天天氣很好，明天出發')
     const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
