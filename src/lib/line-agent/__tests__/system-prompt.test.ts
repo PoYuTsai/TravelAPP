@@ -252,4 +252,40 @@ describe('buildPartnerGroupSystemPrompt', () => {
       )
     })
   })
+
+  // 2026-06-13 外部佐證刀（刀2）: 搜證條款只在 web_search 閘開時注入；
+  // 閘關 ⇒ 與現行 byte-identical（tripwire）。順序：persona → 知識 → 搜證 → 引用。
+  describe('buildPartnerGroupSystemPrompt — 外部佐證刀搜證條款（tripwire）', () => {
+    it('未開閘（省略 / false）⇒ 與現行 byte-identical，絕無搜證字樣', () => {
+      expect(buildPartnerGroupSystemPrompt(makeInput())).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+      expect(
+        buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: false })
+      ).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    })
+
+    it('開閘 ⇒ frozen persona 開頭＋搜證條款各句逐字在場', () => {
+      const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
+      expect(prompt.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
+      expect(prompt).toContain('【外部佐證｜web_search 已開啟】')
+      expect(prompt).toContain('本區塊優先於前面「不得聲稱你已查到任何即時資料」與「我目前還不能上網即時查資料」兩條')
+      expect(prompt).toContain('實質問題（景點開放時間、節慶日期、交通、票價、規定等）內部知識不足時，必須用 web_search 查公開網頁')
+      expect(prompt).toContain('回覆格式：先給結論，再列來源連結，文末固定加一句「以上為網路資料供參考，重要細節建議再與導遊確認」')
+      expect(prompt).toContain('內部沉澱案例優先：沉澱知識已有答案時以內部為準，web 結果只佐證不覆蓋')
+      expect(prompt).toContain('搜不到就誠實說搜不到，絕不腦補來源、絕不編造連結')
+    })
+
+    it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
+      const prompt = buildPartnerGroupSystemPrompt(
+        { ...makeInput(), quotedBotContent: '昨天那個草稿' },
+        '【清微旅行沉澱問答】\nQ：q\nA：a',
+        { webSearchEnabled: true }
+      )
+      const knowledgeAt = prompt.indexOf('【清微旅行沉澱問答】')
+      const searchAt = prompt.indexOf('【外部佐證｜web_search 已開啟】')
+      const quotedAt = prompt.indexOf('【引用脈絡】')
+      expect(knowledgeAt).toBeGreaterThan(-1)
+      expect(searchAt).toBeGreaterThan(knowledgeAt)
+      expect(quotedAt).toBeGreaterThan(searchAt)
+    })
+  })
 })

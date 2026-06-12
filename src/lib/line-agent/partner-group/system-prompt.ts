@@ -49,18 +49,40 @@ export const PARTNER_GROUP_SYSTEM_PROMPT = [
 ].join('\n')
 
 /**
+ * 外部佐證刀（design 2026-06-13 §1）— 搜證條款。ONLY injected when the
+ * composition root determined the web_search gate is open；閘關時
+ * buildPartnerGroupSystemPrompt 與現行 byte-identical（tripwire 驗）。
+ * 條款明文 supersede 凍結 persona 中的「不得聲稱已查即時資料」「不能上網」
+ * 兩句 — 凍結區不動，覆寫責任在這個附加區塊。
+ */
+export const PARTNER_GROUP_WEB_SEARCH_PROMPT = [
+  '【外部佐證｜web_search 已開啟】',
+  '本區塊優先於前面「不得聲稱你已查到任何即時資料」與「我目前還不能上網即時查資料」兩條：現在你可以、也應該用 web_search 工具查公開網頁。',
+  '實質問題（景點開放時間、節慶日期、交通、票價、規定等）內部知識不足時，必須用 web_search 查公開網頁佐證，不要只回「不確定」。',
+  '回覆格式：先給結論，再列來源連結，文末固定加一句「以上為網路資料供參考，重要細節建議再與導遊確認」。',
+  '內部沉澱案例優先：沉澱知識已有答案時以內部為準，web 結果只佐證不覆蓋。',
+  '閒聊、寒暄、內部既有規則可答的問題不要搜尋 — 每次搜尋都是真實花費。',
+  '搜不到就誠實說搜不到，絕不腦補來源、絕不編造連結。',
+].join('\n')
+
+/**
  * Lightweight assembly hook (design §5 step 2).  Frozen persona + guardrails
  * verbatim；刀A：引用脈絡接尾端；檢索閉環刀：沉澱知識區塊接 persona 之後、
  * 引用之前（引用語意最貼近當則訊息，留最尾）。知識缺席 ⇒ 與現行 byte-identical。
+ * 外部佐證刀：搜證條款接知識之後、引用之前，且僅在 webSearchEnabled === true 時注入。
  */
 export function buildPartnerGroupSystemPrompt(
   input: PartnerGroupRespondInput,
-  knowledge?: string | null
+  knowledge?: string | null,
+  opts?: { webSearchEnabled?: boolean }
 ): string {
   const sections = [PARTNER_GROUP_SYSTEM_PROMPT]
   const trimmedKnowledge = knowledge?.trim()
   if (trimmedKnowledge) {
     sections.push('', trimmedKnowledge)
+  }
+  if (opts?.webSearchEnabled === true) {
+    sections.push('', PARTNER_GROUP_WEB_SEARCH_PROMPT)
   }
   const quoted = input.quotedBotContent?.trim()
   if (quoted) {
