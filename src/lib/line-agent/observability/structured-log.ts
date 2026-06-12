@@ -61,6 +61,8 @@ export interface AgentLogFieldsByEvent {
     httpStatus?: number
     /** True when the response carried no usage and tokens were estimated. */
     usageMissing?: boolean
+    /** 外部佐證刀 — 本次回應實際（或保守估）的 web_search 次數。 */
+    webSearchRequests?: number
   }
   cost_cap: {
     checkOutcome?: 'ok' | 'over_cap' | 'kv_unavailable' | 'disabled'

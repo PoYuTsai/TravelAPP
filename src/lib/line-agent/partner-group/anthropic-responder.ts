@@ -40,6 +40,9 @@ const MAX_TOKENS = 1024
 /** 外部佐證刀 — 每題搜尋次數上限（design §3 成本：3 × $0.01 ≈ $0.03/題）。 */
 const WEB_SEARCH_MAX_USES = 3
 
+/** Anthropic web_search 計費：$10 / 1000 次（design §0 vendor）。 */
+const WEB_SEARCH_COST_PER_REQUEST_USD = 0.01
+
 /** 文末來源連結上限（design §1：citations 抽 1–3 個）。 */
 const MAX_SOURCE_URLS = 3
 
@@ -250,7 +253,17 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       ? Math.ceil((system.length + input.text.length) / 4)
       : (inputTokensRaw as number)
     const outputTokens = usageMissing ? MAX_TOKENS : (outputTokensRaw as number)
-    const costUsd = estimateCostUsd(model, inputTokens, outputTokens)
+    // 搜尋費補項（外部佐證刀）：usage.server_tool_use.web_search_requests ×
+    // $0.01。usage 整包缺且本次有掛 tool ⇒ 按 max_uses 全用滿保守估 —
+    // 寧高估觸發煞車，不低估燒錢（同 token 估計的紀律）。
+    const searchRequestsRaw = usage?.server_tool_use?.web_search_requests
+    const searchRequests =
+      typeof searchRequestsRaw === 'number' && searchRequestsRaw > 0 ? searchRequestsRaw : 0
+    const billedSearches =
+      usageMissing && allowWebSearch ? WEB_SEARCH_MAX_USES : searchRequests
+    const costUsd =
+      estimateCostUsd(model, inputTokens, outputTokens) +
+      billedSearches * WEB_SEARCH_COST_PER_REQUEST_USD
 
     const { recorded } = await this.costCap.recordSpend(costUsd)
     if (!recorded) {
@@ -268,6 +281,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
         outcome: 'degraded',
         degradedReason: 'anthropic_parse_error',
         ...(usageMissing ? { usageMissing: true } : {}),
+        ...(billedSearches > 0 ? { webSearchRequests: billedSearches } : {}),
       })
       return degraded(model, 'anthropic_parse_error')
     }
@@ -290,6 +304,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       costUsd,
       outcome: 'ok',
       ...(usageMissing ? { usageMissing: true } : {}),
+      ...(billedSearches > 0 ? { webSearchRequests: billedSearches } : {}),
     })
     return { text: finalText, meta: { responder: 'llm', model } }
   }

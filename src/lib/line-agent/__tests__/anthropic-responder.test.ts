@@ -423,3 +423,39 @@ describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 f
     expect(capEvents.some((e) => e.reason === 'record_failed')).toBe(true)
   })
 })
+
+describe('AnthropicPartnerGroupResponder — 搜尋費記帳（外部佐證刀）', () => {
+  it('usage.server_tool_use.web_search_requests=2 ⇒ recordSpend 含 2×$0.01', async () => {
+    const body = {
+      content: [{ type: 'text', text: 'ok' }],
+      usage: { input_tokens: 100, output_tokens: 50, server_tool_use: { web_search_requests: 2 } },
+    }
+    const { transport } = fakeTransport({ jsonValue: body })
+    const { costCap, spends } = makeCostCap('ok')
+    const { log, entries } = makeLog()
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, costCap, webSearchEnabled: true,
+    }).respond({ ...makeInput(), log })
+
+    const tokenCost = (100 / 1_000_000) * 3 + (50 / 1_000_000) * 15
+    expect(spends[0]).toBeCloseTo(tokenCost + 0.02, 12)
+    expect(entries().find((e) => e.event === 'llm_call')?.webSearchRequests).toBe(2)
+  })
+
+  it('開閘＋usage 整包缺 ⇒ 保守按 max_uses 3 全用滿估搜尋費', async () => {
+    const { transport } = fakeTransport({ jsonValue: { content: [{ type: 'text', text: 'ok' }] } })
+    const { costCap, spends } = makeCostCap('ok')
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, costCap, webSearchEnabled: true,
+    }).respond(makeInput())
+    expect(spends[0]).toBeGreaterThanOrEqual(0.03) // 3 × $0.01 下限
+  })
+
+  it('閘關 ⇒ 記帳公式與現行完全相同（零搜尋費）', async () => {
+    const body = { content: [{ type: 'text', text: 'ok' }], usage: { input_tokens: 421, output_tokens: 96 } }
+    const { transport } = fakeTransport({ jsonValue: body })
+    const { costCap, spends } = makeCostCap('ok')
+    await new AnthropicPartnerGroupResponder({ transport, ...DEPS, costCap }).respond(makeInput())
+    expect(spends[0]).toBeCloseTo((421 / 1_000_000) * 3 + (96 / 1_000_000) * 15, 12)
+  })
+})
