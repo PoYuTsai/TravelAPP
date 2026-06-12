@@ -282,6 +282,7 @@ describe('AnthropicPartnerGroupResponder — 外部佐證刀 web_search tool', (
     }).respond(input)
     const body = JSON.parse(calls[0].init.body as string)
     expect('tools' in body).toBe(false)
+    expect(body.system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
   })
 
   it('webSearchEnabled=true 但非 botDirected ⇒ 不掛 tool', async () => {
