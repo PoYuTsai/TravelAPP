@@ -501,6 +501,11 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
           if (installedQaKnowledgeSource === null) {
             const mod = await import('./install-default-qa-knowledge-source')
             const built = mod.buildDefaultQaKnowledgeSource()
+            if (!built.source) {
+              // Fixed reason code only（installer 已吞 raw error）— 永久降級前留痕，
+              // 不然 reason 被丟掉就 unobservable（Task 6 review Important）。
+              console.warn(`[qa-knowledge] install failed — reason=${built.reason ?? 'unknown'}`)
+            }
             installedQaKnowledgeSource = built.source ?? (async () => null)
           }
           return installedQaKnowledgeSource()

@@ -156,9 +156,20 @@ export function parseAgentCommandArgs(args) {
     }
     return { commandText: 'approve-parse', query, quoted, fixture }
   }
+  if (command === 'partner-respond' || command === '/partner-respond') {
+    // 檢索閉環刀 CLI 黑箱驗收（design 2026-06-12 §2 驗收）：一句話直打真
+    // anthropic responder（含沉澱知識源，若閘開）。不碰真 store、不貼群。
+    const query = args.slice(1).filter((a) => !a.startsWith('--')).join(' ').trim()
+    if (query === '') {
+      throw new Error(
+        'partner-respond · 失敗：請帶要問的話（npm run agent:partner-respond -- "兩大兩小小車會不會擠"）'
+      )
+    }
+    return { commandText: 'partner-respond', query }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush、approve-parse'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush、approve-parse、partner-respond'
   )
 }
 
@@ -1672,6 +1683,108 @@ export async function runApproveParseCommand(options = {}) {
   return lines.join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// partner-respond — 檢索閉環刀 CLI 黑箱驗收入口（design 2026-06-12 §2 驗收）
+// ---------------------------------------------------------------------------
+// 一句話 → 真 anthropic responder（含沉澱知識源，若閘開）→ 印回覆。鐵律同
+// approve-parse：**不碰真 store、不貼群** — KV 只接 cost cap（cost 紀律不因
+// 離線而豁免——memory 教訓：CLI 載 .env.local，閘＋key 齊就是真打 API、真花錢）。
+
+/** GUARD-loaded dynamic import（同 loadApproveParseKit 慣例）。 */
+export async function loadPartnerRespondKit(ctx = {}) {
+  const {
+    importFactoryModule = () =>
+      import('../src/lib/line-agent/partner-group/responder-factory.ts'),
+    importConfigModule = () =>
+      import('../src/lib/line-agent/partner-group/responder-config.ts'),
+    importInstallerModule = () =>
+      import('../src/lib/line-agent/line/install-default-qa-knowledge-source.ts'),
+    importCostCapModule = () =>
+      import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+  } = ctx
+  try {
+    const factoryMod = await importFactoryModule()
+    const configMod = await importConfigModule()
+    const installerMod = await importInstallerModule()
+    const costCapMod = await importCostCapModule()
+    const kvMod = await importKvModule()
+    const kit = {
+      createPartnerGroupResponder: factoryMod?.createPartnerGroupResponder ?? null,
+      getPartnerResponderConfig: configMod?.getPartnerResponderConfig ?? null,
+      buildDefaultQaKnowledgeSource: installerMod?.buildDefaultQaKnowledgeSource ?? null,
+      createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+    }
+    if (Object.values(kit).some((v) => !v)) return null
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 檢索閉環刀黑箱驗收：throws ⇒ main 印訊息＋exit 1（缺閘/缺 env）；return
+ * string ⇒ exit 0。`kit`/`kvClient`/`transport` 注入供測試。知識閘
+ * （QA_KNOWLEDGE_READ_ENABLED）關不擋跑（照樣問 — 用來對照「有知識 vs
+ * 無知識」答案差異）；responder mode / key / KV 缺則明確 throw。
+ */
+export async function runPartnerRespondCommand(options = {}) {
+  const env = options.env ?? process.env
+  const kit = options.kit ?? (await loadPartnerRespondKit())
+  if (!kit) {
+    throw new Error('partner-respond · 失敗（模組未載入，請用 tsx 執行）')
+  }
+
+  // ① 前置閘（同 approve-parse：缺哪個就明說，絕不默默 fallback / degrade stub）
+  const models = kit.getPartnerResponderConfig(env)
+  if (models.partnerResponderMode !== 'anthropic') {
+    throw new Error(
+      'partner-respond · 失敗：AI_AGENT_PARTNER_RESPONDER_MODE 不是 anthropic（黑箱要打真 API）'
+    )
+  }
+  if (!models.anthropicApiKey) {
+    throw new Error('partner-respond · 失敗：缺 ANTHROPIC_API_KEY')
+  }
+
+  // ② costCap 必接 KV（KV 缺就 throw，cost 紀律不豁免）
+  const kvClient = options.kvClient ?? kit.createKvClientFromEnv(env)
+  if (!kvClient) {
+    throw new Error('partner-respond · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（cost cap 要 KV）')
+  }
+  const costCap = kit.createDailyCostCap({ env, kv: kvClient })
+
+  // ③ 知識源走真 composition root（閘關 ⇒ source undefined＋fixed reason，照樣問）
+  const built = kit.buildDefaultQaKnowledgeSource(env)
+  const knowledgeSource = built.source
+
+  const responder = kit.createPartnerGroupResponder({
+    models,
+    transport: options.transport ?? fetch,
+    costCap,
+    knowledgeSource,
+  })
+
+  // ④ 最小 event（CLI 黑箱；adapter 只讀 text / intent / quotedBotContent / log）。
+  //    intent 是 CommandIntent 物件（routePartnerModel 讀 .action）— respond →
+  //    defaultModel，與真機路由一致。
+  const result = await responder.respond({
+    event: { kind: 'group_text', sourceChannel: 'partner_group', mentionsBot: true },
+    intent: { action: 'respond', confidence: 'high', source: 'deterministic' },
+    text: options.query,
+    botDirected: true,
+  })
+
+  return [
+    'partner-respond（黑箱驗收 — 不碰真 store、不貼群）',
+    `輸入：「${options.query}」`,
+    `知識源：${knowledgeSource ? '已接（QA_KNOWLEDGE_READ_ENABLED 閘開）' : `未接（${built.reason}）`}`,
+    `meta：${JSON.stringify(result.meta)}`,
+    '--- 回覆 ---',
+    result.text,
+  ].join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
   const { commandText, query, write, quoted, fixture } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
@@ -1709,6 +1822,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'approve-parse') {
     return runApproveParseCommand({ env: options.env ?? process.env, query, quoted, fixture })
+  }
+  if (commandText === 'partner-respond') {
+    return runPartnerRespondCommand({ env: options.env ?? process.env, query })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =
