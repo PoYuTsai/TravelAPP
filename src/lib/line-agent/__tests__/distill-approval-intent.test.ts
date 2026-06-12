@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { parseApprovalIntentJson } from '../distill/approval-intent'
+import { DISTILL_FIELD_MAX_CHARS } from '../distill/candidates'
 
 describe('parseApprovalIntentJson — 零信任', () => {
   it('approve：行號＋信心', () => {
@@ -45,6 +46,20 @@ describe('parseApprovalIntentJson — 零信任', () => {
     expect(
       parseApprovalIntentJson('{"action":"approve","indices":[1],"confidence":"maybe"}')
     ).toBeNull()
+  })
+
+  it('modify newAnswer 截斷 500 字（對齊 candidates.ts 紀律）', () => {
+    const long = 'a'.repeat(DISTILL_FIELD_MAX_CHARS + 100)
+    const parsed = parseApprovalIntentJson(
+      `{"action":"modify","index":1,"newAnswer":"${long}","confidence":"high"}`
+    )
+    expect(parsed).not.toBeNull()
+    if (parsed?.action === 'modify') {
+      expect(parsed.newAnswer.length).toBe(DISTILL_FIELD_MAX_CHARS)
+      expect(parsed.newAnswer).toBe('a'.repeat(DISTILL_FIELD_MAX_CHARS))
+    } else {
+      throw new Error('expected modify action')
+    }
   })
 
   it('indices 去重、保序', () => {

@@ -3,6 +3,8 @@
  * 模型輸出一律不可信：失敗回 null（caller 走防呆兜底文案），絕不 throw。
  */
 
+import { DISTILL_FIELD_MAX_CHARS } from './candidates'
+
 export type ApprovalIntentConfidence = 'high' | 'low'
 
 export type ApprovalIntent =
@@ -26,6 +28,10 @@ function parseConfidence(v: unknown): ApprovalIntentConfidence | null {
   return v === 'high' || v === 'low' ? v : null
 }
 
+/**
+ * 注意：indices / index 只驗證「正整數」下界；上界（是否超出實際候選清單長度）
+ * 由 caller 對照當下的 candidate list 驗證。
+ */
 export function parseApprovalIntentJson(raw: string): ApprovalIntent | null {
   let data: unknown
   try {
@@ -54,7 +60,7 @@ export function parseApprovalIntentJson(raw: string): ApprovalIntent | null {
   if (obj.action === 'modify') {
     if (!isPositiveInt(obj.index)) return null
     if (typeof obj.newAnswer !== 'string') return null
-    const newAnswer = obj.newAnswer.trim()
+    const newAnswer = obj.newAnswer.trim().slice(0, DISTILL_FIELD_MAX_CHARS)
     if (newAnswer === '') return null
     return { action: 'modify', index: obj.index, newAnswer, confidence }
   }
