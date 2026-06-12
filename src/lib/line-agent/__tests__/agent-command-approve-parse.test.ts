@@ -7,6 +7,9 @@
  * 模式）：層1/層2 解析用真函式，intent source 注入 fake — 零網路、零 KV。
  */
 
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   parseAgentCommandArgs,
@@ -73,6 +76,24 @@ describe('parseAgentCommandArgs approve-parse', () => {
       quoted: undefined,
       fixture: undefined,
     })
+  })
+
+  it('flag 後面接的是另一個 flag → throw 用法（不得把 --fixture 當 quoted 值）', () => {
+    expect(() =>
+      parseAgentCommandArgs(['approve-parse', '收一下', '--quoted', '--fixture', 'alt.json'])
+    ).toThrow('--quoted')
+  })
+
+  it('flag 在結尾缺值 → throw 用法（不得默默用 default fixture）', () => {
+    expect(() => parseAgentCommandArgs(['approve-parse', '1', '要', '--fixture'])).toThrow(
+      '--fixture'
+    )
+  })
+
+  it('重複 flag → throw 用法（第二組不得漏進 query）', () => {
+    expect(() =>
+      parseAgentCommandArgs(['approve-parse', '收', '--quoted', 'a', '--quoted', 'b'])
+    ).toThrow('--quoted')
   })
 })
 
@@ -176,6 +197,23 @@ describe('runApproveParseCommand', () => {
       intentSource: async () => '我覺得你是要收第一條',
     })
     expect(out).toContain('看不懂這句，要收哪幾條？例：1 3 要')
+  })
+
+  it('fixture 條目缺 question/answer → throw 格式不對（不得餵 undefined 給 LLM）', async () => {
+    const tmp = path.join(os.tmpdir(), `distill-approve-bad-${Date.now()}.json`)
+    fs.writeFileSync(tmp, JSON.stringify([{ id: 1 }]))
+    try {
+      await expect(
+        runApproveParseCommand({
+          env: ENV_OK,
+          kit: realKit(),
+          query: '1 要',
+          fixture: tmp,
+        })
+      ).rejects.toThrow('fixture 格式不對')
+    } finally {
+      fs.unlinkSync(tmp)
+    }
   })
 
   it('缺 AI_AGENT_DISTILL_ENABLED / ANTHROPIC_API_KEY → throw 明確訊息', async () => {

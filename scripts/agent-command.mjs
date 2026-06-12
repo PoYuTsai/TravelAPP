@@ -133,7 +133,17 @@ export function parseAgentCommandArgs(args) {
       const i = rest.indexOf(flag)
       if (i === -1) return undefined
       const value = String(rest[i + 1] ?? '').trim()
+      // 防呆：缺值 / 值長得像另一個 flag → 明確報錯，絕不默默把 flag 吃進
+      // query 或 fallback 到 default fixture（會餵垃圾 context 給付費 LLM）。
+      if (value === '' || value.startsWith('--')) {
+        throw new Error(
+          `approve-parse · 用法：${flag} 後面要接一個值（不能留空或接另一個 flag）`
+        )
+      }
       rest.splice(i, 2)
+      if (rest.includes(flag)) {
+        throw new Error(`approve-parse · 用法：${flag} 只能出現一次`)
+      }
       return value
     }
     const quoted = takeFlag('--quoted')
@@ -1595,7 +1605,12 @@ export async function runApproveParseCommand(options = {}) {
   if (
     !Array.isArray(candidates) ||
     candidates.length === 0 ||
-    !candidates.every((c) => typeof c?.id === 'number')
+    !candidates.every(
+      (c) =>
+        typeof c?.id === 'number' &&
+        typeof c?.question === 'string' &&
+        typeof c?.answer === 'string'
+    )
   ) {
     throw new Error(`approve-parse · 失敗：fixture 格式不對（要 [{id,question,answer}]）`)
   }
