@@ -340,6 +340,12 @@ export async function resolveDistillApproval(
       CONFIRM_YES_RE.test(stripped)
     ) {
       try { await store.deleteDistillConfirmation(groupId) } catch { /* TTL 兜底 */ }
+      // 確認綁 batch：re-distill 換了 batch（編號 1..N 重編）→ 舊確認的
+      // indices 對的是舊清單，套到新 batch 會靜默收錯條 — 兜底文案導回重批。
+      // 不落層2：光一個「對」沒有可解析的批准意圖，丟給 LLM 只會瞎猜。
+      if (confirmation.batchCreatedAt !== batch.createdAt) {
+        return fallbackResult('distill_confirmation_stale_batch')
+      }
       return apply(confirmation.approval)
     }
     // 講了別的 → 自動作廢，不卡任何路徑（繼續層2）
@@ -373,7 +379,14 @@ export async function resolveDistillApproval(
   if (intent.confidence === 'low') {
     const restatementText = composeConfirmationText(approval, batch.candidates)
     try {
-      await store.putDistillConfirmation({ groupId, approval, restatementText, createdAt: now })
+      await store.putDistillConfirmation({
+        groupId,
+        approval,
+        restatementText,
+        createdAt: now,
+        // 綁定本輪 batch — re-distill 重編號後舊確認不得套用（見 pending.ts）
+        batchCreatedAt: batch.createdAt,
+      })
     } catch {
       log?.('store_write_failed', { reason: 'distill_confirmation_write_failed' })
       // store 寫失敗收斂成 status: 'error'（同 applyDistillApproval 慣例）；

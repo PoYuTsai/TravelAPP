@@ -129,13 +129,21 @@ export async function runDistillation(
   const renumber = (candidates: DistillCandidate[]): DistillCandidate[] =>
     candidates.map((c, i) => ({ ...c, id: i + 1 }))
 
-  const writeBatch = (candidates: DistillCandidate[]) =>
-    store.putDistillPending({
+  const writeBatch = async (candidates: DistillCandidate[]) => {
+    await store.putDistillPending({
       groupId,
       createdAt: now,
       candidates,
       resolved,
     } satisfies DistillPendingBatch)
+    // 新 batch ＝ 編號重編 → 舊複述確認在源頭作廢（best-effort：刪失敗時
+    // resolve 端的 batchCreatedAt 比對＋KV TTL 雙兜底）。
+    try {
+      await store.deleteDistillConfirmation(groupId)
+    } catch {
+      log?.('store_write_failed', { reason: 'distill_confirmation_delete_failed' })
+    }
+  }
 
   // ③ 零新訊息：不叫 source（沒得織就沒得花錢）。
   if (fresh.length === 0) {

@@ -225,6 +225,41 @@ describe('runDistillation', () => {
     expect(batch?.candidates.every((c) => c.missedCount === 0)).toBe(true)
   })
 
+  it('新 batch 寫入 → 舊複述確認作廢（刀A：re-distill 換 batch，舊確認絕不留著套錯）', async () => {
+    const store = new MemoryStore()
+    await seed(store, [entry({ messageId: 'M1' })])
+    await store.putDistillConfirmation({
+      groupId: GROUP,
+      approval: { type: 'approve', indices: [1] },
+      restatementText: '你是要收 1 對嗎？引用這句回「對」就收',
+      createdAt: NOW - 1000,
+      batchCreatedAt: NOW - 1000,
+    })
+    const source = sourceReturning(
+      candidateJson([{ question: 'Q1', answer: 'A1', sourceLines: [1] }])
+    )
+
+    const result = await runDistillation({ groupId: GROUP, store, source, now: NOW })
+
+    expect(result.status).toBe('stub_ok')
+    expect(await store.getDistillConfirmation(GROUP)).toBeNull()
+  })
+
+  it('deleteDistillConfirmation throw → best-effort 吞掉、沉澱照常完成', async () => {
+    const store = new MemoryStore()
+    await seed(store, [entry({ messageId: 'M1' })])
+    vi.spyOn(store, 'deleteDistillConfirmation').mockRejectedValue(new Error('kv down'))
+    const source = sourceReturning(
+      candidateJson([{ question: 'Q1', answer: 'A1', sourceLines: [1] }])
+    )
+
+    const result = await runDistillation({ groupId: GROUP, store, source, now: NOW })
+
+    expect(result.status).toBe('stub_ok')
+    expect(result.outboundText).toContain('📚 沉澱候選')
+    expect((await store.getDistillPending(GROUP))?.candidates).toHaveLength(1)
+  })
+
   it('source throw → 零 markTranscriptDistilled、pending 不動、status error＋固定文案（重跑冪等）', async () => {
     const store = new MemoryStore()
     await seed(store, [entry({ messageId: 'M1' })])

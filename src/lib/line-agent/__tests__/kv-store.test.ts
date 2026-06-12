@@ -336,6 +336,7 @@ describe('distill confirmation TTL (KvStore)', () => {
       approval: { type: 'approve_all' },
       restatementText: '你是要全收對嗎？引用這句回「對」就收',
       createdAt: 1_700_000_000_000,
+      batchCreatedAt: 1_699_999_999_000,
     })
     expect(calls).toHaveLength(1)
     expect(calls[0].key).toBe('line-agent:distill-confirm:G_partner')

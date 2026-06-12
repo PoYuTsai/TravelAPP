@@ -46,6 +46,11 @@ export interface DistillApprovalConfirmation {
   restatementText: string
   /** ms since epoch（injected，determinism）。 */
   createdAt: number
+  /**
+   * 綁定確認所屬的 pending batch（`DistillPendingBatch.createdAt`）；
+   * re-distill 換 batch 後舊確認不得套用 — 編號重編，套到新 batch 會收錯條。
+   */
+  batchCreatedAt: number
 }
 
 export interface DistillPendingBatch {

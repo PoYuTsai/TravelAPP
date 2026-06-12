@@ -86,6 +86,38 @@ describe('resolveDistillApproval — 三層接話', () => {
     expect(await store.getDistillConfirmation('G1')).toBeNull()
   })
 
+  it('層2 low → 確認狀態綁 batch（batchCreatedAt === batch.createdAt）', async () => {
+    const store = new MemoryStore(); await seedPending(store)
+    const intentSource = vi.fn().mockResolvedValue('{"action":"approve","indices":[1],"confidence":"low"}')
+    await resolveDistillApproval({ ...base, store, text: '那條應該ok', intentSource })
+    const conf = await store.getDistillConfirmation('G1')
+    expect(conf?.batchCreatedAt).toBe(1000) // seedPending 的 batch.createdAt
+  })
+
+  it('確認綁舊 batch（re-distill 已換 batch）→ 引用＋「對」也不套用：兜底文案＋確認刪除＋零 LLM', async () => {
+    const store = new MemoryStore(); await seedPending(store) // batch.createdAt = 1000
+    const restatement = '你是要收 1 對嗎？引用這句回「對」就收'
+    await store.putDistillConfirmation({
+      groupId: 'G1',
+      approval: { type: 'approve', indices: [1] },
+      restatementText: restatement,
+      createdAt: 900,
+      batchCreatedAt: 500, // ≠ 1000 — 確認屬於 re-distill 前的舊 batch
+    })
+    const intentSource = vi.fn()
+    const result = await resolveDistillApproval({
+      ...base, store, text: '對', quotedBotContent: restatement, intentSource,
+    })
+    expect(result?.outboundText).toBe(DISTILL_APPROVAL_FALLBACK_TEXT)
+    expect(result?.meta?.reason).toBe('distill_confirmation_stale_batch')
+    expect(await store.getDistillConfirmation('G1')).toBeNull()
+    expect(intentSource).not.toHaveBeenCalled()
+    // 絕不套用：candidates 原封不動
+    const batch = await store.getDistillPending('G1')
+    expect(batch?.candidates.map((c) => c.id)).toEqual([1, 3])
+    expect(batch?.resolved).toEqual([])
+  })
+
   it('確認掛著但講了別的 → 確認作廢、不卡路徑（落層2）', async () => {
     const store = new MemoryStore(); await seedPending(store)
     await store.putDistillConfirmation({
@@ -93,6 +125,7 @@ describe('resolveDistillApproval — 三層接話', () => {
       approval: { type: 'approve', indices: [1] },
       restatementText: '你是要收 1 對嗎？引用這句回「對」就收',
       createdAt: 1000,
+      batchCreatedAt: 1000,
     })
     const intentSource = vi.fn().mockResolvedValue('{"action":"not_approval"}')
     expect(await resolveDistillApproval({ ...base, store, text: '清萊車程多久', intentSource })).toBeNull()

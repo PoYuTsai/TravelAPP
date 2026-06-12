@@ -434,6 +434,7 @@ export function runCaseStoreContract(
           approval: { type: 'approve' as const, indices: [1, 3] },
           restatementText: '你是要收 1、3 對嗎？引用這句回「對」就收',
           createdAt: 1000,
+          batchCreatedAt: 900,
         }
         await store.putDistillConfirmation(conf)
         expect(await store.getDistillConfirmation('G1')).toEqual(conf)
@@ -446,12 +447,14 @@ export function runCaseStoreContract(
           approval: { type: 'approve' as const, indices: [1, 3] },
           restatementText: '第一次複述',
           createdAt: 1000,
+          batchCreatedAt: 900,
         })
         await store.putDistillConfirmation({
           groupId: 'G1',
           approval: { type: 'approve_all' as const },
           restatementText: '第二次複述',
           createdAt: 2000,
+          batchCreatedAt: 1900,
         })
         const got = await store.getDistillConfirmation('G1')
         expect(got?.approval).toEqual({ type: 'approve_all' })
@@ -465,6 +468,7 @@ export function runCaseStoreContract(
           approval: { type: 'approve_all' as const },
           restatementText: 'x',
           createdAt: 1000,
+          batchCreatedAt: 900,
         })
         await store.deleteDistillConfirmation('G1')
         expect(await store.getDistillConfirmation('G1')).toBeNull()
