@@ -13,7 +13,8 @@
  *     human-in-the-loop context to authorize spend.
  *  3. tool disabled in config → denied (billing / tool gate disabled).
  *  4. bot not directly addressed → denied.
- *  5. user did not explicitly request external/realtime data → denied.
+ *  5. user did not explicitly request external/realtime data → denied
+ *     （web_search 豁免：tag 即授權，見外部佐證刀 design 2026-06-13 §0）.
  *  6. cost cap reached → denied (budget exhausted).
  *  7. otherwise → allowed.
  */
@@ -92,7 +93,9 @@ export function canUseExternalTool(
   }
 
   // 5. User must explicitly ask for external/realtime data.
-  if (!request.userRequestedExternalData) {
+  //    外部佐證刀（design 2026-06-13 §0）：web_search 豁免本關 — 在夥伴群
+  //    tag bot 本身就是 explicit intent（tag 即授權）。OCR / notion_rag 不動。
+  if (request.tool !== 'web_search' && !request.userRequestedExternalData) {
     return {
       allowed: false,
       reason:

@@ -15,6 +15,8 @@
  *  3. The partner group may use a tool ONLY when ALL of: botDirected,
  *     user explicitly requested external/realtime data, env gate enabled, and
  *     the cost cap is not exceeded. Flipping any single condition → denied.
+ *     Exception (外部佐證刀, design 2026-06-13 §0): web_search no longer checks
+ *     userRequestedExternalData — tagging the bot IS the explicit intent.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -117,10 +119,18 @@ describe('canUseExternalTool — Rule 3: partner group AND-gate', () => {
     expect(result.reason).toMatch(/botDirected|addressed/i)
   })
 
-  it('denies when the user did not explicitly request external/realtime data', () => {
+  it('web_search 不再看 userRequestedExternalData — tag 即授權（外部佐證刀）', () => {
     const result = canUseExternalTool(
       passingRequest({ userRequestedExternalData: false }),
       enabledConfig()
+    )
+    expect(result.allowed).toBe(true)
+  })
+
+  it('ocr 仍要求 userRequestedExternalData（第 5 關只對 web_search 鬆綁）', () => {
+    const result = canUseExternalTool(
+      passingRequest({ tool: 'ocr', userRequestedExternalData: false }),
+      enabledConfig({ AI_AGENT_OCR_ENABLED: 'true' })
     )
     expect(result.allowed).toBe(false)
     expect(result.reason).toMatch(/request|external|realtime/i)
