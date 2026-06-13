@@ -1,5 +1,7 @@
 # Customer Itinerary Refine — Production Wiring Implementation Plan
 
+> **✅ 完成（2026-06-13，subagent-driven）**：4 task 全落地，commits `4476f37`（Task 1 seam）/`98ae64e`（Task 2 gate+adapter）/`ddd196b`（Task 3 觀測）。line-agent **1681 綠**（原 1674＋7 新），觸及檔 tsc 零錯。gate `AI_AGENT_CASE_INTAKE_REFINE_ENABLED` default off、關閘 byte-identical。下一步＝Eric 真群開閘驗收。
+>
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 把 `refineCustomerItineraryDraft`（已完成、含三道 deterministic guard 與 Haiku/Sonnet adapter）接進真實 LINE 路徑的 case_intake sufficient→draft seam，讓正式行程在事實逐字鎖死下被 LLM 暖化措辭。
