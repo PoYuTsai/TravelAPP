@@ -37,6 +37,10 @@ import {
   type CustomerItineraryRequirements,
 } from '../notion/customer-itinerary-composer'
 import type { CustomerItineraryConstraints } from '../notion/customer-itinerary-lint'
+import {
+  refineCustomerItineraryDraft,
+  type RefineDraftSource,
+} from '../notion/customer-itinerary-refine'
 import { checkCustomerItineraryRoundTrip } from '../notion/customer-itinerary-roundtrip'
 import { scanCustomerForbiddenTerms } from '../notion/customer-facing-forbidden-terms'
 import { buildSummaryText } from '../commands/case-triage'
@@ -66,6 +70,10 @@ export type CaseIntakeDraftSource = (req: CaseIntakeDraftRequest) => Promise<str
 export interface CaseIntakeEnrichmentSources {
   questionSource: CaseIntakeQuestionSource
   draftSource: CaseIntakeDraftSource
+  /** 行程草稿暖化器（primary，cheap）。缺席 ⇒ 不 refine，byte-identical 現況。 */
+  refineSource?: RefineDraftSource
+  /** rescue（stronger），primary 被 guard 打回才試。 */
+  rescueRefineSource?: RefineDraftSource
 }
 
 // ---------------------------------------------------------------------------
@@ -397,8 +405,22 @@ export async function enrichCaseIntakeReply(
     return fallback(triage, 'draft_leak')
   }
 
+  // 事實逐字鎖死下的 LLM 暖化（optional）。refineSource 缺席 ⇒ 不 refine，
+  // byte-identical 現況。harness 本身 fail-closed：任何 guard 打回／source
+  // throw／空輸出時 refined.draft === composed.draft，故失敗自動退 deterministic。
+  let finalDraft = composed.draft
+  if (sources.refineSource) {
+    const refined = await refineCustomerItineraryDraft({
+      deterministicDraft: composed.draft,
+      constraints: plan.constraints,
+      source: sources.refineSource,
+      rescueSource: sources.rescueRefineSource,
+    })
+    finalDraft = refined.draft
+  }
+
   return {
-    replyText: renderDraftReply(summary, composed.draft),
+    replyText: renderDraftReply(summary, finalDraft),
     enrichment: 'llm_draft',
   }
 }
