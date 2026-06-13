@@ -155,6 +155,7 @@ describe('buildPartnerGroupSystemPrompt', () => {
   it('itinerary drafts must declare the customer_itinerary_v1 shape (parser-friendly)', () => {
     expect(prompt).toContain('customer_itinerary_v1')
     expect(prompt).toContain('Day N｜')
+    expect(prompt).toContain('M/D (週)')
     expect(prompt).toContain('套餐訂製')
     expect(prompt).toContain('日期：YYYY/MM/DD')
     expect(prompt).toContain('人數')
