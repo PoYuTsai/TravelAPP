@@ -18,6 +18,7 @@ import type {
   PartnerGroupRespondInput,
 } from '@/lib/line-agent/partner-group/responder'
 import type { IntentAction } from '@/lib/line-agent/commands/intent'
+import { LI_FAMILY_ELDERLY_CHIANGMAI_GOLDEN_ITINERARY } from '@/lib/line-agent/notion/__fixtures__/customer-itinerary-golden'
 
 /** Allow-all cost cap fake — budget always ok; records every spend（P0-A 刀 2）. */
 function makeCostCap(outcome: CostCapCheckOutcome = 'ok', recorded = true) {
@@ -81,6 +82,26 @@ function fakeTransport(response: Partial<Response> & { jsonValue?: unknown }) {
 }
 
 const OK_BODY = { content: [{ type: 'text', text: '建議先確認人數與日期。' }] }
+
+/** Sequence transport — returns canned jsonValues in order, one per call. */
+function sequenceTransport(jsonValues: unknown[]) {
+  const calls: Array<{ url: string; init: RequestInit }> = []
+  let i = 0
+  const transport = (async (url: unknown, init: unknown) => {
+    calls.push({ url: String(url), init: (init ?? {}) as RequestInit })
+    const jsonValue = jsonValues[Math.min(i, jsonValues.length - 1)]
+    i += 1
+    return { ok: true, status: 200, json: async () => jsonValue } as unknown as Response
+  }) as unknown as typeof fetch
+  return { transport, calls }
+}
+
+const BAD_PROSE_BODY = {
+  content: [{ type: 'text', text: '幫你排個 5 天行程：\n第一天去古城逛逛，第二天上山看大象，很棒喔！' }],
+}
+const GOLDEN_BODY = {
+  content: [{ type: 'text', text: LI_FAMILY_ELDERLY_CHIANGMAI_GOLDEN_ITINERARY }],
+}
 
 describe('AnthropicPartnerGroupResponder — request contract', () => {
   it('POSTs to the Anthropic messages endpoint with the injected key + version header', async () => {
@@ -421,6 +442,51 @@ describe('AnthropicPartnerGroupResponder — daily cost cap（P0-A 刀 2，雙 f
     expect(result.meta?.responder).toBe('llm')
     const capEvents = entries().filter((e) => e.event === 'cost_cap')
     expect(capEvents.some((e) => e.reason === 'record_failed')).toBe(true)
+  })
+})
+
+describe('AnthropicPartnerGroupResponder — Q2 draft intent tripwire（重產→降級）', () => {
+  it('draft：v1 過不了閘 → 帶 problems 重產一次成功（無 ⚠️ 未過檢註記）', async () => {
+    const { transport, calls } = sequenceTransport([BAD_PROSE_BODY, GOLDEN_BODY])
+    const result = await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(
+      makeInput('draft', '排個李家7天行程'),
+    )
+    expect(calls).toHaveLength(2)
+    expect(result.text).toContain('Day 1｜')
+    expect(result.text).not.toContain('未過自動檢查')
+    expect(result.meta?.responder).toBe('llm')
+    expect(result.meta?.degraded).toBeUndefined()
+  })
+
+  it('draft：兩次都過不了閘 → 降級保留原文＋⚠️ 未過檢註記', async () => {
+    const { transport, calls } = sequenceTransport([BAD_PROSE_BODY, BAD_PROSE_BODY])
+    const result = await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(
+      makeInput('draft', '排個行程'),
+    )
+    expect(calls).toHaveLength(2)
+    expect(result.text).toContain('未過自動檢查')
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('itinerary_gate_failed')
+  })
+
+  it('draft：第一次就過閘 → 只呼叫一次、原樣回（無重產）', async () => {
+    const { transport, calls } = sequenceTransport([GOLDEN_BODY])
+    const result = await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(
+      makeInput('draft', '排個李家7天行程'),
+    )
+    expect(calls).toHaveLength(1)
+    expect(result.text).toContain('Day 1｜')
+    expect(result.meta?.degraded).toBeUndefined()
+  })
+
+  it('非 draft intent（analyze）⇒ 不走閘、單次呼叫、行為零變化', async () => {
+    const { transport, calls } = sequenceTransport([BAD_PROSE_BODY])
+    const result = await new AnthropicPartnerGroupResponder({ transport, ...DEPS }).respond(
+      makeInput('analyze', '看一下這團'),
+    )
+    expect(calls).toHaveLength(1)
+    expect(result.meta?.responder).toBe('llm')
+    expect(result.meta?.degraded).toBeUndefined()
   })
 })
 
