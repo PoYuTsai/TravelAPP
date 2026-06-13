@@ -150,6 +150,19 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('哪些需要修正')
   })
 
+  // 2026-06-13 (Q2 B 案): 排行程草稿一律吐 customer_itinerary_v1 結構，報價器才解析得了；
+  // 形狀範本（標題 / 日期 / 人數 header / Day N｜ 區塊）逐字在場，任一被刪即炸。
+  it('itinerary drafts must declare the customer_itinerary_v1 shape (parser-friendly)', () => {
+    expect(prompt).toContain('customer_itinerary_v1')
+    expect(prompt).toContain('Day N｜')
+    expect(prompt).toContain('套餐訂製')
+    expect(prompt).toContain('日期：YYYY/MM/DD')
+    expect(prompt).toContain('人數')
+    expect(prompt).toContain('午餐：')
+    expect(prompt).toContain('晚餐：')
+    expect(prompt).toContain('住宿')
+  })
+
   // 2026-06-10 private-group smoke regression: with no geographic anchor in the
   // prompt, a "哪個夜市適合帶小孩" probe came back with TAIPEI night markets.
   // These clauses pin every place/weather/transport answer to Chiang Mai.
