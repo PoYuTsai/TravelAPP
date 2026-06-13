@@ -60,6 +60,12 @@ describe('enrichCaseIntakeReply — refine wiring', () => {
     expect(refined.enrichment).toBe('llm_draft')
     expect(refined.replyText).not.toBe(det.replyText)
     expect(refined.replyText).toContain('親愛的貴賓您好')
+    // Task 3 觀測：採用 refined 時 refine metadata 透出 used/tier/masked reasons。
+    expect(refined.refine?.used).toBe('refined')
+    expect(refined.refine?.tier).toBe('primary')
+    expect(refined.refine?.rejectionReasons).toEqual([])
+    // 缺席 refineSource 的 det 跑不到 refine ⇒ 無 metadata。
+    expect(det.refine).toBeUndefined()
   })
 
   it('refineSource 被 guard 打回 → 退 deterministic，與無 refine byte-identical', async () => {
@@ -71,6 +77,10 @@ describe('enrichCaseIntakeReply — refine wiring', () => {
         deterministicDraft.replace(/Day 1｜[^\n]*/, 'Day 1｜被竄改的主題') },
     })
     expect(tampered.replyText).toBe(det.replyText)
+    // Task 3 觀測：guard 打回後 used 為 deterministic，rejectionReasons 帶 masked 結構碼。
+    expect(tampered.refine?.used).toBe('deterministic')
+    expect(tampered.refine?.tier).toBeNull()
+    expect(tampered.refine?.rejectionReasons).toContain('structural_diff')
   })
 
   it('refineSource 缺席 → 與現況 byte-identical（regression 鎖）', async () => {

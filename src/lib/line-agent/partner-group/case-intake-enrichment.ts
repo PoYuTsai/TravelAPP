@@ -40,6 +40,7 @@ import type { CustomerItineraryConstraints } from '../notion/customer-itinerary-
 import {
   refineCustomerItineraryDraft,
   type RefineDraftSource,
+  type RefineTier,
 } from '../notion/customer-itinerary-refine'
 import { checkCustomerItineraryRoundTrip } from '../notion/customer-itinerary-roundtrip'
 import { scanCustomerForbiddenTerms } from '../notion/customer-facing-forbidden-terms'
@@ -93,6 +94,20 @@ export interface CaseIntakeEnrichmentResult {
    * roundtrip_failed · draft_leak
    */
   degradedReason?: string
+  /**
+   * refine 暖化觀測 metadata（only present when refineSource 真的跑了）。純觀測，
+   * 不影響 replyText。欄位對齊 RefineResult：
+   *   used — 'refined'（採用暖化版）或 'deterministic'（任一閘打回退原稿）。
+   *   tier — 採用版來自哪層（'primary' | 'rescue'）；退 deterministic 時為 null。
+   *   rejectionReasons — masked 結構碼（lint_error · structural_diff ·
+   *     internal_leak · source_error · empty_output）；採用時為空陣列。
+   *     永不含客人原文／PII。
+   */
+  refine?: {
+    used: 'refined' | 'deterministic'
+    tier: RefineTier | null
+    rejectionReasons: string[]
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -409,6 +424,7 @@ export async function enrichCaseIntakeReply(
   // byte-identical 現況。harness 本身 fail-closed：任何 guard 打回／source
   // throw／空輸出時 refined.draft === composed.draft，故失敗自動退 deterministic。
   let finalDraft = composed.draft
+  let refineMeta: CaseIntakeEnrichmentResult['refine']
   if (sources.refineSource) {
     const refined = await refineCustomerItineraryDraft({
       deterministicDraft: composed.draft,
@@ -417,11 +433,18 @@ export async function enrichCaseIntakeReply(
       rescueSource: sources.rescueRefineSource,
     })
     finalDraft = refined.draft
+    // 觀測 metadata — 只透 mask-safe 結構碼，不含 draft 內文／客人原文。
+    refineMeta = {
+      used: refined.used,
+      tier: refined.tier,
+      rejectionReasons: refined.rejectionReasons,
+    }
   }
 
   return {
     replyText: renderDraftReply(summary, finalDraft),
     enrichment: 'llm_draft',
+    ...(refineMeta !== undefined ? { refine: refineMeta } : {}),
   }
 }
 

@@ -176,6 +176,14 @@ export function createCaseIntakeResponder(
             ...(enriched.degradedReason !== undefined
               ? { degradedReason: enriched.degradedReason }
               : {}),
+            // refine 觀測（只在真的跑了 refine 時帶；皆 mask-safe 結構碼，無 PII）。
+            ...(enriched.refine !== undefined
+              ? {
+                  refineUsed: enriched.refine.used,
+                  refineTier: enriched.refine.tier,
+                  refineRejections: enriched.refine.rejectionReasons,
+                }
+              : {}),
           })
           return {
             text: enriched.replyText,
