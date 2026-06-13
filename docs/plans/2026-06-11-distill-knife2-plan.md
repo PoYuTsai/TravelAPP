@@ -559,3 +559,13 @@ npx vitest run src/lib/line-agent/ && npx next lint --dir src/lib/line-agent
 - **OCR 覆寫 race**：剛進群的截圖若 OCR 在飛時被沉澱掃到，`markTranscriptDistilled` 與 OCR 覆寫可能互洗（後寫贏）。機率極低（手動觸發），最壞情況＝該則下次重掃或 distilled 標丟失一次，自癒。
 - **Mention 剝法對含空白顯示名失效**（final review Important）：`isDistillCommand`/`parseDistillApproval` 用 `/@\S+/g` 剝 mention——若 bot 顯示名含空白（如「@清微 Bot」），剝完殘留尾段 → 指令靜默落回 responder。**私測群實測時優先驗證**；命中再改 mention offset 結構化剝除。quote-to-bot 路徑免 mention 可繞過。
 - **兩個近距離「沉澱」指令不互斥**：`claimPartnerReply` 只擋同 messageId 重送；連打兩次（不同訊息）會雙重計費＋pending 互洗。手動觸發月跑數次，與 OCR race 同級，接受。
+
+## 排程決策：維持手動，不建 cron（2026-06-13 定案）
+
+刀2 全程設計就是**手動觸發**（`@bot 沉澱` / CLI `agent:distill-flush`），月跑數次。曾有「§3 刀2 cron」待辦，盤點後**結案為刻意手動，不建 Vercel cron**，理由：
+
+- 「手動沉澱」是知識沉澱四刀的刻意一環（被動旁聽→**手動沉澱**→LINE 過目→Notion RAG），自動 cron 會跳過「過目」那刀的人為把關。
+- 本計畫 §30 / 已知風險已多處把「手動觸發、月跑數次」當作 ack 延遲、OCR race、雙觸發互洗等風險的**接受前提**；改自動排程等於同時放大這三項風險。
+- cron 另需 CRON_SECRET 驗證、頻率/時段決策、API 額度常態消耗，收益不抵成本。
+
+未來流量上升（如開 OA 1:1 客服）若要重評，再另開設計，呼叫點不動（`run-distillation` orchestrator 已與觸發方式解耦）。
