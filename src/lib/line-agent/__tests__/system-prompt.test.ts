@@ -141,6 +141,15 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('方案取捨')
   })
 
+  // 2026-06-13 (Eric Q2 拍板): 排行程請求 → 先用合理假設給一版標註假設的草稿，
+  // 文末問哪些要修正，依夥伴二次回覆疊代；不要只反問缺哪些資訊（gather-first）。
+  it('itinerary requests get a draft-first reply with labeled assumptions, not just a gap list', () => {
+    expect(prompt).toContain('排行程')
+    expect(prompt).toContain('排出一版初稿')
+    expect(prompt).toContain('標明你')
+    expect(prompt).toContain('哪些需要修正')
+  })
+
   // 2026-06-10 private-group smoke regression: with no geographic anchor in the
   // prompt, a "哪個夜市適合帶小孩" probe came back with TAIPEI night markets.
   // These clauses pin every place/weather/transport answer to Chiang Mai.
@@ -273,6 +282,15 @@ describe('buildPartnerGroupSystemPrompt', () => {
       expect(prompt).toContain('內部沉澱案例優先：沉澱知識已有答案時以內部為準，web 結果只佐證不覆蓋')
       expect(prompt).toContain('閒聊、寒暄、內部既有規則可答的問題不要搜尋 — 每次搜尋都是真實花費')
       expect(prompt).toContain('搜不到就誠實說搜不到，絕不腦補來源、絕不編造連結')
+    })
+
+    // 2026-06-13 (Eric Q3 拍板): 明確超出清邁範圍（其他城市）的問題，開閘時
+    // 解除 frozen persona 的「不得以其他城市回答」硬鎖，可用 web 結果回答並標明
+    // 非專營範圍。閘關時此條款不存在（沿用前面 byte-identical tripwire）。
+    it('開閘 ⇒ 明確超出清邁範圍的問題可用 web 回答並標明非專營範圍（解除其他城市硬鎖）', () => {
+      const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
+      expect(prompt).toContain('明確超出清邁範圍')
+      expect(prompt).toContain('非清微旅行專營範圍')
     })
 
     it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
