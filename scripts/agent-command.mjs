@@ -1711,6 +1711,8 @@ export async function loadPartnerRespondKit(ctx = {}) {
     importCostCapModule = () =>
       import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
     importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+    importToolGateModule = () => import('../src/lib/line-agent/tools/tool-gate.ts'),
+    importToolConfigModule = () => import('../src/lib/line-agent/tools/tool-config.ts'),
   } = ctx
   try {
     const factoryMod = await importFactoryModule()
@@ -1718,12 +1720,16 @@ export async function loadPartnerRespondKit(ctx = {}) {
     const installerMod = await importInstallerModule()
     const costCapMod = await importCostCapModule()
     const kvMod = await importKvModule()
+    const toolGateMod = await importToolGateModule()
+    const toolConfigMod = await importToolConfigModule()
     const kit = {
       createPartnerGroupResponder: factoryMod?.createPartnerGroupResponder ?? null,
       getPartnerResponderConfig: configMod?.getPartnerResponderConfig ?? null,
       buildDefaultQaKnowledgeSource: installerMod?.buildDefaultQaKnowledgeSource ?? null,
       createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
       createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+      canUseExternalTool: toolGateMod?.canUseExternalTool ?? null,
+      loadToolConfig: toolConfigMod?.loadToolConfig ?? null,
     }
     if (Object.values(kit).some((v) => !v)) return null
     return kit
@@ -1777,11 +1783,24 @@ export async function runPartnerRespondCommand(options = {}) {
   const built = kit.buildDefaultQaKnowledgeSource(env)
   const knowledgeSource = built.source
 
+  // 外部佐證刀 — 與 webhook 同一個 composition-root 判法（tool-gate 單一事實來源）
+  const webSearchGate = kit.canUseExternalTool(
+    {
+      tool: 'web_search',
+      sourceChannel: 'line_partner_group',
+      botDirected: true,
+      userRequestedExternalData: false,
+      costSpentUsd: 0,
+    },
+    kit.loadToolConfig(env)
+  )
+
   const responder = kit.createPartnerGroupResponder({
     models,
     transport: options.transport ?? fetch,
     costCap,
     knowledgeSource,
+    webSearchEnabled: webSearchGate.allowed,
   })
 
   // ④ 最小 event（CLI 黑箱；adapter 只讀 text / intent / quotedBotContent / log）。
@@ -1798,6 +1817,7 @@ export async function runPartnerRespondCommand(options = {}) {
     'partner-respond（黑箱驗收 — 不碰真 store、不貼群）',
     `輸入：「${options.query}」`,
     `知識源：${knowledgeSource ? '已接（QA_KNOWLEDGE_READ_ENABLED 閘開）' : `未接（${built.reason}）`}`,
+    `搜證：${webSearchGate.allowed ? '開（web_search 已掛，max 3 次/題）' : '關（AI_AGENT_WEB_SEARCH_ENABLED 未開或 AI_AGENT_TOOL_COST_CAP_USD 未設）'}`,
     `meta：${JSON.stringify(result.meta)}`,
     '--- 回覆 ---',
     result.text,

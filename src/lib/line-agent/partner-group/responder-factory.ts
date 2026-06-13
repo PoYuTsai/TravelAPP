@@ -57,6 +57,11 @@ export interface CreatePartnerGroupResponderInput {
    * adapter 行為與本刀落地前 byte-identical。
    */
   knowledgeSource?: QaKnowledgeSource
+  /**
+   * 外部佐證刀 — web_search 開關。caller（composition root）用
+   * canUseExternalTool 判定後傳入；factory 照樣不讀 env。省略 ⇒ off。
+   */
+  webSearchEnabled?: boolean
 }
 
 /**
@@ -111,6 +116,7 @@ export function createPartnerGroupResponder(
     researchModel: models.researchModel,
     costCap,
     knowledgeSource: input.knowledgeSource,
+    webSearchEnabled: input.webSearchEnabled,
   })
 }
 

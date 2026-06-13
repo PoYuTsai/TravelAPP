@@ -32,6 +32,8 @@ import {
   type NotionRagAnswerSourceDeps,
 } from '@/lib/line-agent/partner-group/notion-rag-answer-source'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
+import { canUseExternalTool } from '@/lib/line-agent/tools/tool-gate'
+import { loadToolConfig } from '@/lib/line-agent/tools/tool-config'
 import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ensure-partner-rag-installed'
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { sanitizeQuotedBotContext } from '@/lib/line-agent/partner-group/quoted-draft-customer-reply'
@@ -511,11 +513,26 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
           return installedQaKnowledgeSource()
         }
       : undefined
+    // 外部佐證刀 — composition root 判 web_search 閘：用 tool-gate 本人判
+    //（單一事實來源，不重複 env 解析）。sourceChannel / botDirected 帶
+    // 「夥伴群＋bot-directed」的前提值 — base responder 只會被這種訊息觸發，
+    // adapter 內另有 per-request 防衛性收窄。
+    const webSearchGate = canUseExternalTool(
+      {
+        tool: 'web_search',
+        sourceChannel: 'line_partner_group',
+        botDirected: true,
+        userRequestedExternalData: false, // 刀1 後 web_search 不看此關（tag 即授權）
+        costSpentUsd: 0,
+      },
+      loadToolConfig(process.env)
+    )
     const base = createPartnerGroupResponder({
       models,
       transport: fetch,
       costCap,
       knowledgeSource,
+      webSearchEnabled: webSearchGate.allowed,
     })
     // 客需三分流 LLM enrichment（design 2026-06-10 §1 LLM 刀）— 有 key 才組
     // enriched responder；無 key ⇒ deterministic-only（factory default）。

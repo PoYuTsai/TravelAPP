@@ -13,6 +13,8 @@ import {
   runPartnerRespondCommand,
 } from '../../../../scripts/agent-command.mjs'
 import { getPartnerResponderConfig } from '../partner-group/responder-config'
+import { canUseExternalTool } from '../tools/tool-gate'
+import { loadToolConfig } from '../tools/tool-config'
 
 const ENV_OK = {
   AI_AGENT_PARTNER_RESPONDER_MODE: 'anthropic',
@@ -26,6 +28,8 @@ const ENV_OK = {
 function realKit(overrides: Record<string, unknown> = {}) {
   return {
     getPartnerResponderConfig,
+    canUseExternalTool,
+    loadToolConfig,
     createPartnerGroupResponder: () => {
       throw new Error('responder factory must not be called when a gate throws')
     },
@@ -38,6 +42,25 @@ function realKit(overrides: Record<string, unknown> = {}) {
     createKvClientFromEnv: () => null,
     ...overrides,
   }
+}
+
+/**
+ * 紀錄 factory 收到的參數（外部佐證刀接線驗）— 真 tool-gate / config，
+ * 其餘 fake；factory 被呼叫時把 input push 進 factoryArgs。
+ */
+function makeRecordingKit() {
+  const factoryArgs: Array<Record<string, unknown>> = []
+  const kit = realKit({
+    buildDefaultQaKnowledgeSource: () => ({ reason: 'disabled' }),
+    createDailyCostCap: () => ({ checkBudget: async () => ({ outcome: 'ok' }) }),
+    createPartnerGroupResponder: (input: Record<string, unknown>) => {
+      factoryArgs.push(input)
+      return {
+        respond: async () => ({ text: 'ok', meta: { responder: 'llm' } }),
+      }
+    },
+  })
+  return { kit, factoryArgs }
 }
 
 describe('parseAgentCommandArgs partner-respond', () => {
@@ -179,5 +202,31 @@ describe('runPartnerRespondCommand', () => {
       query: '兒童座椅怎麼算',
     })
     expect(out).toContain('知識源：已接（QA_KNOWLEDGE_READ_ENABLED 閘開）')
+  })
+
+  // ── 外部佐證刀 — web_search 閘接線 ──────────────────────────────────────────
+
+  it('AI_AGENT_WEB_SEARCH_ENABLED=true＋cap ⇒ webSearchEnabled=true 注入＋輸出標示搜證開', async () => {
+    const { kit, factoryArgs } = makeRecordingKit()
+    const out = await runPartnerRespondCommand({
+      env: { ...ENV_OK, AI_AGENT_WEB_SEARCH_ENABLED: 'true', AI_AGENT_TOOL_COST_CAP_USD: '1.00' },
+      kit,
+      kvClient: {},
+      query: '天燈節哪天',
+    })
+    expect(factoryArgs[0].webSearchEnabled).toBe(true)
+    expect(out).toContain('搜證：開')
+  })
+
+  it('閘未開 ⇒ webSearchEnabled=false＋輸出標示搜證關（照樣跑，不擋）', async () => {
+    const { kit, factoryArgs } = makeRecordingKit()
+    const out = await runPartnerRespondCommand({
+      env: ENV_OK,
+      kit,
+      kvClient: {},
+      query: '天燈節哪天',
+    })
+    expect(factoryArgs[0].webSearchEnabled).toBe(false)
+    expect(out).toContain('搜證：關')
   })
 })

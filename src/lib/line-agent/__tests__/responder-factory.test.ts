@@ -151,6 +151,34 @@ describe('createPartnerGroupResponder', () => {
 
   // ── factory ignores process.env (decision comes only from injected models) ──
 
+  // ── 外部佐證刀 — webSearchEnabled passthrough ──────────────────────────────
+
+  it('webSearchEnabled passthrough：factory 建出的 adapter 開閘掛 tools、省略不掛', async () => {
+    const calls: Array<{ body: string }> = []
+    const transport = (async (_url: unknown, init: any) => {
+      calls.push({ body: init.body })
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+      } as unknown as Response
+    }) as unknown as typeof fetch
+    const input = makeInput()
+    await createPartnerGroupResponder({
+      models: ANTHROPIC_MODELS,
+      transport,
+      costCap: allowAllCostCap,
+      webSearchEnabled: true,
+    }).respond(input)
+    await createPartnerGroupResponder({
+      models: ANTHROPIC_MODELS,
+      transport,
+      costCap: allowAllCostCap,
+    }).respond(input)
+    expect('tools' in JSON.parse(calls[0].body)).toBe(true)
+    expect('tools' in JSON.parse(calls[1].body)).toBe(false)
+  })
+
   it('decides from the injected models, NOT process.env', () => {
     const prev = process.env.AI_AGENT_PARTNER_RESPONDER_MODE
     process.env.AI_AGENT_PARTNER_RESPONDER_MODE = 'anthropic' // try to trick it
