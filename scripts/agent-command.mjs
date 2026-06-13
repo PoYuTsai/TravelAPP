@@ -1805,10 +1805,13 @@ export async function runPartnerRespondCommand(options = {}) {
 
   // ④ 最小 event（CLI 黑箱；adapter 只讀 text / intent / quotedBotContent / log）。
   //    intent 是 CommandIntent 物件（routePartnerModel 讀 .action）— respond →
-  //    defaultModel，與真機路由一致。
+  //    defaultModel，與真機路由一致。真機排行程訊息經 LLM classifier 會判
+  //    action='draft'（走 researchModel＋Q2 tripwire）；黑箱用 PARTNER_RESPOND_INTENT
+  //    env 覆寫以驗 draft 路徑，預設 respond（不破「不收 flag」紀律）。
+  const intentAction = (env.PARTNER_RESPOND_INTENT ?? 'respond').trim() || 'respond'
   const result = await responder.respond({
     event: { kind: 'group_text', sourceChannel: 'partner_group', mentionsBot: true },
-    intent: { action: 'respond', confidence: 'high', source: 'deterministic' },
+    intent: { action: intentAction, confidence: 'high', source: 'deterministic' },
     text: options.query,
     botDirected: true,
   })
