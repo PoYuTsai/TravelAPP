@@ -25,10 +25,18 @@ import { CASE_INTAKE_FIELD_QUESTIONS, CASE_INTAKE_FIELD_LABELS } from './case-in
 import { type DailyCostCap } from '../observability/daily-cost-cap'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { callAnthropicMessages } from '../observability/anthropic-call'
+import {
+  createAnthropicRefineSource,
+  resolveRefineModel,
+  resolveRescueRefineModel,
+} from '../notion/llm-refine-adapter'
+import { isCaseIntakeRefineEnabled } from './case-intake-surfacing'
 
 /** 問句潤飾輸出小；草稿 JSON（7 天行程）要寬一點。 */
 const QUESTION_MAX_TOKENS = 1024
 const DRAFT_MAX_TOKENS = 2048
+/** refine 暖化只動標題／前言／結語，輸出 ~ 整份草稿大小。 */
+const REFINE_MAX_TOKENS = 2048
 
 // ---------------------------------------------------------------------------
 // Model resolution（mirror resolveRefineModel：explicit > env > default）
@@ -157,8 +165,59 @@ export function createAnthropicCaseIntakeSources(
     return text
   }
 
+  // refine 暖化子閘（疊在 LLM enrichment 之上）：閘關 ⇒ 連 source 都不組，
+  // enrichment 行為與 refine 落地前 byte-identical。閘開 ⇒ 組 Haiku 主 +
+  // Sonnet 救援兩個 RefineDraftSource，兩者都委派同一條 cost-cap 內建的
+  // callAnthropicMessages transport（leak tripwire 在 createAnthropicRefineSource 內）。
+  function refineCallModel(): (req: {
+    system: string
+    user: string
+    model: string
+  }) => Promise<string> {
+    return async ({ system, user, model: refineModel }) => {
+      const { text } = await callAnthropicMessages(
+        {
+          model: refineModel,
+          system,
+          messages: [{ role: 'user', content: user }],
+          maxTokens: REFINE_MAX_TOKENS,
+          fallbackInputTokens: Math.ceil((system.length + user.length) / 4),
+          truncation: 'ignore',
+        },
+        {
+          transport: deps.transport,
+          apiKey: deps.apiKey,
+          costCap: deps.costCap,
+          log,
+          makeError: (code) => new CaseIntakeLlmError(code),
+        },
+      )
+      return text
+    }
+  }
+
+  const refineEnabled = isCaseIntakeRefineEnabled(deps.env)
+  const refineSource = refineEnabled
+    ? createAnthropicRefineSource({
+        apiKey: deps.apiKey,
+        env: deps.env,
+        model: resolveRefineModel({ env: deps.env }),
+        callModel: refineCallModel(),
+      })
+    : undefined
+  const rescueRefineSource = refineEnabled
+    ? createAnthropicRefineSource({
+        apiKey: deps.apiKey,
+        env: deps.env,
+        model: resolveRescueRefineModel({ env: deps.env }),
+        callModel: refineCallModel(),
+      })
+    : undefined
+
   return {
     questionSource: (req) => callModel(buildQuestionPolishPrompt(req), QUESTION_MAX_TOKENS),
     draftSource: (req) => callModel(buildItineraryDraftPrompt(req), DRAFT_MAX_TOKENS),
+    ...(refineSource ? { refineSource } : {}),
+    ...(rescueRefineSource ? { rescueRefineSource } : {}),
   }
 }

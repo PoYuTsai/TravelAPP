@@ -83,6 +83,17 @@ export function isCaseIntakeLlmEnabled(
   return (env.AI_AGENT_CASE_INTAKE_LLM_ENABLED ?? '').trim() === 'true'
 }
 
+/**
+ * refine 暖化子閘（疊在 LLM enrichment 之上的第三道閘，同 convention，
+ * exactly "true"，default off）。閘關 ⇒ adapter factory 不組 refine sources，
+ * enrichment 行為與 refine 落地前 byte-identical。
+ */
+export function isCaseIntakeRefineEnabled(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  return (env.AI_AGENT_CASE_INTAKE_REFINE_ENABLED ?? '').trim() === 'true'
+}
+
 export interface ShouldUseCaseIntakeInput {
   sourceChannel: AgentSourceChannel
   /** mentionsBot OR quote-to-bot, resolved by the caller（router botDirected）. */
