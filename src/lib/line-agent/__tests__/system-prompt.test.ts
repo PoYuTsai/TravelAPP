@@ -163,6 +163,15 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('住宿')
   })
 
+  // 2026-06-13 (Q2 補強): 黑箱發現 persona 會用 **粗體** 包 Day 標題＋漏掉最上面三行
+  // header，導致 round-trip parser 解不出而過不了閘。這兩條把「純文字、header 先行」鎖死。
+  it('itinerary drafts must be plain-text (no markdown) with the three header lines first', () => {
+    expect(prompt).toContain('絕對不要用')
+    expect(prompt).toContain('粗體')
+    expect(prompt).toContain('markdown')
+    expect(prompt).toContain('第一行起')
+  })
+
   // 2026-06-10 private-group smoke regression: with no geographic anchor in the
   // prompt, a "哪個夜市適合帶小孩" probe came back with TAIPEI night markets.
   // These clauses pin every place/weather/transport answer to Chiang Mai.
@@ -304,6 +313,14 @@ describe('buildPartnerGroupSystemPrompt', () => {
       const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
       expect(prompt).toContain('明確超出清邁範圍')
       expect(prompt).toContain('非清微旅行專營範圍')
+    })
+
+    // 2026-06-13 (Eric Q3 補強): 超範圍題要「直接給實質答案」，不要婉拒丟谷歌；
+    // 若對方要排行程，一樣吐 customer_itinerary_v1 格式。
+    it('開閘 ⇒ 超範圍題要直接回答、不丟谷歌，要排行程一樣輸出 v1', () => {
+      const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
+      expect(prompt).toContain('不要只叫對方')
+      expect(prompt).toContain('一樣用上面 customer_itinerary_v1')
     })
 
     it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
