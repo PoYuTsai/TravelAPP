@@ -17,11 +17,9 @@
  * 錯誤一律 fixed code，永不帶 key / prompt / 回應內文。
  */
 
-import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
+import { type DailyCostCap } from '../observability/daily-cost-cap'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
-
-const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_VERSION = '2023-06-01'
+import { callAnthropicMessages } from '../observability/anthropic-call'
 
 /** 最多 5 條候選 JSON，2048 綽綽有餘；再大就是模型失控，截斷偵測會擋。 */
 export const DISTILL_MAX_TOKENS = 2048
@@ -98,131 +96,28 @@ export function createAnthropicDistillSource(deps: AnthropicDistillSourceDeps): 
   const log = deps.log ?? createAgentLogger({ requestId: '-' })
 
   return async function distillSource(promptText: string): Promise<string> {
-    // BUDGET GATE — 同 anthropic-responder：非 ok 一律不打。
-    const budget = await deps.costCap.checkBudget()
-    log('cost_cap', {
-      checkOutcome: budget.outcome,
-      dailySpendMicroUsd: budget.dailySpendMicroUsd,
-    })
-    if (budget.outcome !== 'ok') {
-      log('llm_call', { model, outcome: 'degraded', degradedReason: `cost_cap_${budget.outcome}` })
-      throw new DistillLlmError(`cost_cap_${budget.outcome}`)
-    }
-
-    const startedAt = Date.now()
-    let response: Response
-    try {
-      response = await deps.transport(ANTHROPIC_MESSAGES_URL, {
-        method: 'POST',
-        headers: {
-          'x-api-key': deps.apiKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: DISTILL_MAX_TOKENS,
-          system: DISTILL_SYSTEM_INSTRUCTION,
-          messages: [{ role: 'user', content: promptText }],
-        }),
-      })
-    } catch {
-      // Raw error 可能帶 request 細節 — 吞掉，只留 fixed code。
-      log('llm_call', {
+    // transport / cost cap / parse / record / 截斷='throw'（JSON 截斷不可信）
+    // 全在共用 callAnthropicMessages；本層只組 prompt 並把 fixed code 映射成
+    // DistillLlmError（保留既有錯誤型別）。
+    const { text } = await callAnthropicMessages(
+      {
         model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_api_error',
-      })
-      throw new DistillLlmError('anthropic_api_error')
-    }
-
-    if (!response.ok) {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_non_200',
-        httpStatus: response.status,
-      })
-      throw new DistillLlmError('anthropic_non_200')
-    }
-
-    let text: unknown
-    let usage: { input_tokens?: unknown; output_tokens?: unknown } | undefined
-    let stopReason: unknown
-    try {
-      const data = (await response.json()) as {
-        content?: Array<{ text?: unknown }>
-        usage?: { input_tokens?: unknown; output_tokens?: unknown }
-        stop_reason?: unknown
-      }
-      text = data?.content?.[0]?.text
-      usage = data?.usage
-      stopReason = data?.stop_reason
-    } catch {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_parse_error',
-      })
-      throw new DistillLlmError('anthropic_parse_error')
-    }
-
-    // SPEND RECORDING — 已經打了就要記；usage 缺時保守估（絕不記 0）。
-    const inputTokensRaw = usage?.input_tokens
-    const outputTokensRaw = usage?.output_tokens
-    const usageMissing =
-      typeof inputTokensRaw !== 'number' || typeof outputTokensRaw !== 'number'
-    const inputTokens = usageMissing
-      ? Math.ceil((DISTILL_SYSTEM_INSTRUCTION.length + promptText.length) / 4)
-      : (inputTokensRaw as number)
-    const outputTokens = usageMissing ? DISTILL_MAX_TOKENS : (outputTokensRaw as number)
-    const costUsd = estimateCostUsd(model, inputTokens, outputTokens)
-
-    const { recorded } = await deps.costCap.recordSpend(costUsd)
-    if (!recorded) log('cost_cap', { reason: 'record_failed' })
-
-    if (typeof text !== 'string' || text.trim() === '') {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        inputTokens,
-        outputTokens,
-        costUsd,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_parse_error',
-        ...(usageMissing ? { usageMissing: true } : {}),
-      })
-      throw new DistillLlmError('anthropic_parse_error')
-    }
-
-    // 截斷偵測 — 與 vision adapter 不同：這裡輸出是 JSON，截斷即不可信，
-    // 一律 throw（spend 已在上面入帳，不會漏記）。
-    if (stopReason === 'max_tokens') {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        inputTokens,
-        outputTokens,
-        costUsd,
-        outcome: 'degraded',
-        degradedReason: 'max_tokens_truncated',
-        ...(usageMissing ? { usageMissing: true } : {}),
-      })
-      throw new DistillLlmError('max_tokens_truncated')
-    }
-
-    log('llm_call', {
-      model,
-      latencyMs: Date.now() - startedAt,
-      inputTokens,
-      outputTokens,
-      costUsd,
-      outcome: 'ok',
-      ...(usageMissing ? { usageMissing: true } : {}),
-    })
+        system: DISTILL_SYSTEM_INSTRUCTION,
+        messages: [{ role: 'user', content: promptText }],
+        maxTokens: DISTILL_MAX_TOKENS,
+        fallbackInputTokens: Math.ceil(
+          (DISTILL_SYSTEM_INSTRUCTION.length + promptText.length) / 4,
+        ),
+        truncation: 'throw',
+      },
+      {
+        transport: deps.transport,
+        apiKey: deps.apiKey,
+        costCap: deps.costCap,
+        log,
+        makeError: (code) => new DistillLlmError(code),
+      },
+    )
     return text
   }
 }

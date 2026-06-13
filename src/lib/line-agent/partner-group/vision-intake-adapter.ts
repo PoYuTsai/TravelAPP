@@ -16,11 +16,9 @@
  */
 
 import type { LineImageContent } from '../line/content-client'
-import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
+import { type DailyCostCap } from '../observability/daily-cost-cap'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
-
-const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
-const ANTHROPIC_VERSION = '2023-06-01'
+import { callAnthropicMessages } from '../observability/anthropic-call'
 
 /** 抽取輸出是一段對話轉錄 — 不需要長文。 */
 const EXTRACTION_MAX_TOKENS = 1024
@@ -115,133 +113,41 @@ export function createAnthropicVisionIntakeSource(
   const maxTokens = deps.maxTokens ?? EXTRACTION_MAX_TOKENS
 
   return async function extract(image: LineImageContent): Promise<string> {
-    // BUDGET GATE — 同 case-intake adapter：非 ok 一律不打。
-    const budget = await deps.costCap.checkBudget()
-    log('cost_cap', {
-      checkOutcome: budget.outcome,
-      dailySpendMicroUsd: budget.dailySpendMicroUsd,
-    })
-    if (budget.outcome !== 'ok') {
-      log('llm_call', { model, outcome: 'degraded', degradedReason: `cost_cap_${budget.outcome}` })
-      throw new VisionIntakeError(`cost_cap_${budget.outcome}`)
-    }
-
-    const startedAt = Date.now()
-    let response: Response
-    try {
-      response = await deps.transport(ANTHROPIC_MESSAGES_URL, {
-        method: 'POST',
-        headers: {
-          'x-api-key': deps.apiKey,
-          'anthropic-version': ANTHROPIC_VERSION,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: maxTokens,
-          system: systemInstruction,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                {
-                  type: 'image',
-                  source: {
-                    type: 'base64',
-                    media_type: image.mediaType,
-                    data: image.base64,
-                  },
+    // transport / cost cap / parse / record / 截斷='mark'（截斷只標記不致命，
+    // 部分文字仍有價值照樣回）全在共用 callAnthropicMessages；本層只組 image
+    // block 並把 fixed code 映射成 VisionIntakeError。
+    const { text } = await callAnthropicMessages(
+      {
+        model,
+        system: systemInstruction,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: image.mediaType,
+                  data: image.base64,
                 },
-                { type: 'text', text: userText },
-              ],
-            },
-          ],
-        }),
-      })
-    } catch {
-      // Raw error 可能帶 request 細節（url / key）— 吞掉，只留 fixed code。
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_api_error',
-      })
-      throw new VisionIntakeError('anthropic_api_error')
-    }
-
-    if (!response.ok) {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_non_200',
-        httpStatus: response.status,
-      })
-      throw new VisionIntakeError('anthropic_non_200')
-    }
-
-    let text: unknown
-    let usage: { input_tokens?: unknown; output_tokens?: unknown } | undefined
-    let stopReason: unknown
-    try {
-      const data = (await response.json()) as {
-        content?: Array<{ text?: unknown }>
-        usage?: { input_tokens?: unknown; output_tokens?: unknown }
-        stop_reason?: unknown
-      }
-      text = data?.content?.[0]?.text
-      usage = data?.usage
-      stopReason = data?.stop_reason
-    } catch {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_parse_error',
-      })
-      throw new VisionIntakeError('anthropic_parse_error')
-    }
-
-    // SPEND RECORDING — 已經打了就要記；usage 缺時保守估（絕不記 0）。
-    const inputTokensRaw = usage?.input_tokens
-    const outputTokensRaw = usage?.output_tokens
-    const usageMissing =
-      typeof inputTokensRaw !== 'number' || typeof outputTokensRaw !== 'number'
-    const inputTokens = usageMissing
-      ? FALLBACK_IMAGE_INPUT_TOKENS
-      : (inputTokensRaw as number)
-    const outputTokens = usageMissing ? maxTokens : (outputTokensRaw as number)
-    const costUsd = estimateCostUsd(model, inputTokens, outputTokens)
-
-    const { recorded } = await deps.costCap.recordSpend(costUsd)
-    if (!recorded) log('cost_cap', { reason: 'record_failed' })
-
-    if (typeof text !== 'string' || text.trim() === '') {
-      log('llm_call', {
-        model,
-        latencyMs: Date.now() - startedAt,
-        inputTokens,
-        outputTokens,
-        costUsd,
-        outcome: 'degraded',
-        degradedReason: 'anthropic_parse_error',
-        ...(usageMissing ? { usageMissing: true } : {}),
-      })
-      throw new VisionIntakeError('anthropic_parse_error')
-    }
-
-    // 截斷偵測：max_tokens 截斷只標記不致命 — 部分文字仍有價值，照樣回傳。
-    const truncated = stopReason === 'max_tokens'
-    log('llm_call', {
-      model,
-      latencyMs: Date.now() - startedAt,
-      inputTokens,
-      outputTokens,
-      costUsd,
-      outcome: 'ok',
-      ...(truncated ? { degradedReason: 'max_tokens_truncated' } : {}),
-      ...(usageMissing ? { usageMissing: true } : {}),
-    })
+              },
+              { type: 'text', text: userText },
+            ],
+          },
+        ],
+        maxTokens,
+        fallbackInputTokens: FALLBACK_IMAGE_INPUT_TOKENS,
+        truncation: 'mark',
+      },
+      {
+        transport: deps.transport,
+        apiKey: deps.apiKey,
+        costCap: deps.costCap,
+        log,
+        makeError: (code) => new VisionIntakeError(code),
+      },
+    )
     return text.trim()
   }
 }
