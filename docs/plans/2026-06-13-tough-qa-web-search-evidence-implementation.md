@@ -770,6 +770,19 @@ Expected：輸出含 `搜證：開`；回覆給出具體日期＋「資料來源
 
 兩次輸出（含成本觀察）摘要進 Task 11 的 docs commit。若品質不足（搜不到 / 來源爛）→ 停下回報 Eric，討論是否走 SerpAPI（design §4 YAGNI 預留）。
 
+#### ✅ 驗收結果（2026-06-13 07:41 UTC，真打）
+
+| 項目 | Step 1 關閘 | Step 2 開閘 |
+|---|---|---|
+| 搜證標示 | `關` | `開`（web_search 已掛，max 3/題；實際 `webSearchRequests:1`） |
+| 回覆行為 | 誠實說讀不到即時資料、無法確認、建議人工查證；**零**編造日期/URL | 結論「2026 清邁天燈節 11/24–25」＋場地＋「資料來源：」段（1 個 URL）＋「以上為網路資料供參考，重要細節建議再與導遊確認」 |
+| model | `claude-haiku-4-5` | `claude-haiku-4-5` |
+| inputTokens | 1,431 | 14,014（搜證結果灌入 context） |
+| costUsd | $0.002391 | $0.025059（約 10×，差在 web 結果 token） |
+
+判定：**通過**。關/開閘行為皆符合 design 預期，tripwire 條款生效。
+品質備註：開閘來源為 `hopetrip.com`（非官方一手），日期需人工複核；MVP 行為正確，暫不啟 SerpAPI（design §4 預留）。
+
 ---
 
 ### Task 8: 刀4a — 截圖一條龍：vision → respond 接線
