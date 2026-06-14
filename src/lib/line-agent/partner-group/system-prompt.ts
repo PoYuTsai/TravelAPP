@@ -80,12 +80,22 @@ export const PARTNER_GROUP_WEB_SEARCH_PROMPT = [
 export function buildPartnerGroupSystemPrompt(
   input: PartnerGroupRespondInput,
   knowledge?: string | null,
-  opts?: { webSearchEnabled?: boolean }
+  opts?: { webSearchEnabled?: boolean; itineraryReference?: string }
 ): string {
   const sections = [PARTNER_GROUP_SYSTEM_PROMPT]
   const trimmedKnowledge = knowledge?.trim()
   if (trimmedKnowledge) {
     sections.push('', trimmedKnowledge)
+  }
+  // 排行程 reference 骨架（design 2026-06-13 Task 4）— OPTIONAL＋draft-only：
+  // 接知識之後、web_search 之前。缺席（undefined/空白）⇒ byte-identical（tripwire）。
+  const trimmedReference = opts?.itineraryReference?.trim()
+  if (trimmedReference) {
+    sections.push(
+      '',
+      '【排行程參考骨架】下面是一份過往同型行程的活動骨架（已去個資）。請參考其節奏與活動安排，再套用本案的日期/人數/天數/特殊需求重出，不得照抄日期或人名，務必符合 customer_itinerary_v1 格式：',
+      trimmedReference
+    )
   }
   if (opts?.webSearchEnabled === true) {
     sections.push('', PARTNER_GROUP_WEB_SEARCH_PROMPT)

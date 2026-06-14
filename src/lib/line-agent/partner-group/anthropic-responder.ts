@@ -82,6 +82,13 @@ export interface AnthropicPartnerGroupResponderDeps {
    */
   knowledgeSource?: QaKnowledgeSource
   /**
+   * 排行程 reference 骨架源（Task 4）— OPTIONAL＋draft-only＋fail-open，鏡像
+   * knowledgeSource：未注入 / 失敗 / draft 以外的 intent ⇒ system 與現行
+   * byte-identical。need 帶當則 draft 請求文字供 composition root 選參考；
+   * responder 不讀 env、不 import Notion client（注入由 wiring task 負責）。
+   */
+  itineraryReferenceSource?: (need: string) => Promise<string | null>
+  /**
    * Daily cost cap（P0-A 刀 2）— REQUIRED so a forgotten wiring can never mean
    * "unlimited spend". The factory builds the real KV-backed cap; tests inject
    * a fake.
@@ -101,6 +108,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly defaultModel: string
   private readonly researchModel: string
   private readonly knowledgeSource?: QaKnowledgeSource
+  private readonly itineraryReferenceSource?: (need: string) => Promise<string | null>
   private readonly costCap: DailyCostCap
   private readonly webSearchEnabled: boolean
 
@@ -110,6 +118,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.defaultModel = deps.defaultModel
     this.researchModel = deps.researchModel
     this.knowledgeSource = deps.knowledgeSource
+    this.itineraryReferenceSource = deps.itineraryReferenceSource
     this.costCap = deps.costCap
     this.webSearchEnabled = deps.webSearchEnabled === true
   }
@@ -147,6 +156,18 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       }
     }
 
+    // 排行程 reference 骨架（Task 4）— OPTIONAL＋draft-only＋fail-open，鏡像
+    // 知識讀取：僅 draft intent 才諮詢 source；非 draft 一律不發、不付費。
+    // 任何 throw ⇒ itinerary_reference_unavailable log，回覆照常（fail-open）。
+    let itineraryReference: string | null = null
+    if (this.itineraryReferenceSource && input.intent.action === 'draft') {
+      try {
+        itineraryReference = await this.itineraryReferenceSource(input.text)
+      } catch {
+        log('itinerary_reference_unavailable', {})
+      }
+    }
+
     // 外部佐證刀 — per-request 防衛性收窄：deps 開閘之外，本則訊息還要確實
     // 是 bot-directed 且不在 OA 客人面（tool-gate 第 1/4 關在最後一哩重判，
     // 只會收窄、永不放寬）。
@@ -164,6 +185,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     const runOnce = async (correctionNote?: string): Promise<PartnerGroupRespondResult> => {
       const baseSystem = buildPartnerGroupSystemPrompt(input, knowledge, {
         webSearchEnabled: allowWebSearch,
+        itineraryReference: itineraryReference ?? undefined,
       })
       const system = correctionNote
         ? `${baseSystem}\n\n【格式修正要求】上一版排行程草稿未通過自動檢查（customer_itinerary_v1），請依下列問題重新輸出，務必補齊每個 Day N｜ 標題與可解析的日期/人數 header：\n${correctionNote}`

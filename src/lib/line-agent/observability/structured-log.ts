@@ -28,6 +28,7 @@ export type AgentLogEvent =
   | 'store_read_failed'
   | 'qa_knowledge_truncated'
   | 'qa_knowledge_unavailable'
+  | 'itinerary_reference_unavailable'
 
 /** Per-event closed field shapes. All values are codes / numbers / booleans. */
 export interface AgentLogFieldsByEvent {
@@ -93,6 +94,10 @@ export interface AgentLogFieldsByEvent {
     kept?: number
   }
   qa_knowledge_unavailable: {
+    /** Fixed code only — never the raw Notion error（token / db id / url）。 */
+    reason?: string
+  }
+  itinerary_reference_unavailable: {
     /** Fixed code only — never the raw Notion error（token / db id / url）。 */
     reason?: string
   }
