@@ -54,6 +54,37 @@ describe('triageCaseIntake — flow classification', () => {
     expect(kidsNoAges.missingFields).toContain('childAges')
   })
 
+  // Change 6.1 — logistics（航班／住宿）moved OUT of critical: a case with the
+  // 3 scheduling-essential fields is sufficient even when logistics are absent.
+  it('is sufficient when scheduling-essential fields are present even without logistics', () => {
+    const result = triageCaseIntake('客人 12/20 到 12/26，2大2小（5歲、8歲）')
+    expect(result.flow).toBe('sufficient')
+    expect(result.missingFields).toContain('flightOrPickupInfo')
+    expect(result.missingFields).toContain('hotelOrPickupLocation')
+  })
+
+  it('stays insufficient when a real critical field（travelDates）is missing', () => {
+    const result = triageCaseIntake('客人 2大2小（5歲、8歲）想去清邁')
+    expect(result.flow).toBe('insufficient')
+    expect(result.missingFields).toContain('travelDates')
+  })
+
+  // Change 6.2 — child-seat is asked only when at least one child age < 4.
+  it('does not ask child-seat when all children are >= 4', () => {
+    const result = triageCaseIntake('客人 12/20 到 12/26，2大2小（4歲、6歲）')
+    expect(result.missingFields).not.toContain('childSeatNeeds')
+  })
+
+  it('asks child-seat when at least one child age is < 4', () => {
+    const result = triageCaseIntake('客人 12/20 到 12/26，2大2小（2歲、5歲）')
+    expect(result.missingFields).toContain('childSeatNeeds')
+  })
+
+  it('does not ask child-seat when there are no children', () => {
+    const result = triageCaseIntake('客人 12/20 到 12/26，2大0小，航班 CI851，住古城飯店')
+    expect(result.missingFields).not.toContain('childSeatNeeds')
+  })
+
   it('flags medical risk as tricky（precedence over missing fields）', () => {
     const result = triageCaseIntake('客人小孩對花生嚴重過敏，想去清邁')
     expect(result.flow).toBe('tricky')

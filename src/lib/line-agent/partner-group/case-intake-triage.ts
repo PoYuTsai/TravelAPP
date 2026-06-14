@@ -44,16 +44,15 @@ export interface CaseIntakeTriageResult {
 }
 
 /**
- * The fields that BLOCK the sufficient flow（design 北極星: 日期／人數／小孩
- * 年齡／航班／住宿地點）. childSeatNeeds stays advisory: it is asked in the
- * question block when relevant but never blocks sufficiency.
+ * The fields that BLOCK the sufficient flow（design 北極星: 排得出第一版行程骨架
+ * 所需的最小集＝日期／人數／小孩年齡）. 航班／接送資訊與住宿地點屬「物流」，第一版
+ * 行程骨架不需要它們就排得出來，因此即便缺也仍算 sufficient（會在問句區提醒補上，但
+ * 不阻擋）. childSeatNeeds 同樣是 advisory：相關時才在問句區詢問，永不阻擋 sufficiency.
  */
 export const CASE_INTAKE_CRITICAL_FIELDS = [
   'travelDates',
   'partySize',
   'childAges',
-  'flightOrPickupInfo',
-  'hotelOrPickupLocation',
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -203,7 +202,13 @@ function renderTrickyReply(
 export function triageCaseIntake(text: string): CaseIntakeTriageResult {
   const knownFacts = extractKnownFacts(text)
   // Raw requirement text has no prior case state → existing missing list is [].
-  const missingFields = deriveMissingFields([], text, knownFacts)
+  const rawMissing = deriveMissingFields([], text, knownFacts)
+  // childSeatNeeds 只在「有小孩且有人 < 4 歲」時才需要問（座椅是幼童才有的需求）.
+  // deriveMissingFields 為 operator inbox 共用，這裡只在 case-intake 出口收斂.
+  const hasUnderFour = knownFacts.childAges?.some((age) => age < 4) ?? false
+  const missingFields = hasUnderFour
+    ? rawMissing
+    : rawMissing.filter((field) => field !== 'childSeatNeeds')
   const summary = buildSummaryText(knownFacts)
   const trickyReasons = detectTrickyReasons(text)
 
