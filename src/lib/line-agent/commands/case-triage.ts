@@ -115,6 +115,8 @@ export function deriveMissingFields(
   if ((knownFacts.children ?? 0) > 0 && !knownFacts.childAges?.length) {
     missing.push('childAges')
   }
+  // childSeatNeeds 對所有 children>0 都列（operator inbox/buildCaseTriage 不收斂）；
+  // case-intake 出口（triageCaseIntake）會再依「有童 <4 歲」收斂，兩條路徑刻意不同。
   if ((knownFacts.children ?? 0) > 0 && !hasExplicitChildSeatDecision(text)) {
     missing.push('childSeatNeeds')
   }
