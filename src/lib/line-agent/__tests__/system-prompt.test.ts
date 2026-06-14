@@ -324,6 +324,16 @@ describe('buildPartnerGroupSystemPrompt', () => {
       expect(prompt).toContain('一樣用上面 customer_itinerary_v1')
     })
 
+    // 2026-06-14 (Eric 拍板): 夥伴群是內部群，成員是夥伴不是客人；客人問到夜生活/
+    // 成人場所等合法公開營業資訊時，一律照查照整理完整回群，不自我審查、不以「不適合」
+    // 婉拒。閘關時此條款不存在（沿用 byte-identical tripwire）。
+    it('開閘 ⇒ 成人/敏感類合法公開資訊照查照給、不自我審查、不婉拒', () => {
+      const prompt = buildPartnerGroupSystemPrompt(makeInput(), null, { webSearchEnabled: true })
+      expect(prompt).toContain('成人場所')
+      expect(prompt).toContain('不要自我審查')
+      expect(prompt).toContain('夥伴需要完整資訊')
+    })
+
     it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
       const prompt = buildPartnerGroupSystemPrompt(
         { ...makeInput(), quotedBotContent: '昨天那個草稿' },
