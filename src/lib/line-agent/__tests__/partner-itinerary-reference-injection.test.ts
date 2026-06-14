@@ -23,7 +23,11 @@ import type {
 } from '@/lib/line-agent/observability/daily-cost-cap'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
 import type { IntentAction } from '@/lib/line-agent/commands/intent'
-import { LI_FAMILY_ELDERLY_CHIANGMAI_GOLDEN_ITINERARY } from '@/lib/line-agent/notion/__fixtures__/customer-itinerary-golden'
+import {
+  LI_FAMILY_ELDERLY_CHIANGMAI_GOLDEN_ITINERARY,
+  withIntenseActivity,
+} from '@/lib/line-agent/notion/__fixtures__/customer-itinerary-golden'
+import type { ItineraryCaseProfile } from '@/lib/line-agent/notion/customer-itinerary-gate'
 
 const REFERENCE_MARKER = '【排行程參考骨架】'
 const SKELETON = '<家庭套餐訂製> 清邁親子骨架\nDay 1｜古城慢遊\n・參觀寺廟'
@@ -250,5 +254,97 @@ describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（Task 4
     expect(JSON.parse(calls[0].init.body as string).system).toBe(
       PARTNER_GROUP_SYSTEM_PROMPT
     )
+  })
+})
+
+// ── Task 5：本案 profile 餵 per-case lint 規則（caseProfileSource）─────────────
+// 同一份「含叢林飛索」草稿：無 profile ⇒ 中性閘放行（mobility 規則不開）；
+// 注入 limited-mobility profile ⇒ 真規則生效、閘擋下 → 重產→降級。證明 profile
+// 確實到達 gate；no-source / non-draft / throw ⇒ 全部 fail-open，行為零變化。
+const ZIPLINE_DRAFT = withIntenseActivity('叢林飛索')
+const ZIPLINE_BODY = { content: [{ type: 'text', text: ZIPLINE_DRAFT }] }
+const LIMITED_MOBILITY_PROFILE: ItineraryCaseProfile = {
+  mobility: { type: 'limited_mobility_wheelchair_assisted' },
+  stayArea: 'chiangmai_old_city',
+  sameLodgingAllTrip: true,
+}
+
+describe('AnthropicPartnerGroupResponder — 本案 profile 餵 per-case lint（Task 5）', () => {
+  it('DRAFT＋caseProfileSource 回 limited-mobility ⇒ 草稿含叢林飛索被閘擋 → 降級', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
+    const caseProfileSource = vi.fn(async () => LIMITED_MOBILITY_PROFILE)
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      caseProfileSource,
+    })
+
+    const result = await responder.respond(makeInput('draft', '排個李家7天行程'))
+
+    expect(caseProfileSource).toHaveBeenCalledTimes(1)
+    // 第一次過不了閘 → 重產一次（fake 同回應仍失敗）→ 共兩次呼叫、降級保留原文。
+    expect(calls).toHaveLength(2)
+    expect(result.meta?.degraded).toBe(true)
+    expect(result.meta?.error).toBe('itinerary_gate_failed')
+  })
+
+  it('未注入 caseProfileSource（同一份含叢林飛索草稿）⇒ 中性閘放行（fail-open，零變化）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
+    const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
+
+    const result = await responder.respond(makeInput('draft', '排個李家7天行程'))
+
+    expect(calls).toHaveLength(1)
+    expect(result.meta?.degraded).toBeUndefined()
+    expect(result.meta?.responder).toBe('llm')
+  })
+
+  it('NON-draft（analyze）⇒ caseProfileSource 不被諮詢', async () => {
+    const { transport } = fakeTransport({ jsonValue: OK_BODY })
+    const caseProfileSource = vi.fn(async () => LIMITED_MOBILITY_PROFILE)
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      caseProfileSource,
+    })
+
+    await responder.respond(makeInput('analyze', '看一下這團'))
+
+    expect(caseProfileSource).not.toHaveBeenCalled()
+  })
+
+  it('caseProfileSource throw ⇒ fail-open：中性閘放行、itinerary_case_profile_unavailable log', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      caseProfileSource: async () => {
+        throw new Error('notion boom')
+      },
+    })
+    const { log, entries } = makeLog()
+
+    const result = await responder.respond({
+      ...makeInput('draft', '排個李家7天行程'),
+      log,
+    })
+
+    expect(calls).toHaveLength(1)
+    expect(result.meta?.degraded).toBeUndefined()
+    expect(entries().some((e) => e.event === 'itinerary_case_profile_unavailable')).toBe(true)
+  })
+
+  it('caseProfileSource 回 null ⇒ 中性閘放行（與無 profile 等價）', async () => {
+    const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      caseProfileSource: async () => null,
+    })
+
+    const result = await responder.respond(makeInput('draft', '排個李家7天行程'))
+
+    expect(calls).toHaveLength(1)
+    expect(result.meta?.degraded).toBeUndefined()
   })
 })

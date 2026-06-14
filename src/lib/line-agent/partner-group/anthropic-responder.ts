@@ -32,7 +32,10 @@ import { buildPartnerGroupSystemPrompt } from './system-prompt'
 import type { QaKnowledgeSource } from './qa-knowledge-source'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
-import { gateCustomerItineraryDraft } from '../notion/customer-itinerary-gate'
+import {
+  gateCustomerItineraryDraft,
+  type ItineraryCaseProfile,
+} from '../notion/customer-itinerary-gate'
 
 const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -89,6 +92,15 @@ export interface AnthropicPartnerGroupResponderDeps {
    */
   itineraryReferenceSource?: (need: string) => Promise<string | null>
   /**
+   * 本案 profile 源（Task 5）— OPTIONAL＋draft-only＋fail-open，鏡像
+   * itineraryReferenceSource：未注入 / 失敗 / draft 以外的 intent ⇒ gate 收不到
+   * profile，走中性最小 constraints（與現行 byte-identical）。給了就讓 gate 用真
+   * per-case 規則（mobility / stayArea / lodging / 送機 / 航班）檢草稿。need 帶當則
+   * draft 請求文字供 composition root 選 case；responder 不讀 env、不 import Notion
+   * client（profile 推導 heuristic 與注入由 wiring task 負責）。
+   */
+  caseProfileSource?: (need: string) => Promise<ItineraryCaseProfile | null>
+  /**
    * Daily cost cap（P0-A 刀 2）— REQUIRED so a forgotten wiring can never mean
    * "unlimited spend". The factory builds the real KV-backed cap; tests inject
    * a fake.
@@ -109,6 +121,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly researchModel: string
   private readonly knowledgeSource?: QaKnowledgeSource
   private readonly itineraryReferenceSource?: (need: string) => Promise<string | null>
+  private readonly caseProfileSource?: (need: string) => Promise<ItineraryCaseProfile | null>
   private readonly costCap: DailyCostCap
   private readonly webSearchEnabled: boolean
 
@@ -119,6 +132,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.researchModel = deps.researchModel
     this.knowledgeSource = deps.knowledgeSource
     this.itineraryReferenceSource = deps.itineraryReferenceSource
+    this.caseProfileSource = deps.caseProfileSource
     this.costCap = deps.costCap
     this.webSearchEnabled = deps.webSearchEnabled === true
   }
@@ -165,6 +179,18 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
         itineraryReference = await this.itineraryReferenceSource(input.text)
       } catch {
         log('itinerary_reference_unavailable', {})
+      }
+    }
+
+    // 本案 profile（Task 5）— OPTIONAL＋draft-only＋fail-open，鏡像 reference 源：
+    // 僅 draft intent 才諮詢；任何 throw ⇒ itinerary_case_profile_unavailable log，
+    // profile 留 null ⇒ gate 走中性最小 constraints（與現行 byte-identical）。
+    let caseProfile: ItineraryCaseProfile | null = null
+    if (this.caseProfileSource && input.intent.action === 'draft') {
+      try {
+        caseProfile = await this.caseProfileSource(input.text)
+      } catch {
+        log('itinerary_case_profile_unavailable', {})
       }
     }
 
@@ -353,12 +379,12 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       // degraded（budget/transport/parse 已先回 stub）不進閘，原樣透出。
       if (result.meta?.responder !== 'llm') return result
 
-      let gate = gateCustomerItineraryDraft(result.text)
+      let gate = gateCustomerItineraryDraft(result.text, caseProfile ?? undefined)
       if (!gate.ok) {
         const retry = await runOnce(gate.problems.join('；'))
         if (retry.meta?.responder === 'llm') {
           result = retry
-          gate = gateCustomerItineraryDraft(result.text)
+          gate = gateCustomerItineraryDraft(result.text, caseProfile ?? undefined)
         }
         if (!gate.ok) {
           log('llm_call', { model, outcome: 'degraded', degradedReason: 'itinerary_gate_failed' })

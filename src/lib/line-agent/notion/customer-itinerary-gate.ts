@@ -13,12 +13,30 @@
  * error 規則是 Rule 13（Day 1..days 連續），正好驗結構。
  */
 import { checkCustomerItineraryRoundTrip } from './customer-itinerary-roundtrip'
-import { lintCustomerItinerary } from './customer-itinerary-lint'
+import { lintCustomerItinerary, type CustomerItineraryConstraints } from './customer-itinerary-lint'
 
 export interface ItineraryGateResult {
   ok: boolean
   problems: string[]
 }
+
+/**
+ * 本案 profile（Task 5）— 從這位客人的 case 抽出的 per-case lint 參數子集。OPTIONAL：
+ * 給了哪幾欄就餵哪幾欄真規則（mobility / stayArea / lodging / 送機時段 / 已知航班），
+ * 沒給的欄位回退到 gate 既有的中性值，no-profile 路徑與現行 byte-identical。
+ * 推導 heuristic 本身不在本 task 範圍（交給 wiring task）；本 type 只描述 gate 收什麼。
+ */
+export type ItineraryCaseProfile = Partial<
+  Pick<
+    CustomerItineraryConstraints,
+    | 'stayArea'
+    | 'sameLodgingAllTrip'
+    | 'departureDayTransferTime'
+    | 'departureDayPeriod'
+    | 'mobility'
+    | 'knownFlight'
+  >
+>
 
 /** 掃草稿最大的 `Day N｜` 標題推導天數；推不出回 0。 */
 function deriveDeclaredDays(text: string): number {
@@ -30,7 +48,10 @@ function deriveDeclaredDays(text: string): number {
   return max
 }
 
-export function gateCustomerItineraryDraft(draftText: string): ItineraryGateResult {
+export function gateCustomerItineraryDraft(
+  draftText: string,
+  profile?: ItineraryCaseProfile
+): ItineraryGateResult {
   const problems: string[] = []
 
   const days = deriveDeclaredDays(draftText)
@@ -41,12 +62,21 @@ export function gateCustomerItineraryDraft(draftText: string): ItineraryGateResu
   const rt = checkCustomerItineraryRoundTrip(draftText, { days })
   if (!rt.ok) problems.push(...rt.problems)
 
+  // profile 給了哪幾欄就餵哪幾欄真規則；沒給就回退到既有中性值，no-profile 路徑
+  // 與現行 byte-identical。stayArea/sameLodgingAllTrip 是必填，故走三元回退；
+  // optional 欄位走 exactOptionalPropertyTypes-safe 的 conditional-spread。
   const lint = lintCustomerItinerary(draftText, {
     days,
     nights: Math.max(0, days - 1),
-    stayArea: '',
-    sameLodgingAllTrip: false,
+    stayArea: profile?.stayArea ?? '',
+    sameLodgingAllTrip: profile?.sameLodgingAllTrip ?? false,
     customerVersion: true,
+    ...(profile?.departureDayTransferTime
+      ? { departureDayTransferTime: profile.departureDayTransferTime }
+      : {}),
+    ...(profile?.departureDayPeriod ? { departureDayPeriod: profile.departureDayPeriod } : {}),
+    ...(profile?.mobility ? { mobility: profile.mobility } : {}),
+    ...(profile?.knownFlight ? { knownFlight: profile.knownFlight } : {}),
   })
   for (const issue of lint.issues) {
     if (issue.severity === 'error') problems.push(`lint: ${issue.message}`)
