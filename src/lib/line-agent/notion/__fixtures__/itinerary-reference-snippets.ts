@@ -32,3 +32,23 @@ export const RESIDUAL_HONORIFIC_SNIPPET = `Day 1｜抵達
 /** fail-closed 樣本：內文殘留 email。 */
 export const RESIDUAL_EMAIL_SNIPPET = `Day 1｜抵達
 ・聯絡 minguide@gmail.com 安排接機`
+
+/**
+ * fail-closed 樣本：中文數字金額（scrub 只抓阿拉伯數字，漏網 → assert 應 trip → drop）。
+ * 刻意用「五千銖／訂金兩萬」這類不含「泰銖」字串的金額，逼出新 pattern（避免被既有 /泰銖/ 遮住）。
+ */
+export const RESIDUAL_CN_AMOUNT_SNIPPET = `Day 1｜抵達
+・押金五千銖，訂金兩萬元現場付
+・午餐：本地小館`
+
+/** fail-closed 樣本：中文式年月日日期（scrub 只抓 slash/dash 日期，漏網 → assert 應 trip → drop）。 */
+export const RESIDUAL_CN_DATE_SNIPPET = `Day 1｜抵達
+・2025年8月4日 司機接機
+・午餐：本地小館`
+
+/** 回歸守門：含「千人火鍋」「大象保護營」的乾淨骨架，新增的中文金額 pattern 不得 false-trip。 */
+export const CLEAN_WITH_THOUSAND_DISH = `Day 1｜抵達清邁
+・午餐：本地小館
+・晚餐：千人火鍋
+・上午大象保護營（半日）
+・住宿：古城區飯店`

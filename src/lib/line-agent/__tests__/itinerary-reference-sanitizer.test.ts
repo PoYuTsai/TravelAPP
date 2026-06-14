@@ -5,6 +5,9 @@ import {
   CLEAN_SKELETON,
   RESIDUAL_HONORIFIC_SNIPPET,
   RESIDUAL_EMAIL_SNIPPET,
+  RESIDUAL_CN_AMOUNT_SNIPPET,
+  RESIDUAL_CN_DATE_SNIPPET,
+  CLEAN_WITH_THOUSAND_DISH,
 } from '../notion/__fixtures__/itinerary-reference-snippets'
 
 describe('sanitizeItinerarySnippet', () => {
@@ -50,6 +53,27 @@ describe('sanitizeItinerarySnippet', () => {
     const r = sanitizeItinerarySnippet(RESIDUAL_EMAIL_SNIPPET)
     expect(r.ok).toBe(false)
     expect(r.reason).toBe('residual_pii')
+  })
+
+  it('FAIL-CLOSED: drops record when Chinese-numeral amount survives', () => {
+    const r = sanitizeItinerarySnippet(RESIDUAL_CN_AMOUNT_SNIPPET)
+    expect(r.ok).toBe(false)
+    expect(r.reason).toBe('residual_pii')
+    expect(r.skeleton).toBeUndefined()
+  })
+
+  it('FAIL-CLOSED: drops record when Chinese-style 年月日 date survives', () => {
+    const r = sanitizeItinerarySnippet(RESIDUAL_CN_DATE_SNIPPET)
+    expect(r.ok).toBe(false)
+    expect(r.reason).toBe('residual_pii')
+    expect(r.skeleton).toBeUndefined()
+  })
+
+  it('REGRESSION: does not false-trip on 千人火鍋 / 大象保護營', () => {
+    const r = sanitizeItinerarySnippet(CLEAN_WITH_THOUSAND_DISH)
+    expect(r.ok).toBe(true)
+    expect(r.skeleton).toMatch(/千人火鍋/)
+    expect(r.skeleton).toMatch(/大象保護營/)
   })
 
   it('FAIL-CLOSED: drops empty/blank snippet', () => {
