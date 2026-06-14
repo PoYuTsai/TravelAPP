@@ -173,6 +173,15 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('第一行起')
   })
 
+  // 2026-06-15 Task 7 (Eric): 客人未提供航班時，Day 1 預設早班（華航 CI851／長榮
+  // BR257）並標「待確認」，不得臆造確定航班。屬排行程 persona 行為，鎖在 base persona。
+  it('defaults Day 1 to an early flight marked 待確認 when no flight given (no fabrication)', () => {
+    expect(prompt).toContain('待確認')
+    expect(prompt).toContain('CI851')
+    expect(prompt).toContain('BR257')
+    expect(prompt).toContain('不得臆造確定航班')
+  })
+
   // 2026-06-10 private-group smoke regression: with no geographic anchor in the
   // prompt, a "哪個夜市適合帶小孩" probe came back with TAIPEI night markets.
   // These clauses pin every place/weather/transport answer to Chiang Mai.
