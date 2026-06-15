@@ -56,3 +56,32 @@ export function selectItineraryReference(index: RagIndex, need: string): Selecte
   }
   return { source: 'template', skeleton: templateSkeleton() }
 }
+
+/**
+ * 合併刀（M-2）：把骨架選取（selectItineraryReference）＋本案 profile 推導
+ * （deriveProfile）包成單一 ItineraryReferenceSource，一個 draft turn 對
+ * retrieval **只打一次**。index 與 deriveProfile 皆注入 —— 本模組不讀 env、不
+ * 建 Notion client（真 getIndex（TTL 快取）＋真推導器由 composition root 接）。
+ * getIndex 失敗 ⇒ 直接上拋，由 responder 端 fail-open 接住（itinerary_reference_
+ * unavailable log），絕不在此吞掉成「無骨架」靜默降級。
+ */
+export interface CreateItineraryReferenceSourceDeps {
+  /** Expensive：讀語料建索引，由 caller 以 TTL + single-flight 快取。 */
+  getIndex: () => Promise<RagIndex>
+  /** 從當則 draft 文字推導本案 per-case lint profile；推不出回 null（gate 走中性）。 */
+  deriveProfile: (need: string) => ItineraryCaseProfile | null
+}
+
+export function createItineraryReferenceSource(
+  deps: CreateItineraryReferenceSourceDeps
+): ItineraryReferenceSource {
+  return async (need) => {
+    const index = await deps.getIndex()
+    const selected = selectItineraryReference(index, need)
+    return {
+      skeleton: selected.skeleton,
+      source: selected.source,
+      profile: deps.deriveProfile(need),
+    }
+  }
+}
