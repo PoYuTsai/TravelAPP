@@ -5,24 +5,25 @@
  * 有真案例優先；low_confidence（無訊號/無命中）或全數 fail-closed ⇒ 退回手工
  * 「清邁親子5天4夜經典套餐」markdown 骨架。絕不讓 LLM 從零亂編。
  */
-import fs from 'node:fs'
-import path from 'node:path'
 import type { RagIndex } from './rag-index'
 import { retrieveRagCases } from './rag-query'
 import { toItineraryReference } from './itinerary-reference'
-
-const TEMPLATE_REL =
-  'docs/ai-agent-knowledge/cases/itinerary-templates/chiang-mai-family-5d4n-classic.md'
+import { sanitizeItinerarySnippet } from './itinerary-reference-sanitizer'
+import { ITINERARY_TEMPLATE_SKELETON } from './itinerary-reference-template'
 
 export interface SelectedReference {
   source: 'case' | 'template'
   skeleton: string
 }
 
-/** 去 YAML frontmatter，回 markdown body 當骨架。 */
+/**
+ * fallback 手工骨架（I-1/I-2）：inline TS 常數（無 readFileSync docs/** 的 lambda 風險），
+ * 並與真案例共走同一 sanitizeItinerarySnippet assert（統一不變量）。常數已 curated 乾淨
+ * （drift-guard 測試把關），sanitize 不會 fail-closed；萬一未來被改髒，`?? 常數` 確保仍有骨架可注入。
+ */
 function templateSkeleton(): string {
-  const md = fs.readFileSync(path.join(process.cwd(), TEMPLATE_REL), 'utf8')
-  return md.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim()
+  const r = sanitizeItinerarySnippet(ITINERARY_TEMPLATE_SKELETON)
+  return r.skeleton ?? ITINERARY_TEMPLATE_SKELETON
 }
 
 export function selectItineraryReference(index: RagIndex, need: string): SelectedReference {
