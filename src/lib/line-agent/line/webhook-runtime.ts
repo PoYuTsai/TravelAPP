@@ -32,6 +32,8 @@ import {
   type NotionRagAnswerSourceDeps,
 } from '@/lib/line-agent/partner-group/notion-rag-answer-source'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
+import { resolveItineraryReferenceSource } from '@/lib/line-agent/line/itinerary-reference-wiring'
+import type { RagIndex } from '@/lib/line-agent/notion/rag-index'
 import { canUseExternalTool } from '@/lib/line-agent/tools/tool-gate'
 import { loadToolConfig } from '@/lib/line-agent/tools/tool-config'
 import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ensure-partner-rag-installed'
@@ -513,6 +515,30 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
           return installedQaKnowledgeSource()
         }
       : undefined
+    // 排行程合併刀（wiring 刀本體）— composition root 接線，受
+    // AI_AGENT_NOTION_RAG_ENABLED 控：閘關 ⇒ resolveItineraryReferenceSource 回
+    // undefined ⇒ factory 不接線 ⇒ responder/request body byte-identical、零 Notion。
+    // 閘開 ⇒ 合併 source（getIndex 選骨架 ＋ deriveCaseProfile 抽 profile）。getIndex
+    // 為 lazy thunk：首個 gate-on draft 才 dynamic import installer（靜態圖零 SDK，
+    // mirror knowledgeSource）。installer fail-closed（缺 token/SDK 失敗）⇒ throw 固定碼，
+    // 由 responder 的 fail-open 接住（itinerary_reference_unavailable log），絕不臆造骨架。
+    // singleton scope：installed loader 掛在 responder singleton 上，TTL 快取跨請求生效。
+    let installedItineraryIndexLoader: (() => Promise<RagIndex>) | null = null
+    const itineraryReferenceSource = resolveItineraryReferenceSource({
+      env: process.env,
+      getIndex: async () => {
+        if (installedItineraryIndexLoader === null) {
+          const mod = await import('./install-default-itinerary-reference-index')
+          const built = mod.buildDefaultItineraryRagIndexLoader()
+          if (!built.loader) {
+            // Fail-closed：固定碼，never a token / db id / url（installer 已吞 raw error）。
+            throw new Error(`itinerary_rag_index_unavailable:${built.reason ?? 'unknown'}`)
+          }
+          installedItineraryIndexLoader = built.loader
+        }
+        return installedItineraryIndexLoader()
+      },
+    })
     // 外部佐證刀 — composition root 判 web_search 閘：用 tool-gate 本人判
     //（單一事實來源，不重複 env 解析）。sourceChannel / botDirected 帶
     // 「夥伴群＋bot-directed」的前提值 — base responder 只會被這種訊息觸發，
@@ -533,6 +559,7 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
       costCap,
       knowledgeSource,
       webSearchEnabled: webSearchGate.allowed,
+      ...(itineraryReferenceSource ? { itineraryReferenceSource } : {}),
     })
     // 客需三分流 LLM enrichment（design 2026-06-10 §1 LLM 刀）— 有 key 才組
     // enriched responder；無 key ⇒ deterministic-only（factory default）。
