@@ -14,6 +14,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { createPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder-factory'
 import { stubPartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
 import { AnthropicPartnerGroupResponder } from '@/lib/line-agent/partner-group/anthropic-responder'
+import { PARTNER_GROUP_SYSTEM_PROMPT } from '@/lib/line-agent/partner-group/system-prompt'
 import type { PartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
 import type { PartnerGroupRespondInput } from '@/lib/line-agent/partner-group/responder'
 import type { DailyCostCap } from '@/lib/line-agent/observability/daily-cost-cap'
@@ -177,6 +178,50 @@ describe('createPartnerGroupResponder', () => {
     }).respond(input)
     expect('tools' in JSON.parse(calls[0].body)).toBe(true)
     expect('tools' in JSON.parse(calls[1].body)).toBe(false)
+  })
+
+  // ── 排行程合併刀 — itineraryReferenceSource passthrough ─────────────────────
+  it('itineraryReferenceSource passthrough：注入 ⇒ draft 的 system 含骨架；省略 ⇒ baseline', async () => {
+    // 各自一條 transport（fake body 過不了 gate 會重產，故只讀每條的「首呼」）。
+    const makeCapturingTransport = () => {
+      const calls: Array<{ body: string }> = []
+      const transport = (async (_url: unknown, init: any) => {
+        calls.push({ body: init.body })
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+        } as unknown as Response
+      }) as unknown as typeof fetch
+      return { transport, calls }
+    }
+    const SKELETON = '<家庭套餐訂製> 清邁親子骨架\nDay 1｜古城慢遊\n・參觀寺廟'
+    const draft: PartnerGroupRespondInput = {
+      ...makeInput(),
+      intent: { action: 'draft', confidence: 'high', source: 'llm' },
+    }
+
+    const injected = makeCapturingTransport()
+    await createPartnerGroupResponder({
+      models: ANTHROPIC_MODELS,
+      transport: injected.transport,
+      costCap: allowAllCostCap,
+      itineraryReferenceSource: async () => ({
+        skeleton: SKELETON,
+        source: 'case',
+        profile: null,
+      }),
+    }).respond(draft)
+
+    const omitted = makeCapturingTransport()
+    await createPartnerGroupResponder({
+      models: ANTHROPIC_MODELS,
+      transport: omitted.transport,
+      costCap: allowAllCostCap,
+    }).respond(draft)
+
+    expect(JSON.parse(injected.calls[0].body).system).toContain(SKELETON)
+    expect(JSON.parse(omitted.calls[0].body).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
   })
 
   it('decides from the injected models, NOT process.env', () => {

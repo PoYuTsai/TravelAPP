@@ -40,6 +40,7 @@ import {
 } from './case-intake-surfacing'
 import { shouldUseVisionIntake } from './vision-intake-surfacing'
 import type { QaKnowledgeSource } from './qa-knowledge-source'
+import type { ItineraryReferenceSource } from '../notion/itinerary-reference-source'
 
 export interface CreatePartnerGroupResponderInput {
   /** Already-parsed model config (from getPartnerResponderConfig). */
@@ -62,6 +63,13 @@ export interface CreatePartnerGroupResponderInput {
    * canUseExternalTool 判定後傳入；factory 照樣不讀 env。省略 ⇒ off。
    */
   webSearchEnabled?: boolean
+  /**
+   * 排行程參考源（合併刀 M-2）— optional：閘（AI_AGENT_NOTION_RAG_ENABLED）關時
+   * caller 不接線 ⇒ undefined ⇒ adapter 行為與本刀落地前 byte-identical（draft
+   * system 不含骨架、gate 走中性）。factory 照樣不讀 env、不建 Notion client，
+   * 僅原樣轉交 adapter。
+   */
+  itineraryReferenceSource?: ItineraryReferenceSource
 }
 
 /**
@@ -117,6 +125,7 @@ export function createPartnerGroupResponder(
     costCap,
     knowledgeSource: input.knowledgeSource,
     webSearchEnabled: input.webSearchEnabled,
+    itineraryReferenceSource: input.itineraryReferenceSource,
   })
 }
 
