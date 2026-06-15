@@ -29,7 +29,7 @@ export type AgentLogEvent =
   | 'qa_knowledge_truncated'
   | 'qa_knowledge_unavailable'
   | 'itinerary_reference_unavailable'
-  | 'itinerary_case_profile_unavailable'
+  | 'itinerary_reference'
 
 /** Per-event closed field shapes. All values are codes / numbers / booleans. */
 export interface AgentLogFieldsByEvent {
@@ -102,9 +102,12 @@ export interface AgentLogFieldsByEvent {
     /** Fixed code only — never the raw Notion error（token / db id / url）。 */
     reason?: string
   }
-  itinerary_case_profile_unavailable: {
-    /** Fixed code only — never the raw Notion error（token / db id / url）。 */
-    reason?: string
+  itinerary_reference: {
+    /**
+     * M-1 來源訊號（固定碼 case|template，never content）：某筆 draft 用真案例
+     * 或退手工範本 — 調語料涵蓋率的關鍵。
+     */
+    referenceSource?: 'case' | 'template'
   }
 }
 

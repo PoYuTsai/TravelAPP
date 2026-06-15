@@ -28,9 +28,18 @@ import {
   withIntenseActivity,
 } from '@/lib/line-agent/notion/__fixtures__/customer-itinerary-golden'
 import type { ItineraryCaseProfile } from '@/lib/line-agent/notion/customer-itinerary-gate'
+import type { ItineraryReferenceResult } from '@/lib/line-agent/notion/itinerary-reference-source'
 
 const REFERENCE_MARKER = '【排行程參考骨架】'
 const SKELETON = '<家庭套餐訂製> 清邁親子骨架\nDay 1｜古城慢遊\n・參觀寺廟'
+
+/**
+ * 合併刀（M-2）：itineraryReferenceSource 一次回 { skeleton, source, profile } —
+ * 同一 turn 不對 retrieval 打兩次。預設真案例命中、無 profile（中性閘）。
+ */
+function makeRef(overrides: Partial<ItineraryReferenceResult> = {}): ItineraryReferenceResult {
+  return { skeleton: SKELETON, source: 'case', profile: null, ...overrides }
+}
 
 // ── system-prompt unit ─────────────────────────────────────────────────────
 function makeSystemInput(): PartnerGroupRespondInput {
@@ -174,13 +183,13 @@ function fakeTransport(response: Partial<Response> & { jsonValue?: unknown }) {
   return { transport, calls }
 }
 
-describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（Task 4）', () => {
+describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（合併刀 M-2）', () => {
   it('DRAFT intent ＋注入 itineraryReferenceSource ⇒ system 含骨架', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: GOLDEN_BODY })
     const responder = new AnthropicPartnerGroupResponder({
       transport,
       ...DEPS,
-      itineraryReferenceSource: async () => SKELETON,
+      itineraryReferenceSource: async () => makeRef(),
     })
 
     await responder.respond(makeInput('draft', '排個李家7天行程'))
@@ -191,9 +200,24 @@ describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（Task 4
     expect(body.system.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
   })
 
+  it('source 收到的 need === input.text（選取合約釘死，item6）', async () => {
+    const { transport } = fakeTransport({ jsonValue: GOLDEN_BODY })
+    const itineraryReferenceSource = vi.fn(async () => makeRef())
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      itineraryReferenceSource,
+    })
+
+    await responder.respond(makeInput('draft', '排個李家7天行程'))
+
+    expect(itineraryReferenceSource).toHaveBeenCalledTimes(1)
+    expect(itineraryReferenceSource).toHaveBeenCalledWith('排個李家7天行程')
+  })
+
   it('NON-draft intent（analyze）⇒ source 不被諮詢、system 無骨架', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: OK_BODY })
-    const itineraryReferenceSource = vi.fn(async () => SKELETON)
+    const itineraryReferenceSource = vi.fn(async () => makeRef())
     const responder = new AnthropicPartnerGroupResponder({
       transport,
       ...DEPS,
@@ -257,10 +281,57 @@ describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（Task 4
   })
 })
 
-// ── Task 5：本案 profile 餵 per-case lint 規則（caseProfileSource）─────────────
-// 同一份「含叢林飛索」草稿：無 profile ⇒ 中性閘放行（mobility 規則不開）；
-// 注入 limited-mobility profile ⇒ 真規則生效、閘擋下 → 重產→降級。證明 profile
-// 確實到達 gate；no-source / non-draft / throw ⇒ 全部 fail-open，行為零變化。
+// ── M-1：案例/範本來源訊號入 log（調語料涵蓋率的關鍵訊號）──────────────────
+describe('AnthropicPartnerGroupResponder — reference 來源訊號入 log（M-1）', () => {
+  it('命中真案例 ⇒ itinerary_reference log 帶 referenceSource=case', async () => {
+    const { transport } = fakeTransport({ jsonValue: GOLDEN_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      itineraryReferenceSource: async () => makeRef({ source: 'case' }),
+    })
+    const { log, entries } = makeLog()
+
+    await responder.respond({ ...makeInput('draft', '排個李家7天行程'), log })
+
+    const ref = entries().find((e) => e.event === 'itinerary_reference')
+    expect(ref?.referenceSource).toBe('case')
+  })
+
+  it('退手工範本 ⇒ itinerary_reference log 帶 referenceSource=template', async () => {
+    const { transport } = fakeTransport({ jsonValue: GOLDEN_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      itineraryReferenceSource: async () => makeRef({ source: 'template' }),
+    })
+    const { log, entries } = makeLog()
+
+    await responder.respond({ ...makeInput('draft', '排個李家7天行程'), log })
+
+    const ref = entries().find((e) => e.event === 'itinerary_reference')
+    expect(ref?.referenceSource).toBe('template')
+  })
+
+  it('source 回 null ⇒ 不發 itinerary_reference log', async () => {
+    const { transport } = fakeTransport({ jsonValue: GOLDEN_BODY })
+    const responder = new AnthropicPartnerGroupResponder({
+      transport,
+      ...DEPS,
+      itineraryReferenceSource: async () => null,
+    })
+    const { log, entries } = makeLog()
+
+    await responder.respond({ ...makeInput('draft', '排個李家7天行程'), log })
+
+    expect(entries().some((e) => e.event === 'itinerary_reference')).toBe(false)
+  })
+})
+
+// ── 本案 profile 餵 per-case lint 規則（合併進同一 source 的 profile 欄）─────────
+// 同一份「含叢林飛索」草稿：profile=null ⇒ 中性閘放行（mobility 規則不開）；
+// source 回 limited-mobility profile ⇒ 真規則生效、閘擋下 → 重產→降級。證明
+// profile 確實到達 gate；no-source / non-draft / throw / null ⇒ 全部 fail-open。
 const ZIPLINE_DRAFT = withIntenseActivity('叢林飛索')
 const ZIPLINE_BODY = { content: [{ type: 'text', text: ZIPLINE_DRAFT }] }
 const LIMITED_MOBILITY_PROFILE: ItineraryCaseProfile = {
@@ -269,26 +340,29 @@ const LIMITED_MOBILITY_PROFILE: ItineraryCaseProfile = {
   sameLodgingAllTrip: true,
 }
 
-describe('AnthropicPartnerGroupResponder — 本案 profile 餵 per-case lint（Task 5）', () => {
-  it('DRAFT＋caseProfileSource 回 limited-mobility ⇒ 草稿含叢林飛索被閘擋 → 降級', async () => {
+describe('AnthropicPartnerGroupResponder — 本案 profile 餵 per-case lint（合併 source.profile）', () => {
+  it('DRAFT＋source.profile=limited-mobility ⇒ 草稿含叢林飛索被閘擋 → 降級', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
-    const caseProfileSource = vi.fn(async () => LIMITED_MOBILITY_PROFILE)
+    const itineraryReferenceSource = vi.fn(async () =>
+      makeRef({ profile: LIMITED_MOBILITY_PROFILE })
+    )
     const responder = new AnthropicPartnerGroupResponder({
       transport,
       ...DEPS,
-      caseProfileSource,
+      itineraryReferenceSource,
     })
 
     const result = await responder.respond(makeInput('draft', '排個李家7天行程'))
 
-    expect(caseProfileSource).toHaveBeenCalledTimes(1)
+    // 合併刀：一個 turn 只諮詢 source 一次（reference + profile 同回）。
+    expect(itineraryReferenceSource).toHaveBeenCalledTimes(1)
     // 第一次過不了閘 → 重產一次（fake 同回應仍失敗）→ 共兩次呼叫、降級保留原文。
     expect(calls).toHaveLength(2)
     expect(result.meta?.degraded).toBe(true)
     expect(result.meta?.error).toBe('itinerary_gate_failed')
   })
 
-  it('未注入 caseProfileSource（同一份含叢林飛索草稿）⇒ 中性閘放行（fail-open，零變化）', async () => {
+  it('未注入 source（同一份含叢林飛索草稿）⇒ 中性閘放行（fail-open，零變化）', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
     const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
 
@@ -299,47 +373,12 @@ describe('AnthropicPartnerGroupResponder — 本案 profile 餵 per-case lint（
     expect(result.meta?.responder).toBe('llm')
   })
 
-  it('NON-draft（analyze）⇒ caseProfileSource 不被諮詢', async () => {
-    const { transport } = fakeTransport({ jsonValue: OK_BODY })
-    const caseProfileSource = vi.fn(async () => LIMITED_MOBILITY_PROFILE)
-    const responder = new AnthropicPartnerGroupResponder({
-      transport,
-      ...DEPS,
-      caseProfileSource,
-    })
-
-    await responder.respond(makeInput('analyze', '看一下這團'))
-
-    expect(caseProfileSource).not.toHaveBeenCalled()
-  })
-
-  it('caseProfileSource throw ⇒ fail-open：中性閘放行、itinerary_case_profile_unavailable log', async () => {
+  it('source.profile=null ⇒ 中性閘放行（與無 profile 等價）', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
     const responder = new AnthropicPartnerGroupResponder({
       transport,
       ...DEPS,
-      caseProfileSource: async () => {
-        throw new Error('notion boom')
-      },
-    })
-    const { log, entries } = makeLog()
-
-    const result = await responder.respond({
-      ...makeInput('draft', '排個李家7天行程'),
-      log,
-    })
-
-    expect(calls).toHaveLength(1)
-    expect(result.meta?.degraded).toBeUndefined()
-    expect(entries().some((e) => e.event === 'itinerary_case_profile_unavailable')).toBe(true)
-  })
-
-  it('caseProfileSource 回 null ⇒ 中性閘放行（與無 profile 等價）', async () => {
-    const { transport, calls } = fakeTransport({ jsonValue: ZIPLINE_BODY })
-    const responder = new AnthropicPartnerGroupResponder({
-      transport,
-      ...DEPS,
-      caseProfileSource: async () => null,
+      itineraryReferenceSource: async () => makeRef({ profile: null }),
     })
 
     const result = await responder.respond(makeInput('draft', '排個李家7天行程'))

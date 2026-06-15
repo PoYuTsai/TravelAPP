@@ -32,10 +32,11 @@ import { buildPartnerGroupSystemPrompt } from './system-prompt'
 import type { QaKnowledgeSource } from './qa-knowledge-source'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
-import {
-  gateCustomerItineraryDraft,
-  type ItineraryCaseProfile,
-} from '../notion/customer-itinerary-gate'
+import { gateCustomerItineraryDraft } from '../notion/customer-itinerary-gate'
+import type {
+  ItineraryReferenceResult,
+  ItineraryReferenceSource,
+} from '../notion/itinerary-reference-source'
 
 const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -85,21 +86,15 @@ export interface AnthropicPartnerGroupResponderDeps {
    */
   knowledgeSource?: QaKnowledgeSource
   /**
-   * 排行程 reference 骨架源（Task 4）— OPTIONAL＋draft-only＋fail-open，鏡像
+   * 排行程參考源（合併刀 M-2，取代 Task 4/5 的 itineraryReferenceSource ＋
+   * caseProfileSource 兩條 source）— OPTIONAL＋draft-only＋fail-open，鏡像
    * knowledgeSource：未注入 / 失敗 / draft 以外的 intent ⇒ system 與現行
-   * byte-identical。need 帶當則 draft 請求文字供 composition root 選參考；
-   * responder 不讀 env、不 import Notion client（注入由 wiring task 負責）。
+   * byte-identical、gate 走中性最小 constraints。一個 turn **只諮詢一次**，同時取
+   * 骨架（注入 persona）＋來源訊號（M-1 入 log）＋本案 profile（餵 per-case lint）。
+   * need 帶當則 draft 請求文字；responder 不讀 env、不 import Notion client（選取/
+   * profile 推導/注入由 composition root 的 wiring 負責）。
    */
-  itineraryReferenceSource?: (need: string) => Promise<string | null>
-  /**
-   * 本案 profile 源（Task 5）— OPTIONAL＋draft-only＋fail-open，鏡像
-   * itineraryReferenceSource：未注入 / 失敗 / draft 以外的 intent ⇒ gate 收不到
-   * profile，走中性最小 constraints（與現行 byte-identical）。給了就讓 gate 用真
-   * per-case 規則（mobility / stayArea / lodging / 送機 / 航班）檢草稿。need 帶當則
-   * draft 請求文字供 composition root 選 case；responder 不讀 env、不 import Notion
-   * client（profile 推導 heuristic 與注入由 wiring task 負責）。
-   */
-  caseProfileSource?: (need: string) => Promise<ItineraryCaseProfile | null>
+  itineraryReferenceSource?: ItineraryReferenceSource
   /**
    * Daily cost cap（P0-A 刀 2）— REQUIRED so a forgotten wiring can never mean
    * "unlimited spend". The factory builds the real KV-backed cap; tests inject
@@ -120,8 +115,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly defaultModel: string
   private readonly researchModel: string
   private readonly knowledgeSource?: QaKnowledgeSource
-  private readonly itineraryReferenceSource?: (need: string) => Promise<string | null>
-  private readonly caseProfileSource?: (need: string) => Promise<ItineraryCaseProfile | null>
+  private readonly itineraryReferenceSource?: ItineraryReferenceSource
   private readonly costCap: DailyCostCap
   private readonly webSearchEnabled: boolean
 
@@ -132,7 +126,6 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.researchModel = deps.researchModel
     this.knowledgeSource = deps.knowledgeSource
     this.itineraryReferenceSource = deps.itineraryReferenceSource
-    this.caseProfileSource = deps.caseProfileSource
     this.costCap = deps.costCap
     this.webSearchEnabled = deps.webSearchEnabled === true
   }
@@ -170,28 +163,23 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       }
     }
 
-    // 排行程 reference 骨架（Task 4）— OPTIONAL＋draft-only＋fail-open，鏡像
-    // 知識讀取：僅 draft intent 才諮詢 source；非 draft 一律不發、不付費。
-    // 任何 throw ⇒ itinerary_reference_unavailable log，回覆照常（fail-open）。
-    let itineraryReference: string | null = null
+    // 排行程參考（合併刀 M-2）— OPTIONAL＋draft-only＋fail-open，鏡像知識讀取：
+    // 僅 draft intent 才諮詢 source；非 draft 一律不發、不付費。一個 turn **只打
+    // 一次**，同時取骨架（注入 persona）＋來源訊號（M-1）＋本案 profile（餵 gate）。
+    // 任何 throw ⇒ itinerary_reference_unavailable log，回覆照常（fail-open）；
+    // reference 留 null ⇒ system byte-identical、gate 走中性最小 constraints。
+    let reference: ItineraryReferenceResult | null = null
     if (this.itineraryReferenceSource && input.intent.action === 'draft') {
       try {
-        itineraryReference = await this.itineraryReferenceSource(input.text)
+        reference = await this.itineraryReferenceSource(input.text)
       } catch {
         log('itinerary_reference_unavailable', {})
       }
     }
-
-    // 本案 profile（Task 5）— OPTIONAL＋draft-only＋fail-open，鏡像 reference 源：
-    // 僅 draft intent 才諮詢；任何 throw ⇒ itinerary_case_profile_unavailable log，
-    // profile 留 null ⇒ gate 走中性最小 constraints（與現行 byte-identical）。
-    let caseProfile: ItineraryCaseProfile | null = null
-    if (this.caseProfileSource && input.intent.action === 'draft') {
-      try {
-        caseProfile = await this.caseProfileSource(input.text)
-      } catch {
-        log('itinerary_case_profile_unavailable', {})
-      }
+    // M-1：案例 vs 退範本來源訊號入 log（固定碼 case|template）— 調語料涵蓋率的
+    // 關鍵：看得出某筆 draft 用真案例或退手工範本。null（未命中諮詢）不發此 log。
+    if (reference) {
+      log('itinerary_reference', { referenceSource: reference.source })
     }
 
     // 外部佐證刀 — per-request 防衛性收窄：deps 開閘之外，本則訊息還要確實
@@ -211,7 +199,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     const runOnce = async (correctionNote?: string): Promise<PartnerGroupRespondResult> => {
       const baseSystem = buildPartnerGroupSystemPrompt(input, knowledge, {
         webSearchEnabled: allowWebSearch,
-        itineraryReference: itineraryReference ?? undefined,
+        itineraryReference: reference?.skeleton ?? undefined,
       })
       const system = correctionNote
         ? `${baseSystem}\n\n【格式修正要求】上一版排行程草稿未通過自動檢查（customer_itinerary_v1），請依下列問題重新輸出，務必補齊每個 Day N｜ 標題與可解析的日期/人數 header：\n${correctionNote}`
@@ -379,12 +367,12 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       // degraded（budget/transport/parse 已先回 stub）不進閘，原樣透出。
       if (result.meta?.responder !== 'llm') return result
 
-      let gate = gateCustomerItineraryDraft(result.text, caseProfile ?? undefined)
+      let gate = gateCustomerItineraryDraft(result.text, reference?.profile ?? undefined)
       if (!gate.ok) {
         const retry = await runOnce(gate.problems.join('；'))
         if (retry.meta?.responder === 'llm') {
           result = retry
-          gate = gateCustomerItineraryDraft(result.text, caseProfile ?? undefined)
+          gate = gateCustomerItineraryDraft(result.text, reference?.profile ?? undefined)
         }
         if (!gate.ok) {
           log('llm_call', { model, outcome: 'degraded', degradedReason: 'itinerary_gate_failed' })

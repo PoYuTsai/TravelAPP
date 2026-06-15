@@ -10,11 +10,33 @@ import { retrieveRagCases } from './rag-query'
 import { toItineraryReference } from './itinerary-reference'
 import { sanitizeItinerarySnippet } from './itinerary-reference-sanitizer'
 import { ITINERARY_TEMPLATE_SKELETON } from './itinerary-reference-template'
+import type { ItineraryCaseProfile } from './customer-itinerary-gate'
 
 export interface SelectedReference {
   source: 'case' | 'template'
   skeleton: string
 }
+
+/**
+ * 合併刀（開閘前必修 M-2）：排行程 draft 一個 turn 對 retrieval **只打一次**，
+ * 同時回骨架（skeleton）、來源訊號（source，M-1 調語料涵蓋率的關鍵）、本案 profile
+ * （per-case lint，profile 推不出 ⇒ null ⇒ gate 走中性）。取代 Task 4/5 落地時的兩條
+ * inline 簽名（itineraryReferenceSource: string|null ＋ caseProfileSource: profile|null）。
+ */
+export interface ItineraryReferenceResult {
+  skeleton: string
+  source: 'case' | 'template'
+  profile: ItineraryCaseProfile | null
+}
+
+/**
+ * 注入 responder 的單一排行程參考源（開閘前必修 item6 型別別名）。`need` = 當則 draft
+ * 請求文字（責任：responder 永遠傳 input.text）。未命中/低信心 ⇒ 由實作回 template
+ * 骨架（絕不回 null 致 LLM 從零亂編）；整體不可用才回 null（responder fail-open）。
+ */
+export type ItineraryReferenceSource = (
+  need: string
+) => Promise<ItineraryReferenceResult | null>
 
 /**
  * fallback 手工骨架（I-1/I-2）：inline TS 常數（無 readFileSync docs/** 的 lambda 風險），
