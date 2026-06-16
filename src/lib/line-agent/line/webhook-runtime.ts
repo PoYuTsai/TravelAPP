@@ -470,8 +470,15 @@ export function getStore(): CaseStore {
  */
 let _partnerGroupResponder: PartnerGroupResponder | null = null
 
-/** Override the partner-group responder (called by a bootstrap or in tests). */
-export function setPartnerGroupResponder(responder: PartnerGroupResponder): void {
+/**
+ * Override the partner-group responder (called by a bootstrap or in tests).
+ * Passing `null` resets the lazy singleton so the NEXT getPartnerGroupResponder()
+ * REBUILDS it from current env — lets a test drive the real composition root
+ * (e.g. assert the RAG-gate decision / single-shared-index wiring).
+ */
+export function setPartnerGroupResponder(
+  responder: PartnerGroupResponder | null
+): void {
   _partnerGroupResponder = responder
 }
 
@@ -510,68 +517,26 @@ function getSmartReplyAgentFactory(): SmartReplyAgentFactory {
  *
  * 入參全由 composition root 傳入（不在此重讀 env / 不重建 cost cap / 不建第二份
  * 索引）：getRagIndex 已由 caller 依 AI_AGENT_NOTION_RAG_ENABLED 判定（閘關 ⇒
- * undefined ⇒ agent 不掛 RAG tool）；webSearchEnabled 沿用 caller 已算的閘。
- *
- * 省略 deps（測試 / 獨立呼叫）時自我解析：讀 getPartnerResponderConfig、建一個
- * cost cap、依 env 算 RAG / web_search 閘 —— 用於直接斷言 wiring 契約。
+ * undefined ⇒ agent 不掛 RAG tool；閘開 ⇒ caller 注入與排行程參考源**共用同一份**
+ * sharedItineraryIndexLoader，絕不建第二份索引）；webSearchEnabled 沿用 caller
+ * 已算的閘。deps 必填 —— 不在此自我解析 env / 不重建 cost cap / 不 clone loader。
  */
-export function buildSmartReplyVisionResponder(deps?: {
+export function buildSmartReplyVisionResponder(deps: {
   apiKey: string
   defaultModel: string
   costCap: ReturnType<typeof createDailyCostCap>
   webSearchEnabled: boolean
   getRagIndex?: () => Promise<RagIndex>
 }): PartnerGroupResponder | undefined {
-  const resolved =
-    deps ??
-    (() => {
-      const models = getPartnerResponderConfig()
-      const costCap = createDailyCostCap({
-        env: process.env,
-        kv: createKvClientFromEnv(),
-      })
-      const webSearchGate = canUseExternalTool(
-        {
-          tool: 'web_search',
-          sourceChannel: 'line_partner_group',
-          botDirected: true,
-          userRequestedExternalData: false,
-          costSpentUsd: 0,
-        },
-        loadToolConfig(process.env)
-      )
-      let installed: (() => Promise<RagIndex>) | null = null
-      const loader = async (): Promise<RagIndex> => {
-        if (installed === null) {
-          const mod = await import('./install-default-itinerary-reference-index')
-          const built = mod.buildDefaultItineraryRagIndexLoader()
-          if (!built.loader) {
-            throw new Error(
-              `itinerary_rag_index_unavailable:${built.reason ?? 'unknown'}`
-            )
-          }
-          installed = built.loader
-        }
-        return installed()
-      }
-      return {
-        apiKey: models.anthropicApiKey,
-        defaultModel: models.defaultModel,
-        costCap,
-        webSearchEnabled: webSearchGate.allowed,
-        getRagIndex: isNotionRagEnabled(process.env) ? loader : undefined,
-      }
-    })()
-
-  if (!resolved.apiKey) return undefined
+  if (!deps.apiKey) return undefined
 
   const agent = getSmartReplyAgentFactory()({
     transport: fetch,
-    apiKey: resolved.apiKey,
-    defaultModel: resolved.defaultModel,
-    costCap: resolved.costCap,
-    getRagIndex: resolved.getRagIndex,
-    webSearchEnabled: resolved.webSearchEnabled,
+    apiKey: deps.apiKey,
+    defaultModel: deps.defaultModel,
+    costCap: deps.costCap,
+    getRagIndex: deps.getRagIndex,
+    webSearchEnabled: deps.webSearchEnabled,
   })
 
   return createVisionSmartReplyResponder({
@@ -579,8 +544,8 @@ export function buildSmartReplyVisionResponder(deps?: {
       fetchLineImageContent(messageId, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''),
     need: createAnthropicVisionNeedSource({
       transport: fetch,
-      apiKey: resolved.apiKey,
-      costCap: resolved.costCap,
+      apiKey: deps.apiKey,
+      costCap: deps.costCap,
       env: process.env,
     }),
     agent,

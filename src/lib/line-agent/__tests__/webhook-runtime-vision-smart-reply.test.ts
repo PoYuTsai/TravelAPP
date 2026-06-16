@@ -10,16 +10,45 @@
  *  1. gate-off byte-identical: all three gates off + no anthropic key ⇒ a NON-image
  *     tagged partner-group message still routes through the base stub responder and
  *     replies exactly once (no regression vs today).
- *  2. RAG gate wiring: the wiring passes `getRagIndex === undefined` into
- *     `createSmartReplyAgent` when AI_AGENT_NOTION_RAG_ENABLED is off, and a DEFINED
- *     loader when it is on. Asserted through a thin factory seam
- *     (`setSmartReplyAgentFactory`) that records the deps the composition root built.
+ *  2. RAG gate wiring (driven through the REAL composition root): we install a fake
+ *     smart-reply factory via `setSmartReplyAgentFactory` that CAPTURES the deps the
+ *     production singleton builds, reset the lazy singleton, then trigger a real
+ *     rebuild via `getPartnerGroupResponder()`:
+ *       - AI_AGENT_NOTION_RAG_ENABLED off ⇒ captured `getRagIndex === undefined`.
+ *       - AI_AGENT_NOTION_RAG_ENABLED on  ⇒ captured `getRagIndex` is a function.
+ *  3. M-2 "no second index": when RAG is on, the smart-reply agent's `getRagIndex`
+ *     is the SAME loader instance the itinerary reference source receives — proven
+ *     by reference-equality. We mock `itinerary-reference-wiring` to capture the
+ *     `getIndex` the composition root hands the itinerary source, and assert it ===
+ *     the captured smart-reply `getRagIndex` (one shared TTL-cached index loader,
+ *     never a second one).
  *
  * Zero real LINE / Notion / LLM / network. Fakes throughout. The smart-reply agent
  * itself is fully tested in Task 3.2; here we only PROVE the wiring contract.
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest'
+
+// Mock the itinerary-reference-wiring module so we can CAPTURE the `getIndex`
+// (the shared TTL loader) the composition root passes to the itinerary reference
+// source — needed for the M-2 reference-equality assertion. `isNotionRagEnabled`
+// is kept REAL via importActual so the production RAG gate still drives the build.
+const capturedItineraryGetIndex: Array<() => Promise<unknown>> = []
+vi.mock('../line/itinerary-reference-wiring', async (importActual) => {
+  const actual = await importActual<
+    typeof import('../line/itinerary-reference-wiring')
+  >()
+  return {
+    ...actual,
+    resolveItineraryReferenceSource: (deps: { getIndex: () => Promise<unknown> }) => {
+      capturedItineraryGetIndex.push(deps.getIndex)
+      return actual.resolveItineraryReferenceSource(
+        deps as Parameters<typeof actual.resolveItineraryReferenceSource>[0]
+      )
+    },
+  }
+})
+
 import {
   getEventHandler,
   getPartnerGroupResponder,
@@ -27,7 +56,6 @@ import {
   getReplyClient,
   setReplyClient,
   setSmartReplyAgentFactory,
-  buildSmartReplyVisionResponder,
   type ReplyClient,
 } from '../line/webhook-runtime'
 import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
@@ -43,6 +71,7 @@ afterEach(() => {
   setPartnerGroupResponder(pristineResponder)
   setReplyClient(pristineReplyClient)
   setSmartReplyAgentFactory(null) // reset to the real createSmartReplyAgent
+  capturedItineraryGetIndex.length = 0
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
@@ -78,6 +107,25 @@ function recordingReplyClient(returnIds: string[] = []): {
   return { client, calls }
 }
 
+/**
+ * Install a fake smart-reply factory that records the deps the PRODUCTION
+ * composition root builds, then force a real rebuild of the lazy singleton from
+ * current env. Returns the captured deps array (one entry per build that had a key).
+ */
+function buildProductionResponderAndCapture(): SmartReplyAgentDeps[] {
+  const captured: SmartReplyAgentDeps[] = []
+  setSmartReplyAgentFactory((deps) => {
+    captured.push(deps)
+    return async () => ({
+      text: 'fake-agent',
+      meta: { responder: 'llm', model: deps.defaultModel },
+    })
+  })
+  setPartnerGroupResponder(null) // reset lazy singleton → next get() rebuilds from env
+  getPartnerGroupResponder() // trigger the REAL composition root build
+  return captured
+}
+
 // ---------------------------------------------------------------------------
 // 1. gate-off byte-identical (non-image routing unchanged)
 // ---------------------------------------------------------------------------
@@ -99,51 +147,51 @@ describe('gate-off: non-image partner-group routing is unchanged', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. RAG gate wiring — getRagIndex undefined when off, defined when on
+// 2. RAG gate wiring — driven through the REAL production composition root
 // ---------------------------------------------------------------------------
 
-describe('RAG gate wiring into createSmartReplyAgent', () => {
-  function captureFactory() {
-    const captured: SmartReplyAgentDeps[] = []
-    setSmartReplyAgentFactory((deps) => {
-      captured.push(deps)
-      return async () => ({ text: 'fake-agent', meta: { responder: 'llm', model: deps.defaultModel } })
-    })
-    return captured
-  }
-
-  it('AI_AGENT_NOTION_RAG_ENABLED off → getRagIndex is undefined', () => {
+describe('RAG gate wiring into createSmartReplyAgent (production wiring)', () => {
+  it('AI_AGENT_NOTION_RAG_ENABLED off → production passes getRagIndex undefined', () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
     vi.stubEnv('AI_AGENT_DEFAULT_MODEL', 'claude-test')
     // RAG gate left off.
-    const captured = captureFactory()
+    const captured = buildProductionResponderAndCapture()
 
-    const responder = buildSmartReplyVisionResponder()
-
-    expect(responder).not.toBeUndefined()
     expect(captured).toHaveLength(1)
     expect(captured[0].getRagIndex).toBeUndefined()
   })
 
-  it('AI_AGENT_NOTION_RAG_ENABLED on → getRagIndex is a defined loader', () => {
+  it('AI_AGENT_NOTION_RAG_ENABLED on → production passes a defined loader', () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
     vi.stubEnv('AI_AGENT_DEFAULT_MODEL', 'claude-test')
     vi.stubEnv('AI_AGENT_NOTION_RAG_ENABLED', 'true')
-    const captured = captureFactory()
-
-    buildSmartReplyVisionResponder()
+    const captured = buildProductionResponderAndCapture()
 
     expect(captured).toHaveLength(1)
     expect(typeof captured[0].getRagIndex).toBe('function')
   })
 
-  it('no anthropic key → no smart-reply responder built (path absent)', () => {
-    // No ANTHROPIC_API_KEY → vision smart-reply path does not exist.
-    const captured = captureFactory()
+  // M-2: lock "no second index" — RAG on ⇒ the smart-reply agent's getRagIndex is
+  // the SAME loader instance the itinerary reference source receives. Reference-
+  // equality proves a single shared TTL-cached index loader, never two.
+  it('RAG on → smart-reply getRagIndex IS the same shared loader as the itinerary source (no second index)', () => {
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+    vi.stubEnv('AI_AGENT_DEFAULT_MODEL', 'claude-test')
+    vi.stubEnv('AI_AGENT_NOTION_RAG_ENABLED', 'true')
+    const captured = buildProductionResponderAndCapture()
 
-    const responder = buildSmartReplyVisionResponder()
+    // Itinerary source got exactly one getIndex from the composition root.
+    expect(capturedItineraryGetIndex).toHaveLength(1)
+    expect(captured).toHaveLength(1)
+    // Same loader instance handed to BOTH consumers ⇒ single shared index.
+    expect(captured[0].getRagIndex).toBe(capturedItineraryGetIndex[0])
+  })
 
-    expect(responder).toBeUndefined()
+  it('no anthropic key → no smart-reply factory call (path absent)', () => {
+    // No ANTHROPIC_API_KEY → vision smart-reply path does not exist, so the
+    // factory is never invoked even though the singleton is rebuilt.
+    const captured = buildProductionResponderAndCapture()
+
     expect(captured).toHaveLength(0)
   })
 })
