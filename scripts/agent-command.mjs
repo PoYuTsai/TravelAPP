@@ -176,10 +176,37 @@ export function parseAgentCommandArgs(args) {
     }
     return { commandText: 'partner-respond', query }
   }
+  if (command === 'partner-image-respond' || command === '/partner-image-respond') {
+    // 截圖智慧回覆刀 CLI 黑箱驗收（截圖智慧回覆 design Task 6.1）：讀本地圖→need→
+    // agentic RAG/web→兩段。離線測截圖品質再開真群閘。不貼群、不碰真 store。
+    const { imagePath } = parseImageRespondArgs(args)
+    return { commandText: 'partner-image-respond', imagePath }
+  }
 
   throw new Error(
-    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush、approve-parse、partner-respond'
+    '目前支援：inbox、/inbox、notion-rag-dry-run、notion-rag-search、notion-rag-answer、notion-rag-change-dry-run、refine-smoke、partner-rag-path-trace、case-intake、overdue-dry-run、case-done、distill-dry-run、distill-flush、approve-parse、partner-respond、partner-image-respond'
   )
+}
+
+/**
+ * `partner-image-respond` argv 解析（單一 positional 圖片路徑）。flag 紀律同
+ * partner-respond：絕不默默丟 flag。throws ⇒ main 印訊息＋exit 1。
+ */
+export function parseImageRespondArgs(args) {
+  const rest = args.slice(1)
+  const badFlag = rest.find((a) => a.startsWith('--'))
+  if (badFlag !== undefined) {
+    throw new Error(
+      `partner-image-respond · 用法：不支援 flag（收到 ${badFlag}）— 只接圖片路徑`
+    )
+  }
+  const imagePath = (rest[0] ?? '').trim()
+  if (imagePath === '') {
+    throw new Error(
+      'partner-image-respond · 失敗：請帶圖片路徑（npm run agent:partner-image-respond -- ./shot.jpg）'
+    )
+  }
+  return { imagePath }
 }
 
 export function readDotEnvValue(dotenvText, key) {
@@ -1827,8 +1854,199 @@ export async function runPartnerRespondCommand(options = {}) {
   ].join('\n')
 }
 
+// ---------------------------------------------------------------------------
+// partner-image-respond — 截圖智慧回覆刀 CLI 黑箱驗收入口（design Task 6.1）
+// ---------------------------------------------------------------------------
+// 讀本地圖片 → 抽 VisionNeedBrief → 跑 agentic 兩段回迴圈 → 印兩段回覆。供 Eric
+// 離線測截圖回覆品質，再翻真群 env 閘。鐵律同 partner-respond：**不貼群、不碰真
+// store** — KV 只接 cost cap（cost 紀律不因離線豁免）。反遺漏接線（plan Important）：
+// 本刀必同時接 getRagIndex（AI_AGENT_NOTION_RAG_ENABLED 閘）＋ webSearchEnabled
+// （web_search 閘），鏡像 webhook-runtime buildSmartReplyVisionResponder 的接線，
+// 絕不重演舊 partner-respond 漏接 source 的 class of bug。
+
+/** 副檔名 → Anthropic vision 支援的 media type（不支援即 throw 明確訊息）。 */
+const IMAGE_EXT_MEDIA_TYPE = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+}
+
+/** GUARD-loaded dynamic import（同 loadPartnerRespondKit 慣例）。 */
+export async function loadPartnerImageRespondKit(ctx = {}) {
+  const {
+    importConfigModule = () =>
+      import('../src/lib/line-agent/partner-group/responder-config.ts'),
+    importVisionNeedModule = () =>
+      import('../src/lib/line-agent/partner-group/vision-need-extraction.ts'),
+    importAgentModule = () =>
+      import('../src/lib/line-agent/partner-group/smart-reply-agent.ts'),
+    importItineraryIndexModule = () =>
+      import('../src/lib/line-agent/line/install-default-itinerary-reference-index.ts'),
+    importRagGateModule = () =>
+      import('../src/lib/line-agent/line/itinerary-reference-wiring.ts'),
+    importCostCapModule = () =>
+      import('../src/lib/line-agent/observability/daily-cost-cap.ts'),
+    importKvModule = () => import('../src/lib/line-agent/storage/kv-store.ts'),
+    importToolGateModule = () => import('../src/lib/line-agent/tools/tool-gate.ts'),
+    importToolConfigModule = () => import('../src/lib/line-agent/tools/tool-config.ts'),
+  } = ctx
+  try {
+    const configMod = await importConfigModule()
+    const visionNeedMod = await importVisionNeedModule()
+    const agentMod = await importAgentModule()
+    const itineraryIndexMod = await importItineraryIndexModule()
+    const ragGateMod = await importRagGateModule()
+    const costCapMod = await importCostCapModule()
+    const kvMod = await importKvModule()
+    const toolGateMod = await importToolGateModule()
+    const toolConfigMod = await importToolConfigModule()
+    const kit = {
+      getPartnerResponderConfig: configMod?.getPartnerResponderConfig ?? null,
+      createAnthropicVisionNeedSource: visionNeedMod?.createAnthropicVisionNeedSource ?? null,
+      createSmartReplyAgent: agentMod?.createSmartReplyAgent ?? null,
+      buildItineraryIndexLoader: itineraryIndexMod?.buildDefaultItineraryRagIndexLoader ?? null,
+      isNotionRagEnabled: ragGateMod?.isNotionRagEnabled ?? null,
+      createDailyCostCap: costCapMod?.createDailyCostCap ?? null,
+      createKvClientFromEnv: kvMod?.createKvClientFromEnv ?? null,
+      canUseExternalTool: toolGateMod?.canUseExternalTool ?? null,
+      loadToolConfig: toolConfigMod?.loadToolConfig ?? null,
+    }
+    if (Object.values(kit).some((v) => !v)) return null
+    return kit
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 截圖智慧回覆黑箱驗收：throws ⇒ main 印訊息＋exit 1（缺閘/缺 env/讀檔失敗）；
+ * return string ⇒ exit 0。`kit`/`kvClient` 注入供測試。前置閘同 partner-respond：
+ * mode!=anthropic / 缺 key / 缺 model / 缺 cap / 缺 KV 都明確 throw（黑箱要打真 API，
+ * 絕不默默 degrade stub）。
+ */
+export async function runPartnerImageRespondCommand(options = {}) {
+  const env = options.env ?? process.env
+  const kit = options.kit ?? (await loadPartnerImageRespondKit())
+  if (!kit) {
+    throw new Error('partner-image-respond · 失敗（模組未載入，請用 tsx 執行）')
+  }
+
+  // ① 前置閘（鏡像 partner-respond：缺哪個就明說，絕不默默 fallback / degrade stub）
+  const models = kit.getPartnerResponderConfig(env)
+  if (models.partnerResponderMode !== 'anthropic') {
+    throw new Error(
+      'partner-image-respond · 失敗：AI_AGENT_PARTNER_RESPONDER_MODE 不是 anthropic（黑箱要打真 API）'
+    )
+  }
+  if (!models.anthropicApiKey) {
+    throw new Error('partner-image-respond · 失敗：缺 ANTHROPIC_API_KEY')
+  }
+  if (!models.defaultModel || !models.researchModel) {
+    throw new Error(
+      'partner-image-respond · 失敗：缺 AI_AGENT_DEFAULT_MODEL / AI_AGENT_RESEARCH_MODEL'
+    )
+  }
+  if ((env.AI_AGENT_DAILY_COST_CAP_USD ?? '').trim() === '') {
+    throw new Error(
+      'partner-image-respond · 失敗：缺 AI_AGENT_DAILY_COST_CAP_USD（cost cap 未設會靜默 disabled）'
+    )
+  }
+
+  // ② costCap 必接 KV（KV 缺就 throw，cost 紀律不豁免）
+  const kvClient = options.kvClient ?? kit.createKvClientFromEnv(env)
+  if (!kvClient) {
+    throw new Error('partner-image-respond · 失敗：缺 AGENT_KV_URL / AGENT_KV_TOKEN（cost cap 要 KV）')
+  }
+  const costCap = kit.createDailyCostCap({ env, kv: kvClient })
+
+  // ③ 讀本地圖片 → base64 + 依副檔名推 mediaType → LineImageContent。讀檔失敗
+  //    包成明確訊息（絕不丟 raw stack）。
+  const ext = path.extname(options.imagePath ?? '').toLowerCase()
+  const mediaType = IMAGE_EXT_MEDIA_TYPE[ext]
+  if (!mediaType) {
+    throw new Error(
+      `partner-image-respond · 失敗：不支援的圖片副檔名「${ext || '(無)'}」（支援 .jpg/.jpeg/.png/.gif/.webp）`
+    )
+  }
+  let base64
+  try {
+    base64 = fs.readFileSync(options.imagePath).toString('base64')
+  } catch {
+    throw new Error(`partner-image-respond · 失敗：讀不到圖片（${options.imagePath}）`)
+  }
+  const image = { base64, mediaType }
+
+  // ④ 反遺漏接線 — RAG 閘 ＋ web_search 閘，鏡像 webhook-runtime 的單一事實來源。
+  //    RAG 閘關 ⇒ getRagIndex=undefined（agent 不掛 search_chiangmai_cases、絕不建索引）；
+  //    閘開 ⇒ 注入 TTL 快取 loader（與排行程參考源同一份機制）。
+  const ragEnabled = kit.isNotionRagEnabled(env)
+  let getRagIndex
+  if (ragEnabled) {
+    const built = kit.buildItineraryIndexLoader({ env })
+    const loader = typeof built === 'function' ? built : built?.loader
+    if (!loader) {
+      throw new Error(
+        `partner-image-respond · 失敗：RAG 閘開但索引未建（${built?.reason ?? 'unknown'}）`
+      )
+    }
+    getRagIndex = loader
+  }
+
+  // web_search 閘 — 與 webhook 同一個 composition-root 判法（tool-gate 單一事實來源）。
+  const webSearchGate = kit.canUseExternalTool(
+    {
+      tool: 'web_search',
+      sourceChannel: 'line_partner_group',
+      botDirected: true,
+      userRequestedExternalData: false,
+      costSpentUsd: 0,
+    },
+    kit.loadToolConfig(env)
+  )
+
+  // ⑤ 建 need source ＋ agent（兩者共用同一 daily cost cap，鏡像 webhook-runtime）。
+  const need = kit.createAnthropicVisionNeedSource({
+    transport: options.transport ?? fetch,
+    apiKey: models.anthropicApiKey,
+    costCap,
+    env,
+  })
+  const agent = kit.createSmartReplyAgent({
+    transport: options.transport ?? fetch,
+    apiKey: models.anthropicApiKey,
+    defaultModel: models.defaultModel,
+    costCap,
+    getRagIndex,
+    webSearchEnabled: webSearchGate.allowed,
+  })
+
+  // ⑥ 圖→need→agent。最小 PartnerGroupRespondInput：botDirected true（允許 web
+  //    search）、sourceChannel 非 line_oa（夥伴群面，agent per-request 收窄才放行）。
+  const brief = await need(image)
+  const input = {
+    event: { kind: 'image', sourceChannel: 'line_partner_group', mentionsBot: true },
+    intent: { action: 'respond', confidence: 'high', source: 'deterministic' },
+    text: '',
+    botDirected: true,
+  }
+  const result = await agent(brief, input)
+
+  return [
+    'partner-image-respond（黑箱驗收 — 不碰真 store、不貼群）',
+    `圖片：${options.imagePath}（${mediaType}）`,
+    `語義 need：${brief.summary}`,
+    `RAG：${getRagIndex ? '開（search_chiangmai_cases 已掛）' : '關（AI_AGENT_NOTION_RAG_ENABLED 未開）'}`,
+    `搜證：${webSearchGate.allowed ? '開（web_search 已掛，max 3 次/題）' : '關（AI_AGENT_WEB_SEARCH_ENABLED 未開或 AI_AGENT_TOOL_COST_CAP_USD 未設）'}`,
+    `meta：${JSON.stringify(result.meta)}`,
+    '--- 兩段回覆 ---',
+    result.text,
+  ].join('\n')
+}
+
 export async function runAgentCommand(args, options = {}) {
-  const { commandText, query, write, quoted, fixture } = parseAgentCommandArgs(args)
+  const { commandText, query, write, quoted, fixture, imagePath } = parseAgentCommandArgs(args)
   if (commandText === 'refine-smoke') {
     return runRefineSmokeCommand({ env: options.env ?? process.env })
   }
@@ -1867,6 +2085,9 @@ export async function runAgentCommand(args, options = {}) {
   }
   if (commandText === 'partner-respond') {
     return runPartnerRespondCommand({ env: options.env ?? process.env, query })
+  }
+  if (commandText === 'partner-image-respond') {
+    return runPartnerImageRespondCommand({ env: options.env ?? process.env, imagePath })
   }
   const envText = options.envText ?? readEnvFile(options.cwd ?? process.cwd())
   const secret =

@@ -30,6 +30,7 @@
     "agent:distill-flush": "tsx --env-file=.env.local scripts/agent-command.mjs distill-flush",
     "agent:approve-parse": "tsx --env-file=.env.local scripts/agent-command.mjs approve-parse",
     "agent:partner-respond": "tsx --env-file=.env.local scripts/agent-command.mjs partner-respond",
+    "agent:partner-image-respond": "tsx --env-file=.env.local scripts/agent-command.mjs partner-image-respond",
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
