@@ -79,7 +79,12 @@ webhook image + tag
 
 ## 9. Open items / 技術債
 
-- vision 抽 need 的 schema 細節（欄位、缺漏判定）→ writing-plans 時定。
-- 「對外段」如何確保零贅述（system prompt 規範 or 後處理）→ 待定。
-- web search 來源品質/競品過濾規則 → 待定。
-- 開放問題太發散時的 fallback（連 web 都答不好）→ 待定。
+- ✅ vision 抽 need 的 schema 細節（欄位、缺漏判定）→ **定案**：`VisionNeedBrief { isConversation, summary, knownFacts[], gaps[] }`，fail-closed parse（壞 JSON ⇒ 原文當 summary）。見 `vision-need-extraction.ts`。
+- ✅ 「對外段」如何確保零贅述（system prompt 規範 or 後處理）→ **定案**：以 system prompt 規範為主（`SMART_REPLY_SYSTEM_PROMPT`），後處理 `ensureTwoSegments` 只驗格式存在、不重寫內容。
+- web search 來源品質/競品過濾規則 → 待定（沿用 Anthropic web_search server tool 預設，尚未加競品過濾）。
+- 開放問題太發散時的 fallback（連 web 都答不好）→ 待定（目前靠 system prompt「不腦補」+ 兩段「待確認」標註）。
+- vision triage dead-end responder（`createVisionIntakeResponder`）已於實作 Phase 7 移除；轉錄層 adapter（`createAnthropicVisionIntakeSource`）保留供 need 抽取與 transcript OCR 複用。
+
+## 10. 實作狀態（2026-06-16）
+
+**程式完工，待 Eric 開閘真群驗收。** 對應實作計畫 `2026-06-16-line-agent-image-smart-reply-implementation-plan.md`，Phase 1–7 全數完成（subagent-driven + 兩段 review）：圖 → 語義抽 need → agentic tool_use 迴圈（RAG client tool + web server tool，雙 cost-cap fail-closed）→ 兩段輸出 → composition root 接線（受三閘控，gate-off byte-identical）→ CLI 黑箱入口 `agent:partner-image-respond`。全套測試綠、lint 乾淨、型別零新錯。開閘步驟（flip `AI_AGENT_OCR/WEB_SEARCH/NOTION_RAG_ENABLED` + 兩個 cost cap）需 Eric 親自操作 `.env.local`。
