@@ -8,15 +8,30 @@
  * 以 store 判定）；關鍵詞除役 — 純文字「讀取這張圖」不再進 vision 路徑。
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createPartnerGroupResponderWithRagDraft } from '../partner-group/responder-factory'
 import {
   stubPartnerGroupResponder,
   STUB_PARTNER_GROUP_REPLY,
 } from '../partner-group/responder'
-import { createVisionIntakeResponder } from '../partner-group/vision-intake-surfacing'
+import type { PartnerGroupResponder } from '../partner-group/responder'
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { CommandIntent } from '../commands/intent'
+
+/**
+ * Task 7.1（2026-06-16）：舊 createVisionIntakeResponder 已移除。本檔測的是
+ * dispatcher 的「引用圖＋tag → 走 visionIntake slot」路由（與被注入哪種
+ * responder 無關），故以最小假 responder 注入 visionIntake slot，鎖住路由
+ * 命中時走的是注入的那顆 responder（meta.responder + 文字皆由它決定）。
+ */
+const fakeVisionResponder: PartnerGroupResponder = {
+  async respond() {
+    return {
+      text: '【截圖內容整理】\n客人：12/20 出發 2大2小',
+      meta: { responder: 'vision_intake' },
+    }
+  },
+}
 
 const INTENT: CommandIntent = { action: 'analyze', confidence: 'high', source: 'deterministic' }
 
@@ -43,15 +58,11 @@ function makeQuotedImageEvent(
 }
 
 function makeDispatcher(env: Record<string, string | undefined>) {
-  const visionIntake = createVisionIntakeResponder({
-    fetchImage: vi.fn(async () => ({ base64: 'aGk=', mediaType: 'image/jpeg' as const })),
-    vision: vi.fn(async () => '客人：12/20 出發 2大2小'),
-  })
   return createPartnerGroupResponderWithRagDraft({
     base: stubPartnerGroupResponder,
     answerSource: async () => ({ text: 'RAG 草稿內容' }),
     env,
-    visionIntake,
+    visionIntake: fakeVisionResponder,
   })
 }
 
