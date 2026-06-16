@@ -6,6 +6,11 @@
  * model 回的不是合法 JSON ⇒ 把原文當 summary（永不丟掉抽取、永不 throw）。
  */
 
+import type { LineImageContent } from '../line/content-client'
+import type { DailyCostCap } from '../observability/daily-cost-cap'
+import type { AgentLogger } from '../observability/structured-log'
+import { createAnthropicVisionIntakeSource } from './vision-intake-adapter'
+
 export interface VisionNeedBrief {
   /** false ⇒ 非對話截圖（風景/地圖）⇒ 上游回固定誠實句、不進 agentic 迴圈。 */
   isConversation: boolean
@@ -37,4 +42,47 @@ export function parseVisionNeedBrief(raw: string): VisionNeedBrief {
   } catch {
     return { isConversation: true, summary: text, knownFacts: [], gaps: [] }
   }
+}
+
+/** 語義抽取 max_tokens：JSON brief 比純轉錄短。 */
+const NEED_EXTRACTION_MAX_TOKENS = 700
+
+export const VISION_NEED_SYSTEM_INSTRUCTION = [
+  '你是清邁包車旅行社的內部助手。輸入是一張 LINE 對話截圖（客人與夥伴的對話）。',
+  '任務：讀懂「客人方」表達的需求或問題，輸出一個 JSON 物件，供後續助手查資料與回覆。',
+  '只輸出 JSON，不要任何前綴、後綴、markdown fence 或說明。JSON 欄位：',
+  '- isConversation (boolean)：是否為客人對話截圖。若是風景照/地圖/非對話 ⇒ false，其餘欄位給空。',
+  '- summary (string)：用繁體中文一句話講清楚客人想要什麼或在問什麼（可以是開放問題，不限排行程）。',
+  '- knownFacts (string[])：截圖中**實際出現**的關鍵事實（日期、天數、人數、小孩年齡、偏好、預算…），照原文寫。',
+  '- gaps (string[])：排行程或報價常需要、但這張圖**沒有提到**的資訊（航班、住宿區域、上車點…）。圖裡已寫的不要列。',
+  '硬規則：只根據截圖內容；不得腦補、不要猜沒寫出來的資訊；不得提價格或做任何承諾。',
+].join('\n')
+
+const NEED_EXTRACTION_USER_TEXT = '請讀懂這張截圖並輸出 need JSON。'
+
+export interface VisionNeedSourceDeps {
+  transport: typeof fetch
+  apiKey: string
+  costCap: DailyCostCap
+  model?: string
+  env?: Record<string, string | undefined>
+  log?: AgentLogger
+}
+
+export type VisionNeedSource = (image: LineImageContent) => Promise<VisionNeedBrief>
+
+/** 複用 vision-intake-adapter 的 transport/cost-cap 機制，只換 prompt + parse。 */
+export function createAnthropicVisionNeedSource(deps: VisionNeedSourceDeps): VisionNeedSource {
+  const raw = createAnthropicVisionIntakeSource({
+    transport: deps.transport,
+    apiKey: deps.apiKey,
+    costCap: deps.costCap,
+    model: deps.model,
+    env: deps.env,
+    log: deps.log,
+    systemInstruction: VISION_NEED_SYSTEM_INSTRUCTION,
+    userText: NEED_EXTRACTION_USER_TEXT,
+    maxTokens: NEED_EXTRACTION_MAX_TOKENS,
+  })
+  return async (image) => parseVisionNeedBrief(await raw(image))
 }

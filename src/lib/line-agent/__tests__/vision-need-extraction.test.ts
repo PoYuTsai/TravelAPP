@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { parseVisionNeedBrief } from '../partner-group/vision-need-extraction'
+import {
+  VISION_NEED_SYSTEM_INSTRUCTION,
+  createAnthropicVisionNeedSource,
+} from '../partner-group/vision-need-extraction'
+import type { LineImageContent } from '../line/content-client'
+import type { DailyCostCap } from '../observability/daily-cost-cap'
+
+const okCap: DailyCostCap = {
+  checkBudget: async () => ({ outcome: 'ok', dailySpendMicroUsd: 0 }),
+  recordSpend: async () => ({ recorded: true }),
+} as unknown as DailyCostCap
 
 describe('parseVisionNeedBrief', () => {
   it('parses well-formed JSON into a brief', () => {
@@ -40,5 +51,45 @@ describe('parseVisionNeedBrief', () => {
   it('strips ```json fences before parsing (model drift)', () => {
     const brief = parseVisionNeedBrief('```json\n{"isConversation":true,"summary":"想去清邁","knownFacts":[],"gaps":[]}\n```')
     expect(brief.summary).toBe('想去清邁')
+  })
+})
+
+describe('VISION_NEED_SYSTEM_INSTRUCTION (tripwire)', () => {
+  it('要求 JSON 結構並列出四個欄位', () => {
+    for (const f of ['isConversation', 'summary', 'knownFacts', 'gaps'])
+      expect(VISION_NEED_SYSTEM_INSTRUCTION).toContain(f)
+  })
+  it('保留誠實邊界：不腦補、不提價格', () => {
+    expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/不得腦補|不要猜/)
+    expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/價格|報價/)
+  })
+})
+
+describe('createAnthropicVisionNeedSource', () => {
+  it('把 vision 回的 JSON parse 成 brief', async () => {
+    const fakeTransport = (async () =>
+      new Response(
+        JSON.stringify({
+          content: [{ text: JSON.stringify({ isConversation: true, summary: '想去清邁玩水', knownFacts: ['7/1-7/5'], gaps: ['航班'] }) }],
+          usage: { input_tokens: 1500, output_tokens: 80 },
+        }),
+        { status: 200 }
+      )) as unknown as typeof fetch
+    const source = createAnthropicVisionNeedSource({ transport: fakeTransport, apiKey: 'k', costCap: okCap })
+    const brief = await source({ base64: 'AAAA', mediaType: 'image/jpeg' } as LineImageContent)
+    expect(brief.summary).toContain('玩水')
+    expect(brief.gaps).toEqual(['航班'])
+  })
+
+  it('vision 回非 JSON 也 fail-closed（原文當 summary）', async () => {
+    const fakeTransport = (async () =>
+      new Response(
+        JSON.stringify({ content: [{ text: '客人想問清邁天氣' }], usage: { input_tokens: 1500, output_tokens: 20 } }),
+        { status: 200 }
+      )) as unknown as typeof fetch
+    const source = createAnthropicVisionNeedSource({ transport: fakeTransport, apiKey: 'k', costCap: okCap })
+    const brief = await source({ base64: 'AAAA', mediaType: 'image/jpeg' } as LineImageContent)
+    expect(brief.summary).toBe('客人想問清邁天氣')
+    expect(brief.isConversation).toBe(true)
   })
 })
