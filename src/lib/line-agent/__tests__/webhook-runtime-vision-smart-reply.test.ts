@@ -49,6 +49,29 @@ vi.mock('../line/itinerary-reference-wiring', async (importActual) => {
   }
 })
 
+// Mock the vision smart-reply responder factory so the `visionIntake` slot the
+// production composition root builds (`buildSmartReplyVisionResponder` →
+// `createVisionSmartReplyResponder`) is a SPY responder. This lets us assert,
+// through the REAL webhook dispatch path, that a gate-ON quoted-image event
+// actually REACHES `visionIntake.respond` — i.e. the routing wiring holds. The
+// spy short-circuits the real fetchImage/need/agent so the test needs ZERO
+// network. The rest of the module stays real via importActual.
+const visionRespondSpy = vi.fn(
+  async (): Promise<{ text: string; meta: { responder: string } }> => ({
+    text: '【截圖內容整理】spy-vision-reply',
+    meta: { responder: 'vision_intake' },
+  })
+)
+vi.mock('../partner-group/vision-smart-reply-surfacing', async (importActual) => {
+  const actual = await importActual<
+    typeof import('../partner-group/vision-smart-reply-surfacing')
+  >()
+  return {
+    ...actual,
+    createVisionSmartReplyResponder: () => ({ respond: visionRespondSpy }),
+  }
+})
+
 import {
   getEventHandler,
   getPartnerGroupResponder,
@@ -72,6 +95,7 @@ afterEach(() => {
   setReplyClient(pristineReplyClient)
   setSmartReplyAgentFactory(null) // reset to the real createSmartReplyAgent
   capturedItineraryGetIndex.length = 0
+  visionRespondSpy.mockClear()
   vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
@@ -193,5 +217,93 @@ describe('RAG gate wiring into createSmartReplyAgent (production wiring)', () =>
     const captured = buildProductionResponderAndCapture()
 
     expect(captured).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 4. OCR gate ON happy-path — quoted-image partner event REACHES visionIntake
+//    (driven through the REAL webhook dispatch entry, not a unit dispatcher).
+//
+//    This is the last coverage gap before a live-group flip: every segment is
+//    unit-tested (shouldUseVisionIntake, the dispatcher slot, the composition
+//    root wiring) but NOTHING proved that a real inbound quoted-image event
+//    actually traverses webhook → routeCommand → dispatcher → visionIntake.
+//    Here we drive `getEventHandler()` (the real entry) with the OCR gate ON and
+//    a quoted-image partner-group event, and assert the production-built
+//    `visionIntake.respond` (a spy, via the vision-smart-reply-surfacing mock)
+//    IS invoked. A negative (gate OFF) case proves the assertion is meaningful
+//    and that the wiring — not some always-on side effect — is what fires it.
+// ---------------------------------------------------------------------------
+
+/** Gate-ON env: OCR enabled + positive cost cap + anthropic key so the vision
+ *  responder is built at all (no key ⇒ undefined ⇒ path absent). */
+const OCR_GATE_ON_ENV = {
+  AI_AGENT_OCR_ENABLED: 'true',
+  AI_AGENT_TOOL_COST_CAP_USD: '1',
+  ANTHROPIC_API_KEY: 'sk-test',
+  AI_AGENT_DEFAULT_MODEL: 'claude-test',
+} as const
+
+function stubGateOnEnv(): void {
+  for (const [k, v] of Object.entries(OCR_GATE_ON_ENV)) vi.stubEnv(k, v)
+}
+
+/** A bot-directed quoted-IMAGE partner-group event (the vision trigger). */
+function quotedImagePartnerEvent(
+  o: Partial<NormalizedLineEvent> = {}
+): NormalizedLineEvent {
+  return partnerEvent({
+    kind: 'group_quoted',
+    messageId: 'M_quote',
+    text: '@bot',
+    mentionsBot: true,
+    quotedRef: { quotedMessageId: 'M_img' },
+    ...o,
+  })
+}
+
+describe('OCR gate ON: real webhook dispatch reaches visionIntake (live-flip safety net)', () => {
+  it('quoted-image + tagged partner event → production visionIntake.respond IS invoked', async () => {
+    stubGateOnEnv()
+    const { client, calls } = recordingReplyClient(['M_new'])
+    setReplyClient(client)
+    // Force a fresh build of the lazy singleton from the gate-ON env so the
+    // REAL composition root wires the (spied) visionIntake into the dispatcher.
+    setPartnerGroupResponder(null)
+
+    const store = new MemoryStore()
+    // The webhook only treats the quote as an image if the quoted messageId was
+    // recorded as a partner-group image (resolveQuotedImage → store lookup).
+    await store.putPartnerGroupImageMsg('M_img')
+
+    await getEventHandler()(quotedImagePartnerEvent(), store)
+
+    // Dispatch reached the smart-reply path.
+    expect(visionRespondSpy).toHaveBeenCalledTimes(1)
+    // …and its reply was the one actually sent to the partner group.
+    expect(calls).toHaveLength(1)
+    expect((calls[0].messages[0] as { text: string }).text).toContain(
+      '【截圖內容整理】'
+    )
+  })
+
+  it('gate OFF (OCR disabled) → same quoted-image event does NOT reach visionIntake', async () => {
+    // RED-anchor: only the OCR gate is flipped off. The key still builds the
+    // vision responder, the event is still a quoted image — so if dispatch
+    // reached visionIntake regardless of the gate, the spy WOULD fire. It must
+    // not. This is what makes the positive assertion above meaningful.
+    vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
+    vi.stubEnv('AI_AGENT_DEFAULT_MODEL', 'claude-test')
+    // AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD intentionally left off.
+    const { client } = recordingReplyClient(['M_new'])
+    setReplyClient(client)
+    setPartnerGroupResponder(null)
+
+    const store = new MemoryStore()
+    await store.putPartnerGroupImageMsg('M_img')
+
+    await getEventHandler()(quotedImagePartnerEvent(), store)
+
+    expect(visionRespondSpy).not.toHaveBeenCalled()
   })
 })
