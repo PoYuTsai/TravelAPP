@@ -191,6 +191,40 @@ describe('createSmartReplyAgent — 場景 2：RAG client tool 一輪後 end_tur
     expect(result.text).toContain(INTERNAL_HEADER)
   })
 
+  it('getRagIndex reject（getIndex throw）⇒ runRagCaseTool fail-soft、迴圈不中斷、最終兩段', async () => {
+    // never-throw 回歸：getRagIndex 直接 reject，runRagCaseTool 的 getIndex-throw 分支
+    // 必須吞成 fail-soft tool_result（案例庫暫時無法存取…），迴圈繼續、agent 不 throw。
+    const { transport, calls } = sequenceTransport([TOOL_USE_BODY, END_TURN_BODY])
+    const agent = createSmartReplyAgent({
+      ...DEPS,
+      transport,
+      getRagIndex: async () => {
+        throw new Error('notion down')
+      },
+    })
+
+    // (a) 不 throw：resolves。
+    const result = await agent(BRIEF, makeInput())
+
+    // (b) 第 2 次 POST 確實發出（迴圈沒被中斷）。
+    expect(calls).toHaveLength(2)
+
+    // (c) 第 2 次 POST messages 尾端帶失敗那筆 tool_call 的 tool_result，content 含 fail-soft note。
+    const secondMessages = calls[1].body.messages
+    const lastUser = secondMessages[secondMessages.length - 1]
+    expect(lastUser.role).toBe('user')
+    const toolResultBlock = lastUser.content.find((b: any) => b.type === 'tool_result')
+    expect(toolResultBlock).toBeDefined()
+    expect(toolResultBlock.tool_use_id).toBe('toolu_abc123')
+    expect(toolResultBlock.content).toContain('案例庫暫時無法存取')
+
+    // (d) 最終結果為「非降級」兩段回覆。
+    expect(result.meta?.responder).toBe('llm')
+    expect(result.meta?.degraded).toBeUndefined()
+    expect(result.text).toContain(OUTBOUND_HEADER)
+    expect(result.text).toContain(INTERNAL_HEADER)
+  })
+
   it('getRagIndex 注入 ⇒ 第 1 次 POST tools 含 search_chiangmai_cases', async () => {
     const { transport, calls } = sequenceTransport([END_TURN_BODY])
     const agent = createSmartReplyAgent({
