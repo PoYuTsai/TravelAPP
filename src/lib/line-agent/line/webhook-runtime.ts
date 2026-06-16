@@ -32,7 +32,10 @@ import {
   type NotionRagAnswerSourceDeps,
 } from '@/lib/line-agent/partner-group/notion-rag-answer-source'
 import { getPartnerResponderConfig } from '@/lib/line-agent/partner-group/responder-config'
-import { resolveItineraryReferenceSource } from '@/lib/line-agent/line/itinerary-reference-wiring'
+import {
+  resolveItineraryReferenceSource,
+  isNotionRagEnabled,
+} from '@/lib/line-agent/line/itinerary-reference-wiring'
 import type { RagIndex } from '@/lib/line-agent/notion/rag-index'
 import { canUseExternalTool } from '@/lib/line-agent/tools/tool-gate'
 import { loadToolConfig } from '@/lib/line-agent/tools/tool-config'
@@ -44,7 +47,15 @@ import { createDailyCostCap } from '@/lib/line-agent/observability/daily-cost-ca
 import { createKvClientFromEnv } from '@/lib/line-agent/storage/kv-store'
 import { createCaseIntakeResponder } from '@/lib/line-agent/partner-group/case-intake-surfacing'
 import { createAnthropicCaseIntakeSources } from '@/lib/line-agent/partner-group/case-intake-llm-adapter'
-import { createVisionIntakeResponder } from '@/lib/line-agent/partner-group/vision-intake-surfacing'
+// 截圖智慧回覆路（Task 5.1）— 取代舊「圖→純轉錄→triageCaseIntake 死路」的
+// createVisionIntakeResponder。新路：圖→語義抽 need→agentic smart-reply 兩段回。
+import { createVisionSmartReplyResponder } from '@/lib/line-agent/partner-group/vision-smart-reply-surfacing'
+import { createAnthropicVisionNeedSource } from '@/lib/line-agent/partner-group/vision-need-extraction'
+import {
+  createSmartReplyAgent,
+  type SmartReplyAgentDeps,
+} from '@/lib/line-agent/partner-group/smart-reply-agent'
+// vision-intake-adapter 仍由 transcript OCR seam（getTranscriptOcr）使用。
 import { createAnthropicVisionIntakeSource } from '@/lib/line-agent/partner-group/vision-intake-adapter'
 import { fetchLineImageContent } from '@/lib/line-agent/line/content-client'
 import {
@@ -464,6 +475,118 @@ export function setPartnerGroupResponder(responder: PartnerGroupResponder): void
   _partnerGroupResponder = responder
 }
 
+// ---------------------------------------------------------------------------
+// 截圖智慧回覆路 wiring（Task 5.1）— factory seam + composition helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Smart-reply agent factory seam（測試注入 fake 以驗 wiring 契約；null ⇒ 用真
+ * createSmartReplyAgent）. composition root 透過此 seam 建 agent，故測試能斷言
+ * 「RAG 閘關 ⇒ getRagIndex===undefined / 閘開 ⇒ 注入 loader」這條接線契約，而
+ * 無需真 key / 真索引 / 真網路。
+ */
+type SmartReplyAgentFactory = (
+  deps: SmartReplyAgentDeps
+) => ReturnType<typeof createSmartReplyAgent>
+
+let _smartReplyAgentFactory: SmartReplyAgentFactory | null = null
+
+/** Override（測試注入 fake；null ⇒ 重置回真 createSmartReplyAgent）。 */
+export function setSmartReplyAgentFactory(
+  factory: SmartReplyAgentFactory | null
+): void {
+  _smartReplyAgentFactory = factory
+}
+
+function getSmartReplyAgentFactory(): SmartReplyAgentFactory {
+  return _smartReplyAgentFactory ?? createSmartReplyAgent
+}
+
+/**
+ * Composition helper（Task 5.1）— 由閘控的「圖→need→agentic 兩段回」responder。
+ *
+ * 有 anthropicApiKey 才組；無 key ⇒ undefined ⇒ 整條讀圖路徑不存在（與舊
+ * createVisionIntakeResponder 的「無 key 路徑不存在」契約一致）。
+ *
+ * 入參全由 composition root 傳入（不在此重讀 env / 不重建 cost cap / 不建第二份
+ * 索引）：getRagIndex 已由 caller 依 AI_AGENT_NOTION_RAG_ENABLED 判定（閘關 ⇒
+ * undefined ⇒ agent 不掛 RAG tool）；webSearchEnabled 沿用 caller 已算的閘。
+ *
+ * 省略 deps（測試 / 獨立呼叫）時自我解析：讀 getPartnerResponderConfig、建一個
+ * cost cap、依 env 算 RAG / web_search 閘 —— 用於直接斷言 wiring 契約。
+ */
+export function buildSmartReplyVisionResponder(deps?: {
+  apiKey: string
+  defaultModel: string
+  costCap: ReturnType<typeof createDailyCostCap>
+  webSearchEnabled: boolean
+  getRagIndex?: () => Promise<RagIndex>
+}): PartnerGroupResponder | undefined {
+  const resolved =
+    deps ??
+    (() => {
+      const models = getPartnerResponderConfig()
+      const costCap = createDailyCostCap({
+        env: process.env,
+        kv: createKvClientFromEnv(),
+      })
+      const webSearchGate = canUseExternalTool(
+        {
+          tool: 'web_search',
+          sourceChannel: 'line_partner_group',
+          botDirected: true,
+          userRequestedExternalData: false,
+          costSpentUsd: 0,
+        },
+        loadToolConfig(process.env)
+      )
+      let installed: (() => Promise<RagIndex>) | null = null
+      const loader = async (): Promise<RagIndex> => {
+        if (installed === null) {
+          const mod = await import('./install-default-itinerary-reference-index')
+          const built = mod.buildDefaultItineraryRagIndexLoader()
+          if (!built.loader) {
+            throw new Error(
+              `itinerary_rag_index_unavailable:${built.reason ?? 'unknown'}`
+            )
+          }
+          installed = built.loader
+        }
+        return installed()
+      }
+      return {
+        apiKey: models.anthropicApiKey,
+        defaultModel: models.defaultModel,
+        costCap,
+        webSearchEnabled: webSearchGate.allowed,
+        getRagIndex: isNotionRagEnabled(process.env) ? loader : undefined,
+      }
+    })()
+
+  if (!resolved.apiKey) return undefined
+
+  const agent = getSmartReplyAgentFactory()({
+    transport: fetch,
+    apiKey: resolved.apiKey,
+    defaultModel: resolved.defaultModel,
+    costCap: resolved.costCap,
+    getRagIndex: resolved.getRagIndex,
+    webSearchEnabled: resolved.webSearchEnabled,
+  })
+
+  return createVisionSmartReplyResponder({
+    fetchImage: (messageId) =>
+      fetchLineImageContent(messageId, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''),
+    need: createAnthropicVisionNeedSource({
+      transport: fetch,
+      apiKey: resolved.apiKey,
+      costCap: resolved.costCap,
+      env: process.env,
+    }),
+    agent,
+  })
+}
+
 /**
  * Read the current partner-group responder (called per request by the handler).
  *
@@ -524,20 +647,29 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
     // 由 responder 的 fail-open 接住（itinerary_reference_unavailable log），絕不臆造骨架。
     // singleton scope：installed loader 掛在 responder singleton 上，TTL 快取跨請求生效。
     let installedItineraryIndexLoader: (() => Promise<RagIndex>) | null = null
+    // 共用的 TTL 快取索引載入器（lazy thunk）— 排行程參考源「與」截圖智慧回覆
+    // 的 RAG client tool 共用同一份索引：絕不建第二份索引、絕不重複 dynamic
+    // import installer。installer fail-closed（缺 token/SDK 失敗）⇒ throw 固定碼，
+    // 由各 responder 的 fail-open 接住，絕不臆造骨架。installed loader 掛在
+    // responder singleton 上，TTL 快取跨請求生效。
+    const sharedItineraryIndexLoader = async (): Promise<RagIndex> => {
+      if (installedItineraryIndexLoader === null) {
+        const mod = await import('./install-default-itinerary-reference-index')
+        const built = mod.buildDefaultItineraryRagIndexLoader()
+        if (!built.loader) {
+          // Fail-closed：固定碼，never a token / db id / url（installer 已吞 raw error）。
+          throw new Error(`itinerary_rag_index_unavailable:${built.reason ?? 'unknown'}`)
+        }
+        installedItineraryIndexLoader = built.loader
+      }
+      return installedItineraryIndexLoader()
+    }
+    // 單一事實來源：RAG 閘（恰為 "true" 才開）同時控排行程參考源「與」截圖
+    // 智慧回覆的 RAG client tool —— 兩者共用 sharedItineraryIndexLoader。
+    const ragEnabled = isNotionRagEnabled(process.env)
     const itineraryReferenceSource = resolveItineraryReferenceSource({
       env: process.env,
-      getIndex: async () => {
-        if (installedItineraryIndexLoader === null) {
-          const mod = await import('./install-default-itinerary-reference-index')
-          const built = mod.buildDefaultItineraryRagIndexLoader()
-          if (!built.loader) {
-            // Fail-closed：固定碼，never a token / db id / url（installer 已吞 raw error）。
-            throw new Error(`itinerary_rag_index_unavailable:${built.reason ?? 'unknown'}`)
-          }
-          installedItineraryIndexLoader = built.loader
-        }
-        return installedItineraryIndexLoader()
-      },
+      getIndex: sharedItineraryIndexLoader,
     })
     // 外部佐證刀 — composition root 判 web_search 閘：用 tool-gate 本人判
     //（單一事實來源，不重複 env 解析）。sourceChannel / botDirected 帶
@@ -575,23 +707,24 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
           }),
         })
       : undefined
-    // 圖片刀B — 讀圖 responder：有 key 才組；無 key ⇒ 路徑不存在。Surfacing
-    // 走 M3-0 ocr 雙閘（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD，
-    // default off）⇒ 不開閘完全不影響現行行為。觸發＝引用圖＋tag（quotedImage
-    // 由 handler 以 store 判定後線入 respondInput）。fetchImage 的 channel
-    // token 在 CALL time 讀（mirror reply client）。共用同一個 daily cost cap。
-    const visionIntake = models.anthropicApiKey
-      ? createVisionIntakeResponder({
-          fetchImage: (messageId) =>
-            fetchLineImageContent(messageId, process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''),
-          vision: createAnthropicVisionIntakeSource({
-            transport: fetch,
-            apiKey: models.anthropicApiKey,
-            costCap,
-            env: process.env,
-          }),
-        })
-      : undefined
+    // 截圖智慧回覆路（Task 5.1）— 取代舊 createVisionIntakeResponder。三閘
+    // 各司其職、default off ⇒ gate-off byte-identical：
+    //   - OCR 閘（AI_AGENT_OCR_ENABLED + AI_AGENT_TOOL_COST_CAP_USD）由 dispatcher
+    //     的 shouldUseVisionIntake 上游把守 — 閘關 ⇒ 永不進此 responder。
+    //   - RAG 閘（AI_AGENT_NOTION_RAG_ENABLED）控 getRagIndex：閘關 ⇒ undefined ⇒
+    //     agent 不掛 search_chiangmai_cases、絕不建第二份索引；閘開 ⇒ 注入
+    //     sharedItineraryIndexLoader（與排行程參考源共用同一份 TTL 快取索引）。
+    //   - web_search 閘沿用上面已算的 webSearchGate.allowed（單一事實來源）。
+    // 觸發＝引用圖＋tag（quotedImage 由 handler 以 store 判定後線入 respondInput）。
+    // fetchImage 的 channel token 在 CALL time 讀（mirror reply client）。need 抽取
+    // 與 agent 共用同一個 daily cost cap。
+    const visionIntake = buildSmartReplyVisionResponder({
+      apiKey: models.anthropicApiKey,
+      defaultModel: models.defaultModel,
+      costCap,
+      webSearchEnabled: webSearchGate.allowed,
+      getRagIndex: ragEnabled ? sharedItineraryIndexLoader : undefined,
+    })
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
       base,
       caseIntake,
