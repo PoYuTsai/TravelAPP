@@ -63,6 +63,10 @@ describe('VISION_NEED_SYSTEM_INSTRUCTION (tripwire)', () => {
     expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/不得腦補|不要猜/)
     expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/價格|報價/)
   })
+  it('含斜線日期防跨月規則（M/D 視為月/日，不誤判跨月跨年）', () => {
+    expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/月\/日|M\/D/)
+    expect(VISION_NEED_SYSTEM_INSTRUCTION).toMatch(/跨月|跨年/)
+  })
 })
 
 describe('createAnthropicVisionNeedSource', () => {
@@ -91,5 +95,32 @@ describe('createAnthropicVisionNeedSource', () => {
     const brief = await source({ base64: 'AAAA', mediaType: 'image/jpeg' } as LineImageContent)
     expect(brief.summary).toBe('客人想問清邁天氣')
     expect(brief.isConversation).toBe(true)
+  })
+
+  // 回歸網（Task 4）：抽取層必須原樣保留模型回的 7/1-7/5 同月區間，
+  // 不得在 parse 過程把斜線日期竄改成跨月（如 1月7日–7月5日）。
+  // 鎖的是抽取層不破壞已正確日期，不是測模型本身。
+  it('7/1-7/5 抽成同月 5 天區間，不誤判跨月', async () => {
+    const fakeTransport = (async () =>
+      new Response(
+        JSON.stringify({
+          content: [
+            {
+              text: JSON.stringify({
+                isConversation: true,
+                summary: '客人要 7/1 到 7/5 清邁親子行程',
+                knownFacts: ['日期：7/1-7/5（5 天）'],
+                gaps: ['航班', '住宿'],
+              }),
+            },
+          ],
+          usage: { input_tokens: 1500, output_tokens: 60 },
+        }),
+        { status: 200 }
+      )) as unknown as typeof fetch
+    const source = createAnthropicVisionNeedSource({ transport: fakeTransport, apiKey: 'k', costCap: okCap })
+    const brief = await source({ base64: 'AAAA', mediaType: 'image/jpeg' } as LineImageContent)
+    expect(brief.knownFacts.join()).toContain('7/1-7/5')
+    expect(brief.knownFacts.join()).not.toMatch(/1月7日|跨.*月|7月5日.*1月/)
   })
 })
