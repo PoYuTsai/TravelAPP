@@ -1,6 +1,6 @@
 # LINE OA Agent — 行程類截圖走 Golden 範本設計（itinerary golden template）
 
-> 狀態：brainstorm 定案（2026-06-17），待下個 session 進 writing-plans / TDD 實作
+> 狀態：✅ 已實作完成（2026-06-17，7-task TDD，commits b09bef4→f364cba，見 §8）。剩 Eric 開閘真群驗收。
 > 分支：`codex/line-oa-agent-mvp`（branch as-is，暫不 merge/PR）
 > 前情：取代「截圖智慧回覆對行程類也走通用 agentic 自由寫手」——實測思思案輸出不佳（見 §1）。
 
@@ -190,4 +190,6 @@ Day 6｜收心慢遊・送機回國
 
 ## 8. 下一步
 
-新 session（綠區）：`superpowers:writing-plans` 對本 doc 出 implementation plan → subagent-driven TDD。風險最高＝§5.4 優先序反轉與 §5.1 日期 bug 回歸。
+✅ **已實作完成（2026-06-17，subagent-driven TDD，每刀 spec+品質雙審+多處 mutation 驗證）**。plan＝`docs/plans/2026-06-17-itinerary-golden-template-impl-plan.md`。7 task commits：T1 `b09bef4`（兩套 golden 常數）／T2 `740a232`+`5d9dcb9`（selectItineraryReference 反轉，§5.4 最高風險）／T3 `c49c25c`（draft 關 web）／T4 `6454977`+`9ae9aee`（§5.1 日期防跨月）／T5 `68277be`（vision classify fork）／T6 `918c83c`+`5dae1e5`（vision-draft-agent 包兩段）／T7 `992a878`+`c6ea1ff`（composition root gate-conditional 接線）／holistic `f364cba`（跨 task I-1：純 stub 降級透傳裸 result）。line-agent 全套件實質全綠（2005 真 passed）。gate-off byte-identical 跨 task 成立；「golden 留航班碼/markdown vs gate」經實打驗證非問題。
+
+**剩唯一步＝Eric 開閘真群驗收**：flip `AI_AGENT_NOTION_RAG_ENABLED=true`（對外步，需 Eric＋查 `.env.local`，不在本實作自動執行）。branch `codex/line-oa-agent-mvp` as-is（不 merge/PR）。
