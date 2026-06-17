@@ -48,12 +48,15 @@ export function createVisionDraftAgent(
 
     // 3. 對外段（ensureTwoSegments 保證 OUTBOUND_HEADER）＋ 內部待確認段（補 INTERNAL_HEADER）。
     //    ensureTwoSegments 只處理 OUTBOUND_HEADER、不產 INTERNAL_HEADER（見 smart-reply-agent.ts），
-    //    故此處一律補一個內部段，列 brief.gaps。
+    //    故 INTERNAL_HEADER 的重複風險來自 responder 原始正文（result.text）本身若已自帶內部段
+    //    （上游 prompt 演化或某降級路徑）。改成 idempotent：只在 result.text 尚未含 INTERNAL_HEADER
+    //    時才補，比照 ensureTwoSegments 對 OUTBOUND_HEADER 的寫法。
     const gapsLine =
       brief.gaps.length > 0 ? brief.gaps.map((g) => `・${g}`).join('\n') : '無'
-    const twoSegment =
-      `${ensureTwoSegments(result.text)}\n\n` +
-      `${INTERNAL_HEADER}\n待確認（截圖未提及、報價/排程需要）：\n${gapsLine}`
+    const outbound = ensureTwoSegments(result.text)
+    const twoSegment = result.text.includes(INTERNAL_HEADER)
+      ? outbound
+      : `${outbound}\n\n${INTERNAL_HEADER}\n待確認（截圖未提及、報價/排程需要）：\n${gapsLine}`
 
     // meta 透傳（含 responder 的 degraded/error），只覆寫 text。
     return { ...result, text: twoSegment }

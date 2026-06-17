@@ -118,6 +118,26 @@ describe('createVisionDraftAgent', () => {
       makeInput()
     )
     expect(out.text).toContain(INTERNAL_HEADER)
-    expect(out.text).toContain('無')
+    // 鎖內部段本體：gaps 空 → 內部段以「無」收尾（不靠整串碰巧含「無」）。
+    const internalSegment = out.text.split(INTERNAL_HEADER)[1]
+    expect(internalSegment).toContain('待確認（截圖未提及、報價/排程需要）：\n無')
+    expect(out.text.endsWith('無')).toBe(true)
+  })
+
+  it('responder 正文已自帶 INTERNAL_HEADER 時不重複補（idempotent）', async () => {
+    const responder = {
+      respond: vi.fn(
+        async (): Promise<PartnerGroupRespondResult> => ({
+          text: `${OUTBOUND_HEADER}\n草稿內容\n\n${INTERNAL_HEADER}\n待確認：航班`,
+          meta: { responder: 'llm' },
+        })
+      ),
+    }
+    const out = await createVisionDraftAgent({ responder })(
+      { isConversation: true, summary: 's', knownFacts: [], gaps: ['住宿'] },
+      makeInput()
+    )
+    // 只能有一個 INTERNAL_HEADER —— 不因本檔補段而重複。
+    expect(out.text.split(INTERNAL_HEADER).length - 1).toBe(1)
   })
 })
