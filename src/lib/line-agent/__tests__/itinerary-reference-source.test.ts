@@ -3,7 +3,6 @@ import {
   selectItineraryReference,
   createItineraryReferenceSource,
 } from '../notion/itinerary-reference-source'
-import { sanitizeItinerarySnippet } from '../notion/itinerary-reference-sanitizer'
 import type { ItineraryCaseProfile } from '../notion/customer-itinerary-gate'
 import {
   buildRagIndex,
@@ -24,7 +23,20 @@ function indexWith(facts: Partial<RagCaseFacts>): RagIndex {
 }
 
 describe('selectItineraryReference', () => {
-  it('returns top-1 sanitized reference when a like case exists', () => {
+  // 反轉（Task 2，design 2026-06-17 §2 #4）：兩套 golden 主幹恆為 skeleton 主體；
+  // RAG 相似案降為「可微調素材」，只在命中時附於主幹之後並切 source=case。
+
+  it('無 RAG 命中：skeleton 含兩套 golden 主幹，source=template', () => {
+    const index = buildRagIndex([])
+    const r = selectItineraryReference(index, '清邁親子五天')
+    expect(r.source).toBe('template')
+    expect(r.skeleton).toContain('Day 5｜') // 5D4N 主幹在（A）
+    expect(r.skeleton).toContain('清道') // 6D5N 主幹在（B，泰北芳縣特徵地名）
+    // 無命中時不得出現 RAG 微調素材標籤
+    expect(r.skeleton).not.toMatch(/微調素材|參考真實案例/)
+  })
+
+  it('有 RAG 命中：兩套 golden 主幹仍在，且附相似案微調素材，source=case', () => {
     const index = indexWith({
       days: 5,
       nights: 4,
@@ -38,19 +50,14 @@ describe('selectItineraryReference', () => {
 
     const r = selectItineraryReference(index, '清邁親子5天4夜 大象 水上樂園')
     expect(r.source).toBe('case')
-    expect(r.skeleton).toMatch(/Day 1｜/)
+    expect(r.skeleton).toContain('Day 5｜') // golden 主幹（A）恆在
+    expect(r.skeleton).toContain('清道') // golden 主幹（B）恆在
+    expect(r.skeleton).toMatch(/微調素材|參考真實案例/) // RAG 段有標籤
   })
 
-  it('falls back to markdown template when low_confidence (no signal/hit)', () => {
-    const index = buildRagIndex([])
-    const r = selectItineraryReference(index, '隨便問問')
-    expect(r.source).toBe('template')
-    expect(r.skeleton.length).toBeGreaterThan(0)
-  })
-
-  it('falls back to template when top-1 sanitizer fails closed', () => {
+  it('相似案 sanitizer fail-closed ⇒ 退純 golden 主幹，source=template', () => {
     // The only retrievable case carries a residual 王太太 honorific that the
-    // sanitizer denylist trips on (fail-closed) → no case survives → template.
+    // sanitizer denylist trips on (fail-closed) → no case survives → trunk only.
     const index = indexWith({
       days: 5,
       areaHints: ['chiangmai'],
@@ -60,17 +67,17 @@ describe('selectItineraryReference', () => {
 
     const r = selectItineraryReference(index, '清邁親子5天')
     expect(r.source).toBe('template')
+    expect(r.skeleton).toContain('Day 5｜')
+    expect(r.skeleton).not.toMatch(/微調素材|參考真實案例/)
   })
 
-  // 開閘前必修 I-1：fallback 範本與真案例共用同一 sanitizer assert，且不得
-  // 逐字注入具體航班碼（會抵銷「不臆造航班」）或 `**` markdown（會誘發 gate 擋格式）。
-  it('template fallback skeleton is sanitizer-clean, flight-code-free and emphasis-free', () => {
+  // sanitize 邊界：golden 主幹是「權威範本」刻意保留航班碼/markdown（不過 sanitizer）；
+  // 只有 RAG 相似案段過 sanitizer。故主幹路徑必含航班碼/`**`（證明沒被誤送 sanitizer）。
+  it('golden 主幹刻意保留航班碼與 markdown（未被誤送 sanitizer）', () => {
     const r = selectItineraryReference(buildRagIndex([]), '隨便問問')
     expect(r.source).toBe('template')
-    expect(r.skeleton).not.toMatch(/[A-Z]{2}\s?\d{2,4}/) // 航班碼 BR257/CI851
-    expect(r.skeleton).not.toMatch(/華航|長榮|泰航|虎航|亞航/)
-    expect(r.skeleton).not.toMatch(/\*\*/) // markdown 粗體
-    expect(sanitizeItinerarySnippet(r.skeleton).ok).toBe(true)
+    expect(r.skeleton).toMatch(/BR25[78]/) // golden 保留具體航班碼
+    expect(r.skeleton).toMatch(/\*\*/) // golden 保留 markdown 粗體
   })
 })
 

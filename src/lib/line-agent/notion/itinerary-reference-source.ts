@@ -1,15 +1,21 @@
 /**
- * itinerary-reference-source.ts — design 2026-06-14 §4。
+ * itinerary-reference-source.ts — design 2026-06-17 §2（golden 主幹反轉）。
  *
- * 新客需 → retrieveRagCases 取候選 → toItineraryReference（含 sanitizer）。
- * 有真案例優先；low_confidence（無訊號/無命中）或全數 fail-closed ⇒ 退回手工
- * 「清邁親子5天4夜經典套餐」markdown 骨架。絕不讓 LLM 從零亂編。
+ * 兩套 golden 標準範本（A：清邁親子 5D4N、B：泰北芳縣深度 6D5N）**恆為**注入 LLM 的
+ * skeleton 主幹（LLM 依需求自選一套再套日期/微調）。RAG 相似案降為「可微調素材」：
+ * 命中且 sanitize 成功時，附於主幹之後並切 source=case；否則只回純 golden 主幹 source=template。
+ *
+ * sanitize 邊界（關鍵）：golden 主幹是「權威範本」，刻意保留具體航班碼/`**` markdown，
+ * **不**過 sanitizer；只有 RAG 相似案段（toItineraryReference 內已過 sanitizeItinerarySnippet）
+ * 維持 sanitize。絕不把整段 skeleton（含 golden）丟進 sanitizer，否則 golden 航班碼/markdown 會被改動。
  */
 import type { RagIndex } from './rag-index'
 import { retrieveRagCases } from './rag-query'
 import { toItineraryReference } from './itinerary-reference'
-import { sanitizeItinerarySnippet } from './itinerary-reference-sanitizer'
-import { ITINERARY_TEMPLATE_SKELETON } from './itinerary-reference-template'
+import {
+  GOLDEN_CHIANGMAI_FAMILY_5D4N,
+  GOLDEN_NORTHERN_DEEP_6D5N,
+} from './itinerary-reference-template'
 import type { ItineraryCaseProfile } from './customer-itinerary-gate'
 
 export interface SelectedReference {
@@ -39,22 +45,31 @@ export type ItineraryReferenceSource = (
 ) => Promise<ItineraryReferenceResult | null>
 
 /**
- * fallback 手工骨架（I-1/I-2）：inline TS 常數（無 readFileSync docs/** 的 lambda 風險），
- * 並與真案例共走同一 sanitizeItinerarySnippet assert（統一不變量）。常數已 curated 乾淨
- * （drift-guard 測試把關），sanitize 不會 fail-closed；萬一未來被改髒，`?? 常數` 確保仍有骨架可注入。
+ * 兩套 golden 主幹恆注入（design 2026-06-17 §2 #4）：LLM 依需求自選一套再套日期/微調。
+ * 刻意**不**過 sanitizer —— golden 是權威範本，保留具體航班碼/`**` markdown（見檔頭 sanitize 邊界）。
  */
-function templateSkeleton(): string {
-  const r = sanitizeItinerarySnippet(ITINERARY_TEMPLATE_SKELETON)
-  return r.skeleton ?? ITINERARY_TEMPLATE_SKELETON
+function goldenTrunk(): string {
+  return [
+    '【標準範本 A：清邁親子 5 天 4 夜】',
+    GOLDEN_CHIANGMAI_FAMILY_5D4N,
+    '',
+    '【標準範本 B：泰北芳縣深度 6 天 5 夜】',
+    GOLDEN_NORTHERN_DEEP_6D5N,
+  ].join('\n')
 }
 
 export function selectItineraryReference(index: RagIndex, need: string): SelectedReference {
+  const trunk = goldenTrunk()
   const hits = retrieveRagCases(index, need)
   for (const hit of hits) {
-    const ref = toItineraryReference(hit)
-    if (ref) return { source: 'case', skeleton: ref.skeleton } // 第一個 sanitize 成功的即用
+    const ref = toItineraryReference(hit) // 相似案於此過 sanitizeItinerarySnippet（去個資/航班碼）
+    if (ref) {
+      // 第一個 sanitize 成功的相似案附為「可微調素材」，主幹仍為兩套 golden。
+      const skeleton = `${trunk}\n\n【參考真實案例（可微調素材，非主幹）】\n${ref.skeleton}`
+      return { source: 'case', skeleton }
+    }
   }
-  return { source: 'template', skeleton: templateSkeleton() }
+  return { source: 'template', skeleton: trunk }
 }
 
 /**
