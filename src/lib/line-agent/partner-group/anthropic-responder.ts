@@ -33,6 +33,7 @@ import type { QaKnowledgeSource } from './qa-knowledge-source'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
 import { gateCustomerItineraryDraft } from '../notion/customer-itinerary-gate'
+import { partitionOutbound } from './outbound-segments'
 import type {
   ItineraryReferenceResult,
   ItineraryReferenceSource,
@@ -435,12 +436,20 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       // degraded（budget/transport/parse 已先回 stub）不進閘，原樣透出。
       if (result.meta?.responder !== 'llm') return result
 
-      let gate = gateCustomerItineraryDraft(result.text, reference?.profile ?? undefined)
+      // gate「只驗上半」（備注分離 2026-06-17）：模型把備注另起 INTERNAL_HEADER 段，
+      // 只把 v1 行程上半餵 gate，避免「車型建議/待確認/問句」字樣污染 round-trip/lint。
+      let gate = gateCustomerItineraryDraft(
+        partitionOutbound(result.text).itinerary,
+        reference?.profile ?? undefined
+      )
       if (!gate.ok) {
         const retry = await runOnce(gate.problems.join('；'))
         if (retry.meta?.responder === 'llm') {
           result = retry
-          gate = gateCustomerItineraryDraft(result.text, reference?.profile ?? undefined)
+          gate = gateCustomerItineraryDraft(
+            partitionOutbound(result.text).itinerary,
+            reference?.profile ?? undefined
+          )
         }
         if (!gate.ok) {
           log('llm_call', { model, outcome: 'degraded', degradedReason: 'itinerary_gate_failed' })
@@ -463,7 +472,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
         })
         if (verified.meta?.responder === 'llm') {
           const verifiedGate = gateCustomerItineraryDraft(
-            verified.text,
+            partitionOutbound(verified.text).itinerary,
             reference?.profile ?? undefined
           )
           if (verifiedGate.ok) return verified

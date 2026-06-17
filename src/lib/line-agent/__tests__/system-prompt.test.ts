@@ -150,6 +150,14 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('哪些需要修正')
   })
 
+  // 2026-06-17 (Eric 拍板): 備注分離 — 行程上半純 v1，備注（車型建議/待確認/問句）
+  // 另起「【內部備註・待確認】」段，送訊時拆成兩則訊息、gate 只驗上半。
+  it('itinerary drafts keep a pure v1 body and push notes into a separate 【內部備註・待確認】 segment', () => {
+    expect(prompt).toContain('純 v1 行程')
+    expect(prompt).toContain('不要把假設、待確認、車型建議或問句塞進行程內')
+    expect(prompt).toContain('【內部備註・待確認】')
+  })
+
   // 2026-06-13 (Q2 B 案): 排行程草稿一律吐 customer_itinerary_v1 結構，報價器才解析得了；
   // 形狀範本（標題 / 日期 / 人數 header / Day N｜ 區塊）逐字在場，任一被刪即炸。
   it('itinerary drafts must declare the customer_itinerary_v1 shape (parser-friendly)', () => {

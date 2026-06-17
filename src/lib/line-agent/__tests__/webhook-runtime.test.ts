@@ -175,6 +175,24 @@ describe('webhook-runtime partner-group send gate', () => {
     expect(calls[0].messages).toEqual([{ type: 'text', text: 'FAKE-REPLY' }])
   })
 
+  // 備注分離（2026-06-17 Eric 拍板）：含 INTERNAL_HEADER 的草稿拆成兩則 LINE 訊息
+  // （第 1 則純行程、第 2 則內部備注）。無 header 時仍單則（上一條 tripwire 守）。
+  it('splits an itinerary draft with 【內部備註・待確認】 into two LINE messages (itinerary, notes)', async () => {
+    const itinerary = '<家庭套餐訂製> 清邁5日\nDay 1｜抵達'
+    const notes = '【內部備註・待確認】\n・車型建議：Toyota Commuter\n・以上哪些需要修正？'
+    setPartnerGroupResponder(fixedResponder(`${itinerary}\n\n${notes}`))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    expect(calls).toHaveLength(1) // 單次 reply call，但帶兩則訊息
+    expect(calls[0].messages).toEqual([
+      { type: 'text', text: itinerary },
+      { type: 'text', text: notes },
+    ])
+  })
+
   it('does not reply to a partner-group message that does not mention the bot', async () => {
     setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
     const { client, calls } = recordingReplyClient()

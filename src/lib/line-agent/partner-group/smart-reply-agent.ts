@@ -25,8 +25,10 @@ import type { RagIndex } from '../notion/rag-index'
 import { createAgentLogger, type AgentLogger } from '../observability/structured-log'
 import { estimateCostUsd, type DailyCostCap } from '../observability/daily-cost-cap'
 
-export const OUTBOUND_HEADER = '【可直接複製給客人】'
-export const INTERNAL_HEADER = '【內部備註・待確認】'
+// 兩段標頭單一真相在 outbound-segments；此處 import 供本檔 prompt 用、並 re-export
+// 維持既有 importer 不變（vision-draft-agent 等 import { INTERNAL_HEADER, ensureTwoSegments } from 此檔）。
+import { OUTBOUND_HEADER, INTERNAL_HEADER } from './outbound-segments'
+export { OUTBOUND_HEADER, INTERNAL_HEADER }
 
 export const SMART_REPLY_SYSTEM_PROMPT = [
   '你是清邁包車旅行社「清微旅行」的內部 AI 助手。夥伴會貼一張客人截圖並 tag 你，你要幫夥伴',

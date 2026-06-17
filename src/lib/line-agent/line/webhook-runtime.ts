@@ -49,6 +49,7 @@ import { ensurePartnerRagAnswerSourceInstalled } from '@/lib/line-agent/line/ens
 import { shouldReplyToPartnerGroup } from '@/lib/line-agent/line/partner-reply-gate'
 import { sanitizeQuotedBotContext } from '@/lib/line-agent/partner-group/quoted-draft-customer-reply'
 import { replyMessage, type LineMessage } from '@/lib/line-agent/line/message-client'
+import { splitOutboundIntoMessages } from '@/lib/line-agent/partner-group/outbound-segments'
 import { createDailyCostCap } from '@/lib/line-agent/observability/daily-cost-cap'
 import { createKvClientFromEnv } from '@/lib/line-agent/storage/kv-store'
 import { createCaseIntakeResponder } from '@/lib/line-agent/partner-group/case-intake-surfacing'
@@ -367,10 +368,13 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   // 5. Full send gate (post-routing) — the only place a reply is authorised.
   if (shouldReplyToPartnerGroup(event, decision, botDirected)) {
     const outboundText = decision.handlerResult!.outboundText!
+    // 備注分離（2026-06-17）：排行程草稿含 INTERNAL_HEADER 段時拆兩則 LINE 訊息
+    // （第 1 則純 v1 行程、第 2 則內部備注）；無 header ⇒ 單則（送訊行為零變化）。
+    const outboundMessages: LineMessage[] = splitOutboundIntoMessages(outboundText).map(
+      (text) => ({ type: 'text', text })
+    )
     try {
-      const sentIds = await getReplyClient()(event.replyToken!, [
-        { type: 'text', text: outboundText },
-      ])
+      const sentIds = await getReplyClient()(event.replyToken!, outboundMessages)
       log('reply_sent', { sendOutcome: 'ok' })
       // 6. Record the bot-authored ids so a future quote-reply to THIS message
       //    is itself botDirected (quote-to-bot plan §4).  M3.6c also caches the
