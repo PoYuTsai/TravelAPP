@@ -259,6 +259,8 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       const baseSystem = buildPartnerGroupSystemPrompt(input, knowledge, {
         webSearchEnabled: useWebSearch,
         itineraryReference: reference?.skeleton ?? undefined,
+        // 第4刀：golden 命中時改用「強制照抄＋四防」段（system-prompt 內依此分流）。
+        itineraryReferenceSource: reference?.source,
         currentDate,
       })
       let system = correctionNote

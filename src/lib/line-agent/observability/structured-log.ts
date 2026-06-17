@@ -110,10 +110,10 @@ export interface AgentLogFieldsByEvent {
   }
   itinerary_reference: {
     /**
-     * M-1 來源訊號（固定碼 case|template，never content）：某筆 draft 用真案例
-     * 或退手工範本 — 調語料涵蓋率的關鍵。
+     * M-1 來源訊號（固定碼 golden|case|template，never content）：某筆 draft 命中
+     * golden 四案、用真案例、或退手工範本 — 調語料涵蓋率的關鍵。第4刀新增 golden。
      */
-    referenceSource?: 'case' | 'template'
+    referenceSource?: 'golden' | 'case' | 'template'
   }
 }
 

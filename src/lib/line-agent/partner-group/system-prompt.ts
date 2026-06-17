@@ -78,10 +78,32 @@ export const PARTNER_GROUP_WEB_SEARCH_PROMPT = [
  * 引用之前（引用語意最貼近當則訊息，留最尾）。知識缺席 ⇒ 與現行 byte-identical。
  * 外部佐證刀：搜證條款接知識之後、引用之前，且僅在 webSearchEnabled === true 時注入。
  */
+/**
+ * 第4刀（design 2026-06-17）— golden 命中時的「強制照抄＋四防」段，取代軟性參考段。
+ * golden 是逐字權威範本（含具名航班/餐廳/飯店、刻意保留），命中即直接照抄、只換
+ * header；軟性段那句「不得照抄日期或人名」恰好相反，故 golden 路徑必須整段換掉。
+ *
+ * 四防（Eric 2026-06-18 定案）：①防瞎造航班 ②防漏點 ③防越權改寫 ④防 markdown 觸發
+ * gate；外加最終仍過 customer_itinerary_v1 格式檢查（fail-closed）。
+ */
+const GOLDEN_FORCE_COPY_INSTRUCTION = [
+  '【最相符 golden 範本｜強制照抄】下面是一份與本案最相符的權威範本行程（已比對天數/需求選出）。請「直接照抄」這份範本的每日活動、餐廳、住宿、航班與順序，只替換最上方的日期區間與人數 header（依本案實際日期/人數/天數），其餘行程正文不要改寫，務必輸出成 customer_itinerary_v1 格式：',
+  '・防瞎造航班：航班資訊只能照範本；範本沒寫的航班一律標「待確認」，不得自行編造航班碼或時刻。',
+  '・防漏點：客人在本案明確點名的景點/餐廳/住宿/需求，務必逐項覆蓋，不得因照抄範本而漏掉。',
+  '・防越權改寫：只允許替換日期/人數/header；每日活動、餐廳、住宿與順序不得自行優化或改寫。',
+  '・防 markdown：範本若帶 ** 粗體、# 標題或表格，只能當來源理解，輸出時一律轉成純文字「Day N｜主題」結構，不可原樣輸出 markdown 記號（否則報價器解不出、觸發格式檢查退回）。',
+  '最終輸出仍須通過 customer_itinerary_v1 格式檢查，未過即視為失敗。',
+].join('\n')
+
 export function buildPartnerGroupSystemPrompt(
   input: PartnerGroupRespondInput,
   knowledge?: string | null,
-  opts?: { webSearchEnabled?: boolean; itineraryReference?: string; currentDate?: string }
+  opts?: {
+    webSearchEnabled?: boolean
+    itineraryReference?: string
+    itineraryReferenceSource?: 'golden' | 'case' | 'template'
+    currentDate?: string
+  }
 ): string {
   const sections = [PARTNER_GROUP_SYSTEM_PROMPT]
   // 今天日期區塊（design 2026-06-17 年份 bug）— OPTIONAL：composition root 只在
@@ -103,11 +125,18 @@ export function buildPartnerGroupSystemPrompt(
   // 接知識之後、web_search 之前。缺席（undefined/空白）⇒ byte-identical（tripwire）。
   const trimmedReference = opts?.itineraryReference?.trim()
   if (trimmedReference) {
-    sections.push(
-      '',
-      '【排行程參考骨架】下面是一份過往同型行程的活動骨架（已去個資）。請參考其節奏與活動安排，再套用本案的日期/人數/天數/特殊需求重出，不得照抄日期或人名，務必符合 customer_itinerary_v1 格式：',
-      trimmedReference
-    )
+    // 第4刀：golden 命中 ⇒ 強制照抄＋四防（逐字權威範本）；case/template/省略 ⇒
+    // 維持現行軟性參考段（byte-identical）。golden 段與軟性段語意相反（照抄 vs 不照抄），
+    // 故二選一、不疊加。
+    if (opts?.itineraryReferenceSource === 'golden') {
+      sections.push('', GOLDEN_FORCE_COPY_INSTRUCTION, trimmedReference)
+    } else {
+      sections.push(
+        '',
+        '【排行程參考骨架】下面是一份過往同型行程的活動骨架（已去個資）。請參考其節奏與活動安排，再套用本案的日期/人數/天數/特殊需求重出，不得照抄日期或人名，務必符合 customer_itinerary_v1 格式：',
+        trimmedReference
+      )
+    }
   }
   if (opts?.webSearchEnabled === true) {
     sections.push('', PARTNER_GROUP_WEB_SEARCH_PROMPT)
