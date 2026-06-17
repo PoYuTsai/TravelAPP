@@ -527,15 +527,28 @@ type SmartReplyAgent = ReturnType<typeof createVisionDraftAgent>
  * 保守回 'respond'（走現行 agentic 路），絕不讓分類失敗變成 vision 無回覆或
  * 誤把開放題塞進草稿路。LLM fallback 用 safeDefaultLlmClassifier（零 key、零
  * 網路）— 行程類靠 'draft' 關鍵詞的 deterministic 命中即可，不額外燒 model。
+ *
+ * `classify` 抽成可注入參數（預設仍是現行 classifyIntent 呼法），讓測試能注入一個
+ * 會 throw 的 classifier 真正觸發 catch 分支驗 fail-open。生產呼叫點不傳、用預設，
+ * 行為與內聯呼 classifyIntent byte-identical。
  */
-async function classifyVisionIntent(summary: string): Promise<'draft' | 'respond'> {
+async function classifyVisionIntent(
+  summary: string,
+  classify: (
+    text: string
+  ) => Promise<{ action: string }> = (text) =>
+    classifyIntent(text, safeDefaultLlmClassifier)
+): Promise<'draft' | 'respond'> {
   try {
-    const intent = await classifyIntent(summary, safeDefaultLlmClassifier)
+    const intent = await classify(summary)
     return intent.action === 'draft' ? 'draft' : 'respond'
   } catch {
     return 'respond'
   }
 }
+
+/** Task 7 review I-1：export 純供測試注入 throwing classifier 驗 fail-open catch。 */
+export const __test_classifyVisionIntent = classifyVisionIntent
 
 /**
  * 行程類 draft responder（Task 7）— 為 vision draft 路專建的
@@ -757,8 +770,12 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
     // 全走 agent 的 'respond' 路 ⇒ vision 對話路徑與現行 byte-identical（最高
     // 驗收標準）。draft responder 注入「同一份」itineraryReferenceSource（與 base
     // 共用同三閘來源、同 sharedItineraryIndexLoader），web 雙保險關。
+    // S-1：itineraryReferenceSource 來自 resolveItineraryReferenceSource（同一份
+    // process.env），只在 RAG 閘開時非 undefined ⇒ source truthy ⟺ ragEnabled true。
+    // 故 fork 條件只用 source 的存在性當「單一事實來源」（`ragEnabled &&` 冗餘）。
+    // ragEnabled 仍保留給下方 getRagIndex 那行（其本來用途）。
     const visionDraftFork =
-      ragEnabled && itineraryReferenceSource
+      itineraryReferenceSource
         ? {
             classify: classifyVisionIntent,
             draftAgent: buildItineraryDraftResponder({

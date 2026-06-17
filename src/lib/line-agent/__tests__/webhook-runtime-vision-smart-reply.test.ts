@@ -95,6 +95,7 @@ import {
   getReplyClient,
   setReplyClient,
   setSmartReplyAgentFactory,
+  __test_classifyVisionIntent,
   type ReplyClient,
 } from '../line/webhook-runtime'
 import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
@@ -370,7 +371,7 @@ describe('Task 7 — vision draft fork wiring (gate-off byte-identical)', () => 
     expect(typeof capturedVisionDeps[0].draftAgent).toBe('function')
   })
 
-  it('classify wrapper: maps intent draft→"draft", else→"respond", fail-open→"respond"', async () => {
+  it('classify wrapper: maps intent draft→"draft", else→"respond", unknown summary→"respond"', async () => {
     vi.stubEnv('ANTHROPIC_API_KEY', 'sk-test')
     vi.stubEnv('AI_AGENT_DEFAULT_MODEL', 'claude-test')
     vi.stubEnv('AI_AGENT_RESEARCH_MODEL', 'claude-research')
@@ -382,14 +383,40 @@ describe('Task 7 — vision draft fork wiring (gate-off byte-identical)', () => 
     expect(await classify('幫客人 draft 一份清邁五天四夜行程')).toBe('draft')
     // An open-question summary (no draft keyword) → 'respond' (current behaviour).
     expect(await classify('清邁這個月天氣怎麼樣？')).toBe('respond')
-    // Fail-open: a classify-time throw is swallowed → conservative 'respond'.
-    // We feed a value classifyIntent would choke on (non-string) via cast.
+    // A non-string / unknown summary still resolves to 'respond' (the deterministic
+    // pass coerces it to "undefined", no 'draft' keyword). NOTE: this does NOT
+    // exercise the fail-open catch — that is covered by the throwing-classifier
+    // test below. Honest name: this is just "unknown summary → respond".
     expect(
       await classify(undefined as unknown as string)
     ).toBe('respond')
   })
 
-  it('RAG gate ON, draft brief → draftAgent runs the LLM and wraps a gate-passing golden body into two segments', async () => {
+  it('classify wrapper fail-open: an injected classifier that THROWS is swallowed → "respond"', async () => {
+    // I-1: drive the real wrapper with an injected classifier that actually throws,
+    // proving the try-catch fail-open guardrail (currently 0% covered) sends
+    // classify-time failures to the conservative 'respond' path rather than letting
+    // them surface (which would either drop the vision reply or mis-route an open
+    // question into the draft fork).
+    const throwingClassifier = vi.fn(async () => {
+      throw new Error('boom')
+    })
+
+    const result = await __test_classifyVisionIntent(
+      '幫客人 draft 一份清邁五天四夜行程',
+      throwingClassifier
+    )
+
+    // The throw was caught and fail-open returned 'respond'…
+    expect(result).toBe('respond')
+    // …and we actually went through the catch (the throwing classifier was called).
+    expect(throwingClassifier).toHaveBeenCalledTimes(1)
+    expect(throwingClassifier).toHaveBeenCalledWith(
+      '幫客人 draft 一份清邁五天四夜行程'
+    )
+  })
+
+  it('RAG gate ON, draft brief → draftAgent wraps the (degraded) responder output into two segments', async () => {
     // Drive the REAL vision factory so the captured classify→draftAgent fork is
     // exercised, with global fetch stubbed to return a gate-passing golden draft.
     useRealVisionFactory = true
