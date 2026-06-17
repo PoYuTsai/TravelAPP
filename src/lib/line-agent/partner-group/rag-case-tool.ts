@@ -2,15 +2,17 @@
  * rag-case-tool.ts — agentic smart-reply 迴圈的 client 端 RAG 工具。
  *
  * LLM 判斷「這題跟清邁自家案例有關」時呼叫本工具；我們對 RAG index 檢索，
- * 回 operator-safe 案例摘要（toOperatorSafeCaseSummary 已去私密欄位 / PII）。
+ * 回 agent-safe 案例摘要（searchRagIndexForAgent）。GAP-1 放寬（2026-06-17）：
+ * 除結構事實外，附 sanitized 具名行程骨架（餐廳/景點/逐日框架），讓模型有料 grounding；
+ * 骨架必過 toItineraryReference 的 fail-closed sanitizer，真 PII（姓名/電話/金額/航班）絕不外洩。
  * fail-soft：index 不可用 / 無命中 ⇒ 回空 results + note，永不 throw —— 不可
  * 讓 RAG 失敗中斷整個 agentic 迴圈（web search 仍可補）。
  */
 
 import type { RagIndex } from '../notion/rag-index'
 import {
-  searchRagIndex,
-  type OperatorSafeCaseSummary,
+  searchRagIndexForAgent,
+  type AgentCaseSummary,
 } from '../notion/notion-rag-search'
 
 export const RAG_CASE_TOOL_DEF = {
@@ -37,14 +39,15 @@ export interface RunRagCaseToolDeps {
 }
 
 export interface RagCaseToolResult {
-  results: OperatorSafeCaseSummary[]
+  results: AgentCaseSummary[]
   note?: string
 }
 
 /**
- * 對 RAG index 檢索並回 operator-safe 摘要。searchRagIndex 內部已解析自由文字、
- * 取 topN 並投影成 operator-safe 摘要（結構上無從攜帶 privateContext / PII）。
- * 任何路徑都不 throw：getIndex 失敗 ⇒ 暫時無法存取；無命中 ⇒ 明確 note。
+ * 對 RAG index 檢索並回 agent-safe 摘要。searchRagIndexForAgent 內部解析自由文字、
+ * 取 topN，並投影成「結構事實 + sanitized 具名行程骨架」（privateContext 不讀，
+ * snippet 必過 fail-closed sanitizer）。任何路徑都不 throw：getIndex 失敗 ⇒
+ * 暫時無法存取；無命中 ⇒ 明確 note。
  */
 export async function runRagCaseTool(
   input: { query: string },
@@ -60,12 +63,12 @@ export async function runRagCaseTool(
     }
   }
 
-  const search = searchRagIndex(index, input.query, { topN: deps.maxResults })
-  if (search.results.length === 0) {
+  const results = searchRagIndexForAgent(index, input.query, { topN: deps.maxResults })
+  if (results.length === 0) {
     return {
       results: [],
       note: '案例庫沒有相關案例，這題請改用網路查或既有知識。',
     }
   }
-  return { results: search.results }
+  return { results }
 }

@@ -74,6 +74,38 @@ describe('runRagCaseTool', () => {
     expect(JSON.stringify(out.results)).not.toMatch(/lineUserId|電話|@/)
   })
 
+  it('命中時把 sanitized 具名行程骨架送進模型（GAP-1 放寬），且仍剝真 PII', async () => {
+    // 真 Notion snippet：header 帶姓名/人數/日期，內文帶具名餐廳/逐日框架 + 電話。
+    const namedCase = rec('cm-named', {
+      days: 5,
+      nights: 4,
+      partySize: 4,
+      itinerarySnippet: [
+        '<王先生一家訂製>',
+        '人數：4 大 2 小',
+        '📅 日期：2026/01/01',
+        'Day 1｜抵達 晚餐 千人火鍋',
+        'Day 2｜大象保護營 午餐 拳師餐廳 客戶電話 0912345678',
+      ].join('\n'),
+      areaHints: ['chiangmai'],
+      themeHints: ['family'],
+    })
+    const index = buildRagIndex([namedCase])
+    const out = await runRagCaseTool(
+      { query: '清邁 親子' },
+      { getIndex: async () => index, maxResults: 3 }
+    )
+    const json = JSON.stringify(out.results)
+    // 具名餐廳 / 逐日框架要送進模型（abstract-only 治本）
+    expect(json).toMatch(/千人火鍋/)
+    expect(json).toMatch(/拳師餐廳/)
+    expect(json).toMatch(/Day 2/)
+    // 真 PII 仍剝除：姓名 header / 電話 / 日期
+    expect(json).not.toMatch(/王先生/)
+    expect(json).not.toMatch(/0912345678/)
+    expect(json).not.toMatch(/2026\/01\/01/)
+  })
+
   it('無命中 ⇒ results:[] + 明確訊息（不 throw、不腦補）', async () => {
     const index = buildRagIndex([])
     const out = await runRagCaseTool(

@@ -25,6 +25,7 @@ import { parseRagQuery, retrieveRagCases } from './rag-query'
 import type { RagIndex, RagIndexRecord } from './rag-index'
 import { resolveNotionRagConfig } from './notion-rag-config'
 import { buildNotionRagIndex, type NotionRagClient } from './notion-rag-loader'
+import { toItineraryReference } from './itinerary-reference'
 
 /** Operator-safe per-case summary — whitelisted facts only, never private/PII. */
 export interface OperatorSafeCaseSummary {
@@ -41,6 +42,26 @@ export interface OperatorSafeCaseSummary {
    * than a silent re-leak.
    */
   itinerarySnippetPreview?: never
+}
+
+/**
+ * Agent-facing per-case summary — a DIFFERENT (richer) audience than the operator
+ * CLI preview. The smart-reply agent feeds this to the model so it can ground a
+ * partner reply in named itinerary content (餐廳 / 景點 / 逐日框架), which Eric
+ * ruled is commercial info, not PII. GAP-1 relaxed (2026-06-17): the snippet is
+ * surfaced, but ONLY after `sanitizeItinerarySnippet` (via toItineraryReference)
+ * fail-closed strips real PII (姓名 / 電話 / 金額 / 航班 / URL / 日期); a record
+ * whose snippet cannot be sanitized carries no skeleton at all.
+ */
+export interface AgentCaseSummary {
+  days?: number
+  nights?: number
+  areaHints: string[]
+  themeHints: string[]
+  partySize?: number
+  vehicleType?: string
+  /** sanitized 具名行程骨架；snippet 缺或 sanitize fail-closed ⇒ 整個欄位省略。 */
+  itinerarySkeleton?: string
 }
 
 export interface NotionRagSearchParsedQuery {
@@ -107,6 +128,45 @@ export function searchRagIndex(
     resultCount: results.length,
     results,
   }
+}
+
+/**
+ * Project a record to an AGENT-safe summary: the same whitelisted facts as the
+ * operator view PLUS a sanitized itinerary skeleton. The skeleton goes through
+ * `toItineraryReference` (fail-closed sanitizeItinerarySnippet), so it carries
+ * named 餐廳 / 景點 / 逐日框架 but never real PII; an unsanitizable snippet simply
+ * yields no skeleton field rather than leaking.
+ */
+export function toAgentCaseSummary(record: RagIndexRecord): AgentCaseSummary {
+  const base = toOperatorSafeCaseSummary(record)
+  const summary: AgentCaseSummary = {
+    areaHints: base.areaHints,
+    themeHints: base.themeHints,
+  }
+  if (base.days !== undefined) summary.days = base.days
+  if (base.nights !== undefined) summary.nights = base.nights
+  if (base.partySize !== undefined) summary.partySize = base.partySize
+  if (base.vehicleType !== undefined) summary.vehicleType = base.vehicleType
+
+  const ref = toItineraryReference(record)
+  if (ref?.skeleton) summary.itinerarySkeleton = ref.skeleton
+  return summary
+}
+
+/**
+ * Agent counterpart of `searchRagIndex`: same deterministic retrieval + topN,
+ * but projects to AgentCaseSummary so the model receives sanitized named
+ * itinerary content. No `low_confidence` wrapper — the agent tool only needs the
+ * ranked list (empty ⇒ caller emits its own note).
+ */
+export function searchRagIndexForAgent(
+  index: RagIndex,
+  query: string,
+  opts: { topN?: number } = {}
+): AgentCaseSummary[] {
+  const hits = retrieveRagCases(index, query)
+  const topN = opts.topN ?? DEFAULT_TOP_N
+  return hits.slice(0, topN).map((r) => toAgentCaseSummary(r))
 }
 
 // ---------------------------------------------------------------------------
