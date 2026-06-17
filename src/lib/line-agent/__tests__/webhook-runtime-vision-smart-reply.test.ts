@@ -106,6 +106,7 @@ import {
   OUTBOUND_HEADER,
   INTERNAL_HEADER,
 } from '../partner-group/smart-reply-agent'
+import { STUB_PARTNER_GROUP_REPLY } from '../partner-group/responder'
 import { gateCustomerItineraryDraft } from '../notion/customer-itinerary-gate'
 import { LI_FAMILY_ELDERLY_CHIANGMAI_GOLDEN_ITINERARY } from '../notion/__fixtures__/customer-itinerary-golden'
 
@@ -416,7 +417,7 @@ describe('Task 7 — vision draft fork wiring (gate-off byte-identical)', () => 
     )
   })
 
-  it('RAG gate ON, draft brief → draftAgent wraps the (degraded) responder output into two segments', async () => {
+  it('RAG gate ON, draft brief → draftAgent passes through the bare pure-stub when the budget gate fails closed (I-1)', async () => {
     // Drive the REAL vision factory so the captured classify→draftAgent fork is
     // exercised, with global fetch stubbed to return a gate-passing golden draft.
     useRealVisionFactory = true
@@ -429,13 +430,15 @@ describe('Task 7 — vision draft fork wiring (gate-off byte-identical)', () => 
     // cap fails closed to kv_unavailable. Leaving the cap UNSET ⇒ `disabled` ⇒
     // also fails closed. To exercise the real LLM round here we need the budget
     // gate to be `ok`, which requires a working KV — out of scope for a unit
-    // test. So we stub global fetch to BOTH the Anthropic call (the draft
-    // responder) AND keep the cap disabled is not enough. Instead, drive the
-    // budget gate to `ok` by stubbing the cost-cap KV via env is impossible
-    // without a live server. We therefore assert the wiring + two-segment
-    // wrapping contract (which holds regardless of whether the inner LLM round
-    // degrades), and the gate-pass of the golden body is covered by the
-    // dedicated customer-itinerary-gate suite.
+    // test. So the inner draft responder ALWAYS degrades to the pure stub here
+    // (meta.responder === 'stub', cost_cap_disabled), never producing a draft.
+    // Per I-1 (holistic review): when the responder did NOT actually produce a
+    // draft (responder !== 'llm'), the draft fork passes through the BARE stub —
+    // it must NOT wrap a generic stub as 【可直接複製給客人】, or a partner could
+    // mis-paste it to a customer. The two-segment wrapping (OUTBOUND/INTERNAL) is
+    // covered by vision-draft-agent.test.ts for the llm / itinerary_gate_failed
+    // paths; the golden body's gate-pass is covered by the customer-itinerary-gate
+    // suite (re-asserted at the wiring boundary below).
     const fetchSpy = vi.fn(
       async () =>
         new Response(
@@ -472,13 +475,14 @@ describe('Task 7 — vision draft fork wiring (gate-off byte-identical)', () => 
     }
     const out = await draftAgent!(brief, input as never)
 
-    // Two-segment output: outbound copy + internal to-confirm (the Task 6
-    // contract, which holds whether or not the inner LLM round degrades).
-    expect(out.text).toContain(OUTBOUND_HEADER)
-    expect(out.text).toContain(INTERNAL_HEADER)
-    // The internal segment surfaces the brief gaps the draft fork threads through.
-    expect(out.text).toContain('航班')
-    expect(out.text).toContain('住宿區域')
+    // I-1: budget fails closed ⇒ inner responder degrades to the pure stub ⇒
+    // the draft fork passes through the BARE stub (no two-segment wrapping).
+    expect(out.meta?.responder).toBe('stub')
+    expect(out.text).toBe(STUB_PARTNER_GROUP_REPLY)
+    expect(out.text).not.toContain(OUTBOUND_HEADER)
+    expect(out.text).not.toContain(INTERNAL_HEADER)
+    // The brief gaps are NOT surfaced when there is no real draft to attach them to.
+    expect(out.text).not.toContain('航班')
     // The golden body the draft responder is fed passes the gate end-to-end
     // (covered in depth by customer-itinerary-gate.test.ts; re-asserted here so
     // a regression in the golden fixture is caught at the wiring boundary too).

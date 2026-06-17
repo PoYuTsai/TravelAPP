@@ -13,7 +13,10 @@
  *
  * 護欄（不可破）：
  *  - 不讀 env、不 import LINE / Notion client（responder 由注入提供）。
- *  - 降級不 throw：responder 回 degraded result 時，本檔仍正常包兩段、透傳 meta。
+ *  - 降級不 throw：responder 回 degraded result 時本檔絕不 throw、透傳 meta。
+ *    其中 responder==='llm'（含 itinerary_gate_failed：LLM 有草稿戴警告）仍包兩段；
+ *    responder!=='llm'（純 stub：budget/transport/parse 降級回泛用 stub，無實質草稿）⇒
+ *    透傳裸 result、不包兩段、不戴 OUTBOUND_HEADER，與 respond fork 降級呈現對齊（review I-1）。
  *  - 本檔只組 need 文字 + 包兩段，無 I/O。
  */
 
@@ -45,6 +48,16 @@ export function createVisionDraftAgent(
       intent: { action: 'draft', confidence: 'high', source: 'deterministic' },
     }
     const result = await deps.responder.respond(draftInput)
+
+    // 2.5 responder 未真正產出草稿（budget/transport/parse 降級回泛用 stub，
+    //     meta.responder === 'stub'）⇒ 透傳裸 result，不包成「可直接複製給客人」兩段。
+    //     否則夥伴會收到被標成 OUTBOUND_HEADER 的泛用 stub，可能誤貼給客人（holistic review I-1）。
+    //     與 respond fork（smart-reply-agent degraded()）的裸 stub 降級呈現對齊。
+    //     注意：responder === 'llm' + degraded + error:'itinerary_gate_failed' 是「LLM 有產草稿
+    //     但過不了閘、戴 ⚠️ DEGRADE_NOTE」，仍走下方兩段包裝（草稿有實質內容、客人可複製語意成立）。
+    if (result.meta?.responder !== 'llm') {
+      return result
+    }
 
     // 3. 對外段（ensureTwoSegments 保證 OUTBOUND_HEADER）＋ 內部待確認段（補 INTERNAL_HEADER）。
     //    ensureTwoSegments 只處理 OUTBOUND_HEADER、不產 INTERNAL_HEADER（見 smart-reply-agent.ts），

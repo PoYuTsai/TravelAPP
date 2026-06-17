@@ -9,7 +9,9 @@
  *
  * 鎖住：
  *   1. responder 收到 intent.action='draft' 且 need 文字含 knownFacts；輸出兩段含 gaps。
- *   2. responder 降級時仍回兩段、不 throw。
+ *   2. responder==='llm' + itinerary_gate_failed 降級（LLM 有草稿戴警告）仍回兩段、不 throw。
+ *   3. responder==='stub' 純降級（budget/transport 回泛用 stub）⇒ 透傳裸 result、不戴
+ *      OUTBOUND_HEADER，與 respond fork 降級呈現對齊（holistic review I-1）。
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -84,7 +86,7 @@ describe('createVisionDraftAgent', () => {
     expect(out.text).toContain('住宿')
   })
 
-  it('responder 降級時仍回兩段、不 throw', async () => {
+  it('responder==llm + itinerary_gate_failed 降級（LLM 有草稿戴警告）仍回兩段、不 throw', async () => {
     const responder = {
       respond: vi.fn(
         async (): Promise<PartnerGroupRespondResult> => ({
@@ -102,6 +104,27 @@ describe('createVisionDraftAgent', () => {
     // 降級 meta 應透傳，不被本檔吞掉。
     expect(out.meta?.degraded).toBe(true)
     expect(out.meta?.error).toBe('itinerary_gate_failed')
+  })
+
+  it('responder==stub 純降級（budget/transport 回泛用 stub）⇒ 透傳裸 result、不包兩段', async () => {
+    // 純 stub（無實質草稿）：smart-reply-agent degraded() 的形狀。
+    const stubResult: PartnerGroupRespondResult = {
+      text: '收到，我先記下來。這批我目前先跑安全版助理流程……',
+      meta: { responder: 'stub', model: 'claude-x', degraded: true, error: 'cost_cap_exceeded' },
+    }
+    const responder = {
+      respond: vi.fn(async (): Promise<PartnerGroupRespondResult> => stubResult),
+    }
+    const out = await createVisionDraftAgent({ responder })(
+      { isConversation: true, summary: 's', knownFacts: [], gaps: ['航班'] },
+      makeInput()
+    )
+    // 透傳裸 result —— 不戴 OUTBOUND/INTERNAL_HEADER（避免泛用 stub 被誤標為可複製給客人）。
+    expect(out).toEqual(stubResult)
+    expect(out.text).not.toContain(OUTBOUND_HEADER)
+    expect(out.text).not.toContain(INTERNAL_HEADER)
+    expect(out.meta?.responder).toBe('stub')
+    expect(out.meta?.error).toBe('cost_cap_exceeded')
   })
 
   it('無 gaps 時內部段寫「無」', async () => {

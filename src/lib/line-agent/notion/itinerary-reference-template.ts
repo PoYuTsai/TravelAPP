@@ -21,6 +21,12 @@
  * 的日程骨架（刻意去掉該 doc 的 `#`/`>` 文件 chrome 與 Retrieval Hints meta，只留可注入的活動骨架；
  * 並把原 body 的具體航班碼 BR257/BR258 改為「待確認」、移除 `**` 粗體）。兩處須同步維持乾淨。
  */
+/**
+ * **無生產 consumer**（2026-06-17 holistic review M-1）：T2 golden 範本反轉後，
+ * 排行程注入主幹改走 `goldenTrunk()`（itinerary-reference-source.ts），不再經本骨架；
+ * 本常數目前僅由自身的 itinerary-reference-template.test.ts drift-guard 引用，
+ * 作為 curated 乾淨參照保留（不刪——drift-guard 仍鎖死其乾淨度）。
+ */
 export const ITINERARY_TEMPLATE_SKELETON = `<套餐訂製>清邁親子5天4夜經典套餐
 Day 1｜抵達清邁・放鬆展開旅程
 ・機場接機（早班抵達，航班待確認）
