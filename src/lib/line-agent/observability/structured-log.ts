@@ -49,6 +49,12 @@ export interface AgentLogFieldsByEvent {
     /** Fixed degraded code（e.g. roundtrip_failed）— never content. */
     degradedReason?: string
     reason?: string
+    /**
+     * vision_intake 真客人對話分叉（design 決策 #2，固定碼 draft|respond，
+     * never content）：draft ＝ 行程類截圖走 golden 範本草稿路；respond ＝
+     * 開放題走 agentic 路。
+     */
+    visionIntent?: 'draft' | 'respond'
   }
   llm_call: {
     model?: string

@@ -76,6 +76,8 @@ interface ResponderFakes {
   fetchImage: ReturnType<typeof vi.fn>
   need: ReturnType<typeof vi.fn>
   agent: ReturnType<typeof vi.fn>
+  draftAgent: ReturnType<typeof vi.fn>
+  classify: ReturnType<typeof vi.fn>
 }
 
 function makeResponder(
@@ -94,11 +96,23 @@ function makeResponder(
           meta: { responder: 'llm', model: 'claude-x' },
         })
       ),
+    draftAgent:
+      overrides.draftAgent ??
+      vi.fn(
+        async (): Promise<PartnerGroupRespondResult> => ({
+          text: '草稿',
+          meta: { responder: 'llm' },
+        })
+      ),
+    // 預設 'respond' → 維持現行行為（走 agent），既有測試不回歸。
+    classify: overrides.classify ?? vi.fn(async () => 'respond'),
   }
   const responder = createVisionSmartReplyResponder({
     fetchImage: fakes.fetchImage as never,
     need: fakes.need as never,
     agent: fakes.agent as never,
+    draftAgent: fakes.draftAgent as never,
+    classify: fakes.classify as never,
   })
   return { responder, fakes }
 }
@@ -114,6 +128,39 @@ describe('createVisionSmartReplyResponder', () => {
     expect(fakes.agent).toHaveBeenCalledWith(CONVERSATION_BRIEF, expect.anything())
     expect(result.text).toBe(AGENT_TWO_SEGMENT)
     expect(result.meta?.responder).toBe('llm')
+  })
+
+  it('1b. 行程類 brief → 走 draftAgent，不走 agent', async () => {
+    const need = vi.fn(async () => ({
+      ...CONVERSATION_BRIEF,
+      summary: '想排清邁五天行程',
+    }))
+    const classify = vi.fn(async () => 'draft')
+    const { responder, fakes } = makeResponder({ need, classify })
+    const result = await responder.respond(makeInput(makeEvent()))
+
+    expect(fakes.classify).toHaveBeenCalledWith('想排清邁五天行程')
+    expect(fakes.draftAgent).toHaveBeenCalledTimes(1)
+    expect(fakes.draftAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ summary: '想排清邁五天行程' }),
+      expect.anything()
+    )
+    expect(fakes.agent).not.toHaveBeenCalled()
+    expect(result.text).toBe('草稿')
+  })
+
+  it('1c. 開放題 brief → 走 agent，不走 draftAgent（現行行為不變）', async () => {
+    const need = vi.fn(async () => ({
+      ...CONVERSATION_BRIEF,
+      summary: '清邁現在天氣如何',
+    }))
+    const classify = vi.fn(async () => 'respond')
+    const { responder, fakes } = makeResponder({ need, classify })
+    await responder.respond(makeInput(makeEvent()))
+
+    expect(fakes.classify).toHaveBeenCalledWith('清邁現在天氣如何')
+    expect(fakes.agent).toHaveBeenCalledTimes(1)
+    expect(fakes.draftAgent).not.toHaveBeenCalled()
   })
 
   it('2. non-conversation: fixed sentence, agent NOT called, degraded not_a_conversation', async () => {

@@ -58,6 +58,20 @@ export interface CreateVisionSmartReplyResponderDeps {
   need: VisionNeedSource
   /** 截圖智慧回覆 agentic 迴圈（Task 3.2）— 已產兩段輸出。 */
   agent: SmartReplyAgent
+  /**
+   * 真客人對話的意圖分叉（design 決策 #2）：'draft' ＝ 行程類截圖走 golden 範本
+   * 草稿路；'respond' ＝ 開放題走現行 agentic 路。
+   *
+   * 可選：未注入 ⇒ 視為 'respond'，行為與現行 byte-identical（接線在 Task 7，
+   * fail-open try-catch 由 composition root wrapper 保證，不在本檔）。
+   */
+  classify?: (summary: string) => Promise<'draft' | 'respond'>
+  /**
+   * 行程類草稿 responder（Task 6 造本體）。簽名同 `agent`。
+   *
+   * 可選：未注入但 classify 回 'draft' ⇒ 安全退回 `agent`（永不無回覆）。
+   */
+  draftAgent?: SmartReplyAgent
 }
 
 /** fail-closed degraded result（固定句＋fixed-code meta，永不 throw）。 */
@@ -138,8 +152,20 @@ export function createVisionSmartReplyResponder(
           )
         }
 
-        // 5. 真客人對話 ⇒ 交給 agentic 迴圈（已產兩段輸出）。
-        input.log?.('route_decision', { path: 'vision_intake' })
+        // 5. 真客人對話 ⇒ 先判行程類 vs 開放題（design 決策 #2）。
+        //    classify 未注入 ⇒ 視為 'respond'，與現行行為 byte-identical。
+        const kind = deps.classify ? await deps.classify(brief.summary) : 'respond'
+        if (kind === 'draft' && deps.draftAgent) {
+          input.log?.('route_decision', {
+            path: 'vision_intake',
+            visionIntent: 'draft',
+          })
+          return await deps.draftAgent(brief, input)
+        }
+        input.log?.('route_decision', {
+          path: 'vision_intake',
+          visionIntent: 'respond',
+        })
         return await deps.agent(brief, input)
       } catch {
         // 任何意外錯誤一律收斂 UNAVAILABLE，絕不 throw、絕不 500 webhook。
