@@ -24,6 +24,42 @@ export interface ItineraryHints {
   themeHints: string[]
 }
 
+export interface ItineraryDuration {
+  days?: number
+  nights?: number
+}
+
+/**
+ * Derive trip duration from 行程框架 free text (第2刀：治「天數-」). The real
+ * private_2026 corpus rarely fills an explicit 天數/夜數 column; the signal lives
+ * in the snippet. Deterministic, conservative, whitelist-style — never invents:
+ *
+ *   1. 「X天Y夜」(spaces tolerated) → days AND nights (most explicit, wins).
+ *   2. else 「X天」alone → days only — NEVER auto-derive nights = days - 1
+ *      (mirrors the adapter's duration rule).
+ *   3. else max「Day N」framework marker → days only.
+ *
+ * Only ARABIC digits match, so a sub-trip written「寮國一日遊」(Chinese numeral)
+ * can never be mistaken for the total duration. No signal → empty object.
+ */
+export function parseItineraryDuration(text: string): ItineraryDuration {
+  if (!text || text.trim().length === 0) return {}
+
+  const both = text.match(/(\d+)\s*天\s*(\d+)\s*夜/)
+  if (both) return { days: Number(both[1]), nights: Number(both[2]) }
+
+  const daysOnly = text.match(/(\d+)\s*天/)
+  if (daysOnly) return { days: Number(daysOnly[1]) }
+
+  let maxDay = 0
+  for (const m of text.matchAll(/Day\s*(\d+)/gi)) {
+    maxDay = Math.max(maxDay, Number(m[1]))
+  }
+  if (maxDay > 0) return { days: maxDay }
+
+  return {}
+}
+
 // Chinese place token → canonical area hint. Half/full-width variants share a token.
 const AREA_ALIASES: Record<string, string> = {
   清邁: 'chiangmai',

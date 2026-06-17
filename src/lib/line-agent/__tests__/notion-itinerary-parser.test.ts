@@ -25,7 +25,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { parseItineraryHints } from '../notion/itinerary-parser'
+import { parseItineraryHints, parseItineraryDuration } from '../notion/itinerary-parser'
 import { notionPagesToRagRecords } from '../notion/notion-rag-adapter'
 import { buildRagIndex, queryRagIndex, toPartnerSafeView } from '../notion/rag-index'
 import {
@@ -241,5 +241,62 @@ describe('partner-safe view keeps derived hints, drops private context', () => {
     expect(serialized).not.toContain('8000') // profit
     expect(serialized).not.toContain('王先生') // customer name
     expect(serialized).not.toContain(REAL_2026_FIXTURE_DATABASE_ID)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 11: duration extraction（第2刀：治「天數-」——92 筆真語料無顯式 天數 欄）
+// ---------------------------------------------------------------------------
+
+describe('parseItineraryDuration — 從行程內文補天數', () => {
+  it('「X天Y夜」標題 ⇒ days + nights 都抽得到', () => {
+    expect(parseItineraryDuration('清邁親子5天4夜經典套餐')).toEqual({ days: 5, nights: 4 })
+    expect(parseItineraryDuration('泰北芳縣深度 6 天 5 夜')).toEqual({ days: 6, nights: 5 })
+  })
+
+  it('只有「X天」（無夜）⇒ 只回 days，絕不自行推 nights=days-1', () => {
+    expect(parseItineraryDuration('清邁親子 5 天：動物園 + 大象')).toEqual({ days: 5 })
+  })
+
+  it('無「天」字 ⇒ 退而由 Day N 框架取最大日為 days（nights 不推）', () => {
+    const snippet = 'Day 1｜抵達\nDay 2｜大象\nDay 3｜送機'
+    expect(parseItineraryDuration(snippet)).toEqual({ days: 3 })
+  })
+
+  it('子行程「一日遊」絕不誤判為總天數', () => {
+    expect(parseItineraryDuration('Day 1｜清邁\nDay 2｜寮國一日遊')).toEqual({ days: 2 })
+  })
+
+  it('無任何天數訊號 ⇒ 空物件（不亂補）', () => {
+    expect(parseItineraryDuration('清邁 大象 親子')).toEqual({})
+  })
+})
+
+describe('adapter：顯式 天數 欄缺時，由 itinerarySnippet 補 days/nights', () => {
+  it('無 天數/夜數 欄但 snippet 有「5天4夜」⇒ facts.days/nights 補上', () => {
+    const [rec] = notionPagesToRagRecords(
+      [
+        {
+          id: 'no-duration-col',
+          properties: { 行程框架: '清邁親子5天4夜：動物園 + 大象保護營' },
+        },
+      ],
+      { sourceTable: 'private_2026' }
+    )
+    expect(rec.facts.days).toBe(5)
+    expect(rec.facts.nights).toBe(4)
+  })
+
+  it('顯式 天數 欄永遠優先於 snippet 推導', () => {
+    const [rec] = notionPagesToRagRecords(
+      [
+        {
+          id: 'explicit-wins',
+          properties: { 天數: 7, 行程框架: '清邁親子5天4夜' },
+        },
+      ],
+      { sourceTable: 'private_2026' }
+    )
+    expect(rec.facts.days).toBe(7)
   })
 })

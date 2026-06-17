@@ -27,7 +27,7 @@ import type {
   NotionPageFixture,
 } from './types'
 import { normalizeField } from './field-policy'
-import { parseItineraryHints } from './itinerary-parser'
+import { parseItineraryHints, parseItineraryDuration } from './itinerary-parser'
 import {
   buildRagIndexRecord,
   type RagCaseFacts,
@@ -244,6 +244,16 @@ function parseProperties(properties: Record<string, unknown>): ParsedPage {
     }
     if (facts.themeHints === undefined && derived.themeHints.length > 0) {
       facts.themeHints = derived.themeHints
+    }
+
+    // Duration fallback（第2刀：治「天數-」）：顯式 天數/夜數 欄缺時，由行程內文
+    // 補 days/nights。顯式欄位永遠優先；snippet 推導絕不自行推 nights = days - 1。
+    const duration = parseItineraryDuration(facts.itinerarySnippet)
+    if (facts.days === undefined && duration.days !== undefined) {
+      facts.days = duration.days
+    }
+    if (facts.nights === undefined && duration.nights !== undefined) {
+      facts.nights = duration.nights
     }
   }
 
