@@ -54,7 +54,9 @@ describe('resolveItineraryReferenceSource — 閘控', () => {
     const r = await source!('清邁親子5天4夜 大象 水上樂園，長輩坐輪椅，住古城')
 
     expect(getIndex).toHaveBeenCalledTimes(1)
-    expect(r?.source).toBe('case')
+    // 第3刀：need 含「5天4夜」⇒ matchGoldenCase 命中經典 ⇒ source=golden（優先級反轉）。
+    // 本測重點為 wiring（getIndex 被叫＋deriveCaseProfile 真接上），source 值隨第3刀改。
+    expect(r?.source).toBe('golden')
     expect(r?.skeleton).toMatch(/Day 1｜/)
     expect(r?.profile?.mobility?.type).toMatch(/limited|wheelchair/)
     expect(r?.profile?.stayArea).toBe('chiangmai_old_city')

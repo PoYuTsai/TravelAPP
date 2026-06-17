@@ -15,11 +15,13 @@ import { toItineraryReference } from './itinerary-reference'
 import {
   GOLDEN_CHIANGMAI_FAMILY_5D4N,
   GOLDEN_NORTHERN_DEEP_6D5N,
+  GOLDEN_LI_FAMILY_ELDERLY_7D6N,
+  GOLDEN_NEWYEAR_5D4N,
 } from './itinerary-reference-template'
 import type { ItineraryCaseProfile } from './customer-itinerary-gate'
 
 export interface SelectedReference {
-  source: 'case' | 'template'
+  source: 'golden' | 'case' | 'template'
   skeleton: string
 }
 
@@ -31,7 +33,7 @@ export interface SelectedReference {
  */
 export interface ItineraryReferenceResult {
   skeleton: string
-  source: 'case' | 'template'
+  source: 'golden' | 'case' | 'template'
   profile: ItineraryCaseProfile | null
 }
 
@@ -58,16 +60,102 @@ function goldenTrunk(): string {
   ].join('\n')
 }
 
+/** 跨年/天燈/CAD 消歧關鍵字（5 天時用以從經典分流到跨年；天數抽不到時亦用於 fallback）。 */
+const NEWYEAR_KEYWORDS = /跨年|天燈|新年|CAD|水燈/
+/** 長輩/行動不便消歧關鍵字（天數抽不到時 fallback 到李先生案）。 */
+const ELDERLY_KEYWORDS = /長輩|輪椅|年長|行動不便|銀髮/
+/** 泰北深度消歧關鍵字（天數抽不到時 fallback 到深度案）。 */
+const DEEP_KEYWORDS = /深度|芳縣|清萊|金三角|泰北深度/
+
+const CN_DIGITS: Record<string, number> = {
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+  十: 10,
+}
+
+/**
+ * 從 need 抽天數：先抓「(數字)(天|日)」（阿拉伯或單一中文數字一~十）。
+ * 取**第一個**匹配（避免「5天4夜」誤抓 4 夜——「夜」不在單位內，且天數優先）。
+ * 抽不到回 null。
+ */
+function extractDays(need: string): number | null {
+  const m = need.match(/([0-9]+|[一二三四五六七八九十])\s*[天日]/)
+  if (!m) return null
+  const token = m[1]
+  if (/^[0-9]+$/.test(token)) return parseInt(token, 10)
+  return CN_DIGITS[token] ?? null
+}
+
+interface GoldenCase {
+  id: string
+  skeleton: string
+}
+
+const GOLDEN_CLASSIC: GoldenCase = { id: 'classic-5d4n', skeleton: GOLDEN_CHIANGMAI_FAMILY_5D4N }
+const GOLDEN_DEEP: GoldenCase = { id: 'northern-6d5n', skeleton: GOLDEN_NORTHERN_DEEP_6D5N }
+const GOLDEN_LI: GoldenCase = { id: 'li-7d6n', skeleton: GOLDEN_LI_FAMILY_ELDERLY_7D6N }
+const GOLDEN_NEWYEAR: GoldenCase = { id: 'newyear-5d4n', skeleton: GOLDEN_NEWYEAR_5D4N }
+
+/**
+ * 第3刀：golden 檢索優先級 matcher。**天數為主鍵、關鍵字消歧**。
+ *
+ * - 抽到 days：5→（跨年關鍵字勝出則跨年，否則經典）；6→深度；7→李先生；其他（4/8…）→ null。
+ * - 抽不到 days：關鍵字 fallback（跨年 > 李先生 > 深度），都沒 → null。
+ *
+ * 命中回該案 {id, skeleton}（skeleton 為權威範本，呼叫端**絕不**送 sanitizer）；不命中回 null。
+ */
+export function matchGoldenCase(need: string): GoldenCase | null {
+  const days = extractDays(need)
+  if (days !== null) {
+    if (days === 5) return NEWYEAR_KEYWORDS.test(need) ? GOLDEN_NEWYEAR : GOLDEN_CLASSIC
+    if (days === 6) return GOLDEN_DEEP
+    if (days === 7) return GOLDEN_LI
+    return null // 其他天數（4、8…）目前無 golden
+  }
+  // 天數抽不到 → 關鍵字 fallback（消歧優先序：跨年 > 李先生 > 深度）
+  if (NEWYEAR_KEYWORDS.test(need)) return GOLDEN_NEWYEAR
+  if (ELDERLY_KEYWORDS.test(need)) return GOLDEN_LI
+  if (DEEP_KEYWORDS.test(need)) return GOLDEN_DEEP
+  return null
+}
+
 export function selectItineraryReference(index: RagIndex, need: string): SelectedReference {
-  const trunk = goldenTrunk()
+  // 第3刀：先比對四案。命中 ⇒ 只放該 golden 排第一（優先級非擴主幹），切 source=golden。
+  const matched = matchGoldenCase(need)
+
+  // 沿用既有迴圈取第一個 sanitize 成功的 RAG 相似案（可微調素材）。
+  let firstRef: { skeleton: string } | null = null
   const hits = retrieveRagCases(index, need)
   for (const hit of hits) {
     const ref = toItineraryReference(hit) // 相似案於此過 sanitizeItinerarySnippet（去個資/航班碼）
     if (ref) {
-      // 第一個 sanitize 成功的相似案附為「可微調素材」，主幹仍為兩套 golden。
-      const skeleton = `${trunk}\n\n【參考真實案例（可微調素材，非主幹）】\n${ref.skeleton}`
-      return { source: 'case', skeleton }
+      firstRef = ref
+      break
     }
+  }
+
+  if (matched) {
+    // 命中路徑：只放該 matched golden（不再 dump 兩套 trunk）。matched 是權威範本，
+    // **絕不**過 sanitizer；只有 RAG firstRef 段（已於 toItineraryReference 內 sanitize）附後。
+    let skeleton = `【最相符 golden 範本（依需求套日期/微調）】\n${matched.skeleton}`
+    if (firstRef) {
+      skeleton += `\n\n【參考真實案例（可微調素材，非主幹）】\n${firstRef.skeleton}`
+    }
+    return { source: 'golden', skeleton }
+  }
+
+  // 未命中：維持現行 trunk 路徑（firstRef 有 → case；無 → template）。
+  const trunk = goldenTrunk()
+  if (firstRef) {
+    const skeleton = `${trunk}\n\n【參考真實案例（可微調素材，非主幹）】\n${firstRef.skeleton}`
+    return { source: 'case', skeleton }
   }
   return { source: 'template', skeleton: trunk }
 }
