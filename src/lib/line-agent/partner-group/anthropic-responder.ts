@@ -40,7 +40,7 @@ import type {
 
 const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages'
 const ANTHROPIC_VERSION = '2023-06-01'
-const MAX_TOKENS = 1024
+const MAX_TOKENS = 4096
 
 /** 外部佐證刀 — 每題搜尋次數上限（design §3 成本：3 × $0.01 ≈ $0.03/題）。 */
 const WEB_SEARCH_MAX_USES = 3
@@ -54,6 +54,35 @@ const MAX_SOURCE_URLS = 3
 /** Q2 排行程降級註記（design 2026-06-13）：兩次都過不了 tripwire 時附在原文後。 */
 const DEGRADE_NOTE =
   '\n\n⚠️ 此行程草稿格式未過自動檢查，報價器可能無法直接解析，請 Eric 確認。'
+
+/**
+ * 排行程二段流程 Pass 2 查核指示（design 2026-06-17）— web research 與「是不是
+ * 排行程」解耦：Pass 1 先出乾淨草稿（關 web，保格式），Pass 2 才開 web 查核不確定
+ * 的事實（開放時間、節慶/活動日期、景點/路線是否存在、季節性歇業），改錯後以
+ * **完全相同**的 customer_itinerary_v1 格式重出整份行程（不得格式漂移）。附在
+ * system 末段、Pass 1 草稿放在 user content。
+ */
+const ITINERARY_WEB_VERIFY_NOTE =
+  '【行程查核要求｜web_search】上方使用者訊息內附的是一份已照 customer_itinerary_v1 格式排好的行程草稿。請用 web_search 查核草稿中不確定的事實性內容（景點開放時間、節慶/活動日期、某景點或路線是否存在、季節性歇業/關閉），修正任何錯誤；查核完成後，請以「完全相同」的 customer_itinerary_v1 格式（三行 header＋連續 Day N｜ 純文字結構）重新輸出整份行程，不得改變格式、不得只回修正摘要。確定無誤處原樣保留。'
+
+/**
+ * 排行程日期基準（design 2026-06-17）— 把 now 格式化成「2026年6月17日（週三）」，
+ * 以 Asia/Taipei 為準（夥伴/Eric 在台灣；年份判斷不受伺服器 UTC 換日影響）。
+ */
+function formatTaipeiDateLabel(now: Date): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('zh-TW', {
+      timeZone: 'Asia/Taipei',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      weekday: 'short',
+    })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value])
+  )
+  return `${parts.year}年${parts.month}月${parts.day}日（${parts.weekday}）`
+}
 
 /** Safe-default fallback: stub text, observably tagged with the error code. */
 function degraded(model: string, error: string): PartnerGroupRespondResult {
@@ -102,6 +131,12 @@ export interface AnthropicPartnerGroupResponderDeps {
    */
   costCap: DailyCostCap
   /**
+   * 排行程日期基準時鐘（design 2026-06-17 年份 bug）— OPTIONAL，預設真時鐘
+   * `() => new Date()`。draft intent 才取值注入 system「今天日期」；測試注入固定
+   * 時鐘求決定性。讀時鐘不違反「不讀 env」鐵律（時鐘非 env）。
+   */
+  now?: () => Date
+  /**
    * 外部佐證刀 — web_search server tool 開關。composition root（webhook /
    * CLI）用 canUseExternalTool 判定後注入；responder 不讀 env 鐵律不破。
    * 省略 / false ⇒ request body 與現行 byte-identical。
@@ -117,6 +152,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
   private readonly knowledgeSource?: QaKnowledgeSource
   private readonly itineraryReferenceSource?: ItineraryReferenceSource
   private readonly costCap: DailyCostCap
+  private readonly now: () => Date
   private readonly webSearchEnabled: boolean
 
   constructor(deps: AnthropicPartnerGroupResponderDeps) {
@@ -127,6 +163,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     this.knowledgeSource = deps.knowledgeSource
     this.itineraryReferenceSource = deps.itineraryReferenceSource
     this.costCap = deps.costCap
+    this.now = deps.now ?? (() => new Date())
     this.webSearchEnabled = deps.webSearchEnabled === true
   }
 
@@ -184,12 +221,21 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
 
     // 外部佐證刀 — per-request 防衛性收窄：deps 開閘之外，本則訊息還要確實
     // 是 bot-directed 且不在 OA 客人面（tool-gate 第 1/4 關在最後一哩重判，
-    // 只會收窄、永不放寬）。
-    const allowWebSearch =
+    // 只會收窄、永不放寬）。design 2026-06-17：web research 與「是不是排行程」
+    // 解耦 — toolGateOpen 是純工具閘信號（與非 draft 路徑同一組守衛，line_oa /
+    // botDirected 不鬆）；draft 的 Pass 1 仍硬關 web（保格式），Pass 2 才吃
+    // toolGateOpen。非 draft 路徑 allowWebSearch 與現行完全相同。
+    const toolGateOpen =
       this.webSearchEnabled &&
-      input.intent.action !== 'draft' &&            // 行程類草稿一律關 web（design §5.6）
       input.event.sourceChannel !== 'line_oa' &&
       (input.botDirected ?? input.event.mentionsBot) === true
+    const allowWebSearch = toolGateOpen && input.intent.action !== 'draft'
+
+    // 排行程日期基準（design 2026-06-17 年份 bug）— 只 draft intent 注入「今天日期」，
+    // 非 draft 留 undefined ⇒ system byte-identical。文字路與截圖路都以 draft intent
+    // 走此 responder，故一處修正同治兩路。
+    const currentDate =
+      input.intent.action === 'draft' ? formatTaipeiDateLabel(this.now()) : undefined
 
     // ── single LLM round, repeatable ────────────────────────────────────────
     // Q2 排行程 tripwire（design 2026-06-13）needs to re-issue the call with a
@@ -197,14 +243,28 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     // parse → spend → finalText path lives in runOnce. correctionNote 非空時
     // 附加到 system 末段，要 LLM 依 problems 重出 v1（第一次呼叫 undefined ⇒
     // system 與現行 byte-identical）。
-    const runOnce = async (correctionNote?: string): Promise<PartnerGroupRespondResult> => {
+    // runOnce 走完整 transport → parse → spend → finalText 一輪，spend/log 一致。
+    // opts（design 2026-06-17 二段流程）：
+    //   webOverride —— 覆蓋本輪 tool 掛載與搜尋費記帳（Pass 2 需 web 開，但
+    //                   allowWebSearch 對 draft 恆 false）；省略 ⇒ 用 allowWebSearch。
+    //   systemSuffix —— 接在 system 末段的指示（Pass 2 的查核要求）。
+    //   userContent —— 覆蓋 user message 內容（Pass 2 餵 Pass 1 草稿）；省略 ⇒ input.text。
+    //   logPass —— llm_call log 加一個固定數字標籤區分 Pass（不記任何內容）。
+    const runOnce = async (
+      correctionNote?: string,
+      opts?: { webOverride?: boolean; systemSuffix?: string; userContent?: string; logPass?: number }
+    ): Promise<PartnerGroupRespondResult> => {
+      const useWebSearch = opts?.webOverride ?? allowWebSearch
       const baseSystem = buildPartnerGroupSystemPrompt(input, knowledge, {
-        webSearchEnabled: allowWebSearch,
+        webSearchEnabled: useWebSearch,
         itineraryReference: reference?.skeleton ?? undefined,
+        currentDate,
       })
-      const system = correctionNote
+      let system = correctionNote
         ? `${baseSystem}\n\n【格式修正要求】上一版排行程草稿未通過自動檢查（customer_itinerary_v1），請依下列問題重新輸出，務必補齊每個 Day N｜ 標題與可解析的日期/人數 header：\n${correctionNote}`
         : baseSystem
+      if (opts?.systemSuffix) system = `${system}\n\n${opts.systemSuffix}`
+      const userContent = opts?.userContent ?? input.text
       const startedAt = Date.now()
 
       let response: Response
@@ -220,8 +280,8 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
             model,
             max_tokens: MAX_TOKENS,
             system,
-            messages: [{ role: 'user', content: input.text }],
-            ...(allowWebSearch
+            messages: [{ role: 'user', content: userContent }],
+            ...(useWebSearch
               ? {
                   tools: [
                     { type: 'web_search_20250305', name: 'web_search', max_uses: WEB_SEARCH_MAX_USES },
@@ -302,7 +362,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       const usageMissing =
         typeof inputTokensRaw !== 'number' || typeof outputTokensRaw !== 'number'
       const inputTokens = usageMissing
-        ? Math.ceil((system.length + input.text.length) / 4)
+        ? Math.ceil((system.length + userContent.length) / 4)
         : (inputTokensRaw as number)
       const outputTokens = usageMissing ? MAX_TOKENS : (outputTokensRaw as number)
       // 搜尋費補項（外部佐證刀）：usage.server_tool_use.web_search_requests ×
@@ -312,7 +372,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
       const searchRequests =
         typeof searchRequestsRaw === 'number' && searchRequestsRaw > 0 ? searchRequestsRaw : 0
       const billedSearches =
-        usageMissing && allowWebSearch ? WEB_SEARCH_MAX_USES : searchRequests
+        usageMissing && useWebSearch ? WEB_SEARCH_MAX_USES : searchRequests
       const costUsd =
         estimateCostUsd(model, inputTokens, outputTokens) +
         billedSearches * WEB_SEARCH_COST_PER_REQUEST_USD
@@ -334,6 +394,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
           degradedReason: 'anthropic_parse_error',
           ...(usageMissing ? { usageMissing: true } : {}),
           ...(billedSearches > 0 ? { webSearchRequests: billedSearches } : {}),
+          ...(opts?.logPass ? { pass: opts.logPass } : {}),
         })
         return degraded(model, 'anthropic_parse_error')
       }
@@ -357,12 +418,18 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
         outcome: 'ok',
         ...(usageMissing ? { usageMissing: true } : {}),
         ...(billedSearches > 0 ? { webSearchRequests: billedSearches } : {}),
+        ...(opts?.logPass ? { pass: opts.logPass } : {}),
       })
       return { text: finalText, meta: { responder: 'llm', model } }
     }
 
-    // ── draft intent（排行程）→ tripwire：過閘原樣回／失敗帶 problems 重產 1 次／
-    //    再失敗降級保留原文＋未過檢註記（真群永遠有回覆）。非 draft 路徑完全不動。
+    // ── draft intent（排行程）→ 二段流程（design 2026-06-17）：
+    //    Pass 1：tripwire 出乾淨草稿（關 web，保格式）— 過閘原樣回／失敗帶
+    //            problems 重產 1 次／再失敗降級保留原文＋未過檢註記。
+    //    Pass 2：toolGateOpen 時對 Pass 1 乾淨草稿做 web 佐證修正並 re-gate；過
+    //            閘採 Pass 2（附來源），失敗/降級回退 Pass 1（永不比今日差）。
+    //    web research 與「是不是排行程」解耦：Pass 1 恆關 web，Pass 2 才吃工具閘。
+    //    非 draft 路徑完全不動。
     if (input.intent.action === 'draft') {
       let result = await runOnce()
       // degraded（budget/transport/parse 已先回 stub）不進閘，原樣透出。
@@ -382,6 +449,26 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
             meta: { responder: 'llm', model, degraded: true, error: 'itinerary_gate_failed' },
           }
         }
+      }
+
+      // Pass 2 — web 佐證修正。只在 toolGateOpen 且 Pass 1 已過閘可用時發；
+      // 一次額外呼叫，spend/log 全走 runOnce。過閘 ⇒ 採 Pass 2（附來源連結）；
+      // 失敗/降級/再過不了閘 ⇒ 回退 Pass 1（永不比今日差）。
+      if (toolGateOpen) {
+        const verified = await runOnce(undefined, {
+          webOverride: true,
+          systemSuffix: ITINERARY_WEB_VERIFY_NOTE,
+          userContent: result.text,
+          logPass: 2,
+        })
+        if (verified.meta?.responder === 'llm') {
+          const verifiedGate = gateCustomerItineraryDraft(
+            verified.text,
+            reference?.profile ?? undefined
+          )
+          if (verifiedGate.ok) return verified
+        }
+        // Pass 2 降級或未過閘 ⇒ 回退 Pass 1（result 已是過閘的乾淨草稿）。
       }
       return result
     }

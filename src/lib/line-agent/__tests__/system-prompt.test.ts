@@ -343,6 +343,29 @@ describe('buildPartnerGroupSystemPrompt', () => {
       expect(prompt).toContain('夥伴需要完整資訊')
     })
 
+    // 2026-06-17 (Eric): 排行程草稿年份 bug — 模型不知今天幾號，亂猜 2024/2025；
+    // 且看到 OCR 開頭散落的數字（如人數「1」）會把「7/1~7/5」誤判成 1月。draft 路
+    // 注入「今天日期＋年份基準＋M/D 判讀規則」修正之；非 draft（無 currentDate）byte-identical。
+    describe('buildPartnerGroupSystemPrompt — 今天日期/年份基準（行程年份 bug）', () => {
+      it('未給 currentDate（省略 / 空白）⇒ 與現行 byte-identical（tripwire）', () => {
+        expect(buildPartnerGroupSystemPrompt(makeInput(), null, {})).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+        expect(
+          buildPartnerGroupSystemPrompt(makeInput(), null, { currentDate: '   ' })
+        ).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+      })
+
+      it('給 currentDate ⇒ 注入今天日期＋年份基準＋M/D 判讀規則（接 persona 之後）', () => {
+        const p = buildPartnerGroupSystemPrompt(makeInput(), null, {
+          currentDate: '2026年6月17日（週三）',
+        })
+        expect(p.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
+        expect(p).toContain('【今天日期】2026年6月17日（週三）')
+        expect(p).toContain('明年') // 跨年年份要遞增
+        expect(p).toContain('7/1~7/5') // M/D 同月判讀範例
+        expect(p).toContain('絕不可把開頭散落的數字') // 「1 7/1~7/5 → 1月」誤判
+      })
+    })
+
     it('順序：知識區塊在搜證條款之前、引用脈絡在最後', () => {
       const prompt = buildPartnerGroupSystemPrompt(
         { ...makeInput(), quotedBotContent: '昨天那個草稿' },

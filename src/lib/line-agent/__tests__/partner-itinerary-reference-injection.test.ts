@@ -249,12 +249,14 @@ describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（合併
 
     expect(result.meta?.responder).toBe('llm')
     const body = JSON.parse(calls[0].init.body as string)
+    // 無骨架（reference cut 的關注點）；draft 路另含日期區塊（年份 bug 2026-06-17），
+    // 故不再 byte-identical 到裸 persona，改驗「以 persona 開頭＋無骨架」。
     expect(body.system).not.toContain(REFERENCE_MARKER)
-    expect(body.system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    expect(body.system.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
     expect(entries().some((e) => e.event === 'itinerary_reference_unavailable')).toBe(true)
   })
 
-  it('source 回 null ⇒ system 與現行 byte-identical', async () => {
+  it('source 回 null ⇒ system 無骨架（draft 另含日期區塊，非裸 persona）', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: GOLDEN_BODY })
     const responder = new AnthropicPartnerGroupResponder({
       transport,
@@ -264,20 +266,20 @@ describe('AnthropicPartnerGroupResponder — 排行程 reference 注入（合併
 
     await responder.respond(makeInput('draft', '排個李家7天行程'))
 
-    expect(JSON.parse(calls[0].init.body as string).system).toBe(
-      PARTNER_GROUP_SYSTEM_PROMPT
-    )
+    const system = JSON.parse(calls[0].init.body as string).system
+    expect(system).not.toContain(REFERENCE_MARKER)
+    expect(system.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
   })
 
-  it('未注入 source（draft）⇒ 行為不變、system === baseline', async () => {
+  it('未注入 source（draft）⇒ 行為不變、system 以 persona 開頭且無骨架', async () => {
     const { transport, calls } = fakeTransport({ jsonValue: GOLDEN_BODY })
     const responder = new AnthropicPartnerGroupResponder({ transport, ...DEPS })
 
     await responder.respond(makeInput('draft', '排個李家7天行程'))
 
-    expect(JSON.parse(calls[0].init.body as string).system).toBe(
-      PARTNER_GROUP_SYSTEM_PROMPT
-    )
+    const system = JSON.parse(calls[0].init.body as string).system
+    expect(system).not.toContain(REFERENCE_MARKER)
+    expect(system.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
   })
 })
 

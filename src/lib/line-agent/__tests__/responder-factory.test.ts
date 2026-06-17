@@ -221,7 +221,11 @@ describe('createPartnerGroupResponder', () => {
     }).respond(draft)
 
     expect(JSON.parse(injected.calls[0].body).system).toContain(SKELETON)
-    expect(JSON.parse(omitted.calls[0].body).system).toBe(PARTNER_GROUP_SYSTEM_PROMPT)
+    // 省略 source ⇒ 無骨架；draft 路另含日期區塊（年份 bug 2026-06-17），故驗
+    // 「以 persona 開頭＋不含骨架」而非 byte-identical 到裸 persona。
+    const omittedSystem = JSON.parse(omitted.calls[0].body).system
+    expect(omittedSystem).not.toContain(SKELETON)
+    expect(omittedSystem.startsWith(PARTNER_GROUP_SYSTEM_PROMPT)).toBe(true)
   })
 
   it('decides from the injected models, NOT process.env', () => {

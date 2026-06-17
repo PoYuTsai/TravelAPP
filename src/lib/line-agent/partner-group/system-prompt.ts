@@ -81,9 +81,20 @@ export const PARTNER_GROUP_WEB_SEARCH_PROMPT = [
 export function buildPartnerGroupSystemPrompt(
   input: PartnerGroupRespondInput,
   knowledge?: string | null,
-  opts?: { webSearchEnabled?: boolean; itineraryReference?: string }
+  opts?: { webSearchEnabled?: boolean; itineraryReference?: string; currentDate?: string }
 ): string {
   const sections = [PARTNER_GROUP_SYSTEM_PROMPT]
+  // 今天日期區塊（design 2026-06-17 年份 bug）— OPTIONAL：composition root 只在
+  // draft intent 算出當前日期（Asia/Taipei）注入；缺席 ⇒ byte-identical（tripwire）。
+  // 治兩個誤判：①模型不知今天幾號 → 亂猜 2024/2025；②看到 OCR 開頭散落的數字
+  // （如人數「1」）把「7/1~7/5」誤判成 1月。接 persona 之後、其餘區塊之前（硬事實）。
+  const trimmedDate = opts?.currentDate?.trim()
+  if (trimmedDate) {
+    sections.push(
+      '',
+      `【今天日期】${trimmedDate}。排行程時所有年份一律以此為基準：客人或截圖只寫月/日（例如 7/1）沒寫年份時，預設用今年；若該月份在今年已過完，排到明年；跨年行程的年份要正確遞增（例如 12/31～1/4 應排成 2026/12/31～2027/01/04，而非同一年）。斜線日期一律解讀為「月/日」：7/1~7/5 是 7月1日到 7月5日（同一個月），不得改寫成跨月或跨年；絕不可把開頭散落的數字（例如人數「1」「1 7/1~7/5」中的 1）誤判成月份。`
+    )
+  }
   const trimmedKnowledge = knowledge?.trim()
   if (trimmedKnowledge) {
     sections.push('', trimmedKnowledge)
