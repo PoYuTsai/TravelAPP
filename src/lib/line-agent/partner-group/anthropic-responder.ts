@@ -187,6 +187,7 @@ export class AnthropicPartnerGroupResponder implements PartnerGroupResponder {
     // 只會收窄、永不放寬）。
     const allowWebSearch =
       this.webSearchEnabled &&
+      input.intent.action !== 'draft' &&            // 行程類草稿一律關 web（design §5.6）
       input.event.sourceChannel !== 'line_oa' &&
       (input.botDirected ?? input.event.mentionsBot) === true
 

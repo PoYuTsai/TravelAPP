@@ -316,6 +316,18 @@ describe('AnthropicPartnerGroupResponder — 外部佐證刀 web_search tool', (
     }).respond(input)
     expect('tools' in JSON.parse(calls[0].init.body as string)).toBe(false)
   })
+
+  it('draft intent 永不掛 web_search（即使 webSearchEnabled＋botDirected）', async () => {
+    // GOLDEN_BODY 第一次就過閘 ⇒ 單次呼叫，避免重產路徑干擾斷言。
+    const { transport, calls } = sequenceTransport([GOLDEN_BODY])
+    const input = makeInput('draft', '@bot 排個李家7天行程')
+    input.botDirected = true
+    await new AnthropicPartnerGroupResponder({
+      transport, ...DEPS, webSearchEnabled: true,
+    }).respond(input)
+    const body = JSON.parse(calls[0].init.body as string)
+    expect('tools' in body).toBe(false) // 行程類草稿一律關 web（design §5.6）
+  })
 })
 
 describe('AnthropicPartnerGroupResponder — 多 block 解析＋citations（外部佐證刀）', () => {
