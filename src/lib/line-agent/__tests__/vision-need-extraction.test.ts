@@ -121,6 +121,8 @@ describe('createAnthropicVisionNeedSource', () => {
     const source = createAnthropicVisionNeedSource({ transport: fakeTransport, apiKey: 'k', costCap: okCap })
     const brief = await source({ base64: 'AAAA', mediaType: 'image/jpeg' } as LineImageContent)
     expect(brief.knownFacts.join()).toContain('7/1-7/5')
+    // 以下 negative 僅自我文件化「期望輸出形狀」：stub 回傳由本測試自控，
+    // 不會因 production parse 改動而紅（非防跨月 parse 回歸的安全網）。真正有鑑別力的是上一行。
     expect(brief.knownFacts.join()).not.toMatch(/1月7日|跨.*月|7月5日.*1月/)
   })
 })
