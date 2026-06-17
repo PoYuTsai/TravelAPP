@@ -20,7 +20,13 @@ import type { NormalizedLineEvent } from '@/lib/line-agent/line/event-normalizer
 import type { CaseStore } from '@/lib/line-agent/storage/store'
 import { selectStore } from '@/lib/line-agent/storage/select-store'
 import { routeCommand, type RouterInput } from '@/lib/line-agent/commands/router'
-import { safeDefaultLlmClassifier } from '@/lib/line-agent/commands/intent'
+import {
+  classifyIntent,
+  safeDefaultLlmClassifier,
+} from '@/lib/line-agent/commands/intent'
+import { AnthropicPartnerGroupResponder } from '@/lib/line-agent/partner-group/anthropic-responder'
+import { createVisionDraftAgent } from '@/lib/line-agent/partner-group/vision-draft-agent'
+import type { ItineraryReferenceSource } from '@/lib/line-agent/notion/itinerary-reference-source'
 import type { PartnerGroupResponder } from '@/lib/line-agent/partner-group/responder'
 import {
   createPartnerGroupResponder,
@@ -509,6 +515,52 @@ function getSmartReplyAgentFactory(): SmartReplyAgentFactory {
   return _smartReplyAgentFactory ?? createSmartReplyAgent
 }
 
+/** draftAgent 的型別＝createVisionDraftAgent 的回傳（與 SmartReplyAgent 同型）。 */
+type SmartReplyAgent = ReturnType<typeof createVisionDraftAgent>
+
+/**
+ * classify wrapper（Task 7）— 把現有 `classifyIntent` 收斂成 vision 流程要的
+ * `(summary) => 'draft' | 'respond'`：action==='draft' → 'draft'、其餘 →
+ * 'respond'。
+ *
+ * try-catch FAIL-OPEN：classifyIntent / 注入 classifier 內部任何 throw ⇒
+ * 保守回 'respond'（走現行 agentic 路），絕不讓分類失敗變成 vision 無回覆或
+ * 誤把開放題塞進草稿路。LLM fallback 用 safeDefaultLlmClassifier（零 key、零
+ * 網路）— 行程類靠 'draft' 關鍵詞的 deterministic 命中即可，不額外燒 model。
+ */
+async function classifyVisionIntent(summary: string): Promise<'draft' | 'respond'> {
+  try {
+    const intent = await classifyIntent(summary, safeDefaultLlmClassifier)
+    return intent.action === 'draft' ? 'draft' : 'respond'
+  } catch {
+    return 'respond'
+  }
+}
+
+/**
+ * 行程類 draft responder（Task 7）— 為 vision draft 路專建的
+ * AnthropicPartnerGroupResponder 實例。雙保險關 web（webSearchEnabled:false，
+ * Task 3 也已讓 draft intent 一律關 web）、注入「同三閘來源」的
+ * itineraryReferenceSource（golden 骨架注入＋per-case gate）。閘關時 caller 不接
+ * 此 responder（見 getPartnerGroupResponder），故此 helper 只在閘開時被叫到。
+ */
+function buildItineraryDraftResponder(deps: {
+  models: ReturnType<typeof getPartnerResponderConfig>
+  costCap: ReturnType<typeof createDailyCostCap>
+  itineraryReferenceSource: ItineraryReferenceSource
+}): SmartReplyAgent {
+  const responder = new AnthropicPartnerGroupResponder({
+    transport: fetch,
+    apiKey: deps.models.anthropicApiKey,
+    defaultModel: deps.models.defaultModel,
+    researchModel: deps.models.researchModel,
+    costCap: deps.costCap,
+    itineraryReferenceSource: deps.itineraryReferenceSource,
+    webSearchEnabled: false, // draft 一律關 web（雙保險，Task 3）
+  })
+  return createVisionDraftAgent({ responder })
+}
+
 /**
  * Composition helper（Task 5.1）— 由閘控的「圖→need→agentic 兩段回」responder。
  *
@@ -527,6 +579,18 @@ export function buildSmartReplyVisionResponder(deps: {
   costCap: ReturnType<typeof createDailyCostCap>
   webSearchEnabled: boolean
   getRagIndex?: () => Promise<RagIndex>
+  /**
+   * 行程類分叉（Task 7）— 真客人對話的意圖判：'draft'＝行程類截圖走 golden
+   * 範本草稿路、'respond'＝開放題走現行 agentic 路。fail-open 由 wrapper 保證。
+   *
+   * 可選且 GATE-CONDITIONAL：caller 只在 RAG 閘（AI_AGENT_NOTION_RAG_ENABLED）
+   * 開時注入 classify＋draftAgent；閘關時兩者皆 undefined ⇒
+   * createVisionSmartReplyResponder 沿用其現行 'respond' default ⇒ vision 對話
+   * 路徑與現行 byte-identical（draft-keyword summary 也不會悄悄改走草稿路）。
+   */
+  classify?: (summary: string) => Promise<'draft' | 'respond'>
+  /** 行程類草稿 responder（Task 6）。同上 GATE-CONDITIONAL。 */
+  draftAgent?: SmartReplyAgent
 }): PartnerGroupResponder | undefined {
   if (!deps.apiKey) return undefined
 
@@ -549,6 +613,10 @@ export function buildSmartReplyVisionResponder(deps: {
       env: process.env,
     }),
     agent,
+    // GATE-CONDITIONAL：閘關 ⇒ caller 不傳 ⇒ 兩者 undefined ⇒ vision 對話路徑
+    // byte-identical。conditional-spread 兼顧 exactOptionalPropertyTypes。
+    ...(deps.classify ? { classify: deps.classify } : {}),
+    ...(deps.draftAgent ? { draftAgent: deps.draftAgent } : {}),
   })
 }
 
@@ -683,12 +751,30 @@ export function getPartnerGroupResponder(): PartnerGroupResponder {
     // 觸發＝引用圖＋tag（quotedImage 由 handler 以 store 判定後線入 respondInput）。
     // fetchImage 的 channel token 在 CALL time 讀（mirror reply client）。need 抽取
     // 與 agent 共用同一個 daily cost cap。
+    // 行程類分叉（Task 7）— GATE-CONDITIONAL：只在 RAG 閘開且
+    // itineraryReferenceSource 真接上時，才把 classify＋draftAgent 線入 vision
+    // 流程。閘關 ⇒ 兩者皆 undefined ⇒ createVisionSmartReplyResponder 維持現行
+    // 全走 agent 的 'respond' 路 ⇒ vision 對話路徑與現行 byte-identical（最高
+    // 驗收標準）。draft responder 注入「同一份」itineraryReferenceSource（與 base
+    // 共用同三閘來源、同 sharedItineraryIndexLoader），web 雙保險關。
+    const visionDraftFork =
+      ragEnabled && itineraryReferenceSource
+        ? {
+            classify: classifyVisionIntent,
+            draftAgent: buildItineraryDraftResponder({
+              models,
+              costCap,
+              itineraryReferenceSource,
+            }),
+          }
+        : {}
     const visionIntake = buildSmartReplyVisionResponder({
       apiKey: models.anthropicApiKey,
       defaultModel: models.defaultModel,
       costCap,
       webSearchEnabled: webSearchGate.allowed,
       getRagIndex: ragEnabled ? sharedItineraryIndexLoader : undefined,
+      ...visionDraftFork,
     })
     _partnerGroupResponder = createPartnerGroupResponderWithRagDraft({
       base,
