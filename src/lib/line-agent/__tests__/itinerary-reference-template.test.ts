@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { ITINERARY_TEMPLATE_SKELETON } from '../notion/itinerary-reference-template'
+import {
+  ITINERARY_TEMPLATE_SKELETON,
+  GOLDEN_CHIANGMAI_FAMILY_5D4N,
+  GOLDEN_NORTHERN_DEEP_6D5N,
+} from '../notion/itinerary-reference-template'
 import { sanitizeItinerarySnippet } from '../notion/itinerary-reference-sanitizer'
 
 // 開閘前必修 I-1 / M-3 的 drift-guard：fallback 範本常數與真案例共用同一 sanitizer
@@ -32,5 +36,28 @@ describe('ITINERARY_TEMPLATE_SKELETON (排行程 fallback 骨架)', () => {
     expect(ITINERARY_TEMPLATE_SKELETON).toMatch(/午餐：/)
     expect(ITINERARY_TEMPLATE_SKELETON).toMatch(/晚餐：/)
     expect(ITINERARY_TEMPLATE_SKELETON).toMatch(/・住宿：/)
+  })
+})
+
+describe('golden itinerary skeletons', () => {
+  it('清邁親子 5D4N 有 Day 1..Day 5 連續標題', () => {
+    for (let d = 1; d <= 5; d++) {
+      expect(GOLDEN_CHIANGMAI_FAMILY_5D4N).toContain(`Day ${d}｜`)
+    }
+    expect(GOLDEN_CHIANGMAI_FAMILY_5D4N).not.toContain('Day 6｜')
+  })
+
+  it('泰北深度 6D5N 有 Day 1..Day 6 連續標題', () => {
+    for (let d = 1; d <= 6; d++) {
+      expect(GOLDEN_NORTHERN_DEEP_6D5N).toContain(`Day ${d}｜`)
+    }
+    expect(GOLDEN_NORTHERN_DEEP_6D5N).not.toContain('Day 7｜')
+  })
+
+  it('兩套都標 header 占位（日期/人數）讓 LLM 套', () => {
+    for (const g of [GOLDEN_CHIANGMAI_FAMILY_5D4N, GOLDEN_NORTHERN_DEEP_6D5N]) {
+      expect(g).toMatch(/日期/)
+      expect(g).toMatch(/人數/)
+    }
   })
 })
