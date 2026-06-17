@@ -6,9 +6,11 @@
  *  - I-2（runtime 可達性）：Vercel lambda 的 cwd / file tracing 不保證打包 `docs/**`，
  *    `readFileSync` 會 throw；responder 的 fail-open 雖不崩，卻會在「無命中」(語料早期最常見)
  *    時讓安全網靜默消失、LLM 從零亂編——正是範本要防的事。inline 消除檔案相依。
- *  - I-1（兩路徑共用 sanitizer）：本常數與真案例 snippet 共走同一 `sanitizeItinerarySnippet`
- *    assert（見 itinerary-reference-source.ts `templateSkeleton`），使「凡注入為骨架者皆過同一
- *    assert」成為統一不變量。常數已 curated 乾淨，sanitize 不會 fail-closed。
+ *  - I-1（curated 乾淨範本）：本常數原為 low_confidence fallback 的注入骨架，與真案例 snippet
+ *    共走同一 `sanitizeItinerarySnippet` assert。2026-06-17 golden 範本反轉（itinerary-reference-source.ts
+ *    `selectItineraryReference`）後，注入主幹改為 `goldenTrunk()`（兩套 GOLDEN_*），`templateSkeleton()`
+ *    已移除；本常數現僅保留為 curated 乾淨參照（由下方 drift-guard 鎖死），sanitizer assert 只套在
+ *    真案例 snippet（見 itinerary-reference.ts `toItineraryReference`）。常數已 curated 乾淨，不會 fail-closed。
  *  - M-3（維持無敬稱/無航班碼）：未來編輯本常數**必須**維持
  *      無具體航班碼（會抵銷 Task 7「不臆造航班、標待確認」、且同字串在真案例會被 drop）、
  *      無 `**` / `#` markdown 強調（會誘發 customer_itinerary_v1 gate 擋格式、拉高 degrade 率）、
