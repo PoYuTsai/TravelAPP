@@ -223,6 +223,10 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
   let dayRawLines: string[] = []
   let dayActivities: string[] = []
   let pendingDate: { month: number; day: number } | null = null // 暫存日期，等待與 Day X 合併
+  // 跨年遞增：逐日 stamp 年份，月份比前一天小（如 12→1）就把年份 +1，
+  // 否則跨年行程（12/31 起、隔年 1/x）會被全部釘在 detectedYear。
+  let stampYear = detectedYear
+  let prevStampMonth: number | null = null
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -270,8 +274,12 @@ export function parseItineraryText(text: string, year?: number): ParseResult {
 
       // 使用暫存日期（如果有）或空字串
       const dateToUse = pendingDate || dateInfo
+      if (dateToUse) {
+        if (prevStampMonth !== null && dateToUse.month < prevStampMonth) stampYear += 1
+        prevStampMonth = dateToUse.month
+      }
       const dateStr = dateToUse
-        ? `${detectedYear}-${String(dateToUse.month).padStart(2, '0')}-${String(dateToUse.day).padStart(2, '0')}`
+        ? `${stampYear}-${String(dateToUse.month).padStart(2, '0')}-${String(dateToUse.day).padStart(2, '0')}`
         : ''
 
       currentDay = {

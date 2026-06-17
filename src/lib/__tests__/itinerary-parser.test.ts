@@ -139,6 +139,31 @@ Day 2｜湄康蓬村
     expect(result.days[1].title).toBe('湄康蓬村')
   })
 
+  it('跨年行程：12月起、隔年1月的天數年份遞增', () => {
+    const text = `12/31 (四)
+Day 1｜抵達清邁・跨年
+・機場接機
+・住宿
+
+1/1 (五)
+Day 2｜跨年日
+・景點A
+・住宿
+
+1/2 (六)
+Day 3｜返程
+・送機`
+
+    const result = parseItineraryText(text, 2026)
+    expect(result.success).toBe(true)
+    expect(result.days.length).toBe(3)
+    expect(result.days[0].date).toBe('2026-12-31')
+    expect(result.days[1].date).toBe('2027-01-01')
+    expect(result.days[2].date).toBe('2027-01-02')
+    // 跨年 12/31→1/1 不該吐連續性 warning
+    expect(result.warnings).toHaveLength(0)
+  })
+
   it('正確分配早上/下午/晚上活動', () => {
     const text = `2/12 (四)
 Day 1｜測試
