@@ -12,6 +12,7 @@ import type {
   DistillPendingBatch,
   DistillApprovalConfirmation,
 } from '../distill/pending'
+import type { OaContactRecord } from '../ads/oa-contact-record'
 
 /**
  * Max characters of bot-authored message content cached for quote-to-bot
@@ -183,4 +184,19 @@ export interface CaseStore {
 
   /** 刪除該群確認狀態（講了別的＝作廢）。empty groupId 是 no-op；冪等。 */
   deleteDistillConfirmation(groupId: string): Promise<void>
+
+  // ── 廣告刀1：OA 被動聯絡記錄（以 userId 為 key）────────────────────────────
+
+  /**
+   * Persist（insert or update）一筆 OA 被動聯絡記錄。userId 為 primary key —
+   * 覆寫語意（last write wins）。empty userId 是 no-op。獨立 namespace — 永不
+   * 出現在案件面（listAll()/get()），永不觸發對客回覆。
+   */
+  putOaContactRecord(record: OaContactRecord): Promise<void>
+
+  /** 依 userId 讀一筆記錄；不存在回 null。empty userId 回 null、零 I/O。 */
+  getOaContactRecord(userId: string): Promise<OaContactRecord | null>
+
+  /** 列出所有 OA 聯絡記錄（每日轉換表批次填 Sheet 掃描用）。 */
+  listOaContactRecords(): Promise<OaContactRecord[]>
 }

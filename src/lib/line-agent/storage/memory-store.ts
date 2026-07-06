@@ -15,6 +15,7 @@ import type {
   DistillPendingBatch,
   DistillApprovalConfirmation,
 } from '../distill/pending'
+import type { OaContactRecord } from '../ads/oa-contact-record'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -72,6 +73,12 @@ export class MemoryStore implements CaseStore {
    * 10 分鐘過期只在 KV 層成立。
    */
   private readonly distillConfirmations = new Map<string, DistillApprovalConfirmation>()
+
+  /**
+   * 廣告刀1：OA 被動聯絡記錄（NOT case state）— userId → OaContactRecord。
+   * 覆寫語意；in-memory 不模擬 TTL（同其他 marker 的慣例）。
+   */
+  private readonly oaContactRecords = new Map<string, OaContactRecord>()
 
   // ── put ───────────────────────────────────────────────────────────────────
 
@@ -253,5 +260,23 @@ export class MemoryStore implements CaseStore {
   async deleteDistillConfirmation(groupId: string): Promise<void> {
     if (groupId === '') return
     this.distillConfirmations.delete(groupId)
+  }
+
+  // ── 廣告刀1：OA 被動聯絡記錄 ───────────────────────────────────────────────
+
+  async putOaContactRecord(record: OaContactRecord): Promise<void> {
+    if (record.userId === '') return
+    // Shallow copy 防呼叫端透過引用改已存紀錄（同 put 的慣例）。
+    this.oaContactRecords.set(record.userId, { ...record })
+  }
+
+  async getOaContactRecord(userId: string): Promise<OaContactRecord | null> {
+    if (userId === '') return null
+    const r = this.oaContactRecords.get(userId)
+    return r ? { ...r } : null
+  }
+
+  async listOaContactRecords(): Promise<OaContactRecord[]> {
+    return Array.from(this.oaContactRecords.values()).map((r) => ({ ...r }))
   }
 }

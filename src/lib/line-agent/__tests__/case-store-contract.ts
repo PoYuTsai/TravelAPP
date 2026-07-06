@@ -18,6 +18,7 @@ import type { CaseStore } from '../storage/store'
 import { createInitialCase, type AgentCase } from '../cases/case-state'
 import type { TranscriptEntry } from '../transcript/transcript-entry'
 import type { DistillPendingBatch } from '../distill/pending'
+import type { OaContactRecord } from '../ads/oa-contact-record'
 
 const T0 = '2026-06-01T08:00:00.000Z'
 const T1 = '2026-06-01T09:00:00.000Z'
@@ -52,6 +53,10 @@ function makeTranscriptEntry(
     text: '高山行程2月可以走嗎',
     ...overrides,
   }
+}
+
+function makeOaContactRecord(over: Partial<OaContactRecord> = {}): OaContactRecord {
+  return { userId: 'U1', followedAt: 1720000000000, ...over }
 }
 
 /**
@@ -474,6 +479,42 @@ export function runCaseStoreContract(
         expect(await store.getDistillConfirmation('G1')).toBeNull()
         await expect(store.getDistillConfirmation('')).resolves.toBeNull()
         await expect(store.deleteDistillConfirmation('')).resolves.toBeUndefined()
+      })
+    })
+
+    // ── 廣告刀1：OA 被動聯絡記錄（以 userId 為 key）──────────────────────────
+    // 被動記錄「加好友 → 首則訊息」；userId 為 primary key、覆寫語意。
+    // 獨立 namespace — 永不漏進案件面，永不觸發對客回覆。
+
+    describe(`${label} — OaContactRecord`, () => {
+      it('round-trips put/get by userId', async () => {
+        const store = await makeStore()
+        await store.putOaContactRecord(
+          makeOaContactRecord({ userId: 'Uabc', firstMessageAt: 5, messages: [{ ts: 5, text: 'hi' }] })
+        )
+        expect(await store.getOaContactRecord('Uabc')).toEqual(
+          makeOaContactRecord({ userId: 'Uabc', firstMessageAt: 5, messages: [{ ts: 5, text: 'hi' }] })
+        )
+      })
+
+      it('returns null for unknown or empty userId', async () => {
+        const store = await makeStore()
+        expect(await store.getOaContactRecord('nope')).toBeNull()
+        expect(await store.getOaContactRecord('')).toBeNull()
+      })
+
+      it('overwrite is idempotent (last write wins)', async () => {
+        const store = await makeStore()
+        await store.putOaContactRecord(makeOaContactRecord({ userId: 'Ux' }))
+        await store.putOaContactRecord(makeOaContactRecord({ userId: 'Ux', sheetWritten: true }))
+        expect((await store.getOaContactRecord('Ux'))?.sheetWritten).toBe(true)
+      })
+
+      it('lists all records', async () => {
+        const store = await makeStore()
+        await store.putOaContactRecord(makeOaContactRecord({ userId: 'Ua' }))
+        await store.putOaContactRecord(makeOaContactRecord({ userId: 'Ub' }))
+        expect((await store.listOaContactRecords()).map((r) => r.userId).sort()).toEqual(['Ua', 'Ub'])
       })
     })
   })

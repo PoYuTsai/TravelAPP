@@ -22,6 +22,7 @@ import type {
   DistillPendingBatch,
   DistillApprovalConfirmation,
 } from '../distill/pending'
+import type { OaContactRecord } from '../ads/oa-contact-record'
 import {
   type CaseStore,
   BOT_AUTHORED_CONTENT_MAX_CHARS,
@@ -468,5 +469,20 @@ export class KvStore implements CaseStore {
     if (groupId === '') return
     const kv = this.ensureClient()
     await kv.del(`${DISTILL_CONFIRM_PREFIX}${groupId}`)
+  }
+
+  // ── 廣告刀1：OA 被動聯絡記錄（Task 3 補真實作）───────────────────────────────
+  // 型別/介面先落地（Task 2）；KV 真實作＋契約綠留給 Task 3。
+
+  async putOaContactRecord(_record: OaContactRecord): Promise<void> {
+    throw new Error('putOaContactRecord not implemented (Task 3)')
+  }
+
+  async getOaContactRecord(_userId: string): Promise<OaContactRecord | null> {
+    throw new Error('getOaContactRecord not implemented (Task 3)')
+  }
+
+  async listOaContactRecords(): Promise<OaContactRecord[]> {
+    throw new Error('listOaContactRecords not implemented (Task 3)')
   }
 }
