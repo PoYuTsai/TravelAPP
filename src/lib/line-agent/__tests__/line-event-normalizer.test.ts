@@ -180,13 +180,15 @@ describe('normalizeLineEvent', () => {
     expect(e.groupId).toBe(PARTNER_GROUP_ID)
   })
 
-  it('returns null for a non-message event type (e.g. follow)', () => {
-    const followEvent = {
-      type: 'follow',
+  it('returns null for a non-message event type (e.g. postback/join)', () => {
+    // NOTE: `follow` is now upgraded to oa_follow (廣告刀1) — see the dedicated
+    // "follow event" describe block. Other non-message events stay fail-closed.
+    const postbackEvent = {
+      type: 'postback',
       source: { type: 'user', userId: LINE_USER_ID },
       timestamp: TS,
     }
-    const result = normalizeLineEvent(followEvent, PARTNER_GROUP_ID)
+    const result = normalizeLineEvent(postbackEvent, PARTNER_GROUP_ID)
     expect(result).toBeNull()
   })
 
@@ -456,5 +458,42 @@ describe('normalizeLineEvent — replyToken capture', () => {
     const raw = makeGroupTextEvent({ replyToken: undefined })
     const e = normalizeLineEvent(raw, PARTNER_GROUP_ID, BOT_USER_ID) as NormalizedLineEvent
     expect(e.replyToken).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// follow event → oa_follow (廣告刀1：OA 1:1 被動記錄加好友)
+// ---------------------------------------------------------------------------
+
+describe('follow event', () => {
+  it('normalizes a user follow into oa_follow', () => {
+    const ev = normalizeLineEvent(
+      { type: 'follow', timestamp: 1720000000000, source: { type: 'user', userId: 'U123' } },
+      'Gpartner',
+    )
+    expect(ev).toEqual({
+      kind: 'oa_follow',
+      sourceChannel: 'line_oa',
+      lineUserId: 'U123',
+      messageId: '',
+      mentionsBot: false,
+      timestamp: 1720000000000,
+      replyToken: undefined,
+    })
+  })
+
+  it('ignores a follow from a non-user source (group/room)', () => {
+    expect(
+      normalizeLineEvent(
+        { type: 'follow', timestamp: 1, source: { type: 'group', groupId: 'Gx' } },
+        'Gpartner',
+      ),
+    ).toBeNull()
+  })
+
+  it('still ignores unfollow / other non-message events', () => {
+    expect(
+      normalizeLineEvent({ type: 'unfollow', source: { type: 'user', userId: 'U1' } }, 'Gp'),
+    ).toBeNull()
   })
 })

@@ -53,6 +53,7 @@ export type NormalizedLineEventKind =
   | 'image'          // Image message (OA or group) — carry messageId for OCR later
   | 'file'           // File/document message — carry messageId for download later
   | 'unknown_group'  // Anything else in the group (sticker, video, audio, …)
+  | 'oa_follow'      // OA 1:1 加好友事件（廣告刀1 被動記錄用；無 message）
 
 // ---------------------------------------------------------------------------
 // Normalized event shape
@@ -190,6 +191,21 @@ export function normalizeLineEvent(
   partnerGroupId: string,
   botUserId = ''
 ): NormalizedLineEvent | null {
+  // 廣告刀1：follow 事件僅對 OA 1:1（source.type==='user'）有意義，升格成 oa_follow。
+  if (raw.type === 'follow') {
+    const followSource = raw.source ?? {}
+    if (followSource.type !== 'user') return null
+    return {
+      kind: 'oa_follow',
+      sourceChannel: 'line_oa',
+      lineUserId: followSource.userId ?? '',
+      messageId: '',
+      mentionsBot: false,
+      timestamp: raw.timestamp ?? Date.now(),
+      replyToken: typeof raw.replyToken === 'string' ? raw.replyToken : undefined,
+    }
+  }
+
   // Only handle 'message' type events.  Follow/join/leave/postback etc. are
   // not actionable in MVP; return null so the handler skips them.
   if (raw.type !== 'message') return null
