@@ -944,7 +944,7 @@ git commit -m "feat(ads): 刀8 每日 cron＋冪等 runner＋Sheets append（TDD
 ## 執行紀錄（subagent-driven，逐刀更新）
 
 - **刀1 ✅ 完成** — commit `b82e747`。normalizer 擴收 follow→oa_follow。順修一條 stale 測試（原斷言 user follow→null，改用 postback 驗 fail-closed）。spec ✅／code quality ✅（reviewer 實追下游 webhook 路由確認不破「不自動回」鐵律）。全 line-agent 1870 passed。
-- **刀2 ✅ 完成** — commit `c6c5133`（amend 過一次）。OaContactRecord 型別＋CaseStore 三方法＋契約區塊＋MemoryStore。code review 抓到 Important：MemoryStore 對巢狀 `messages` 用 shallow copy → 改 `structuredClone`（對齊 distill 先例，消除 MemoryStore↔KvStore 分歧），補 isolation 契約測。MemoryStore 67/67 綠。**KvStore 目前 5 紅＝刻意 stub（`not implemented (Task 3)`），刀3 補真實作即轉綠。**
-- **刀3 ⏳ 待做（下一步從這開始）** — KvStore 實作 `putOaContactRecord/getOaContactRecord/listOaContactRecords`，TTL 60 天，namespace 前綴 `oa:contact:`，list **必須復用既有 `listTranscriptEntries` 的 index 機制**（先讀 kv-store.ts 該方法確認是 index-set 還 scan，別自創）。跑綠那 5 紅。base SHA = `c6c5133`。
+- **刀2 ✅ 完成** — commit `0983b62`(型別＋契約＋MemoryStore) + `192b9f9`(review fix)。code review 抓到 Important：MemoryStore 對巢狀 `messages` 用 shallow copy → 改 `structuredClone`（對齊 distill 先例，消除 MemoryStore↔KvStore 分歧），補 isolation 契約測。MemoryStore 67/67 綠。**KvStore 目前 5 紅＝刻意 stub（`not implemented (Task 3)`），刀3 補真實作即轉綠。**（註：原本 amend 成 `c6c5133`，但發現 `0983b62` 已被 push，為守「絕不改寫已 push 的 commit」，改用非破壞式：把 fix 疊成新 commit `192b9f9`。）
+- **刀3 ⏳ 待做（下一步從這開始）** — KvStore 實作 `putOaContactRecord/getOaContactRecord/listOaContactRecords`，TTL 60 天，namespace 前綴 `oa:contact:`，list **必須復用既有 `listTranscriptEntries` 的 index 機制**（先讀 kv-store.ts 該方法確認是 index-set 還 scan，別自創）。跑綠那 5 紅。base SHA = `f8a546c`（＝目前分支 tip，local==remote）。
 - 刀4–8 待做（見上各 Task；刀6、刀7 與 1–5 無依賴可平行）。
 
