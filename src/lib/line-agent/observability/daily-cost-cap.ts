@@ -98,8 +98,8 @@ function parseCapUsd(env: Record<string, string | undefined>): number | null {
   return Number.isFinite(value) && value > 0 ? value : null
 }
 
-/** 以 UTC+7 取日字串 YYYY-MM-DD。 */
-function bangkokDay(epochMs: number): string {
+/** 以 UTC+7（曼谷）取日字串 YYYY-MM-DD。日 cap 與廣告刀8 每日表共用同一時區換算，絕不自寫第二份。 */
+export function bangkokDay(epochMs: number): string {
   return new Date(epochMs + BANGKOK_OFFSET_MS).toISOString().slice(0, 10)
 }
 

@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/ads-daily-sheet", "schedule": "0 2 * * *" }
+  ]
+}
