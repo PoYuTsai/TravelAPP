@@ -195,6 +195,10 @@ const DISTILL_PENDING_TTL_SECONDS = 2_592_000 // 30 days
 // 確認就自動作廢（design §1），絕不讓 stale 確認在幾小時後誤觸發收錄。
 const DISTILL_CONFIRM_PREFIX = 'line-agent:distill-confirm:'
 const DISTILL_CONFIRM_TTL_SECONDS = 600 // 10 分鐘（design §1 複述確認）
+// 廣告刀1：OA 被動聯絡記錄 — 獨立 namespace，以 userId 為 key，永不 match case:*。
+// TTL 60 天：每日轉換表回填的滾動窗；同 userId 覆寫＝加好友→首訊軌跡最新化。
+const OA_CONTACT_KEY_PREFIX = 'oa:contact:'
+const OA_CONTACT_TTL_SECONDS = 5_184_000 // 60 days（60 * 24 * 60 * 60）
 
 function caseKey(caseId: string): string {
   return `${CASE_PREFIX}${caseId}`
@@ -218,6 +222,10 @@ function partnerGroupImgKey(messageId: string): string {
 
 function transcriptKey(messageId: string): string {
   return `${TRANSCRIPT_PREFIX}${messageId}`
+}
+
+function oaContactKey(userId: string): string {
+  return `${OA_CONTACT_KEY_PREFIX}${userId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -471,18 +479,29 @@ export class KvStore implements CaseStore {
     await kv.del(`${DISTILL_CONFIRM_PREFIX}${groupId}`)
   }
 
-  // ── 廣告刀1：OA 被動聯絡記錄（Task 3 補真實作）───────────────────────────────
-  // 型別/介面先落地（Task 2）；KV 真實作＋契約綠留給 Task 3。
+  // ── 廣告刀1：OA 被動聯絡記錄（以 userId 為 key，TTL 60 天）───────────────────
+  // 獨立 namespace，永不漏進案件面（listAll/get 走 case:*）。list 機制復用
+  // listTranscriptEntries 的 keys-scan（無獨立 index-set）。
 
-  async putOaContactRecord(_record: OaContactRecord): Promise<void> {
-    throw new Error('putOaContactRecord not implemented (Task 3)')
+  async putOaContactRecord(record: OaContactRecord): Promise<void> {
+    if (record.userId === '') return
+    const kv = this.ensureClient()
+    // setWithTtl JSON round-trips the record（同 putTranscriptEntry），
+    // 覆寫語意：同 userId 最新軌跡取代舊值。
+    await kv.setWithTtl(oaContactKey(record.userId), record, OA_CONTACT_TTL_SECONDS)
   }
 
-  async getOaContactRecord(_userId: string): Promise<OaContactRecord | null> {
-    throw new Error('getOaContactRecord not implemented (Task 3)')
+  async getOaContactRecord(userId: string): Promise<OaContactRecord | null> {
+    if (userId === '') return null
+    const kv = this.ensureClient()
+    return kv.get<OaContactRecord>(oaContactKey(userId))
   }
 
   async listOaContactRecords(): Promise<OaContactRecord[]> {
-    throw new Error('listOaContactRecords not implemented (Task 3)')
+    const kv = this.ensureClient()
+    const keys = await kv.keys(`${OA_CONTACT_KEY_PREFIX}*`)
+    if (keys.length === 0) return []
+    const records = await Promise.all(keys.map((k) => kv.get<OaContactRecord>(k)))
+    return records.filter((r): r is OaContactRecord => r !== null)
   }
 }
