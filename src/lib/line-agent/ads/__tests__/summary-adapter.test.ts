@@ -87,6 +87,25 @@ describe('summarizeOaInquiry', () => {
     expect(out).toEqual({ inquiry: '', headcount: '', amount: '' })
   })
 
+  it('messages undefined → fallback, never throws (fail-open)', async () => {
+    const llm = vi.fn()
+    await expect(
+      summarizeOaInquiry({ messages: undefined } as any, { env: {}, llm }),
+    ).resolves.toEqual({ inquiry: '', headcount: '', amount: '' })
+    expect(llm).not.toHaveBeenCalled()
+  })
+
+  it('message with null text → fallback, never throws', async () => {
+    const llm = vi.fn()
+    await expect(
+      summarizeOaInquiry(
+        { messages: [{ ts: 1, text: null }, { ts: 2, text: '清邁包車' }] } as any,
+        { env: {}, llm },
+      ),
+    ).resolves.toEqual({ inquiry: '清邁包車', headcount: '', amount: '' })
+    expect(llm).not.toHaveBeenCalled()
+  })
+
   it('long first message → excerpt truncated with ellipsis', async () => {
     const long = '一'.repeat(100)
     const out = await summarizeOaInquiry(

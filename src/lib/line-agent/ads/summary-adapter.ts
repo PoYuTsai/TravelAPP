@@ -59,7 +59,8 @@ export interface SummaryDeps {
 const EXCERPT_MAX = 60
 
 function excerpt(messages: OaContactMessage[]): string {
-  const first = messages.find((m) => m.text.trim() !== '')?.text.trim() ?? ''
+  if (!Array.isArray(messages)) return ''
+  const first = messages.map((m) => (m?.text ?? '').trim()).find((t) => t !== '') ?? ''
   return first.length > EXCERPT_MAX ? `${first.slice(0, EXCERPT_MAX)}…` : first
 }
 
