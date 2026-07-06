@@ -1,0 +1,163 @@
+# Notion RAG Sources and Dedup Policy
+
+> Scope: future LINE AI Agent itinerary RAG / similar-case traversal. This file records source-of-truth rules only. It does not enable Notion reads, does not contain real Notion database IDs, and does not change current partner-group responder behavior.
+>
+> `last_reviewed: 2026-06-05`
+
+## Source Tables
+
+Future Notion RAG should consider three read-only sources:
+
+| Source | Env placeholder | Role | Mutability |
+|---|---|---|---|
+| 2026 團隊協作 | `NOTION_TEAM_2026_DATABASE_ID` | Partner/team-facing collaboration table, created after adding partners | Active, but duplicate subset |
+| 2026 私人資料表 | `NOTION_PRIVATE_2026_DATABASE_ID` | Eric private full 2026 case table; includes itinerary field and richer private context | Active; may still receive new customer cases |
+| 2025 私人資料表 | `NOTION_PRIVATE_2025_DATABASE_ID` | Eric private historical 2025 case table; real past itineraries | Frozen / immutable |
+
+Do not put actual Notion database IDs in this repository. Add the two private table IDs only as deployment secrets / local env values when the implementation gate opens.
+
+## Relationship Between 2026 Sources
+
+2026 團隊協作裡面有的資料 = 2026 私人資料表也有。
+
+Background:
+
+- Eric originally had private 2025 and 2026 tables for real customer cases.
+- After adding two partners, Eric created the 2026 團隊協作 table because profit sharing and team visibility required a separate collaboration surface.
+- The team table was cloned/split from the private 2026 source.
+- Therefore the 2026 team table should not be treated as an independent second corpus for itinerary RAG scoring.
+
+Implication:
+
+- RAG 檢索應優先用私人 2025/2026 做完整 traverse.
+- If both 2026 團隊協作 and 2026 私人資料表 are enabled, dedupe by stable case identity before scoring.
+- Do not let the same 2026 case appear twice in retrieved references.
+- The 2026 team table can remain useful for partner-safe summaries and collaboration context, but private 2026 is the fuller itinerary source.
+
+## Dedup Key Strategy
+
+第一版採 **hybrid**：explicit stable key 優先，**複合自然鍵 fingerprint** 作為 fallback。**第一輪不做 fuzzy matching**；模糊／近似比對留到第二輪，避免首刀變大。
+
+### Layer 1 — explicit stable key (highest priority, reserved)
+
+未來的內部 RAG/index record 預留以下 stable identity 欄位。當 Eric 願意在私人 2026 與 team 2026 都補一個共同欄位（例如「清微案例ID」）時，就用它當**最高優先** dedupe key：
+
+- `canonicalCaseId?` — 跨表共用的穩定案例 ID（對應未來的「清微案例ID」欄位）。存在時即為唯一 dedupe key，蓋過 fingerprint。
+- `sourceRecordIds[]` — 此 canonical case 對應到的各來源原始 record id（私人 2026 / team 2026 / 私人 2025）。
+- `sourceTables[]` — 來源表標記，取值 `private_2026` | `team_2026` | `private_2025`。
+
+Reserved schema（**contract only，尚未接線**；TS 型別待下一刀真接 Notion read adapter 時再落地）：
+
+```ts
+interface RagCaseIdentity {
+  canonicalCaseId?: string                                      // 對應未來「清微案例ID」共同欄位；存在則最高優先
+  sourceRecordIds: string[]                                     // 各來源原始 record id（不外洩 partner group）
+  sourceTables: Array<'private_2026' | 'team_2026' | 'private_2025'>
+}
+```
+
+### Layer 2 — composite natural-key fingerprint (v1 fallback)
+
+`canonicalCaseId` 不存在時，用以下欄位組成 **deterministic fingerprint** 當 dedupe key：
+
+- 旅遊日期 range（travel date range）
+- 天數 / 晚數（days / nights）
+- 旅遊人數摘要（party summary：大人 / 小孩 / 小孩年齡）
+- 航班 / 接送資訊（flight / transfer info）
+- 行程框架 normalized snippet（itinerary framework，先 normalize 再取片段）
+- area / theme hints
+
+Fingerprint 必須 deterministic（同輸入同輸出）：先 normalize（trim、全半形、日期格式統一）再 hash。**v1 僅做 exact-fingerprint 比對，不做 fuzzy / 近似比對。**
+
+## Source Priority
+
+Dedup 與 retrieval 的來源優先序：
+
+- **private_2026 > team_2026**：同一 2026 案例兩邊都出現時，private 2026 為 canonical（較完整、含行程與私人脈絡）；team 2026 視為 duplicate subset，dedupe 後不重複進 retrieval。
+- **private_2025**：獨立歷史 corpus（frozen / immutable）。它是過去真實案例，**不與 2026 強 dedupe**，自成一層歷史參考。
+- **markdown templates**：curated seed（`docs/ai-agent-knowledge/cases/itinerary-templates/`），**不與 Notion case 強 dedupe**；只能用 title / theme 類似度做 retrieval reference。
+
+## Mutability Rules
+
+- 2025 私人資料表是 frozen / immutable. It can be indexed, cached, and used as stable historical reference after field mapping is confirmed.
+- 2026 私人資料表可能還會新增客人. It needs incremental refresh, updated indexing, and duplicate detection against any team-collaboration mirror.
+- 2026 團隊協作 may continue changing for operations, but should be treated as a team collaboration view, not the canonical private itinerary corpus.
+
+## Itinerary Field
+
+The important field in the private tables is the itinerary field (`行程框架` / itinerary framework). These are real itineraries Chiangway arranged for actual customers, but not every record follows the parser-standard format.
+
+Future ingestion should normalize messy Notion itinerary text into the same output family as:
+
+- `parser_format: customer_itinerary_v1`
+- `Day X｜...`
+- `午餐：`
+- `晚餐：`
+- `・住宿：`
+
+If a Notion case lacks a standard format, preserve the original facts but convert only the structure. Do not invent missing meals, dates, prices, hotels, flight details, or ticket costs.
+
+## Access And Privacy
+
+The private 2025/2026 tables may contain fields that should never be visible to partner group output.
+
+Rules:
+
+- Notion reads are read-only. No insert, update, archive, or writeback.
+- Partner group output receives only sanitized reference points.
+- Operator-only does not mean raw full access.
+- 不要把成本、分潤、私人備註、Notion page URL、database ID 輸出到 partner group。
+- Do not output cost, profit share, private notes, customer contact details, Notion page URL, token, or database ID.
+- Do not output actual Notion database IDs to partner group, logs, generated itinerary text, or quote text.
+- Keep IDs in env only: `NOTION_PRIVATE_2025_DATABASE_ID`, `NOTION_PRIVATE_2026_DATABASE_ID`, `NOTION_TEAM_2026_DATABASE_ID`.
+
+## Retrieval Iteration Plan
+
+Use a two-layer corpus model:
+
+1. 第一層：markdown itinerary template library.
+   - Source: `docs/ai-agent-knowledge/cases/itinerary-templates/`.
+   - Purpose: curated, parser-shaped seed examples and SOP-backed templates.
+   - Status: small but clean; best for prompt grounding and output format consistency.
+2. 第二層：Notion traverse 後存成我們自己的 RAG/index database.
+   - Source: private 2025/2026 Notion tables, with team 2026 deduped.
+   - Purpose: larger real-case memory for similar-case retrieval, itinerary traverse, and partner-facing first-draft itinerary assistance.
+   - Important: this internal index is for retrieval and organization, not formal quote writing.
+
+有空先完整 traverse 一次，再寫入內部索引庫方便整理與檢索。Notion remains read-only; the internal RAG/index database is the derived retrieval layer.
+
+Suggested iteration:
+
+1. First pass: markdown itinerary templates in `cases/itinerary-templates/`.
+2. Second pass: private 2025 frozen table, because it is stable and good for validating parser normalization.
+3. Third pass: private 2026 active table, with incremental refresh.
+4. Fourth pass: team 2026 table only for partner-safe collaboration context and dedupe checks.
+
+The RAG ranking should favor:
+
+- family / kids / elderly match
+- days and nights
+- area match: chiangmai, chiangrai, lampang, lamphun, mae_kampong, fang, inthanon
+- activity match: elephant, night_safari, rainy_season, cafe, market, adventure, slow_travel
+- operational facts: luggage, flights, child seat, long-drive tolerance, guide need
+
+## Future Implementation Reminder
+
+When Notion RAG implementation begins, add config support for:
+
+- `NOTION_PRIVATE_2025_DATABASE_ID`
+- `NOTION_PRIVATE_2026_DATABASE_ID`
+
+Do this behind an explicit RAG/read gate. Do not enable private table traversal just because a Notion token exists.
+
+## How To Get A Notion Database ID (future gate only)
+
+僅在**下一刀真的要接 Notion read adapter / traverse job** 時，才請 Eric 提供三個 database id 放 env（`NOTION_PRIVATE_2025_DATABASE_ID`、`NOTION_PRIVATE_2026_DATABASE_ID`、`NOTION_TEAM_2026_DATABASE_ID`），**不寫進 repo**。取得方式：
+
+1. 打開該 Notion database 頁面。
+2. 點右上角 Share / Copy link。
+3. link 裡 `notion.so/.../<這段 32 字元 hex 或 dashed id>` 就是 database / page id。
+4. 如果 link 有 `?v=...`，只取 `?v=` 前面那段當 database id（`?v=` 後面是 view id，不要）。
+5. 確認 Notion integration 已被 invite 到該 database，否則 API 即使有 token 也讀不到。
+
+ID 一律只進 deployment secret / 本機 env，永不進 repo、log、生成行程文字或報價文字。

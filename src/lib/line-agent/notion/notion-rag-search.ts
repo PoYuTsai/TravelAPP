@@ -1,0 +1,231 @@
+/**
+ * notion-rag-search.ts
+ *
+ * Operator-only RAG retrieval PREVIEW. Pure, synchronous (no env / fetch /
+ * Notion). Turns a free-text need into an operator-safe ranked preview of the
+ * corpus, so Eric can probe query quality from the CLI without touching the LINE
+ * live path, Sanity, a scheduler, or an LLM.
+ *
+ * The projection is OPERATOR-SAFE, a different (looser) cut than the
+ * partner-safe view: the operator may see structural + descriptive facts
+ * (days / nights / area / theme / partySize / vehicleType), but NEVER private
+ * context (cost / revenue / profit / private notes / Notion url / database id)
+ * and NEVER raw record ids or PII. Because the summary is built from a whitelist
+ * of `facts` fields only, it structurally cannot carry any of that — a downstream
+ * formatter renders an already-safe object.
+ *
+ * GAP-1 (2026-06-06): the raw `itinerarySnippet` is free 行程框架 text and on real
+ * records carries customer names / flight numbers / phone / URL / amounts. A
+ * truncated preview of it was NOT safe to surface, so it is dropped from the
+ * operator output entirely. Structured facts already convey the "what activities"
+ * signal; re-introducing a snippet would require a dedicated sanitizer + fixtures.
+ */
+
+import { parseRagQuery, retrieveRagCases } from './rag-query'
+import type { RagIndex, RagIndexRecord } from './rag-index'
+import { resolveNotionRagConfig } from './notion-rag-config'
+import { buildNotionRagIndex, type NotionRagClient } from './notion-rag-loader'
+import { toItineraryReference } from './itinerary-reference'
+
+/** Operator-safe per-case summary — whitelisted facts only, never private/PII. */
+export interface OperatorSafeCaseSummary {
+  days?: number
+  nights?: number
+  areaHints: string[]
+  themeHints: string[]
+  partySize?: number
+  vehicleType?: string
+  /**
+   * GAP-1: intentionally absent. The 行程框架 free text leaks PII (names / flights /
+   * phone / URL / amounts), so no itinerary preview is surfaced. Kept as an
+   * optional `never` so any code that still references it is a type error rather
+   * than a silent re-leak.
+   */
+  itinerarySnippetPreview?: never
+}
+
+/**
+ * Agent-facing per-case summary — a DIFFERENT (richer) audience than the operator
+ * CLI preview. The smart-reply agent feeds this to the model so it can ground a
+ * partner reply in named itinerary content (餐廳 / 景點 / 逐日框架), which Eric
+ * ruled is commercial info, not PII. GAP-1 relaxed (2026-06-17): the snippet is
+ * surfaced, but ONLY after `sanitizeItinerarySnippet` (via toItineraryReference)
+ * fail-closed strips real PII (姓名 / 電話 / 金額 / 航班 / URL / 日期); a record
+ * whose snippet cannot be sanitized carries no skeleton at all.
+ */
+export interface AgentCaseSummary {
+  days?: number
+  nights?: number
+  areaHints: string[]
+  themeHints: string[]
+  partySize?: number
+  vehicleType?: string
+  /** sanitized 具名行程骨架；snippet 缺或 sanitize fail-closed ⇒ 整個欄位省略。 */
+  itinerarySkeleton?: string
+}
+
+export interface NotionRagSearchParsedQuery {
+  areas: string[]
+  themes: string[]
+  partySize?: number
+}
+
+export interface NotionRagSearchResult {
+  /** ok = at least one hit; low_confidence = parsed signal too weak / no hit. */
+  status: 'ok' | 'low_confidence'
+  parsedQuery: NotionRagSearchParsedQuery
+  totalRecords: number
+  resultCount: number
+  results: OperatorSafeCaseSummary[]
+}
+
+const DEFAULT_TOP_N = 5
+
+/**
+ * Project an index record to an operator-safe summary. Reads ONLY a whitelist of
+ * structured `facts` — privateContext and identity (raw record ids) are never
+ * touched, and the free-text `itinerarySnippet` is deliberately NOT read (GAP-1),
+ * so nothing private, identifying, or free-text can survive into the output.
+ */
+export function toOperatorSafeCaseSummary(record: RagIndexRecord): OperatorSafeCaseSummary {
+  const f = record.facts
+  const summary: OperatorSafeCaseSummary = {
+    areaHints: f.areaHints ?? [],
+    themeHints: f.themeHints ?? [],
+  }
+  if (f.days !== undefined) summary.days = f.days
+  if (f.nights !== undefined) summary.nights = f.nights
+  if (f.partySize !== undefined) summary.partySize = f.partySize
+  if (f.vehicleType !== undefined) summary.vehicleType = f.vehicleType
+  return summary
+}
+
+/**
+ * Search a built index with a free-text query and return an operator-safe,
+ * ranked top-N preview. A query with no usable signal (or no hit) returns
+ * `low_confidence` with zero results — never the whole corpus.
+ */
+export function searchRagIndex(
+  index: RagIndex,
+  query: string,
+  opts: { topN?: number } = {}
+): NotionRagSearchResult {
+  const parsed = parseRagQuery(query)
+  const parsedQuery: NotionRagSearchParsedQuery = {
+    areas: parsed.areas ?? [],
+    themes: parsed.themes ?? [],
+    ...(parsed.partySize !== undefined ? { partySize: parsed.partySize } : {}),
+  }
+
+  const hits = retrieveRagCases(index, query)
+  const topN = opts.topN ?? DEFAULT_TOP_N
+  const results = hits.slice(0, topN).map((r) => toOperatorSafeCaseSummary(r))
+
+  return {
+    status: results.length > 0 ? 'ok' : 'low_confidence',
+    parsedQuery,
+    totalRecords: index.records.length,
+    resultCount: results.length,
+    results,
+  }
+}
+
+/**
+ * Project a record to an AGENT-safe summary: the same whitelisted facts as the
+ * operator view PLUS a sanitized itinerary skeleton. The skeleton goes through
+ * `toItineraryReference` (fail-closed sanitizeItinerarySnippet), so it carries
+ * named 餐廳 / 景點 / 逐日框架 but never real PII; an unsanitizable snippet simply
+ * yields no skeleton field rather than leaking.
+ */
+export function toAgentCaseSummary(record: RagIndexRecord): AgentCaseSummary {
+  const base = toOperatorSafeCaseSummary(record)
+  const summary: AgentCaseSummary = {
+    areaHints: base.areaHints,
+    themeHints: base.themeHints,
+  }
+  if (base.days !== undefined) summary.days = base.days
+  if (base.nights !== undefined) summary.nights = base.nights
+  if (base.partySize !== undefined) summary.partySize = base.partySize
+  if (base.vehicleType !== undefined) summary.vehicleType = base.vehicleType
+
+  const ref = toItineraryReference(record)
+  if (ref?.skeleton) summary.itinerarySkeleton = ref.skeleton
+  return summary
+}
+
+/**
+ * Agent counterpart of `searchRagIndex`: same deterministic retrieval + topN,
+ * but projects to AgentCaseSummary so the model receives sanitized named
+ * itinerary content. No `low_confidence` wrapper — the agent tool only needs the
+ * ranked list (empty ⇒ caller emits its own note).
+ */
+export function searchRagIndexForAgent(
+  index: RagIndex,
+  query: string,
+  opts: { topN?: number } = {}
+): AgentCaseSummary[] {
+  const hits = retrieveRagCases(index, query)
+  const topN = opts.topN ?? DEFAULT_TOP_N
+  return hits.slice(0, topN).map((r) => toAgentCaseSummary(r))
+}
+
+// ---------------------------------------------------------------------------
+// Operator runtime — mirrors runNotionRagTraverseDryRun (client injected)
+// ---------------------------------------------------------------------------
+
+const EMPTY_PARSED_QUERY: NotionRagSearchParsedQuery = { areas: [], themes: [] }
+
+export interface NotionRagSearchReport {
+  status: 'skipped' | 'ok' | 'error'
+  parsedQuery: NotionRagSearchParsedQuery
+  totalRecords: number
+  resultCount: number
+  results: OperatorSafeCaseSummary[]
+  /** Config-resolution + build issue CODES only — never raw tokens/messages. */
+  issues: string[]
+  /** Present only when status === 'error'. */
+  errorCode?: 'missing_database_id' | 'client_error'
+}
+
+/**
+ * Run the operator search against an injected client: resolve config, build the
+ * index, then project an operator-safe ranked preview. The disabled gate lives
+ * in the CLI; here a config skip / build error surfaces as a code-only report,
+ * and the result projection drops every private/PII-carrying field.
+ */
+export async function runNotionRagSearch(
+  env: Record<string, string | undefined>,
+  client: NotionRagClient,
+  query: string,
+  opts: { topN?: number } = {}
+): Promise<NotionRagSearchReport> {
+  const { config, issues: configIssues } = resolveNotionRagConfig(env)
+  const issues = configIssues.map((i) => i.code)
+
+  const result = await buildNotionRagIndex(config, client)
+
+  if (result.status === 'skipped') {
+    return { status: 'skipped', parsedQuery: EMPTY_PARSED_QUERY, totalRecords: 0, resultCount: 0, results: [], issues }
+  }
+  if (result.status === 'error') {
+    return {
+      status: 'error',
+      parsedQuery: EMPTY_PARSED_QUERY,
+      totalRecords: result.index.records.length,
+      resultCount: 0,
+      results: [],
+      issues: [...issues, result.error.code],
+      errorCode: result.error.code,
+    }
+  }
+
+  const search = searchRagIndex(result.index, query, opts)
+  return {
+    status: 'ok',
+    parsedQuery: search.parsedQuery,
+    totalRecords: search.totalRecords,
+    resultCount: search.resultCount,
+    results: search.results,
+    issues,
+  }
+}

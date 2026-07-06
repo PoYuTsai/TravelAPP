@@ -1,0 +1,77 @@
+/**
+ * vision-draft-agent.ts — Task 6：行程類截圖走 golden 範本草稿（兩段輸出）。
+ *
+ * Task 5 在 vision 流程開好 `draftAgent` 注入孔（classify='draft' 時呼叫）。
+ * 本檔造 `draftAgent` 本體：與 SmartReplyAgent 同型 `(brief, input) => Promise<result>`。
+ *
+ * AD-1（複用 draft responder）：把 brief 組成 need 文字，以 intent.action='draft'
+ * 呼叫注入的 `responder`（＝ AnthropicPartnerGroupResponder，已內建 golden 注入 →
+ * gate → 重產 → 降級）。本檔**不**重造 LLM 迴圈 / golden 注入 / gate / 降級。
+ *
+ * AD-3（兩段對映）：responder 正文當對外段（用 ensureTwoSegments 收尾，保證有
+ * OUTBOUND_HEADER），brief.gaps 當內部待確認段（補 INTERNAL_HEADER）。
+ *
+ * 護欄（不可破）：
+ *  - 不讀 env、不 import LINE / Notion client（responder 由注入提供）。
+ *  - 降級不 throw：responder 回 degraded result 時本檔絕不 throw、透傳 meta。
+ *    其中 responder==='llm'（含 itinerary_gate_failed：LLM 有草稿戴警告）仍包兩段；
+ *    responder!=='llm'（純 stub：budget/transport/parse 降級回泛用 stub，無實質草稿）⇒
+ *    透傳裸 result、不包兩段、不戴 OUTBOUND_HEADER，與 respond fork 降級呈現對齊（review I-1）。
+ *  - 本檔只組 need 文字 + 包兩段，無 I/O。
+ */
+
+import type {
+  PartnerGroupResponder,
+  PartnerGroupRespondInput,
+  PartnerGroupRespondResult,
+} from './responder'
+import type { VisionNeedBrief } from './vision-need-extraction'
+import { INTERNAL_HEADER, ensureTwoSegments } from './smart-reply-agent'
+
+export interface CreateVisionDraftAgentDeps {
+  /** 行程類 draft responder（＝AnthropicPartnerGroupResponder，已內建 golden 注入＋gate）。 */
+  responder: PartnerGroupResponder
+}
+
+/** brief → 行程類草稿（兩段）。複用 draft responder 的 golden/gate 機制（AD-1）。 */
+export function createVisionDraftAgent(
+  deps: CreateVisionDraftAgentDeps,
+): (brief: VisionNeedBrief, input: PartnerGroupRespondInput) => Promise<PartnerGroupRespondResult> {
+  return async (brief, input) => {
+    // 1. brief（summary + knownFacts）→ need 文字。
+    const need = [brief.summary, ...brief.knownFacts].filter(Boolean).join('\n')
+
+    // 2. 以 draft intent 呼叫注入的 draft responder（golden 注入＋gate＋降級在其內）。
+    const draftInput: PartnerGroupRespondInput = {
+      ...input,
+      text: need,
+      intent: { action: 'draft', confidence: 'high', source: 'deterministic' },
+    }
+    const result = await deps.responder.respond(draftInput)
+
+    // 2.5 responder 未真正產出草稿（budget/transport/parse 降級回泛用 stub，
+    //     meta.responder === 'stub'）⇒ 透傳裸 result，不包成「可直接複製給客人」兩段。
+    //     否則夥伴會收到被標成 OUTBOUND_HEADER 的泛用 stub，可能誤貼給客人（holistic review I-1）。
+    //     與 respond fork（smart-reply-agent degraded()）的裸 stub 降級呈現對齊。
+    //     注意：responder === 'llm' + degraded + error:'itinerary_gate_failed' 是「LLM 有產草稿
+    //     但過不了閘、戴 ⚠️ DEGRADE_NOTE」，仍走下方兩段包裝（草稿有實質內容、客人可複製語意成立）。
+    if (result.meta?.responder !== 'llm') {
+      return result
+    }
+
+    // 3. 對外段（ensureTwoSegments 保證 OUTBOUND_HEADER）＋ 內部待確認段（補 INTERNAL_HEADER）。
+    //    ensureTwoSegments 只處理 OUTBOUND_HEADER、不產 INTERNAL_HEADER（見 smart-reply-agent.ts），
+    //    故 INTERNAL_HEADER 的重複風險來自 responder 原始正文（result.text）本身若已自帶內部段
+    //    （上游 prompt 演化或某降級路徑）。改成 idempotent：只在 result.text 尚未含 INTERNAL_HEADER
+    //    時才補，比照 ensureTwoSegments 對 OUTBOUND_HEADER 的寫法。
+    const gapsLine =
+      brief.gaps.length > 0 ? brief.gaps.map((g) => `・${g}`).join('\n') : '無'
+    const outbound = ensureTwoSegments(result.text)
+    const twoSegment = result.text.includes(INTERNAL_HEADER)
+      ? outbound
+      : `${outbound}\n\n${INTERNAL_HEADER}\n待確認（截圖未提及、報價/排程需要）：\n${gapsLine}`
+
+    // meta 透傳（含 responder 的 degraded/error），只覆寫 text。
+    return { ...result, text: twoSegment }
+  }
+}

@@ -1,0 +1,888 @@
+/**
+ * Tests for the webhook runtime seams (tagged-reply plan Task 3 + Task 4).
+ *
+ * Task 3 — partner-group responder seam:
+ *   - setPartnerGroupResponder injects a fake the default handler then uses
+ *     when routing a partner-group tagged event through routeCommand.
+ *   - the un-injected resolver lazily defaults to the safe stub (no API call).
+ *
+ * Task 4 — reply client seam + send gate (the core cut):
+ *   The default handler keeps the RouterDecision and, ONLY when the pure reply
+ *   gate (shouldReplyToPartnerGroup) is satisfied, sends via an injected reply
+ *   client. Every assertion below uses a fake reply client + fake responder, so
+ *   there is zero real LINE / LLM / network I/O and zero real key.
+ */
+
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import {
+  getEventHandler,
+  getPartnerGroupResponder,
+  setPartnerGroupResponder,
+  getReplyClient,
+  setReplyClient,
+  setTranscriptOcr,
+  deriveBotDirected,
+  type ReplyClient,
+} from '../line/webhook-runtime'
+import type { CaseStore } from '@/lib/line-agent/storage/store'
+import { MemoryStore } from '@/lib/line-agent/storage/memory-store'
+import { LineApiError, type LineMessage } from '../line/message-client'
+import type { NormalizedLineEvent } from '../line/event-normalizer'
+import type { PartnerGroupResponder } from '../partner-group/responder'
+import {
+  QUOTED_DRAFT_CUSTOMER_REPLY,
+  QUOTED_DRAFT_CONTENT_MISSING_REPLY,
+} from '../partner-group/quoted-draft-customer-reply'
+import { setDefaultAgentLogSink } from '../observability/structured-log'
+
+// Capture the pristine lazy defaults BEFORE any injection so afterEach can
+// restore them — the seams are module singletons and would otherwise leak.
+const pristineResponder = getPartnerGroupResponder()
+const pristineReplyClient = getReplyClient()
+
+afterEach(() => {
+  setPartnerGroupResponder(pristineResponder)
+  setReplyClient(pristineReplyClient)
+  setTranscriptOcr(null) // null ⇒ 無 OCR 退化；閘 default off，對其他測試零影響
+  setDefaultAgentLogSink(null)
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+})
+
+// ---------------------------------------------------------------------------
+// Fixtures
+// ---------------------------------------------------------------------------
+
+function taggedPartnerGroupEvent(
+  overrides: Partial<NormalizedLineEvent> = {}
+): NormalizedLineEvent {
+  return {
+    kind: 'group_text',
+    sourceChannel: 'line_partner_group',
+    lineUserId: 'U_tsai',
+    groupId: 'G_partner',
+    messageId: 'M001',
+    text: '@bot 請幫我確認',
+    mentionsBot: true,
+    timestamp: 1_700_000_000_000,
+    replyToken: 'reply_token_xyz',
+    ...overrides,
+  }
+}
+
+function oaEvent(overrides: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
+  return {
+    kind: 'oa_text',
+    sourceChannel: 'line_oa',
+    lineUserId: 'U_customer',
+    messageId: 'M_oa_001',
+    text: 'hi',
+    mentionsBot: false,
+    timestamp: 1_700_000_000_000,
+    replyToken: 'oa_reply_token',
+    ...overrides,
+  }
+}
+
+/**
+ * A reply client that records every call instead of hitting LINE.
+ *
+ * `returnIds` is what the fake LINE reply resolves to — the bot-authored message
+ * ids the real `replyMessage` would parse from `sentMessages[].id`. The handler
+ * records these via `putBotAuthoredPartnerMsg`, so a test passes the ids it wants
+ * to assert get tracked (quote-to-bot plan §4). Defaults to `[]` (Task 3/4
+ * callers asserted only that a send happened, not the returned ids).
+ */
+function recordingReplyClient(returnIds: string[] = []): {
+  client: ReplyClient
+  calls: Array<{ replyToken: string; messages: LineMessage[] }>
+} {
+  const calls: Array<{ replyToken: string; messages: LineMessage[] }> = []
+  const client: ReplyClient = async (replyToken, messages) => {
+    calls.push({ replyToken, messages })
+    return returnIds
+  }
+  return { client, calls }
+}
+
+/** A responder that always returns the given text (no API call). */
+function fixedResponder(text: string): PartnerGroupResponder {
+  return {
+    async respond() {
+      return { text, meta: { responder: 'llm' as const } }
+    },
+  }
+}
+
+/**
+ * A responder that calls `spy` on each invocation — used to assert the (billed)
+ * responder is NOT reached on a quote-to-human / no-replyToken path.
+ */
+function spyResponder(spy: () => void): PartnerGroupResponder {
+  return {
+    async respond() {
+      spy()
+      return { text: 'SPY-RESPONDER-TEXT', meta: { responder: 'llm' as const } }
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Task 3 — responder seam
+// ---------------------------------------------------------------------------
+
+describe('webhook-runtime partner-group responder seam', () => {
+  it('routes a partner-group tagged event through the injected responder', async () => {
+    let calls = 0
+    const fake: PartnerGroupResponder = {
+      async respond() {
+        calls += 1
+        return { text: 'FAKE-RESPONDER-TEXT', meta: { responder: 'llm' as const } }
+      },
+    }
+    setPartnerGroupResponder(fake)
+    setReplyClient(recordingReplyClient().client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    expect(calls).toBe(1)
+  })
+
+  it('lazily defaults to the safe stub responder when none is injected', async () => {
+    const result = await getPartnerGroupResponder().respond({
+      event: taggedPartnerGroupEvent(),
+      intent: { action: 'analyze', confidence: 'high', source: 'deterministic' },
+      text: '@bot 請幫我確認',
+    })
+    expect(result.meta?.responder).toBe('stub')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 4 — reply client seam + send gate
+// ---------------------------------------------------------------------------
+
+describe('webhook-runtime partner-group send gate', () => {
+  it('replies exactly once to a partner-group tagged event with the responder text', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].replyToken).toBe('reply_token_xyz')
+    expect(calls[0].messages).toEqual([{ type: 'text', text: 'FAKE-REPLY' }])
+  })
+
+  // 備注分離（2026-06-17 Eric 拍板）：含 INTERNAL_HEADER 的草稿拆成兩則 LINE 訊息
+  // （第 1 則純行程、第 2 則內部備注）。無 header 時仍單則（上一條 tripwire 守）。
+  it('splits an itinerary draft with 【內部備註・待確認】 into two LINE messages (itinerary, notes)', async () => {
+    const itinerary = '<家庭套餐訂製> 清邁5日\nDay 1｜抵達'
+    const notes = '【內部備註・待確認】\n・車型建議：Toyota Commuter\n・以上哪些需要修正？'
+    setPartnerGroupResponder(fixedResponder(`${itinerary}\n\n${notes}`))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    expect(calls).toHaveLength(1) // 單次 reply call，但帶兩則訊息
+    expect(calls[0].messages).toEqual([
+      { type: 'text', text: itinerary },
+      { type: 'text', text: notes },
+    ])
+  })
+
+  it('does not reply to a partner-group message that does not mention the bot', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ mentionsBot: false, text: '今天天氣不錯' }),
+      new MemoryStore()
+    )
+
+    expect(calls).toHaveLength(0)
+  })
+
+  it('never replies to an OA customer event, even one containing a literal "@bot"', async () => {
+    let responderCalls = 0
+    setPartnerGroupResponder({
+      async respond() {
+        responderCalls += 1
+        return { text: 'SHOULD-NOT-SEND', meta: { responder: 'llm' as const } }
+      },
+    })
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await getEventHandler()(oaEvent({ text: '@bot 在嗎' }), new MemoryStore())
+
+    expect(responderCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('does not reply to a denied dev command from the partner group', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    // "deploy" matches the deterministic dev-action pattern → router denies it
+    // BEFORE the tag gate, regardless of the @bot mention.
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ text: '@bot deploy the site' }),
+      new MemoryStore()
+    )
+
+    expect(calls).toHaveLength(0)
+  })
+
+  it('skips the reply (with a structured reply_skipped log) when a respond decision has no replyToken', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ replyToken: undefined }),
+      new MemoryStore()
+    )
+
+    expect(calls).toHaveLength(0)
+    const skipped = lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')
+    expect(skipped?.reason).toBe('missing_reply_token')
+  })
+
+  it('does not invoke the real responder for a tagged event with no replyToken (no wasted model call)', async () => {
+    // An event with no live reply token can NEVER be answered on LINE, so the
+    // (potentially billed) responder must not run just to be discarded by the
+    // gate. The handler still routes + warns, but with the stub — not this fake.
+    let responderCalls = 0
+    setPartnerGroupResponder({
+      async respond() {
+        responderCalls += 1
+        return { text: 'SHOULD-NOT-RUN', meta: { responder: 'llm' as const } }
+      },
+    })
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ replyToken: undefined }),
+      new MemoryStore()
+    )
+
+    expect(responderCalls).toBe(0)
+    expect(calls).toHaveLength(0)
+    expect(
+      lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')?.reason
+    ).toBe('missing_reply_token')
+  })
+
+  it('suppresses a reply failure: no throw, keeps the webhook ack, logs a structured code-only error', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    setReplyClient(async () => {
+      throw new LineApiError(
+        429,
+        'rate limited',
+        'replyMessage failed with status 429: rate limited'
+      )
+    })
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await expect(
+      getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+    ).resolves.toBeUndefined()
+
+    // P0-A 刀 2 收編：traceable as a structured reply_sent error with a FIXED
+    // code — the raw LINE error (which could echo tokens) never reaches the log.
+    const sent = lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_sent')
+    expect(sent?.sendOutcome).toBe('error')
+    expect(sent?.reason).toBe('line_reply_failed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 5 — messageId send-once secondary guard
+// ---------------------------------------------------------------------------
+
+describe('webhook-runtime partner-group reply dedupe (messageId send-once)', () => {
+  it('replies only once when the same partner-group messageId is redelivered', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    // The SAME store must back both deliveries — the claim is store-backed so
+    // it survives across the at-least-once redelivery (and, on KV, across
+    // serverless instances).
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: 'M-dupe' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store) // LINE redelivers the identical event
+
+    expect(calls).toHaveLength(1)
+  })
+
+  it('does not re-invoke the responder on a redelivered messageId (no re-bill)', async () => {
+    let responderCalls = 0
+    setPartnerGroupResponder({
+      async respond() {
+        responderCalls += 1
+        return { text: 'FAKE-REPLY', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(recordingReplyClient().client)
+
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: 'M-dupe-2' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store)
+
+    // The claim is taken BEFORE the (billed) responder runs, so the second
+    // delivery never reaches the model.
+    expect(responderCalls).toBe(1)
+  })
+
+  it('never dedupes an empty messageId (each delivery is sent)', async () => {
+    setPartnerGroupResponder(fixedResponder('FAKE-REPLY'))
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({ messageId: '' })
+
+    await getEventHandler()(event, store)
+    await getEventHandler()(event, store)
+
+    // Mirrors the OA rule (handlers.ts:246): collapsing all id-less messages
+    // into one claim would silently drop real replies.
+    expect(calls).toHaveLength(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 5 — quote-to-bot runtime control flow (botDirected wired end-to-end)
+// ---------------------------------------------------------------------------
+
+describe('quote-to-bot runtime control flow', () => {
+  function quoteEvent(o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
+    return {
+      kind: 'group_quoted',
+      sourceChannel: 'line_partner_group',
+      lineUserId: 'U_min',
+      groupId: 'G_partner',
+      messageId: 'M_q1',
+      text: '這個行程可以嗎',
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt_q1',
+      quotedRef: { quotedMessageId: 'M_botPrev' },
+      ...o,
+    }
+  }
+
+  it('quote-to-bot (store hit, no mention): responds once and records the new sent id', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['M_botNew']) // returns new sent id
+    setReplyClient(client)
+    setPartnerGroupResponder(fixedResponder('好的，這個行程沒問題'))
+
+    await getEventHandler()(quoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    // The chain continues: a future quote to THIS reply is itself botDirected.
+    expect(await store.isBotAuthoredPartnerMsg('M_botNew')).toBe(true)
+  })
+
+  it('quote-to-human (store miss, no mention): no responder, no reply', async () => {
+    const store = new MemoryStore()
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+
+    await getEventHandler()(quoteEvent(), store) // M_botPrev not in store
+
+    expect(calls).toHaveLength(0)
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('store read throws: fail-safe → no reply, webhook does not throw', async () => {
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      throw new Error('KV down')
+    }
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+
+    await expect(getEventHandler()(quoteEvent(), store)).resolves.toBeUndefined()
+    expect(calls).toHaveLength(0)
+  })
+
+  it('quote-to-bot + dev command: denied → no reply', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['x'])
+    setReplyClient(client)
+
+    await getEventHandler()(quoteEvent({ text: '幫我 deploy 上線' }), store)
+
+    expect(calls).toHaveLength(0)
+  })
+
+  it('quote-to-bot redelivery (same messageId): replies exactly once', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+    setPartnerGroupResponder(fixedResponder('ok'))
+
+    const ev = quoteEvent()
+    await getEventHandler()(ev, store)
+    await getEventHandler()(ev, store) // redelivery of the identical event
+
+    expect(calls).toHaveLength(1)
+  })
+
+  it('quote-to-bot without replyToken: no reply, warns, responder not called', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev')
+    const { client, calls } = recordingReplyClient()
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+    const lines: string[] = []
+    setDefaultAgentLogSink((l) => lines.push(l))
+
+    await getEventHandler()(quoteEvent({ replyToken: undefined }), store)
+
+    expect(calls).toHaveLength(0)
+    expect(spy).not.toHaveBeenCalled()
+    expect(
+      lines.map((l) => JSON.parse(l)).find((e) => e.event === 'reply_skipped')?.reason
+    ).toBe('missing_reply_token')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// M3.6c — quote-to-bot "整理給客人" content carryover (end-to-end wiring)
+//
+// These use the PRISTINE dispatching responder (no fake injected) so the real
+// customer-summary path runs. The webhook must fetch the cached quoted bot
+// content, sanitize it, and thread it into the responder context so the
+// deterministic customer template is produced; on a content miss it fails closed
+// to the paste-the-draft reply; and it must cache the OUTBOUND content of the
+// reply it sends so a chained quote carries content too.
+// ---------------------------------------------------------------------------
+
+describe('M3.6c quoted-draft customer-summary wiring', () => {
+  const SUMMARIZE_TEXT = '請根據我引用的這則內部案例草稿，幫我整理一段可以回客人的簡短說法'
+  const INTERNAL_DRAFT = '【夥伴內部草稿】清邁親子 5 天：大象保育營、夜間動物園；成本約 NT$38000。'
+
+  function summarizeQuoteEvent(o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent {
+    return {
+      kind: 'group_quoted',
+      sourceChannel: 'line_partner_group',
+      lineUserId: 'U_min',
+      groupId: 'G_partner',
+      messageId: 'M_q_sum',
+      text: SUMMARIZE_TEXT,
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt_sum',
+      quotedRef: { quotedMessageId: 'M_botPrev' },
+      ...o,
+    }
+  }
+
+  it('quoted bot draft cached + summarise intent → replies with the customer template', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+    // No responder injected: the pristine dispatcher owns the customer path.
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0]).toMatchObject({
+      type: 'text',
+      text: QUOTED_DRAFT_CUSTOMER_REPLY,
+    })
+    // The reply must not leak the quoted internal draft body.
+    expect(calls[0].messages[0].text).not.toContain('成本')
+    expect(calls[0].messages[0].text).not.toContain('夥伴內部草稿')
+  })
+
+  it('caches the OUTBOUND reply content so a chained quote carries content', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    const { client } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(await store.getBotAuthoredPartnerMsgContent('M_botNew')).toBe(
+      QUOTED_DRAFT_CUSTOMER_REPLY,
+    )
+  })
+
+  it('quoted id is bot-authored but content NOT cached → fail-closed paste-the-draft reply', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev') // id flag only, no content
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await getEventHandler()(summarizeQuoteEvent(), store)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toBe(QUOTED_DRAFT_CONTENT_MISSING_REPLY)
+  })
+
+  it('content fetch throws → fail-safe: still replies with the paste-the-draft fallback', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('M_botPrev', INTERNAL_DRAFT)
+    store.getBotAuthoredPartnerMsgContent = async () => {
+      throw new Error('KV down')
+    }
+    const { client, calls } = recordingReplyClient(['M_botNew'])
+    setReplyClient(client)
+
+    await expect(
+      getEventHandler()(summarizeQuoteEvent(), store),
+    ).resolves.toBeUndefined()
+    expect(calls).toHaveLength(1)
+    expect(calls[0].messages[0].text).toBe(QUOTED_DRAFT_CONTENT_MISSING_REPLY)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// deriveBotDirected (quote-to-bot plan §3 / Task 3) — pure helper, no wiring
+// ---------------------------------------------------------------------------
+
+describe('deriveBotDirected', () => {
+  const base = (o: Partial<NormalizedLineEvent> = {}): NormalizedLineEvent => ({
+    kind: 'group_text',
+    sourceChannel: 'line_partner_group',
+    lineUserId: 'U',
+    groupId: 'G',
+    messageId: 'M',
+    mentionsBot: false,
+    timestamp: 1,
+    ...o,
+  })
+
+  it('true when mentionsBot is true (store not consulted)', async () => {
+    let called = 0
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      called++
+      return false
+    }
+    expect(await deriveBotDirected(base({ mentionsBot: true }), store)).toBe(true)
+    expect(called).toBe(0) // short-circuit: no store read when already mentioned
+  })
+
+  it('true when group_quoted quotes a bot-authored id', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('Mbot')
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mbot' } })
+    expect(await deriveBotDirected(ev, store)).toBe(true)
+  })
+
+  it('false when group_quoted quotes a non-bot (human) id', async () => {
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mhuman' } })
+    expect(await deriveBotDirected(ev, new MemoryStore())).toBe(false)
+  })
+
+  it('false for OA even if a quotedRef somehow present (store never consulted)', async () => {
+    let called = 0
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      called++
+      return true
+    }
+    const ev = base({
+      sourceChannel: 'line_oa',
+      kind: 'group_quoted',
+      quotedRef: { quotedMessageId: 'X' },
+      mentionsBot: false,
+    })
+    expect(await deriveBotDirected(ev, store)).toBe(false)
+    expect(called).toBe(0)
+  })
+
+  it('fail-safe false when store read throws', async () => {
+    const store = new MemoryStore()
+    store.isBotAuthoredPartnerMsg = async () => {
+      throw new Error('KV timeout')
+    }
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: 'Mbot' } })
+    expect(await deriveBotDirected(ev, store)).toBe(false)
+  })
+
+  it('false when group_quoted but quotedMessageId empty', async () => {
+    const ev = base({ kind: 'group_quoted', quotedRef: { quotedMessageId: '' } })
+    expect(await deriveBotDirected(ev, new MemoryStore())).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 6 — quote-to-bot invariants regression band (design §6)
+//
+// No production code: these LOCK the design §6 invariants as explicit
+// regression tests. The two genuinely-new gaps (§6.1 OA+quotedRef end-to-end,
+// §6.6 responder purity) are asserted here; §6.2–§6.5 / §6.7 are already proven
+// by named tests above and are referenced (not duplicated) to keep DRY. If any
+// of these go red, it is a Task 5 defect to fix at the source — not here.
+// ---------------------------------------------------------------------------
+
+describe('quote-to-bot invariants (design §6 regression band)', () => {
+  // §6.1 — a customer OA event is NEVER botDirected, even with a quotedRef whose
+  // id IS in the bot-authored store. The OA plane short-circuits in
+  // deriveBotDirected BEFORE any store read, so no responder + no reply.
+  it('§6.1 OA inbound with a quotedRef: store never consulted, responder 0, reply 0', async () => {
+    const store = new MemoryStore()
+    await store.putBotAuthoredPartnerMsg('whatever') // even if it WERE bot-authored…
+    let storeReads = 0
+    store.isBotAuthoredPartnerMsg = async (id) => {
+      storeReads++
+      return id === 'whatever'
+    }
+    const { client, calls } = recordingReplyClient(['x'])
+    setReplyClient(client)
+    const spy = vi.fn()
+    setPartnerGroupResponder(spyResponder(spy))
+
+    const oa: NormalizedLineEvent = {
+      kind: 'group_quoted',
+      sourceChannel: 'line_oa',
+      lineUserId: 'U_cust',
+      messageId: 'M_oa',
+      text: 'hi',
+      mentionsBot: false,
+      timestamp: 1,
+      replyToken: 'rt',
+      quotedRef: { quotedMessageId: 'whatever' },
+    }
+    await getEventHandler()(oa, store)
+
+    expect(storeReads).toBe(0) // OA plane short-circuits before any store read
+    expect(spy).not.toHaveBeenCalled()
+    expect(calls).toHaveLength(0)
+  })
+
+  // §6.6 — the responder seam cannot SEND: the handler never hands it a channel
+  // access token, a LINE reply client, or the store. `event.replyToken` may well
+  // exist — it rides inside the allowed `event` key — but the responder has no
+  // transport to act on it; sending stays the handler's job. Proven structurally:
+  // the input carries only the documented PartnerGroupRespondInput keys, so no
+  // top-level token/client/store is reachable from inside respond().
+  it('§6.6 responder purity: respond() input carries only documented keys (no channel token / client / store)', async () => {
+    let capturedKeys: string[] = []
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedKeys = Object.keys(input)
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(recordingReplyClient(['M_new']).client)
+
+    await getEventHandler()(taggedPartnerGroupEvent(), new MemoryStore())
+
+    // The full allowed surface of PartnerGroupRespondInput — nothing else may
+    // leak in. There is no top-level `store`, channel `accessToken`, or
+    // `replyClient`, and no top-level `replyToken`: a reply token only ever
+    // reaches respond() nested inside `event`, where it cannot be sent — the
+    // handler keeps the channel token / LINE client / store, so the responder
+    // has no way to send even when `event.replyToken` is present.
+    // `botDirected` is a documented PartnerGroupRespondInput key (mentionsBot OR
+    // quote-to-bot), threaded by the router for the M3.2 dispatcher. It is a bare
+    // boolean signal — NOT a send capability — so it does not weaken §6.6.
+    // `log` is a documented PartnerGroupRespondInput key（P0-A 刀 2）— a
+    // write-only telemetry sink with closed field shapes, NOT a send capability,
+    // so it does not weaken §6.6.
+    // `quotedImage`（圖片刀B）is a derived boolean signal — NOT a send
+    // capability — so it does not weaken §6.6.
+    const allowed = new Set([
+      'event',
+      'intent',
+      'text',
+      'actor',
+      'caseId',
+      'context',
+      'botDirected',
+      'quotedImage',
+      'log',
+    ])
+    expect(capturedKeys.length).toBeGreaterThan(0)
+    for (const key of capturedKeys) {
+      expect(allowed.has(key)).toBe(true)
+    }
+  })
+
+  // §6.2–§6.5 / §6.7 are already asserted by named tests above — referenced here
+  // (DRY), NOT duplicated:
+  //   §6.2 引用真人不回      → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-human (store miss, no mention): no responder, no reply'
+  //   §6.3 引用 bot 免重 tag → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-bot (store hit, no mention): responds once and records the new sent id'
+  //        既有 tag 路徑不破  → 'webhook-runtime partner-group send gate' ›
+  //        'replies exactly once to a partner-group tagged event with the responder text'
+  //   §6.4 denied 不回       → 'quote-to-bot runtime control flow' ›
+  //        'quote-to-bot + dev command: denied → no reply'
+  //   §6.5 redelivery 不重燒 → 'webhook-runtime partner-group reply dedupe (messageId send-once)' ›
+  //        'does not re-invoke the responder on a redelivered messageId (no re-bill)'  +
+  //        'quote-to-bot runtime control flow' › 'quote-to-bot redelivery (same messageId): replies exactly once'
+  //   §6.7 stub 預設         → 'webhook-runtime partner-group responder seam' ›
+  //        'lazily defaults to the safe stub responder when none is injected'
+})
+
+// ---------------------------------------------------------------------------
+// 圖片刀B — partner-group image markers（引用圖＋tag 即觸發的判定來源）
+// ---------------------------------------------------------------------------
+
+describe('partner-group image event recording（圖片刀B）', () => {
+  it('marks a partner-group image event so a later quote to it can trigger vision', async () => {
+    const store = new MemoryStore()
+    const event = taggedPartnerGroupEvent({
+      kind: 'image',
+      messageId: 'M_img_001',
+      text: undefined,
+      mentionsBot: false,
+      timestamp: 1_700_000_111_000,
+    })
+    await getEventHandler()(event, store)
+
+    expect(await store.isPartnerGroupImageMsg('M_img_001')).toBe(true)
+  })
+
+  it('never records an OA customer image（customer plane never feeds the vision path）', async () => {
+    const store = new MemoryStore()
+    const event = oaEvent({ kind: 'image', messageId: 'M_oa_img', text: undefined })
+    await getEventHandler()(event, store)
+
+    expect(await store.isPartnerGroupImageMsg('M_oa_img')).toBe(false)
+  })
+
+  it('a quote to a recorded image threads quotedImage=true to the responder（引用圖＋tag 即觸發）', async () => {
+    const store = new MemoryStore()
+    await store.putPartnerGroupImageMsg('M_img_001')
+
+    let capturedQuotedImage: boolean | undefined
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedQuotedImage = input.quotedImage
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(async () => ['M_sent'])
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'group_quoted',
+      messageId: 'M_quoting_img',
+      quotedRef: { quotedMessageId: 'M_img_001' },
+    })
+    await getEventHandler()(event, store)
+
+    expect(capturedQuotedImage).toBe(true)
+  })
+
+  it('a quote to a NON-image message never threads quotedImage=true', async () => {
+    const store = new MemoryStore()
+
+    let capturedQuotedImage: boolean | undefined
+    setPartnerGroupResponder({
+      async respond(input) {
+        capturedQuotedImage = input.quotedImage
+        return { text: 'ok', meta: { responder: 'llm' as const } }
+      },
+    })
+    setReplyClient(async () => ['M_sent'])
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'group_quoted',
+      messageId: 'M_quoting_text',
+      quotedRef: { quotedMessageId: 'M_some_text_msg' },
+    })
+    await getEventHandler()(event, store)
+
+    expect(capturedQuotedImage).not.toBe(true)
+  })
+
+  it('a store write failure is best-effort: logged, never thrown（webhook 還是 200）', async () => {
+    const store = new MemoryStore()
+    const failingStore = new Proxy(store, {
+      get(target, prop, receiver) {
+        if (prop === 'putPartnerGroupImageMsg') {
+          return async () => {
+            throw new Error('kv down')
+          }
+        }
+        return Reflect.get(target, prop, receiver)
+      },
+    }) as unknown as CaseStore
+
+    const lines: string[] = []
+    setDefaultAgentLogSink((line) => lines.push(line))
+
+    const event = taggedPartnerGroupEvent({
+      kind: 'image',
+      messageId: 'M_img_002',
+      text: undefined,
+      mentionsBot: false,
+    })
+    await expect(getEventHandler()(event, failingStore)).resolves.toBeUndefined()
+
+    const failureLine = lines.find((l) => l.includes('store_write_failed'))
+    expect(failureLine).toBeDefined()
+    expect(failureLine).toContain('partner_image_record_failed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 沉澱管線刀1 — 旁聽存檔接線（transcript capture wiring）
+// ---------------------------------------------------------------------------
+
+describe('partner-group transcript capture（沉澱管線刀1）', () => {
+  it('閘開時 group_text 被旁聽存檔（不影響回覆行為）', async () => {
+    vi.stubEnv('AI_AGENT_TRANSCRIPT_ENABLED', 'true')
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ mentionsBot: false, text: '高山2月可以嗎', replyToken: undefined }),
+      store
+    )
+    const got = await store.getTranscriptEntry('M001')
+    expect(got?.kind).toBe('text')
+    expect(got?.text).toBe('高山2月可以嗎')
+  })
+
+  it('閘開時 image 經注入 OCR 入檔，且既有 image-marker 行為不變', async () => {
+    vi.stubEnv('AI_AGENT_TRANSCRIPT_ENABLED', 'true')
+    setTranscriptOcr(async () => '客人：兩大一小')
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ kind: 'image', mentionsBot: false, text: undefined, replyToken: undefined }),
+      store
+    )
+    expect((await store.getTranscriptEntry('M001'))?.text).toBe('客人：兩大一小')
+    expect(await store.isPartnerGroupImageMsg('M001')).toBe(true) // 1a 不受影響
+  })
+
+  it('閘關（default）→ 完全不入檔（現行行為零改變）', async () => {
+    const store = new MemoryStore()
+    await getEventHandler()(
+      taggedPartnerGroupEvent({ mentionsBot: false, replyToken: undefined }),
+      store
+    )
+    expect(await store.listTranscriptEntries()).toEqual([])
+  })
+})

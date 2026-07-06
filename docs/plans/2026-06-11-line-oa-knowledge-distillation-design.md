@@ -1,0 +1,162 @@
+# 2026-06-11 LINE OA Agent 知識沉澱設計（被動旁聽 → 批次沉澱 → Notion RAG）
+
+> 來源：2026-06-11 brainstorming session。前一輪定案的方向（見專案記憶
+> `project_line_agent_knowledge_base_direction`）在本檔落成具體設計。
+> 狀態：§0–§3 全部 Eric 已確認（2026-06-11）。
+
+## 0. 前提：定位對齊修正（2026-06-11 Eric 同意）
+
+對照 Eric 口述目標與原始 phase 文件後的四點修正，之後 session 一律以此為準：
+
+1. **順序鏈不可動**：agent 現在是「對內營運助理」（夥伴群）。對客人的 OA 1:1
+   是 P2 終局，被「不准 auto-reply 客人」鐵律鎖著。信任升級鏈：
+   只讀 → dry-run → 小範圍真群 → 寫入 → 金流 → 碰客人。
+2. **web search 邊界**：只准查事實（景點開放時間、節慶日期），**絕不**參與
+   報價或可行性判斷。tough QA 的出口是誠實 tag 人，不是搜尋。
+3. **「自動勾選包含/不包含」走 Sanity API**，不做 CUA 瀏覽器自動化——那是
+   自己的後台，quote parser 已解析出 included/excluded 結構化欄位，API 直寫，
+   UI 只反映結果（對齊 engineering plan Task 10/11 的排序）。
+4. **每一刀先問**：「這刀能不能讓真實對話早一天發生？」（體檢報告：agent 佔
+   41% codebase 零營收貢獻）。煙測（讀圖+三分流）優先於本檔實作。
+5. **成功標準＝草擬採用率**：agent 草的內容被 Eric/夥伴實際採用（或小改後採用）
+   的比例，是「該不該解鎖下一級信任」的依據。初版定義從寬，**一切以實測中
+   Eric 的判斷回報為準，Eric 隨時修正定義**。
+6. **大腦/手的分界**：大腦＝CC（實作+判斷）+ Codex（品質把關）；LINE agent
+   ＝窄而可靠的手。「專屬 AI 大腦」的體驗靠 CC 讀 agent 資料實現，**絕不**靠
+   把 LINE bot 養胖（對齊 CLAUDE.md Operating Boundaries 第一條）。
+7. **終局修正（2026-06-11 Eric 定案）**：原 P2「OA 1:1 自動回覆客人」**暫不開**
+   ——尊重夥伴，且真實旅遊客服必須由**真人**做客人對接+成交收單；AI 永遠是
+   輔助。此決策取代體檢報告 P2-10 的「一人經營終局」敘述。
+
+## 1. 整體架構與資料流（已確認）
+
+```
+夥伴群訊息（文字/截圖）
+   │ 被動，零動作
+   ▼
+① 旁聽存檔層（新）── KV 滾動 30 天
+   ├ 文字：直接存（零 LLM）
+   └ 截圖：當下 OCR 成文字一起存（~$0.003/張，現有 COST_CAP 守著）
+   │
+   │ Eric 心血來潮（可選）
+   ▼
+② 隨手標（新，很薄）── 引用 + 自然語言「記一下」→ 該則標 priority
+   │
+   │ Eric 打「沉澱」才跑（手動觸發，定案 A）
+   ▼
+③ 批次沉澱（新）── LLM 掃 30 天存檔，只找「重複的常規問答」
+   │
+   ▼
+④ 過目（新）── 私測群貼一則 ①②③ 候選清單，Eric 回「1 3 要」
+   │
+   ▼
+⑤ Notion RAG 知識庫（現成）── 批准的才寫入
+   │
+   ▼
+⑥ 自動草擬（現成）── 下次同類問題，bot 查庫命中即草擬
+```
+
+新做的只有 ①②③④；⑤⑥ 沿用現有 `notion-rag-*` 與 `rag-draft-surfacing`。
+① 掛在現有 webhook partner-group 路徑，不另開通道。
+Eric 的必要動作只有兩個：偶爾打「沉澱」、看清單回一句。
+
+### 已定案的選擇（與理由）
+
+| 決策點 | 定案 | 理由 |
+|---|---|---|
+| 沉澱觸發 | **手動**（Eric 說「沉澱」） | 成本完全可控；先手動驗證沉澱品質，有複利再考慮自動節流。cron 空窗週照燒，否決 |
+| 原始對話壽命 | **滾動 30 天 TTL** | 覆蓋「同類問題重複出現」觀察窗；不永久留存夥伴對話（隱私重量） |
+| 過目管道 | **LINE 私測群一批一則** | Eric 主場是 LINE 手機端；Notion 草稿區會堆死，否決 |
+| 截圖讀取時機 | **進群當下 OCR** | LINE 圖片內容會過期，沉澱時才讀有缺角風險；量小成本 trivial |
+| 餵答案手勢 | **不需要**（被動旁聽） | 靠 Eric 記得 @bot 的設計已被證偽（會忘 → 庫空）。bot 本來就收得到群裡每一則 |
+
+## 2. 存什麼、怎麼沉澱（已確認）
+
+### ① 旁聽存檔層
+
+每則群訊息一筆，KV TTL 30 天自動過期：
+
+```
+{ messageId, groupId, 發話者, 時間,
+  kind: text | image,
+  text: 原文（截圖 = 當下 OCR 文字）,
+  quotedMessageId?: 引用線索,
+  priority?: Eric「記一下」標過,
+  distilled?: 已被沉澱掃過（避免重複掃） }
+```
+
+- 文字零 LLM 零成本；截圖走現成 vision 管線，受現有每日成本帽管。
+- **不存圖片本體**，只存 OCR 文字——省錢 + 避免長期保存客人截圖的隱私重量。
+
+### ② 隨手標
+
+- 意圖分類器（`commands/intent.ts`）加 `remember` 意圖。
+- 引用某則 +「記一下」→ 該則標 `priority`，bot 簡短回「✅」。
+- 不引用光說「記一下」→ 標最近一則非 bot 訊息。
+- 「引用錨定」是一級輸入：引用自帶 messageId，免猜。
+
+### ③ 批次沉澱
+
+「沉澱」→ 撈 30 天內 `distilled=false` 訊息 → 按引用關係+時間織成對話串 →
+**一次 LLM 呼叫（Sonnet）**：
+
+1. 找「重複出現的常規問答」（價格/景點/可行性）——**重複 ≥2 次或標過
+   priority 才入選**
+2. 排除一次性談判（條件式喬價，如高球單趟算一日錢那種——記了也用不上）
+3. 產出最多 5 條候選：`{問題, 答案, 出處訊息, 出現次數}`
+
+掃過標 `distilled=true`，下次只掃新訊息——成本線性不累積。
+估每次沉澱 $0.05–0.15，月跑數次。
+
+## 3. 過目、寫入 Notion、錯誤處理（已確認）
+
+### ④ 過目的精確行為
+
+- 候選清單貼**私測群**（與 case-intake surfacing 同一面）。
+- Eric 回覆該則：「1 3 要」「都要」「2 改成XXX再收」——走意圖分類器，
+  支援**修改後收錄**（收 Eric 改寫的版本）。
+- 沒回就掛著，下次「沉澱」合併再提；同一條被略過兩次不再提（行動即投票）。
+
+### ⑤ 寫入 Notion
+
+- 這是 agent **第一條 Notion 寫入路徑**（「不寫回 Notion」原則的首次例外）：
+  - 只准寫**知識庫 DB**，絕不碰案件 DB。
+  - 欄位對齊現有 RAG schema → 寫入後立刻可被現有檢索撈到，閉環即生效。
+  - 上 `KNOWLEDGE_WRITE_ENABLED` 環境閘，預設關。
+
+**檢索閉環缺口（2026-06-12 實查）**：QA DB 目前**尚非** RAG 檢索源——
+現有 rag-index 是 case-shaped（天數/地區/成本欄位），沉澱問答頁塞不進
+現有 index 結構。⑥ 自動草擬要吃到沉澱知識需另開一刀（QA 檢索 source
+或 prompt 注入）。上方「欄位對齊→立刻可被檢索撈到」的原句**不成立**，
+以本缺口註記取代。
+
+### 錯誤處理（全部 fail-safe）
+
+- 存檔失敗 → 丟該則，絕不堵 webhook 主流程（回覆優先於記錄）。
+- OCR 失敗 → 仍存該筆但 text 空，沉澱時如實報告「有一張圖讀不到」。
+- 沉澱 LLM 失敗 → 回報、`distilled` 不標，重跑冪等安全。
+- LINE at-least-once 重送 → 同 messageId 同 key 覆寫，不重複記。
+
+### 測試
+
+- store：沿用現有 contract test 模式（`__tests__/case-store-contract.ts` 風格）。
+- 對話串編織 + `remember`/`沉澱`/批准意圖：unit test。
+- 沉澱：fake LLM adapter fixture。
+- 上線前：CLI dry-run 一次真資料。
+
+### 沉澱問答 db（2026-06-11 已建）
+
+- 已用「清微旅行知識庫」integration（讀+寫）在知識庫主頁下建立，id 存
+  `.env.local` 的 `NOTION_DISTILLED_QA_DB`（`.env.example` 有註解條目）。
+- 欄位：問題（title）/ 答案 / 地區（multi-select）/ 主題（multi-select）/
+  出處 / 出現次數（number）/ 狀態（候選→已批准/已略過）/ 收錄日期。
+- 已插一筆「（示範）」資料示意格式；刀3 寫入時 `狀態=候選` 由過目流程晉升。
+
+## 實作順序（建議，未排程）
+
+1. 刀1：① 旁聽存檔（含截圖 OCR 入存檔）——純記錄，零對外行為，風險最低 ✅ done（2026-06-11，store d2f2ec5 / archiver d5bf5d8 / OCR prompt 3257c9d+d09cb56 / 接線 47567b0＋placeholder fix 44ed0f6）
+2. 刀2：③ 沉澱 + ④ 過目（dry-run：先只貼候選，不寫 Notion）✅ done（2026-06-11，store cdca52e / weaver f4e910c / candidates 3ef24f7 / adapter 233fff4 / orchestrator 6f1d7f5 / approval 0b7ea4d / router c7eac19 / webhook d76fb4c）
+3. 刀3：⑤ Notion 寫入（開 `KNOWLEDGE_WRITE_ENABLED`）✅ done（2026-06-12，schema 驗證 5ba31e7 / writer adapter 46b5fa8 / approval 接寫入 03ea194+e827da4 / 冪等標記 189908e / 守門測試 b91ea0c+ed2ad26 / webhook 接線 0ee6ac5+441eb53 / CLI distill-flush fdc4b79）
+4. 刀4：② 隨手標（nice-to-have，最後）
+
+每刀獨立可驗收；煙測與正式群驗收優先於本管線動工。

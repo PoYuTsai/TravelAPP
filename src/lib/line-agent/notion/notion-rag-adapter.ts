@@ -1,0 +1,306 @@
+/**
+ * Notion read adapter (fixture-first) — NotionPageFixture → RagIndexRecord[].
+ *
+ * Bridges the minimal Notion page shape (types.ts) to the RAG index contract
+ * (rag-index.ts). It is deliberately SDK-agnostic and network-free: the future
+ * real adapter only has to flatten a Notion API response into NotionPageFixture
+ * and this layer keeps working unchanged.
+ *
+ * NO real Notion API, NO real database id, NO Sanity / webhook / send gate.
+ *
+ * Mapping rules:
+ *   - Property NAMES are normalised through the shared FIELD_ALIASES
+ *     (field-policy.ts) so date/area/theme aliases resolve in one place.
+ *   - Duration is the ONE exception: field-policy conflates 天數 into canonical
+ *     'nights', but the RAG layer keeps days and nights distinct, so the adapter
+ *     owns its own duration aliases. Eric's rule (2026-06-05):
+ *         天數 → days, 夜數 → nights, NEVER auto-derive nights = days - 1.
+ *   - Shareable trip structure → facts (partner-safe).
+ *   - Private fields (成本/分潤) + provenance (databaseId) → privateContext only;
+ *     toPartnerSafeView() drops them downstream.
+ *   - Whitelist by construction: only recognised properties are read, so an
+ *     unknown / sensitive field (客人姓名) never enters the record at all.
+ */
+
+import type {
+  AudienceScope,
+  NotionPageFixture,
+} from './types'
+import { normalizeField } from './field-policy'
+import { parseItineraryHints, parseItineraryDuration } from './itinerary-parser'
+import {
+  buildRagIndexRecord,
+  type RagCaseFacts,
+  type RagIndexRecord,
+  type RagPrivateContext,
+  type RagSourceTable,
+} from './rag-index'
+
+export interface NotionRagAdapterOptions {
+  /** Which corpus these pages came from — the page shape carries no tag. */
+  sourceTable: RagSourceTable
+}
+
+// Duration aliases owned by the adapter (see header — field-policy conflates 天數).
+const DAYS_ALIASES = new Set(['天數', '天数', '行程天數'])
+const NIGHTS_ALIASES = new Set(['夜數', '夜数', '晚數', '晚数'])
+
+// Cross-table stable case id (future「清微案例ID」), highest-priority dedupe key.
+const CASE_ID_ALIASES = new Set(['案例ID', '清微案例ID', 'caseId', 'caseID'])
+
+// Facts are always partner-safe (read_only structure only); privacy lives in
+// privateContext and is enforced at projection time, not here.
+const FACTS_AUDIENCE: AudienceScope = 'partner_group'
+
+// Canonical family/kids retrieval theme (GAP-2) + the words that signal it in
+// free text. partySize alone is NEVER one of them — only an explicit child count
+// or a family/child word qualifies, so an adults-only large party is not family.
+const FAMILY_THEME = 'family'
+const FAMILY_SIGNAL_WORDS = ['親子', '小朋友', '小孩', '兒童', 'family', 'kids']
+
+function containsFamilySignal(text: string | undefined): boolean {
+  if (!text) return false
+  const lower = text.toLowerCase()
+  return FAMILY_SIGNAL_WORDS.some((w) => lower.includes(w.toLowerCase()))
+}
+
+/** True when themeHints already carries family — raw (親子) or canonical (family). */
+function hasFamilyTheme(themeHints: string[] | undefined): boolean {
+  if (!themeHints) return false
+  const lower = FAMILY_SIGNAL_WORDS.map((w) => w.toLowerCase())
+  return themeHints.some((h) => lower.includes(h.trim().toLowerCase()))
+}
+
+// --- coercion helpers ------------------------------------------------------
+
+function asString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined
+}
+
+function asNumber(v: unknown): number | undefined {
+  return typeof v === 'number' && !Number.isNaN(v) ? v : undefined
+}
+
+function asNumberArray(v: unknown): number[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const nums = v.filter((x): x is number => typeof x === 'number' && !Number.isNaN(x))
+  return nums.length > 0 ? nums : undefined
+}
+
+/**
+ * Hint array from a Notion property — accepts a single string (select / text)
+ * OR a string[] (multi_select). Trims, drops empties, dedupes while preserving
+ * first-seen order. Empty result → undefined (keeps facts free of empty slots).
+ */
+function asHints(v: unknown): string[] | undefined {
+  const raw = Array.isArray(v) ? v : [v]
+  const hints: string[] = []
+  for (const item of raw) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (trimmed.length === 0 || hints.includes(trimmed)) continue
+    hints.push(trimmed)
+  }
+  return hints.length > 0 ? hints : undefined
+}
+
+/** Set a key only when the value is defined — keeps facts free of empty slots. */
+function setIf<T extends object, K extends keyof T>(target: T, key: K, value: T[K] | undefined): void {
+  if (value !== undefined) target[key] = value
+}
+
+/**
+ * Parse Eric's real「旅遊人數」column into a total + optional adult/child split.
+ *
+ *   '成人2 小朋友2' → { partySize: 4, adults: 2, children: 2 }
+ *   '7大2小'        → { partySize: 9, adults: 7, children: 2 }
+ *   '成人9'         → { partySize: 9, adults: 9 }            (no children invented)
+ *   '9人' / 8       → { partySize: 9 }                       (no split invented)
+ *   '一家人'        → {}                                     (un-splittable → nothing)
+ *
+ * Rule (Eric, 2026-06-05/06): partySize is the closest real fact; adults/children
+ * are only filled when the text states them — NEVER auto-derived.
+ */
+function parsePartySize(value: unknown): { partySize?: number; adults?: number; children?: number } {
+  if (typeof value === 'number' && !Number.isNaN(value)) return { partySize: value }
+  if (typeof value !== 'string') return {}
+
+  const s = value.trim()
+  if (s.length === 0) return {}
+
+  const adultsMatch = s.match(/(?:成人|大人)\s*(\d+)/) ?? s.match(/(\d+)\s*大/)
+  const childrenMatch = s.match(/(?:小朋友|小孩)\s*(\d+)/) ?? s.match(/(\d+)\s*小/)
+  const adults = adultsMatch ? Number(adultsMatch[1]) : undefined
+  const children = childrenMatch ? Number(childrenMatch[1]) : undefined
+
+  if (adults !== undefined || children !== undefined) {
+    return { partySize: (adults ?? 0) + (children ?? 0), adults, children }
+  }
+
+  // No adult/child breakdown — accept a bare total like '9人' or '9'.
+  const totalMatch = s.match(/(\d+)\s*人/) ?? s.match(/^(\d+)$/)
+  if (totalMatch) return { partySize: Number(totalMatch[1]) }
+
+  return {}
+}
+
+// --- core ------------------------------------------------------------------
+
+interface ParsedPage {
+  facts: RagCaseFacts
+  privateContext: RagPrivateContext
+  canonicalCaseId?: string
+}
+
+function parseProperties(properties: Record<string, unknown>): ParsedPage {
+  const facts: RagCaseFacts = {}
+  const privateContext: RagPrivateContext = {}
+  let canonicalCaseId: string | undefined
+  let rawPartyText: string | undefined
+
+  for (const [rawName, value] of Object.entries(properties)) {
+    if (CASE_ID_ALIASES.has(rawName)) {
+      canonicalCaseId = asString(value) ?? canonicalCaseId
+      continue
+    }
+    if (DAYS_ALIASES.has(rawName)) {
+      setIf(facts, 'days', asNumber(value))
+      continue
+    }
+    if (NIGHTS_ALIASES.has(rawName)) {
+      setIf(facts, 'nights', asNumber(value))
+      continue
+    }
+
+    // Everything else routes through the shared canonical map. Unknown
+    // properties resolve to null and are simply never read (whitelist).
+    switch (normalizeField(rawName)) {
+      case 'dates':
+        setIf(facts, 'travelDateRange', asString(value))
+        break
+      case 'partySize': {
+        rawPartyText = asString(value)
+        const { partySize, adults, children } = parsePartySize(value)
+        setIf(facts, 'partySize', partySize)
+        setIf(facts, 'adults', adults)
+        setIf(facts, 'children', children)
+        break
+      }
+      case 'adults':
+        setIf(facts, 'adults', asNumber(value))
+        break
+      case 'children':
+        setIf(facts, 'children', asNumber(value))
+        break
+      case 'childAges':
+        setIf(facts, 'childAges', asNumberArray(value))
+        break
+      case 'cityArea':
+        setIf(facts, 'areaHints', asHints(value))
+        break
+      case 'tripType':
+        setIf(facts, 'themeHints', asHints(value))
+        break
+      case 'flightInfo':
+        setIf(facts, 'flightInfo', asString(value))
+        break
+      case 'vehicleType':
+        setIf(facts, 'vehicleType', asString(value))
+        break
+      case 'itinerarySummary':
+        setIf(facts, 'itinerarySnippet', asString(value))
+        break
+      case 'cost':
+        setIf(privateContext, 'cost', asNumber(value))
+        break
+      case 'revenue':
+        // number stays a number; a non-empty string is kept verbatim (type is number | string).
+        setIf(
+          privateContext,
+          'revenue',
+          asNumber(value) ?? (typeof value === 'string' && value.trim().length > 0 ? value : undefined)
+        )
+        break
+      case 'profitShare':
+        // RagPrivateContext.profitShare is a string (split descriptor or amount).
+        setIf(
+          privateContext,
+          'profitShare',
+          value === undefined || value === null ? undefined : String(value)
+        )
+        break
+      default:
+        break // 人數/景點餐廳/車導配置/狀態/內部備註… not RAG facts; intentionally dropped
+    }
+  }
+
+  // Derive area/theme hints from the itinerary free-text ONLY when no explicit
+  // 城市區域 / 行程類型 column supplied them. Explicit columns always win; the
+  // deterministic parser is a fallback for the real corpus that lacks them.
+  if (facts.itinerarySnippet) {
+    const derived = parseItineraryHints(facts.itinerarySnippet)
+    if (facts.areaHints === undefined && derived.areaHints.length > 0) {
+      facts.areaHints = derived.areaHints
+    }
+    if (facts.themeHints === undefined && derived.themeHints.length > 0) {
+      facts.themeHints = derived.themeHints
+    }
+
+    // Duration fallback（第2刀：治「天數-」）：顯式 天數/夜數 欄缺時，由行程內文
+    // 補 days/nights。顯式欄位永遠優先；snippet 推導絕不自行推 nights = days - 1。
+    const duration = parseItineraryDuration(facts.itinerarySnippet)
+    if (facts.days === undefined && duration.days !== undefined) {
+      facts.days = duration.days
+    }
+    if (facts.nights === undefined && duration.nights !== undefined) {
+      facts.nights = duration.nights
+    }
+  }
+
+  // Family/kids is a retrieval theme signal (GAP-2). Add canonical 'family' when
+  // an explicit child count (旅遊人數 split) OR a family/child word in the
+  // itinerary / party free-text says so — but only when themeHints does not
+  // already carry family (raw 親子 or canonical), to avoid a duplicate. partySize
+  // alone never triggers it, so an adults-only large party stays non-family.
+  const familySignal =
+    (facts.children !== undefined && facts.children > 0) ||
+    containsFamilySignal(facts.itinerarySnippet) ||
+    containsFamilySignal(rawPartyText)
+  if (familySignal && !hasFamilyTheme(facts.themeHints)) {
+    facts.themeHints = [...(facts.themeHints ?? []), FAMILY_THEME]
+  }
+
+  return { facts, privateContext, canonicalCaseId }
+}
+
+/** Convert one Notion page (minimal fixture shape) into a RagIndexRecord. */
+export function notionPageToRagRecord(
+  page: NotionPageFixture,
+  opts: NotionRagAdapterOptions
+): RagIndexRecord {
+  const { facts, privateContext, canonicalCaseId } = parseProperties(page.properties)
+
+  // Provenance: the page's own database id is operator-only context.
+  setIf(privateContext, 'databaseId', asString(page.databaseId))
+
+  const hasPrivate = Object.keys(privateContext).length > 0
+
+  return buildRagIndexRecord({
+    identity: {
+      canonicalCaseId,
+      sourceRecordIds: [page.id],
+      sourceTables: [opts.sourceTable],
+    },
+    facts,
+    audience: FACTS_AUDIENCE,
+    privateContext: hasPrivate ? privateContext : undefined,
+  })
+}
+
+/** Convert a batch of pages. Feed the result straight into buildRagIndex(). */
+export function notionPagesToRagRecords(
+  pages: NotionPageFixture[],
+  opts: NotionRagAdapterOptions
+): RagIndexRecord[] {
+  return pages.map((page) => notionPageToRagRecord(page, opts))
+}

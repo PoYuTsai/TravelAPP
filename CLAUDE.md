@@ -1,109 +1,73 @@
-# 清微旅行 Chiangway Travel
+# Chiangway Travel - Claude Code Context
 
-## 專案資訊
+Keep this file small. It is loaded into Claude Code sessions; detailed playbooks live in docs and skills.
 
-- **品牌**: 清微旅行 Chiangway Travel
-- **服務**: 清邁親子包車、客製旅遊、中文導遊
-- **網站**: https://chiangway-travel.com
-- **技術架構**: Next.js 14 + Sanity CMS + Tailwind CSS
+## Project
 
-> **本檔自律**：目標 ≤ 100 行、上限 120 行。超過請搬內容到 `docs/`。最後重審：2026-04-24。
+- Brand: 清微旅行 Chiangway Travel
+- Service: Chiang Mai family charter, custom travel, Mandarin guide
+- Site: https://chiangway-travel.com
+- Stack: Next.js 14, Sanity CMS, Tailwind CSS
+- Positioning: Taiwan dad Eric + Thai mom Min, a real Chiang Mai family. Parent-friendly itineraries. Driver and guide are separate professional roles.
 
-## 🚫 本檔禁入（違反視同 review 失敗）
+## AI Workflow
 
-| 禁止內容 | 正確去處 |
-|---------|---------|
-| Bug 修復記錄（`[YYYY-MM-DD] 症狀/修復`） | `docs/plans/` 對應計畫檔 |
-| 已完成功能清單 | `git log` |
-| 單次 commit/PR 的實作細節 | PR description |
-| 第三方服務配置詳情（Sanity project ID / webhook 步驟） | `docs/` 對應設定檔 |
-| SEO 文章大綱草稿 | 直接生成到 `src/` 或 Sanity Studio |
-| Session 特定除錯過程 | `~/.claude/learnings/cross-project-tech/` 跨專案踩雷 |
-| 與全域 `~/.claude/CLAUDE.md` 重複的規則（Green Discipline、Git 安全、模型選擇、Superpowers 流程） | 刪除本地副本，靠全域注入 |
-| 未實作的設計藍圖（含從他專案借鑑的 spec） | 等對方實作驗證後再搬，或放 `docs/plans/` 標註 `status: draft` |
+- Work one project at a time. Start with TravelAPP; copy proven context-harness changes to VibeSync later.
+- Claude Code is the implementation runner: inspect files, edit, test, and report.
+- Codex is the architecture/review partner: plan review, diff review, context-harness maintenance.
+- Primary operator channel: RC / Claude Code app + tmux sharing the same session. Treat tmux as the source of truth.
+- Discord/DC is optional legacy intake. Keep remote prompts short and avoid pasting full diffs, logs, or plans unless explicitly needed.
+- Private Discord AI room is focus-locked: write only to active `rc-*`; treat `dc-*` as legacy read-only unless Eric explicitly unlocks. Design: `docs/plans/2026-06-05-discord-focus-locked-ai-engineering-room.md`.
+- Use tmux for control commands such as `/clear`, interrupts, restarts, long-running tests, and commits. If the app UI spins after `/clear`, stop it manually and trust tmux state.
 
-**保鮮期原則**：硬規則加「保鮮期到 YYYY-MM-DD」或「保留條件」。到期或條件消失即刪。
+## Context Budget Rules
 
-## 品牌定位（2026-04 定稿）
+- Do not auto-read long docs, full diffs, terminal logs, or history files.
+- Prefer file paths plus short summaries. Read exact files only when the task requires them.
+- Use `/round` before `/clear` or handoff: goal, changed files, verification, blocker, next action.
+- If startup context is already yellow before work begins, first check `CLAUDE.md`, active `.claude/skills`, opened IDE files, and enabled plugins.
+- Run `powershell -ExecutionPolicy Bypass -File scripts/context-harness-audit.ps1` when auditing context bloat.
 
-- **核心差異化（一個詞）**：「爸媽開的」—— 台灣爸爸 Eric × 泰國媽媽 Min，住在清邁、自己也帶小孩
-- **戰略形式**：游擊戰（小池塘裡的大魚）+ 側翼戰（無爭地帶突襲）
-- **品類**：清邁親子包車（新興品類，無強勢品牌佔據）
-- **強優勢（不可複製）**：跨文化家庭身份 + 在地網絡 + 中文母語，天然稟賦
-- **司機 + 導遊專業分工**（非一人包辦）是產品層的差異化
+## Language
 
-### 統一 Bio（IG / FB / TikTok）
-```
-爸媽開的清邁親子包車
-台灣爸爸 Eric × 泰國媽媽 Min
-158+ 組家庭平安暢遊清邁 🚐
-LINE 聊聊行程 ↓
-```
+- Reply to Eric in Traditional Chinese by default.
+- Keep code identifiers, file paths, commands, env vars, and API names in their original form.
+- Status updates, smoke reports, `/round` summaries, and handoffs should be concise Traditional Chinese unless Eric explicitly asks for English.
 
-四行論證鏈：差異化+品類 → 身份證據 → 信任狀 → 低壓力 CTA
-完整策略：`docs/plans/2026-04-19-positioning-diagnosis.md`
+## Operating Boundaries
 
-### 鐵律（所有 SEO / 文案 / 功能決策必看）
-- 不做品牌延伸（民宿、票券代訂等）—— 蹺蹺板原則
-- 不擴城市（曼谷、普吉、清萊）—— 兵力原則
-- 不搶「最便宜」「最豪華」「No.1」—— 排他定律
-- 只做中文家庭客群—— 不主打「中英泰文導遊」
+- CC/tmux is the operator. LINE bot is only a LINE execution channel that CC can call.
+- LINE OA customer messages must not be auto-replied to unless Eric explicitly changes this rule.
+- Posting to the partner LINE group requires explicit send intent.
+- Quote creation is dry-run only until Eric approves a server-side Sanity write token.
+- File edits, tests, commits, and deploys are done by CC/tmux, not by LINE bot.
 
-## 重要文件
+## On-Demand References
 
-| 文件 | 用途 |
-|------|------|
-| `docs/prompts/seo-article-prompt.md` | SEO 文章撰寫指令（生成文章前必讀）|
-| `docs/plans/2026-01-15-seo-content-strategy.md` | SEO 內容策略與文章清單 |
-| `docs/plans/2026-01-13-landing-page-redesign.md` | 網站設計規範 |
-| `docs/plans/2026-04-19-positioning-diagnosis.md` | **戰略基石**（顧軍輝定位框架分析報告）|
-| `docs/plans/2026-04-20-quote-display-page.md` | `/quote/[slug]` 報價展示頁實作計畫 |
-| `docs/plans/2026-03-22-phase7-line-oa-ai-assistant*.md` | Phase 7 LINE OA AI 客服規格（待實作）|
+- SEO article writing: read `docs/prompts/seo-article-prompt.md` first.
+- SEO content strategy: `docs/plans/2026-01-15-seo-content-strategy.md`.
+- Landing page design rules: `docs/plans/2026-01-13-landing-page-redesign.md`.
+- Brand positioning: `docs/plans/2026-04-19-positioning-diagnosis.md`.
+- Quote display: `docs/plans/2026-04-20-quote-display-page.md`.
+- LINE OA / AI assistant plans: `docs/plans/2026-03-22-phase7-line-oa-ai-assistant*.md`.
+- Context harness design: `docs/ai-harness/context-management.md`.
 
-## 內部營運系統現況
+## Work Rules
 
-- **Sanity Studio `/studio`** — 內容管理 + 內部工具入口
-- **報價計算器（正式版）** — 協作者共用，門票原價計算、三階段付款
-- **報價展示頁 `/quote/[slug]`** — 已上線。計算器可「產生報價連結」→ LINE 貼給客戶看動態互動報價；`/quote/sample` 是 LINE OA 公開 showcase
-- **財務 Dashboard / 記帳** — 僅 owner 可存取
-- **知識庫** — Notion 資料庫（餐廳/咖啡/飯店/景點/門票/話術）
+- Before editing: inspect nearby code and current git status.
+- Keep changes scoped. Do not touch unrelated files.
+- Never commit secrets or `.env.local`.
+- Verify with the smallest meaningful command, then broaden when risk is higher.
+- If making commits: feature commit first, then docs update commit if required.
+- If pushing after a feature commit, update relevant `docs/plans/...` and `README.md` build trigger in a follow-up docs commit.
 
-## 自訂 Skills
+## Content Rules
 
-| Skill | 觸發方式 | 用途 |
-|-------|----------|------|
-| `comprehensive-review` | `/comprehensive-review` | 10 角色全面審查網站（架構、UX、SEO、資安等）|
+- Social post review: one core idea, clean line breaks, light CTA, fixed hashtags: `#清微旅行 #清邁親子包車 #親子自由行`.
+- Avoid: "中英泰文導遊"; use "中文導遊".
+- SEO articles must end with a LINE CTA.
 
-審查的執行流程、角色定義、SOP、歷史記錄都在 `.claude/skills/comprehensive-review.md` 裡，不重複。
-
-## ⚠️ Common Pitfalls（現役，真的會再踩）
-
-保鮮期原則：若某條 Pitfall 連續 3 個月沒再踩 + 已在 code 層面防呆，就刪掉。
-
-- **Discord bot 上線但「耳聾」**（2026-04-24 實戰）→ 雙根因：(1) 全域 `~/.claude/settings.json` 停用了 discord plugin；(2) start.sh 用錯 `--channels server:discord` 語法。
-  正解：專案 `.claude/settings.local.json` 加 `enabledPlugins` 陣列 override 全域停用；start.sh 用 `--channels plugin:discord@claude-plugins-official`（不是 `server:discord`）。跨專案踩雷全集 + TL;DR 推薦模式：`~/.claude/learnings/cross-project-tech/discord-plugin-gotchas.md`。
-
-## 工作流程
-
-### 每次 commit / push 後要更新的文件
-
-- `docs/plans/...` — 記錄當次修改項目、新增檔案、commit hash
-- `README.md` — Phase 狀態表、`<!-- Last build trigger: YYYY-MM-DD -->` 註解
-- `.claude/skills/comprehensive-review.md` — 只在綜合審查後更新歷史記錄
-
-commit → push → 更新文件 → commit + push 文件更新（兩段式，避免功能與文件混在同一個 commit）
-
-### 寫 SEO 文章時
-
-1. 先讀取 `docs/prompts/seo-article-prompt.md`
-2. 照著「強制協作流程」執行：先問問題、再寫大綱、最後撰寫全文
-3. 文章結尾必須有 LINE CTA
-
-### 審社群貼文 / 影片文案 / 心理學框架
-
-詳見 memory `project_social_content_guide.md`（IG/FB 審稿清單、影片文案協作流程、文案心理學對照表）。開發對話不載入，Eric 開「幫我審貼文」這類話題時再拉出來參考。
-
-### 社群連結
+## Links
 
 - LINE: https://line.me/R/ti/p/@037nyuwk
 - Facebook: https://www.facebook.com/profile.php?id=61569067776768
