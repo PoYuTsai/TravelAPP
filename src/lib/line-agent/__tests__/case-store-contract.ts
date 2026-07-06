@@ -516,6 +516,14 @@ export function runCaseStoreContract(
         await store.putOaContactRecord(makeOaContactRecord({ userId: 'Ub' }))
         expect((await store.listOaContactRecords()).map((r) => r.userId).sort()).toEqual(['Ua', 'Ub'])
       })
+
+      it('isolates stored messages from caller mutation', async () => {
+        const store = await makeStore()
+        await store.putOaContactRecord(makeOaContactRecord({ userId: 'Uiso', messages: [{ ts: 1, text: 'a' }] }))
+        const got = await store.getOaContactRecord('Uiso')
+        got!.messages!.push({ ts: 2, text: 'b' })
+        expect((await store.getOaContactRecord('Uiso'))!.messages).toHaveLength(1)
+      })
     })
   })
 }

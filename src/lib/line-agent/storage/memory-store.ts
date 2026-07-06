@@ -266,17 +266,18 @@ export class MemoryStore implements CaseStore {
 
   async putOaContactRecord(record: OaContactRecord): Promise<void> {
     if (record.userId === '') return
-    // Shallow copy 防呼叫端透過引用改已存紀錄（同 put 的慣例）。
-    this.oaContactRecords.set(record.userId, { ...record })
+    // structuredClone，同 distill 慣例 — 防呼叫端透過引用改巢狀 messages
+    // （shallow copy 只複製 messages 陣列引用，擋不住 push 就地改髒 store；
+    // 且 KvStore 走 JSON round-trip 不共用引用，兩 store 須一致）。
+    this.oaContactRecords.set(record.userId, structuredClone(record))
   }
 
   async getOaContactRecord(userId: string): Promise<OaContactRecord | null> {
     if (userId === '') return null
-    const r = this.oaContactRecords.get(userId)
-    return r ? { ...r } : null
+    return structuredClone(this.oaContactRecords.get(userId) ?? null)
   }
 
   async listOaContactRecords(): Promise<OaContactRecord[]> {
-    return Array.from(this.oaContactRecords.values()).map((r) => ({ ...r }))
+    return Array.from(this.oaContactRecords.values()).map((r) => structuredClone(r))
   }
 }
