@@ -24,7 +24,9 @@ function base64url(bytes: Uint8Array): string {
   for (const b of bytes) s += String.fromCharCode(b)
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
-function utf8(s: string): Uint8Array { return new TextEncoder().encode(s) }
+// TS 5.7 的 lib.dom 把 BufferSource 收緊成 ArrayBuffer-backed；TextEncoder 於 runtime 永遠
+// 產出真 ArrayBuffer（非 SharedArrayBuffer），故此處收斂型別讓 crypto.subtle.sign 接受。
+function utf8(s: string): Uint8Array<ArrayBuffer> { return new TextEncoder().encode(s) as Uint8Array<ArrayBuffer> }
 
 async function importPrivateKey(pem: string): Promise<CryptoKey> {
   const body = pem.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\s+/g, '')
