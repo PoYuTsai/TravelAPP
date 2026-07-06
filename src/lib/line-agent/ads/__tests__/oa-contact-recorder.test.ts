@@ -91,6 +91,50 @@ describe('recordOaContactEvent', () => {
     await recordOaContactEvent(oaText('U1', '   ', 5), s, { env: ON })
     expect(await s.getOaContactRecord('U1')).toBeNull()
   })
+  it('follow → best-effort resolves and stores displayName', async () => {
+    const s = new MemoryStore()
+    await recordOaContactEvent(follow('U1', 111), s, {
+      env: ON,
+      resolveDisplayName: async (id) => (id === 'U1' ? '陳先生' : null),
+    })
+    expect(await s.getOaContactRecord('U1')).toMatchObject({ userId: 'U1', followedAt: 111, displayName: '陳先生' })
+  })
+  it('first text (no prior follow) → best-effort resolves displayName', async () => {
+    const s = new MemoryStore()
+    await recordOaContactEvent(oaText('U1', 'hi', 5), s, {
+      env: ON,
+      resolveDisplayName: async () => '林媽媽',
+    })
+    expect((await s.getOaContactRecord('U1'))?.displayName).toBe('林媽媽')
+  })
+  it('does not re-resolve when displayName already known (hot-path dedupe)', async () => {
+    const s = new MemoryStore()
+    await s.putOaContactRecord({ userId: 'U1', displayName: '既有名' })
+    let calls = 0
+    await recordOaContactEvent(oaText('U1', 'hi', 5), s, {
+      env: ON,
+      resolveDisplayName: async () => { calls++; return '新名' },
+    })
+    expect(calls).toBe(0)
+    expect((await s.getOaContactRecord('U1'))?.displayName).toBe('既有名')
+  })
+  it('resolver failure does not block recording the contact (fail-safe)', async () => {
+    const s = new MemoryStore()
+    await recordOaContactEvent(follow('U1', 111), s, {
+      env: ON,
+      resolveDisplayName: async () => { throw new Error('LINE 500') },
+    })
+    const r = await s.getOaContactRecord('U1')
+    expect(r?.followedAt).toBe(111)
+    expect(r?.displayName).toBeUndefined()
+  })
+  it('no resolver injected → records without displayName (backward compat)', async () => {
+    const s = new MemoryStore()
+    await recordOaContactEvent(follow('U1', 111), s, { env: ON })
+    const r = await s.getOaContactRecord('U1')
+    expect(r?.followedAt).toBe(111)
+    expect(r?.displayName).toBeUndefined()
+  })
   it('swallows store errors (fail-safe, never throws)', async () => {
     const boom = { getOaContactRecord: async () => { throw new Error('kv down') }, putOaContactRecord: async () => {} } as any
     await expect(recordOaContactEvent(follow('U1'), boom, { env: ON })).resolves.toBeUndefined()

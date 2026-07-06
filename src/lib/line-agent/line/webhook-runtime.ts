@@ -73,6 +73,7 @@ import {
   type TranscriptOcr,
 } from '@/lib/line-agent/transcript/archiver'
 import { recordOaContactEvent } from '@/lib/line-agent/ads/oa-contact-recorder'
+import { fetchLineProfileDisplayName } from '@/lib/line-agent/line/profile'
 import {
   isDistillEnabled,
   runDistillation,
@@ -309,7 +310,17 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
   //       default off ⇒ 此行為不存在（recorder 內部先查閘、零 store touch、
   //       byte-identical）。recorder 內部 fail-safe（吞錯）— 記錄絕不堵 webhook。
   //       只吃 line_oa 的 oa_follow / oa_text，夥伴群與其他事件一律短路略過。
-  await recordOaContactEvent(event, store, { env: process.env, log })
+  //       刀9：best-effort 補 LINE displayName（profile API）。token 為空或 API
+  //       失敗 → resolver 回 null，recorder 照記聯絡軌跡、只是缺姓名（fail-safe）。
+  await recordOaContactEvent(event, store, {
+    env: process.env,
+    log,
+    resolveDisplayName: (lineUserId) =>
+      fetchLineProfileDisplayName({
+        lineUserId,
+        channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN ?? '',
+      }),
+  })
 
   // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
   //     the quoted bot draft (fail-safe inside) so the responder can turn it into

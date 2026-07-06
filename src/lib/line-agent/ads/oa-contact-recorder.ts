@@ -39,6 +39,27 @@ export interface OaContactRecorderDeps {
   env: Record<string, string | undefined>
   /** Per-request structured logger（可選）；只記固定 code，raw store error 可能 echo KV url。 */
   log?: AgentLogger
+  /**
+   * Best-effort 取 LINE displayName（注入；接 profile API）。純加值 —
+   * 失敗/未接一律吞掉，絕不擋主記錄。已知名不重抓（熱路徑省一次 profile 呼叫）。
+   */
+  resolveDisplayName?: (lineUserId: string) => Promise<string | null>
+}
+
+/**
+ * best-effort 取顯示名，自帶 try/catch：resolver 未接或炸掉一律回 undefined，
+ * 絕不讓 profile 失敗冒泡到外層 catch 而漏記主記錄。
+ */
+async function resolveDisplayNameSafe(
+  resolve: OaContactRecorderDeps['resolveDisplayName'],
+  lineUserId: string
+): Promise<string | undefined> {
+  if (!resolve) return undefined
+  try {
+    return (await resolve(lineUserId)) ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -65,10 +86,14 @@ export async function recordOaContactEvent(
       const existing = await store.getOaContactRecord(userId)
       // 冪等：已記過加好友日就不覆寫（LINE 可能重送 follow）。
       if (existing?.followedAt) return
+      const displayName =
+        existing?.displayName ??
+        (await resolveDisplayNameSafe(deps.resolveDisplayName, userId))
       await store.putOaContactRecord({
         ...(existing ?? { userId }),
         userId,
         followedAt: event.timestamp,
+        ...(displayName ? { displayName } : {}),
       })
       return
     }
@@ -83,11 +108,15 @@ export async function recordOaContactEvent(
         ...(existing.messages ?? []),
         { ts: event.timestamp, text: text.slice(0, OA_TEXT_MAX_CHARS) },
       ].slice(-OA_MESSAGES_MAX)
+      const displayName =
+        existing.displayName ??
+        (await resolveDisplayNameSafe(deps.resolveDisplayName, userId))
       await store.putOaContactRecord({
         ...existing,
         userId,
         firstMessageAt: existing.firstMessageAt ?? event.timestamp,
         messages,
+        ...(displayName ? { displayName } : {}),
       })
       return
     }

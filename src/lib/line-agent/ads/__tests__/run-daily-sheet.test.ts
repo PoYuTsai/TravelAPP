@@ -51,6 +51,50 @@ describe('runAdsDailySheet', () => {
     expect((await store.getOaContactRecord('U1'))?.sheetWritten).toBe(true)
   })
 
+  it('prepends displayName as the first column (name | date | inquiry | ...)', async () => {
+    const store = new MemoryStore()
+    await store.putOaContactRecord({
+      userId: 'U1',
+      displayName: '陳先生',
+      followedAt: 100,
+      firstMessageAt: 200,
+      messages: [{ ts: 200, text: 'q' }],
+    })
+    const rows: SheetCell[][] = []
+    await runAdsDailySheet({
+      store,
+      sheets: fakeSheets(rows),
+      summarize,
+      spreadsheetId: 'S',
+      range: 'A1',
+      now: () => 1_720_000_000_000,
+    })
+    expect(rows[0][0]).toBe('陳先生')
+    // 姓名插在最前 → 原本第一欄（日期）右移到 index 1、詢問項目到 index 2。
+    expect(rows[0][2]).toBe('清邁包車')
+  })
+
+  it('first column is empty string when displayName is unknown', async () => {
+    const store = new MemoryStore()
+    await store.putOaContactRecord({
+      userId: 'U1',
+      followedAt: 100,
+      firstMessageAt: 200,
+      messages: [{ ts: 200, text: 'q' }],
+    })
+    const rows: SheetCell[][] = []
+    await runAdsDailySheet({
+      store,
+      sheets: fakeSheets(rows),
+      summarize,
+      spreadsheetId: 'S',
+      range: 'A1',
+      now: () => 1_720_000_000_000,
+    })
+    expect(rows[0][0]).toBe('')
+    expect(rows[0][2]).toBe('清邁包車')
+  })
+
   it('is idempotent — re-run does not re-append', async () => {
     const store = new MemoryStore()
     await store.putOaContactRecord({

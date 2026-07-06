@@ -42,11 +42,13 @@ function toDay(ts: number | undefined): string {
 }
 
 /**
- * 欄序對齊設計：日期 | 詢問項目 | 人數 | 預估金額 | 加好友日 | 成交✓ | 成交金額 | 備註。
- * 成交欄（✓／金額）留空給 Eric 人工回填；備註標「自動」以區分手動列。
+ * 欄序對齊設計：姓名 | 日期 | 詢問項目 | 人數 | 預估金額 | 加好友日 | 成交✓ | 成交金額 | 備註。
+ * 姓名（LINE displayName）擺最前；未知則空字串。成交欄（✓／金額）留空給 Eric
+ * 人工回填；備註標「自動」以區分手動列。改欄序時務必同步手動改 Sheet 表頭。
  */
 function buildRow(record: OaContactRecord, summary: OaSummary, now: number): SheetCell[] {
   return [
+    record.displayName ?? '',
     toDay(now),
     summary.inquiry,
     summary.headcount,

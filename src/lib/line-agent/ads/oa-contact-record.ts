@@ -14,6 +14,8 @@ export interface OaContactMessage {
 
 export interface OaContactRecord {
   userId: string
+  /** LINE 顯示名稱（best-effort，透過 profile API 抓；未知則不設）。 */
+  displayName?: string
   followedAt?: number
   firstMessageAt?: number
   /** 保留最新，上限 OA_MESSAGES_MAX 則。 */

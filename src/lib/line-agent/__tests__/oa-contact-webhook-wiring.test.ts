@@ -100,6 +100,28 @@ describe('webhook oa-contact-recorder seam（廣告刀5 接線）', () => {
     expect(await store.getByLineUserId(OA_USER)).not.toBeNull()
   })
 
+  it('5. 閘開 → 透過 LINE profile API best-effort 補 displayName', async () => {
+    vi.stubEnv('AI_AGENT_OA_CAPTURE_ENABLED', 'true')
+    vi.stubEnv('LINE_CHANNEL_ACCESS_TOKEN', 'test-token')
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(
+        new Response(JSON.stringify({ displayName: '陳先生' }), { status: 200 })
+      )
+    const store = new MemoryStore()
+
+    await getEventHandler()(oaFollowEvent(), store)
+
+    const record = await store.getOaContactRecord(OA_USER)
+    expect(record?.displayName).toBe('陳先生')
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/v2/bot/profile/${OA_USER}`),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
+      })
+    )
+  })
+
   it('4. 閘開＋夥伴群事件 → recorder 不寫 OA namespace（只記客人面）', async () => {
     vi.stubEnv('AI_AGENT_OA_CAPTURE_ENABLED', 'true')
     const store = new MemoryStore()
