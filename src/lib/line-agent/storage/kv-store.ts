@@ -197,7 +197,9 @@ const DISTILL_CONFIRM_PREFIX = 'line-agent:distill-confirm:'
 const DISTILL_CONFIRM_TTL_SECONDS = 600 // 10 分鐘（design §1 複述確認）
 // 廣告刀1：OA 被動聯絡記錄 — 獨立 namespace，以 userId 為 key，永不 match case:*。
 // TTL 60 天：每日轉換表回填的滾動窗；同 userId 覆寫＝加好友→首訊軌跡最新化。
-const OA_CONTACT_KEY_PREFIX = 'oa:contact:'
+// OA plane 專屬 namespace（刻意不掛 line-agent:，標示廣告聯絡人資料面），
+// 與既有 scan(line-agent:* / case:*) 前綴互不重疊。
+const OA_CONTACT_PREFIX = 'oa:contact:'
 const OA_CONTACT_TTL_SECONDS = 5_184_000 // 60 days（60 * 24 * 60 * 60）
 
 function caseKey(caseId: string): string {
@@ -225,7 +227,7 @@ function transcriptKey(messageId: string): string {
 }
 
 function oaContactKey(userId: string): string {
-  return `${OA_CONTACT_KEY_PREFIX}${userId}`
+  return `${OA_CONTACT_PREFIX}${userId}`
 }
 
 function lineUserKey(lineUserId: string): string {
@@ -499,7 +501,7 @@ export class KvStore implements CaseStore {
 
   async listOaContactRecords(): Promise<OaContactRecord[]> {
     const kv = this.ensureClient()
-    const keys = await kv.keys(`${OA_CONTACT_KEY_PREFIX}*`)
+    const keys = await kv.keys(`${OA_CONTACT_PREFIX}*`)
     if (keys.length === 0) return []
     const records = await Promise.all(keys.map((k) => kv.get<OaContactRecord>(k)))
     return records.filter((r): r is OaContactRecord => r !== null)

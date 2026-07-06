@@ -517,6 +517,13 @@ export function runCaseStoreContract(
         expect((await store.listOaContactRecords()).map((r) => r.userId).sort()).toEqual(['Ua', 'Ub'])
       })
 
+      it('put with empty userId is a no-op (not stored, not listed)', async () => {
+        const store = await makeStore()
+        await store.putOaContactRecord(makeOaContactRecord({ userId: '' }))
+        expect(await store.getOaContactRecord('')).toBeNull()
+        expect(await store.listOaContactRecords()).toEqual([])
+      })
+
       it('isolates stored messages from caller mutation', async () => {
         const store = await makeStore()
         await store.putOaContactRecord(makeOaContactRecord({ userId: 'Uiso', messages: [{ ts: 1, text: 'a' }] }))
