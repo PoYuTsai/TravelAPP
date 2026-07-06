@@ -72,6 +72,7 @@ import {
   TRANSCRIPT_OCR_USER_TEXT,
   type TranscriptOcr,
 } from '@/lib/line-agent/transcript/archiver'
+import { recordOaContactEvent } from '@/lib/line-agent/ads/oa-contact-recorder'
 import {
   isDistillEnabled,
   runDistillation,
@@ -302,6 +303,13 @@ const defaultEventHandler: NormalizedEventHandler = async (event, store) => {
       log,
     })
   }
+
+  // 1a-3. 廣告刀5 — OA 客人被動記錄：加好友 → 首則訊息軌跡入 KV，供每日轉換表
+  //       自動填 Sheet 用。archiver 的客人面對照物。閘 AI_AGENT_OA_CAPTURE_ENABLED
+  //       default off ⇒ 此行為不存在（recorder 內部先查閘、零 store touch、
+  //       byte-identical）。recorder 內部 fail-safe（吞錯）— 記錄絕不堵 webhook。
+  //       只吃 line_oa 的 oa_follow / oa_text，夥伴群與其他事件一律短路略過。
+  await recordOaContactEvent(event, store, { env: process.env, log })
 
   // 1b. M3.6c — when this is a quote-to-bot message, fetch the cached content of
   //     the quoted bot draft (fail-safe inside) so the responder can turn it into
