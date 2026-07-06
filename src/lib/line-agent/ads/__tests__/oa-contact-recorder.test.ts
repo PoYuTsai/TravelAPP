@@ -54,6 +54,26 @@ describe('recordOaContactEvent', () => {
     expect(r?.messages?.[0].text).toBe('m6')
     expect(r?.messages?.at(-1)?.text).toBe('m25')
   })
+  it('text→follow order: follow keeps existing messages/firstMessageAt, only adds followedAt', async () => {
+    const s = new MemoryStore()
+    await recordOaContactEvent(oaText('U1', 'hi', 200), s, { env: ON })
+    await recordOaContactEvent(follow('U1', 111), s, { env: ON })
+    const r = await s.getOaContactRecord('U1')
+    expect(r).toMatchObject({
+      userId: 'U1',
+      followedAt: 111,
+      firstMessageAt: 200,
+      messages: [{ ts: 200, text: 'hi' }],
+    })
+  })
+  it('follow preserves sheetWritten and writes followedAt', async () => {
+    const s = new MemoryStore()
+    await s.putOaContactRecord({ userId: 'U1', firstMessageAt: 1, sheetWritten: true })
+    await recordOaContactEvent(follow('U1', 111), s, { env: ON })
+    const r = await s.getOaContactRecord('U1')
+    expect(r?.sheetWritten).toBe(true)
+    expect(r?.followedAt).toBe(111)
+  })
   it('preserves sheetWritten across later text', async () => {
     const s = new MemoryStore()
     await s.putOaContactRecord({ userId: 'U1', firstMessageAt: 1, sheetWritten: true })

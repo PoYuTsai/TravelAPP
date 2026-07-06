@@ -17,6 +17,7 @@
 
 import type { NormalizedLineEvent } from '../line/event-normalizer'
 import type { CaseStore } from '../storage/store'
+import type { AgentLogger } from '../observability/structured-log'
 import {
   OA_MESSAGES_MAX,
   OA_TEXT_MAX_CHARS,
@@ -36,8 +37,8 @@ export function isOaCaptureEnabled(
 export interface OaContactRecorderDeps {
   /** 環境（閘）。 */
   env: Record<string, string | undefined>
-  /** Code-only log（可選）；raw store error 可能 echo KV url，只記 code。 */
-  log?: (code: string, meta?: Record<string, unknown>) => void
+  /** Per-request structured logger（可選）；只記固定 code，raw store error 可能 echo KV url。 */
+  log?: AgentLogger
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,7 @@ export async function recordOaContactEvent(
     // 其他事件（image/file/sticker/夥伴群…）→ 略過（熱路徑零成本）。
   } catch {
     // FAIL-SAFE：記錄失敗 → 丟該則，絕不堵 webhook。
-    deps.log?.('oa_contact_record_failed')
+    // Code-only log（reason 固定碼）：raw store error 可能 echo KV url。
+    deps.log?.('store_write_failed', { reason: 'oa_contact_record_failed' })
   }
 }
