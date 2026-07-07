@@ -65,7 +65,9 @@ export function createSheetsClient(deps: SheetsClientDeps): SheetsClient {
   return {
     async appendRows(spreadsheetId, range, rows) {
       const token = await getAccessToken()
-      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`
+      // insertDataOption=INSERT_ROWS：目標分頁常有原生 Table 物件（只框表頭），append 預設
+      // OVERWRITE 會每次都寫回表頭下一列互相覆蓋、銷毀既有資料。改插入新列才安全（既有列往下推）。
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`
       const res = await deps.transport(url, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

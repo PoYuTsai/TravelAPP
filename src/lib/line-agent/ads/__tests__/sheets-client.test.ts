@@ -29,6 +29,10 @@ describe('createSheetsClient.appendRows', () => {
     expect(appendCall.url).toContain('/SHEET_ID/values/')
     expect(appendCall.url).toContain(':append')
     expect(appendCall.url).toContain('valueInputOption=USER_ENTERED')
+    // insertDataOption=INSERT_ROWS 為必要：目標分頁有原生 Table 物件（框到表頭）時，
+    // Sheets append 預設 OVERWRITE 會每次都寫回表頭下一列（R2）互相覆蓋、銷毀既有客人資料。
+    // INSERT_ROWS 改為插入新列（既有列往下推），同輪多筆與跨天 cron 都不會互蓋。
+    expect(appendCall.url).toContain('insertDataOption=INSERT_ROWS')
     expect(appendCall.init.headers.Authorization).toBe('Bearer ya29.fake')
     expect(JSON.parse(appendCall.init.body)).toEqual({ values: [['2026-07-06', '清邁包車', '4', '18000', '2026-07-05', '', '', '自動']] })
   })
