@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-06-12 檢索閉環刀完成 — 沉澱 QA 回流 system prompt（default off）＋CLI 黑箱驗收通過 -->
+<!-- Last build trigger: 2026-07-09 每日轉換表日期欄改首次詢問日＋production 補 AI_AGENT_DAILY_COST_CAP_USD 讓摘要真打 Haiku -->
