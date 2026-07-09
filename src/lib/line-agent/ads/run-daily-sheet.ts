@@ -8,7 +8,9 @@
  *   - 冪等：sheetWritten=true 者略過；標記在 append 成功「之後」才寫，故某筆
  *     append 失敗會留待下次 cron 重試，且不擋其他筆（逐筆 try/catch）。
  *   - follow-only（只加好友、沒詢問過 → 無 firstMessageAt）一律跳過，不佔行。
- *   - 日期欄用 bangkokDay（UTC+7）共用 daily-cost-cap 的時區換算，絕不自寫。
+ *   - 日期欄＝客人「首次詢問日」（record.firstMessageAt），絕不用匯出/重試當下的
+ *     now()——否則 append 失敗、隔天 cron 重試會把日期錯記成重試日。換算共用
+ *     daily-cost-cap 的 bangkokDay（UTC+7），絕不自寫。
  *   - route（composition root）另負責綁真 sheets / summarize；本層純邏輯不觸網。
  */
 
@@ -24,7 +26,10 @@ export interface RunAdsDailySheetDeps {
   summarize: (input: { messages: OaContactRecord['messages'] }) => Promise<OaSummary>
   spreadsheetId: string
   range: string
-  /** 注入式時鐘（epoch ms）；日期欄用它取「匯出當日」。 */
+  /**
+   * 注入式時鐘（epoch ms）。日期欄改用 record.firstMessageAt（見上方紀律），
+   * 本欄目前保留給未來其他用途（例如診斷 log 的匯出時間戳）。
+   */
   now: () => number
   /** 固定碼 log（可選）；raw error 可能含敏感字，只記 code。 */
   log?: (code: string, meta?: Record<string, unknown>) => void
@@ -46,10 +51,10 @@ function toDay(ts: number | undefined): string {
  * 姓名（LINE displayName）擺最前；未知則空字串。成交欄（✓／金額）留空給 Eric
  * 人工回填；備註標「自動」以區分手動列。改欄序時務必同步手動改 Sheet 表頭。
  */
-function buildRow(record: OaContactRecord, summary: OaSummary, now: number): SheetCell[] {
+function buildRow(record: OaContactRecord, summary: OaSummary): SheetCell[] {
   return [
     record.displayName ?? '',
-    toDay(now),
+    toDay(record.firstMessageAt),
     summary.inquiry,
     summary.headcount,
     summary.amount,
@@ -72,7 +77,7 @@ export async function runAdsDailySheet(
     try {
       const summary = await deps.summarize({ messages: record.messages ?? [] })
       await deps.sheets.appendRows(deps.spreadsheetId, deps.range, [
-        buildRow(record, summary, deps.now()),
+        buildRow(record, summary),
       ])
       // 標記只在 append 成功後 — 失敗留待下次 cron 重試（冪等）。
       await deps.store.putOaContactRecord({ ...record, sheetWritten: true })

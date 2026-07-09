@@ -13,6 +13,7 @@ import { MemoryStore } from '../../storage/memory-store'
 import type { SheetCell } from '../sheets-client'
 import type { OaSummary } from '../summary-adapter'
 import { runAdsDailySheet } from '../run-daily-sheet'
+import { bangkokDay } from '../../observability/daily-cost-cap'
 
 function fakeSheets(rows: SheetCell[][]) {
   return {
@@ -93,6 +94,32 @@ describe('runAdsDailySheet', () => {
     })
     expect(rows[0][0]).toBe('')
     expect(rows[0][2]).toBe('清邁包車')
+  })
+
+  it('date column uses firstMessageAt (inquiry day), not the export-time now() — retry next day must not shift the date', async () => {
+    const store = new MemoryStore()
+    // firstMessageAt 落在某一天；now() 是「隔天 cron 重試」時刻（append 失敗後重跑）。
+    const firstMessageAt = 1_720_000_000_000
+    const retryNow = 1_720_100_000_000 // 明顯是不同的曼谷日
+    expect(bangkokDay(firstMessageAt)).not.toBe(bangkokDay(retryNow))
+
+    await store.putOaContactRecord({
+      userId: 'U1',
+      followedAt: firstMessageAt,
+      firstMessageAt,
+      messages: [{ ts: firstMessageAt, text: 'q' }],
+    })
+    const rows: SheetCell[][] = []
+    await runAdsDailySheet({
+      store,
+      sheets: fakeSheets(rows),
+      summarize,
+      spreadsheetId: 'S',
+      range: 'A1',
+      now: () => retryNow,
+    })
+    // index 1 = 日期欄（姓名在 index 0）。應是客人首次詢問日，不是匯出/重試當日。
+    expect(rows[0][1]).toBe(bangkokDay(firstMessageAt))
   })
 
   it('is idempotent — re-run does not re-append', async () => {
