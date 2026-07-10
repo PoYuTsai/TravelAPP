@@ -186,7 +186,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
             <li className="flex justify-between gap-4">
               <span className="text-gray-700">接送機（單趟，無排行程日）</span>
               <span className="font-semibold text-gray-900 whitespace-nowrap">
-                轎車 {thb(AIRPORT_TRANSFER_FEES.sedan)}／Van {thb(AIRPORT_TRANSFER_FEES.van)}
+                轎車 THB {thb(AIRPORT_TRANSFER_FEES.sedan)}／Van THB {thb(AIRPORT_TRANSFER_FEES.van)}
               </span>
             </li>
             <li className="flex justify-between gap-4">

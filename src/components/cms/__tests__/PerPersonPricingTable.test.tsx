@@ -68,6 +68,7 @@ describe('PerPersonPricingTable', () => {
     expect(text).toMatch(/300\s*／小時／台/)
     expect(text).toMatch(/500\s*／日／張/)
     expect(text).toMatch(/100\s*／人／趟/)
+    expect(text).toContain('轎車 THB 500／Van THB 700')
     expect(text).toContain('安全座椅也佔一個座位')
     expect(text).toContain('10 小時')
     expect(text).toContain('12 小時')
