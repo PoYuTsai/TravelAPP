@@ -3,6 +3,8 @@
 > These are representative package structures from the Chiangway LINE rich menu and confirmed client cases. They are reference templates — actual pricing and itinerary details vary per case and must be confirmed with Eric.
 >
 > All prices below are placeholders / approximate structures. Always use the internal quote calculator for real pricing. Mark as `需驗證` any price you cannot confirm.
+>
+> **Current service truth (2026-07-10):** the standard arrangement is a Thai driver with itinerary confirmation and LINE Chinese support. A Chinese-speaking guide is optional and is a separate professional role. Passenger count does not automatically force a guide. Use `docs/plans/2026-07-10-per-person-pricing-framework.md` for fleet, family-discount, and manual-quote rules.
 
 ## Package 1: 清邁 5 天 4 夜 親子家庭包車
 
@@ -19,10 +21,15 @@ D5: Checkout → airport dropoff (departure day per flight time)
 ```
 
 **Included (standard)**:
-- Vehicle (1 large van for ≤ 6 adults + 2 children; 2 vans for larger groups)
-- Chinese-speaking guide (all active touring days)
+- Vehicle(s) selected by total occupied seats: sedan for 2–3 guests, one Van for 4–9, and two Vans for 10–18; 19+ is manual
+- Professional Thai driver(s)
+- Itinerary confirmation and LINE Chinese support
 - Fuel, parking, tolls
-- Passenger insurance
+
+**Optional / quote-specific**:
+- Chinese-speaking guide on the confirmed non-transfer service days; a guide is not automatically included on every active day
+- Passenger insurance (THB 100/person/trip)
+- Child safety seat (THB 500/day/seat); it is installed on that child's passenger seat and does not add another traveler, but must be considered in the vehicle seating layout
 
 **Excluded (standard)**:
 - All meals
@@ -35,7 +42,7 @@ D5: Checkout → airport dropoff (departure day per flight time)
 - Airport arrival/departure times
 - Lodging location (Old City, Nimman, Riverside affect routing)
 - Desired attractions and must-haves
-- Guide requirement (yes/no)
+- Guide requirement (yes/no/unsure) and which non-transfer service days need guiding; partial-day or partial-trip guide requests require manual confirmation
 
 ---
 

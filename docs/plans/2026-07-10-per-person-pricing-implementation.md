@@ -1,5 +1,8 @@
 # 人頭計價改造 — 實作計畫（後台報價器＋前台＋套餐＋LINE 選單＋夥伴對照）
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED.** 本文件記錄 calibration 前的分階段實作，內文仍含 8–9 人自動導遊與 10+ 拆單等已淘汰假設，不能作為現行服務或報價規則。production 規則以 [`2026-07-10-per-person-pricing-framework.md`](2026-07-10-per-person-pricing-framework.md) 與 [`2026-07-10-pricing-line-production-calibration-implementation.md`](2026-07-10-pricing-line-production-calibration-implementation.md) 為準。
+
 > 2026-07-10。定價架構見 `2026-07-10-per-person-pricing-framework.md`（參數：G=T1/T2 1,000、T3/T4 1,500；V=150；小孩 12+全價/3-11 八折/0-2 半價）。
 > 分 5 個 Phase，每 Phase 一個 session 刀。對外幣別 THB、收現金；TWD 降為內部參考。
 

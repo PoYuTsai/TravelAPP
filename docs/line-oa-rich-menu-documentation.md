@@ -1,5 +1,8 @@
 # LINE OA Rich Menu 完整文件
 
+> [!WARNING]
+> **ARCHIVED / SUPERSEDED — 2026-07-10.** 本文件保留 2026-01 的歷史設計與營運紀錄；其中版型、NT$／`$` 價格、票券、民宿、固定套餐、關鍵字與超時話術**不得再執行**。目前唯一 production 規格是 [`plans/2026-07-10-line-rich-menu-production-spec.md`](plans/2026-07-10-line-rich-menu-production-spec.md)。
+
 > 最後更新：2026-01-28
 > 用途：LINE OA 圖文選單內容紀錄，供未來優化參考
 

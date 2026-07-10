@@ -1,5 +1,8 @@
 # LINE OA Rich Menu 優化 - 執行計畫 (MOP)
 
+> [!WARNING]
+> **ARCHIVED / SUPERSEDED — 2026-07-10.** 這是舊版 1 大＋3 小選單的歷史 MOP，包含已淘汰的 `$` 價格、關鍵字與超時回覆；**不要依本文件操作線上 OA**。請只執行 [`plans/2026-07-10-line-rich-menu-production-spec.md`](plans/2026-07-10-line-rich-menu-production-spec.md)，且所有外部寫入仍需 action-time confirmation。
+
 > 建立日期：2026-01-28
 > 最後更新：2026-01-29
 > 狀態：✅ 設計完成，待上線
