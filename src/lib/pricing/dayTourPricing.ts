@@ -8,7 +8,17 @@ export const DAY_TOUR_PRICING_TIER_LABELS: Record<DayTourPricingTier, string> = 
 }
 
 const DAY_TOUR_PRICING_TIERS: readonly DayTourPricingTier[] = ['T1', 'T2', 'T3', 'T4']
-const DEFAULT_DAY_TOUR_PRICING_TIER: DayTourPricingTier = 'T1'
+
+export const DAY_TOUR_PRICING_TIER_PENDING_LABEL = '方案分級待確認，請 LINE 確認'
+
+export interface DayTourRouteIdentity {
+  title?: string | null
+  slug?: string | null
+}
+
+interface DayTourPricingTierLabelInput extends DayTourRouteIdentity {
+  pricingTier?: unknown
+}
 
 export function isDayTourPricingTier(value: unknown): value is DayTourPricingTier {
   return (
@@ -17,12 +27,24 @@ export function isDayTourPricingTier(value: unknown): value is DayTourPricingTie
   )
 }
 
-export function normalizeDayTourPricingTier(value: unknown): DayTourPricingTier {
-  return isDayTourPricingTier(value) ? value : DEFAULT_DAY_TOUR_PRICING_TIER
+export function normalizeDayTourPricingTier(value: unknown): DayTourPricingTier | null {
+  return isDayTourPricingTier(value) ? value : null
 }
 
-export function getDayTourPricingTierLabel(value: unknown): string {
-  return DAY_TOUR_PRICING_TIER_LABELS[normalizeDayTourPricingTier(value)]
+export function getDayTourPricingTierLabel({
+  pricingTier,
+  title,
+  slug,
+}: DayTourPricingTierLabelInput): string {
+  const normalizedTier = normalizeDayTourPricingTier(pricingTier)
+  if (normalizedTier) {
+    return DAY_TOUR_PRICING_TIER_LABELS[normalizedTier]
+  }
+
+  const proposal = proposeDayTourPricingTier({ title, slug })
+  return proposal.status === 'proposed'
+    ? DAY_TOUR_PRICING_TIER_LABELS[proposal.proposedTier]
+    : DAY_TOUR_PRICING_TIER_PENDING_LABEL
 }
 
 /** Public day-tour pricing promises are code-owned; Sanity only selects a tier. */
@@ -53,11 +75,6 @@ export const DAY_TOUR_ROUTE_TIER_PROPOSALS = [
   tier: DayTourPricingTier
   patterns: readonly string[]
 }>
-
-export interface DayTourRouteIdentity {
-  title?: string | null
-  slug?: string | null
-}
 
 export type DayTourTierProposal =
   | {

@@ -78,7 +78,7 @@ describe('day-tour canonical public pricing', () => {
     ['missing', undefined],
     ['unknown tier', 'T9'],
     ['prototype key', '__proto__'],
-  ])('renders a safe card tier label for %s runtime pricingTier', (_label, pricingTier) => {
+  ])('renders a neutral card tier label for unknown %s runtime pricingTier', (_label, pricingTier) => {
     const RuntimeCard = DayTourCard as unknown as React.ComponentType<Record<string, unknown>>
     let text = ''
 
@@ -93,15 +93,21 @@ describe('day-tour canonical public pricing', () => {
       text = container.textContent ?? ''
     }).not.toThrow()
 
-    expect(text).toContain('T1 市區')
+    expect(text).toContain('方案分級待確認，請 LINE 確認')
+    expect(text).not.toContain('T1 市區')
   })
 
   it.each([
     ['missing', undefined],
     ['unknown tier', 'T9'],
     ['prototype key', '__proto__'],
-  ])('renders a safe detail tier label for %s runtime pricingTier', async (_label, pricingTier) => {
-    const runtimeDayTour = { ...hostileDayTour, pricingTier }
+  ])('renders a neutral detail tier label for unknown %s runtime pricingTier', async (_label, pricingTier) => {
+    const runtimeDayTour = {
+      ...hostileDayTour,
+      title: '未知區域一日遊',
+      slug: 'unknown-area-day-tour',
+      pricingTier,
+    }
     mocks.sanityFetch.mockImplementation(async (query: string) => {
       if (query.includes('_type == "tourPackage"')) return null
       if (query.includes('_type == "dayTour"')) return runtimeDayTour
@@ -117,7 +123,31 @@ describe('day-tour canonical public pricing', () => {
       text = container.textContent ?? ''
     }).not.toThrow()
 
-    expect(text).toContain('服務區域：T1 市區')
+    expect(text).toContain('服務區域：方案分級待確認，請 LINE 確認')
+    expect(text).not.toContain('T1 市區')
+  })
+
+  it('derives known missing tiers for both card and detail views', async () => {
+    const { container: card } = render(
+      <DayTourCard
+        title="清萊一日遊"
+        slug="chiang-rai-day-tour"
+      />
+    )
+    expect(card.textContent).toContain('T3 清萊')
+
+    const runtimeDayTour = { ...hostileDayTour, pricingTier: undefined }
+    mocks.sanityFetch.mockImplementation(async (query: string) => {
+      if (query.includes('_type == "tourPackage"')) return null
+      if (query.includes('_type == "dayTour"')) return runtimeDayTour
+      return null
+    })
+
+    const page = await TourDetailPage({
+      params: Promise.resolve({ slug: runtimeDayTour.slug }),
+    })
+    const { container: detail } = render(page)
+    expect(detail.textContent).toContain('服務區域：T2 近郊')
   })
 
   it('renders per-occupant pricing copy and ignores hostile legacy price props', () => {

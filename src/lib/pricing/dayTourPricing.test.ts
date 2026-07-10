@@ -17,7 +17,11 @@ describe('day-tour runtime pricing tier normalization', () => {
   ] satisfies Array<[DayTourPricingTier, string]>)('keeps %s and returns its label', (tier, label) => {
     expect(isDayTourPricingTier(tier)).toBe(true)
     expect(normalizeDayTourPricingTier(tier)).toBe(tier)
-    expect(getDayTourPricingTierLabel(tier)).toBe(label)
+    expect(getDayTourPricingTierLabel({
+      pricingTier: tier,
+      title: '清萊大象探索',
+      slug: 'chiang-rai-elephant',
+    })).toBe(label)
   })
 
   it.each([
@@ -26,8 +30,19 @@ describe('day-tour runtime pricing tier normalization', () => {
     ['prototype key', '__proto__'],
   ])('falls back safely for %s', (_label, value) => {
     expect(isDayTourPricingTier(value)).toBe(false)
-    expect(normalizeDayTourPricingTier(value)).toBe('T1')
-    expect(getDayTourPricingTierLabel(value)).toBe('T1 市區')
+    expect(normalizeDayTourPricingTier(value)).toBeNull()
+    expect(getDayTourPricingTierLabel({
+      pricingTier: value,
+      title: '未知區域一日遊',
+      slug: 'unknown-area-day-tour',
+    })).toBe('方案分級待確認，請 LINE 確認')
+  })
+
+  it.each([
+    ['茵他儂一日遊', 'doi-inthanon-day-tour', 'T2 近郊'],
+    ['清萊一日遊', 'chiang-rai-day-tour', 'T3 清萊'],
+  ])('derives the unique known route for missing tier: %s', (title, slug, label) => {
+    expect(getDayTourPricingTierLabel({ title, slug })).toBe(label)
   })
 })
 
@@ -70,5 +85,6 @@ describe('day-tour pricing tier proposals', () => {
       route: null,
       proposedTier: null,
     })
+    expect(getDayTourPricingTierLabel(identity)).toBe('方案分級待確認，請 LINE 確認')
   })
 })

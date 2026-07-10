@@ -397,7 +397,11 @@ export default async function TourDetailPage({
                 {DAY_TOUR_PUBLIC_PRICING.disclosure.join('；')}。
               </p>
               <p className="mt-3 text-sm font-medium text-primary">
-                服務區域：{getDayTourPricingTierLabel((tour as DayTour).pricingTier)}
+                服務區域：{getDayTourPricingTierLabel({
+                  pricingTier: (tour as DayTour).pricingTier,
+                  title: tour.title,
+                  slug: tour.slug,
+                })}
               </p>
               <Link
                 href={DAY_TOUR_PUBLIC_PRICING.pricingHref}

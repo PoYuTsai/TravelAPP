@@ -83,7 +83,7 @@ export default function DayTourCard({
           {DAY_TOUR_PUBLIC_PRICING.cardLabel}
         </p>
         <p className="mt-1 text-xs text-gray-500">
-          {getDayTourPricingTierLabel(pricingTier)}
+          {getDayTourPricingTierLabel({ pricingTier, title, slug })}
         </p>
 
         {/* CTA Arrow */}
