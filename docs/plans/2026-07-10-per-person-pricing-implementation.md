@@ -58,14 +58,16 @@
 
 | 順序 | 內容 | 依賴 |
 |------|------|------|
-| 刀1 | Phase 0 引擎＋tests | 無 |
+| 刀1 ✅ | Phase 0 引擎＋tests（2026-07-10 完成，a189e0e） | 無 |
 | 刀2 | Phase 1 報價器 | 刀1 |
 | 刀3 | Phase 2 前台報價頁＋重出三張套餐報價 | 刀2 |
 | 刀4 | Phase 3 公開價目頁 | 刀1（可與刀3 並行） |
 | 刀5 | Phase 4 選單＋快查卡 | 刀4 上線後 |
 
+刀1 完成紀錄（a189e0e）：`src/lib/pricing/perPersonRates.ts`＋22 unit tests；匯率 fallback 單一事實來源 `DEFAULT_THB_PER_TWD=1.1`（TWD=THB÷rate；後台舊值 0.93 是方向錯誤、TWD 會灌水 ~7.5%，`PricingCalculator` 三處與 `src/lib/quote/fetchQuote.ts:169` 均改引常數）。
+
 風險：
 - 舊 snapshot 相容（前台以 `pricingModel` 判別，舊格式走現行路徑）
-- 匯率 fallback 不一致（0.93 vs 1.1）——Phase 0 統一
+- ~~匯率 fallback 不一致（0.93 vs 1.1）~~——刀1 已統一 1.1
 - `PricingCalculator.tsx` 是 3,000+ 行大檔，改動須小步＋既有測試護航（注意 activityTickets.test.ts 有既有 TS2783 錯誤，非本工程引入）
 - 10 人以上兩台車的報價器 UX（兩張表加總）先做最簡版：提示拆兩單

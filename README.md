@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-07-10 廣告訪客 LINE CTA 切換加入好友管道追蹤連結（gclid 7天歸因） -->
+<!-- Last build trigger: 2026-07-10 人頭計價刀1 perPersonRates 引擎＋匯率 fallback 統一 1.1 -->
