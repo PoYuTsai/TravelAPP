@@ -52,6 +52,7 @@
 - 圖文選單「參考價格」入口 → 指向 `/services/car-charter` 新人頭價目區（純 LINE 後台操作＋`docs/line-oa-rich-menu-documentation.md` 更新）；不再讓客人看到任何成本式明細
 - **夥伴快查卡**：從 framework 文件產出單頁（LINE 可傳的圖或 PDF）：三張每人價表＋座位硬規則＋小孩三段＋加購＋機場日規則；放 `docs/partner/pricing-cheatsheet-v1.md`（先 md，再轉圖）
 - 夥伴報價 SOP：① 數佔位人數（嬰兒也算）→ ② 判斷每日最遠點定 Tier → ③ 查表報每人價 ×天數 → ④ 加購另列 → ⑤ 成單需正式報價頁時回報 Eric/CC 出 quote URL
+- 快查卡收款要點：**當日應收 = 團費 + 現場付加購**（門票代收代付含在內，單一收款點同一天結清；見 framework 第 8 節門票設計）
 - 快查卡版本號與 framework 文件同步，改參數必同步重發
 
 ## 執行順序與風險
@@ -69,6 +70,8 @@
 刀2 完成紀錄（eae12ed）：引擎補 `AIRPORT_TRANSFER_FEES`（純接送日按車收 500/700，第5節規則2）；新增 `perPersonAdapter.ts`（type→tier 映射含 goldentriangle T4、機場日 name 推斷、10+ 拆單降級）；報價器三欄人數（嬰兒佔位計級距、餐費排除）、resolveFleet 配車、售價=人頭團費（黃表降內部成本毛利參考）、10+ 擋下載/產連結；externalQuote perPerson 售價結構 items＋`_quoteSnapshot.pricingModel:'perPerson'`（舊 snapshot 路徑不動）；載入舊 quote 匯率 <0.9 自動重設 1.1。Review 遺留建議（未做）：needLuggageCar 文案純看人數不看有無機場日、對外 tab「÷N 成人」舊口徑殘留、`downloadExternalQuote` dead code 可刪、保險改含嬰兒 +100/人需 Eric 確認。
 
 刀3 完成紀錄（69d7f3c，程式面）：修 `pricingModel` 斷鏈——`fetchQuote.ts` 原只取 `snapshot.externalQuote`、`pricingModel` 被丟棄，補傳到 `QuoteData`（types.ts 加 `pricingModel?: 'perPerson'`）；`QuoteCostDashboard` 的 `TotalQuoteCard`＋`LineItemBreakdown` 依 `pricingModel==='perPerson'` 反轉 THB 大字／TWD 縮約值註記，舊快照走現行 NT$ 渲染；included 對齊黃表補「超時費」。新增 fetchQuote mock 測試 3 條＋元件 jsdom/RTL 測試 2 條（mock framer-motion，jsdom 無 IntersectionObserver）。**2026-07-10 Eric 回饋定案（同日補丁）**：① 舊連結維持，套餐展示頁（package mode）下架價格明細區塊；② 超時費按台實收（清邁10hr/清萊金三角12hr 後 THB 300/小時/台），從 included 移除、perPerson excluded 列明；③ 保險客選加購、要保時嬰兒也保 +100/人（刀2 行為確認）。**未完項**：三張示範套餐重出——定價提案已出（6人檔錨點：5天4夜 6,000／清萊2天 3,500／泰北6天 7,700 THB/人，完整試算見 `docs/plans/2026-07-10-package-pricing-proposal.md`），待 Eric 核價後 dry-run 重出；uao33058 payload type 是 suburban 非 chiangrai、lyx5aysy 金三角日 typed chiangrai 非 goldentriangle，重出時要改對 type。
+
+2026-07-10 三套餐錨點價定案：k8oeyepp 5天4夜 **6,000**／uao33058 清萊2天 **3,500（選 T3 口徑）**／lyx5aysy 泰北6天 **7,700** THB/人（Eric 核價，詳見 `2026-07-10-package-pricing-proposal.md` 定案狀態）；三張套餐可進 dry-run 重出。
 
 風險：
 - 舊 snapshot 相容（前台以 `pricingModel` 判別，舊格式走現行路徑）
