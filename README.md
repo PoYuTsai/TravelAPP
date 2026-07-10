@@ -22,6 +22,7 @@
 | Phase 6 | 記帳系統 + 知識庫 + 報價計算系統 | ✅ 完成 |
 | 品牌 2026-04 | 「爸媽開的」定位全面同步（官網 / Sanity / 評價 / bio）| ✅ 完成 |
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
+| 定價 2026-07 | 包車每人每日參考價、親子全家總價與 LINE 價格圖同步 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | 🧪 Preview AI + 夥伴群協作 + RAG groundwork |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。
@@ -31,7 +32,7 @@
 ### 對外前台
 - 響應式 Landing Page + LINE CTA + GA4/Google Ads 轉換追蹤
 - 部落格：SEO 分類、分頁、搜尋、精選文章、結構化資料
-- 包車 / 民宿 / About Us 頁面
+- 包車 / 民宿 / About Us 頁面；包車頁公開「泰國司機」與「泰國司機＋中文導遊」兩套參考價，親子詢價回覆全家總價
 - 歷史案例展示（狀態排序、年份分組、分頁載入）
 - 品牌實體訊號集中於 `src/lib/brand-entity.ts`
 
