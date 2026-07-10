@@ -12,6 +12,12 @@ const PUBLIC_SOURCE_ROOTS = [
 const PUBLIC_SOURCE_FILES = [
   // This production-facing Sanity schema lives outside the recursive roots above.
   'src/sanity/schemas/siteSettings.ts',
+  // Operational copy generators can republish stale claims even when the site is clean.
+  'scripts/setup-notion-replies.mjs',
+  'scripts/upload-post.mjs',
+  'scripts/update-post.mjs',
+  'scripts/force-update-post.mjs',
+  'scripts/upload-transportation-post.mjs',
 ] as const
 
 const EXCLUDED_PUBLIC_SOURCE_FILES = new Set([
@@ -151,6 +157,11 @@ describe('production public copy tripwire', () => {
     expect(paths).toContain('src/components/sections/Testimonials.tsx')
     expect(paths).toContain('src/lib/site-settings.ts')
     expect(paths).toContain('src/lib/quote/quoteDisplay.ts')
+    expect(paths).toContain('scripts/setup-notion-replies.mjs')
+    expect(paths).toContain('scripts/upload-post.mjs')
+    expect(paths).toContain('scripts/update-post.mjs')
+    expect(paths).toContain('scripts/force-update-post.mjs')
+    expect(paths).toContain('scripts/upload-transportation-post.mjs')
     expect(paths).not.toContain('src/components/sections/testimonials-data.ts')
     expect(paths).not.toContain('src/lib/line-agent/cases/auto-reply.ts')
 
@@ -176,6 +187,30 @@ describe('production public copy tripwire', () => {
       expect(findViolations('virtual-public-page.tsx', promise)).toEqual([
         expect.stringContaining('正面中文司機承諾'),
       ])
+    }
+  })
+
+  it('keeps the transportation post generator on paid child seats and optional guides', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'scripts/upload-transportation-post.mjs'),
+      'utf8',
+    )
+
+    expect(source).toContain('付費加購安全座椅（THB 500／日／張）')
+    expect(source).toContain('標準安排泰國司機，中文導遊可選配')
+    expect(source).not.toContain('一定會準備的配備')
+    expect(source).not.toContain('專業司機 + 中文導遊')
+  })
+
+  it('keeps every generic article uploader on Thai drivers with optional guides', () => {
+    for (const relativePath of [
+      'scripts/upload-post.mjs',
+      'scripts/update-post.mjs',
+      'scripts/force-update-post.mjs',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8')
+      expect(source).toContain('標準泰國司機、中文導遊可選配')
+      expect(source).not.toContain('專業司機 + 中文導遊')
     }
   })
 })

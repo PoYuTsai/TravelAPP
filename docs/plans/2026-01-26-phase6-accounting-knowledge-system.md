@@ -43,6 +43,8 @@
 
 **新增檔案：** `scripts/setup-notion-replies.mjs`
 
+> ⚠️ 2026-07-10 補註：此檔為歷史 `LEGACY / MANUAL-ONLY` seed，只能在人工確認的全新空白資料庫使用；不得重跑來修正或覆寫既有 live Notion。live 話術請先人工審核，再透過一次性 migration 或 Notion UI 更新。腳本內的初始話術已校準為目前司機／導遊、保險與超時政策，但這不代表 production Notion 已被更新。
+
 **資料新增（16 筆）：**
 | 分類 | 筆數 | 內容 |
 |------|------|------|

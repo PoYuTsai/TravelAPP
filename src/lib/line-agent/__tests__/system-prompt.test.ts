@@ -124,6 +124,14 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('未加購不構成報價缺漏')
   })
 
+  it('locks charter hours, grace period, and per-vehicle overtime without guide overtime', () => {
+    expect(prompt).toContain('清邁 10 小時')
+    expect(prompt).toContain('清萊／金三角 12 小時')
+    expect(prompt).toContain('基本用車時間用完後，另有 30 分鐘彈性')
+    expect(prompt).toContain('THB 300／小時／車')
+    expect(prompt).toContain('導遊不另收超時費')
+  })
+
   it('flags airport transfers with 6+ luggage to confirm size/count and consider a second vehicle', () => {
     expect(prompt).toContain('機場接送')
     expect(prompt).toContain('行李')
