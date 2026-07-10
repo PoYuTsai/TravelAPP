@@ -139,7 +139,8 @@ const carCharterQuery = `*[_type == "carCharter"][0]{
   pricingSectionTitle,
   process,
   gallery,
-  faq
+  faq,
+  pricingFootnotes
 }`
 
 async function getCarCharterData() {
@@ -228,9 +229,7 @@ export default async function CarCharterPage() {
               title={data?.pricingSectionTitle || '包車價格參考'}
               subtitle="以人數計價，人越多每人越划算"
             />
-            {/* 注意：Sanity pricingFootnotes 為舊「一台車價」時代內容（含導遊費/房費等成本拆項，
-                違反人頭計價對客展示原則），暫不渲染；Eric 更新 Sanity 內容後再接回 footnotes prop。 */}
-            <PerPersonPricingTable />
+            <PerPersonPricingTable footnotes={data?.pricingFootnotes} />
 
             {/* 三大套餐錨點價 */}
             <div className="mt-12">
