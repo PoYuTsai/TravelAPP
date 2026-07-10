@@ -18,6 +18,7 @@ import {
   renderRichMenuPng,
 } from './productionArtworkRenderer'
 import sharp from 'sharp'
+import { PUBLIC_PRICE_RANGE } from '@/lib/pricing/publicPolicy'
 
 const ARTWORK_FONT_PATHS = ['Regular', 'Bold', 'Black'].map((weight) =>
   resolve(
@@ -292,6 +293,7 @@ describe('production artwork data', () => {
     expect(svg).toContain('.lineId { font-size: 58px')
     expect(svg).not.toContain('buttonKicker')
     expect(svg).toContain('<text x="160" y="235" class="hero">')
+    expect(svg).toContain(`成人參考價 ${PUBLIC_PRICE_RANGE}`)
     expect(76 * (375 / 2160)).toBeGreaterThanOrEqual(13)
     expect(62 * (375 / 2160)).toBeGreaterThanOrEqual(10)
     expect(58 * (375 / 2160)).toBeGreaterThanOrEqual(10)

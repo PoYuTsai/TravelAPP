@@ -15,7 +15,7 @@ import {
 } from '@/lib/pricing/perPersonRates'
 import {
   CHARTER_OVERTIME_POLICY,
-  PUBLIC_DAY_TOUR_PRICE_RANGE_THB,
+  PUBLIC_PRICE_RANGE,
 } from '@/lib/pricing/publicPolicy'
 
 const ARTWORK_FONT_FAMILY = 'Chiangway Artwork Sans'
@@ -199,7 +199,7 @@ export function buildPricingArtworkOverlaySvg(): string {
     <rect x="80" y="50" width="2000" height="290" rx="48" fill="url(#headerGlow)"/>
     <rect x="120" y="78" width="670" height="66" rx="33" fill="#F7C009"/>
     <text x="160" y="128" class="brand">清微旅行｜清邁私家一日遊</text>
-    <text x="${PRICING_ARTWORK_HEADLINE_CONTENT_BOUNDS.left}" y="235" class="hero">成人每人參考價 THB ${formatThb(PUBLIC_DAY_TOUR_PRICE_RANGE_THB.min)}–${formatThb(PUBLIC_DAY_TOUR_PRICE_RANGE_THB.max)}</text>
+    <text x="${PRICING_ARTWORK_HEADLINE_CONTENT_BOUNDS.left}" y="235" class="hero">成人參考價 ${PUBLIC_PRICE_RANGE}</text>
     <text x="${PRICING_ARTWORK_HEADLINE_CONTENT_BOUNDS.left}" y="312" class="heroSub">不併團・行程可調整・爸媽開的親子包車</text>
 
     ${cards}
