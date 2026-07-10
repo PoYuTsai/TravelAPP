@@ -156,40 +156,40 @@ export default function CancellationPage() {
                   <tr className="bg-gray-100">
                     <th className="border border-gray-300 px-4 py-2 text-left">取消時間</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">退款比例</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 10,000 元）</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 THB 10,000）</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">14 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-green-600 font-semibold">全額退款（100%）</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 5,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 5,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7-13 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-yellow-600 font-semibold">退款 50%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 5,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 5,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">4-6 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-orange-600 font-semibold">退款 30%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">3 天內取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">當天取消或未到</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-gray-500 text-xs mt-2">
-              * 範例假設訂單總金額 10,000 元，已付 50% 訂金（5,000 元）
+              * 範例假設訂單總金額 THB 10,000，已付 50% 訂金（THB 5,000）
             </p>
           </section>
 
@@ -205,35 +205,35 @@ export default function CancellationPage() {
                   <tr className="bg-gray-100">
                     <th className="border border-gray-300 px-4 py-2 text-left">取消時間</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">退款比例</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 6,000 元）</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 THB 6,000）</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">30 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-green-600 font-semibold">全額退款（100%）</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">14-29 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-yellow-600 font-semibold">退款 50%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7-13 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-orange-600 font-semibold">退款 30%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 1,800 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 1,800</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7 天內取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-gray-500 text-xs mt-2">
-              * 範例假設訂單總金額 6,000 元，已付 50% 訂金（3,000 元）
+              * 範例假設訂單總金額 THB 6,000，已付 50% 訂金（THB 3,000）
             </p>
           </section>
 

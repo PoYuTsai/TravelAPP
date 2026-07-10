@@ -68,6 +68,11 @@ describe('formatPeople', () => {
     const result = formatPeople(1, 1, '2歲')
     expect(result).toBe('1 大 1 小（2歲）')
   })
+
+  it('成人、小孩與嬰兒分開顯示', () => {
+    const result = formatPeople(2, 1, '5歲', 1)
+    expect(result).toBe('2 大 1 小（5歲） 1 嬰')
+  })
 })
 
 describe('parseList', () => {
@@ -102,6 +107,7 @@ describe('generateItineraryHTML', () => {
     endDate: '2026-02-14',
     adults: 2,
     children: 1,
+    infants: 1,
     childrenAges: '5歲',
     days: [
       {
@@ -118,8 +124,26 @@ describe('generateItineraryHTML', () => {
         guidePrice: 2500,
       },
     ],
+    quotationItems: [
+      {
+        date: '2026-02-12',
+        description: '泰國司機包車服務',
+        unitPrice: 3200,
+        quantity: 1,
+        unit: '台',
+      },
+      {
+        description: '兒童安全座椅',
+        unitPrice: 500,
+        quantity: 1,
+        unit: '張',
+      },
+    ],
+    quotationTotal: 3700,
+    // Legacy pricing fields deliberately remain in the fixture. They must never
+    // become a new PDF quote when canonical quotation items are available.
     totalPrice: 10000,
-    priceIncludes: '油費\n停車費',
+    priceIncludes: '油費\n停車費\n中文導遊服務（選配）\n旅遊保險（選配）',
     priceExcludes: '門票\n餐費',
   }
 
@@ -135,7 +159,17 @@ describe('generateItineraryHTML', () => {
 
   it('生成包含人數的 HTML', () => {
     const html = generateItineraryHTML(mockData)
-    expect(html).toContain('2 大 1 小（5歲）')
+    expect(html).toContain('2 大 1 小（5歲） 1 嬰')
+  })
+
+  it('escapes child age text before inserting it into PDF HTML', () => {
+    const html = generateItineraryHTML({
+      ...mockData,
+      childrenAges: '<script>alert("age")</script>',
+    })
+
+    expect(html).not.toContain('<script>alert("age")</script>')
+    expect(html).toContain('&lt;script&gt;alert(&quot;age&quot;)&lt;/script&gt;')
   })
 
   it('生成包含行程標題的 HTML', () => {
@@ -154,9 +188,58 @@ describe('generateItineraryHTML', () => {
     expect(html).toContain('Nimman Hotel')
   })
 
-  it('生成包含費用的 HTML', () => {
+  it('只用 canonical 報價項目顯示 THB 費用', () => {
     const html = generateItineraryHTML(mockData)
-    expect(html).toContain('NT$10,000')
+    expect(html).toContain('泰國司機包車服務')
+    expect(html).toContain('兒童安全座椅')
+    expect(html).toContain('THB 3,200')
+    expect(html).toContain('THB 500')
+    expect(html).toContain('THB 3,700')
+    expect(html).not.toContain('NT$10,000')
+    expect(html).not.toContain('台幣轉帳')
+  })
+
+  it('recalculates the displayed total from canonical rows when quotationTotal is stale', () => {
+    const html = generateItineraryHTML({ ...mockData, quotationTotal: 1 })
+
+    expect(html).toContain('THB 3,700')
+    expect(html).not.toContain('<td class="number">THB 1</td>')
+  })
+
+  it('只有 canonical 項目存在時才呈現導遊與保險', () => {
+    const policyData = {
+      ...mockData,
+      priceExcludes: '門票\n餐費\n中文導遊服務（未選配）\n旅遊保險（未選配）',
+    }
+    const withoutOptions = generateItineraryHTML(policyData)
+    expect(withoutOptions).not.toContain('中文導遊服務（選配）')
+    expect(withoutOptions).not.toContain('旅遊保險（選配）')
+    expect(withoutOptions).toContain('中文導遊服務（未選配）')
+    expect(withoutOptions).toContain('旅遊保險（未選配）')
+
+    const withOptions = generateItineraryHTML({
+      ...policyData,
+      quotationItems: [
+        ...mockData.quotationItems,
+        {
+          description: '中文導遊（選配）',
+          unitPrice: 2500,
+          quantity: 1,
+          unit: '日',
+        },
+        {
+          description: '旅遊保險（選配）',
+          unitPrice: 100,
+          quantity: 4,
+          unit: '人',
+        },
+      ],
+      quotationTotal: 6600,
+    })
+    expect(withOptions).toContain('中文導遊（選配）')
+    expect(withOptions).toContain('旅遊保險（選配）')
+    expect(withOptions).not.toContain('中文導遊服務（未選配）')
+    expect(withOptions).not.toContain('旅遊保險（未選配）')
   })
 
   it('生成包含費用包含/不包含的 HTML', () => {
@@ -177,23 +260,25 @@ describe('generateItineraryHTML', () => {
     // 應該不會出錯
   })
 
-  it('處理無費用資訊', () => {
+  it('沒有 canonical 報價時只輸出行程，不回退 legacy 費用或付款區', () => {
     const noPrice = {
       ...mockData,
-      totalPrice: 0,
-      priceIncludes: undefined,
-      priceExcludes: undefined,
+      quotationItems: undefined,
+      quotationTotal: undefined,
       days: [
         {
           date: '2026-02-12',
           title: '測試',
-          carPrice: 0,
-          guidePrice: 0,
+          carPrice: 3200,
+          guidePrice: 2500,
         },
       ],
+      totalPrice: 10000,
     }
     const html = generateItineraryHTML(noPrice)
-    // 應該不會出錯
     expect(html).toContain('測試')
+    expect(html).not.toContain('費用說明')
+    expect(html).not.toContain('付款方式')
+    expect(html).not.toContain('NT$')
   })
 })

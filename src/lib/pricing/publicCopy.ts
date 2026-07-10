@@ -87,7 +87,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     },
     {
       question: '超時怎麼計算？',
-      answer: `清邁一日用車 ${CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊與金三角一日 ${CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時，結束時間有 ${CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性。超過後，超時費為 THB ${CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，按台計收；中文導遊不另收超時費。`,
+      answer: `清邁一日用車 ${CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊與金三角一日 ${CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時；基本用車時間用完後，另有 ${CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性。超過後，超時費為 THB ${CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，按台計收；中文導遊不另收超時費。`,
     },
     {
       question: '可以帶嬰兒車嗎？',

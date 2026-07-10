@@ -34,7 +34,10 @@ import { buildParsedActivityTickets } from './activityTickets'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
   buildQuoteItinerary,
+  DEFAULT_FORMAL_QUOTE_OPTIONS,
   getExternalQuoteHeaderCopy,
+  getExternalQuoteTotalCopy,
+  resolveSavedGuideSelection,
   EXTERNAL_QUOTE_LAYOUT,
   EXTERNAL_QUOTE_THEME,
   TWD_TRANSFER_ACCOUNT,
@@ -1070,6 +1073,11 @@ function downloadSimpleExternalQuote(
     hasThaiDress: c.thaiDressPrice > 0,
     travelerCount: _people,
   })
+  const totalPriceCopy = getExternalQuoteTotalCopy(
+    externalQuote.totalTHB,
+    externalQuote.totalTWD,
+    fmt,
+  )
 
   const itineraryToShow =
     customItinerary && customItinerary.length > 0
@@ -1384,8 +1392,8 @@ function downloadSimpleExternalQuote(
 
     <div class="total-box">
       <div class="label">團費總計</div>
-      <div class="amount">NT$ ${fmt(externalQuote.totalTWD)}</div>
-      <div class="sub">約 ${fmt(externalQuote.totalTHB)} 泰銖${c.children > 0 ? '<br>小孩費用已併入全團總價' : ''}</div>
+      <div class="amount">${totalPriceCopy.primary}</div>
+      <div class="sub">${totalPriceCopy.twdReference}${c.children > 0 ? '<br>小孩費用已併入全團總價' : ''}</div>
     </div>
 
     <div class="grid">
@@ -1854,8 +1862,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [includeMeals, setIncludeMeals] = useState(true)
   const [mealServiceDays, setMealServiceDays] = useState(config.mealDays)
   const [includeTickets, setIncludeTickets] = useState(true)
-  const [includeInsurance, setIncludeInsurance] = useState(true)
-  const [includeGuide, setIncludeGuide] = useState(true)  // 導遊選項
+  const [includeInsurance, setIncludeInsurance] = useState<boolean>(DEFAULT_FORMAL_QUOTE_OPTIONS.includeInsurance)
+  const [includeGuide, setIncludeGuide] = useState<boolean>(DEFAULT_FORMAL_QUOTE_OPTIONS.includeGuide)  // 導遊選項
   const [guideServiceDays, setGuideServiceDays] = useState(config.guideDays)
   const [guideCostPerDay, setGuideCostPerDay] = useState(config.guidePerDay.cost)
   const [guidePricePerDay, setGuidePricePerDay] = useState(config.guidePerDay.price)
@@ -2582,7 +2590,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       config.guidePerDay
     )
 
-    if (quote.data.includeGuide !== undefined) setIncludeGuide(quote.data.includeGuide)
+    setIncludeGuide(resolveSavedGuideSelection(quote.data.includeGuide))
     if (quote.data.includeTickets !== undefined) setIncludeTickets(quote.data.includeTickets)
     setIncludeInsurance(
       resolveSavedInsuranceSelection({
@@ -2707,8 +2715,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setIncludeAccommodation(true)
     setIncludeMeals(true)
     setMealServiceDays(config.mealDays)
-    setIncludeInsurance(true)
-    setIncludeGuide(true)
+    setIncludeInsurance(DEFAULT_FORMAL_QUOTE_OPTIONS.includeInsurance)
+    setIncludeGuide(DEFAULT_FORMAL_QUOTE_OPTIONS.includeGuide)
     setIncludeTickets(true)
     setGuideServiceDays(config.guideDays)
     setGuideCostPerDay(config.guidePerDay.cost)
@@ -6215,6 +6223,11 @@ function ExternalQuoteTab({
   const headerCopy = getExternalQuoteHeaderCopy(tripDays, tripNights)
   const travelerSummary = `${adults} 位成人${childCount > 0 ? ` + ${childCount} 位小孩` : ''}`
   const overtimePolicy = getCharterOvertimePolicyCopy(calculation.carCount)
+  const totalPriceCopy = getExternalQuoteTotalCopy(
+    externalQuote.totalTHB,
+    externalQuote.totalTWD,
+    fmt,
+  )
 
   const cardShadow = `0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow}`
   const surfaceShadow = `0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow}`
@@ -6404,10 +6417,10 @@ function ExternalQuoteTab({
       >
         <div style={{ fontSize: 14, opacity: 0.9 }}>團費總計</div>
         <div style={{ fontSize: responsive.isCompact ? 32 : 38, fontWeight: 700, margin: '8px 0' }}>
-          NT$ {fmt(externalQuote.totalTWD)}
+          {totalPriceCopy.primary}
         </div>
         <div style={{ fontSize: 12, opacity: 0.8 }}>
-          約 {fmt(externalQuote.totalTHB)} 泰銖
+          {totalPriceCopy.twdReference}
           {childCount > 0 && <span style={{ display: 'block', marginTop: 4 }}>小孩費用已併入全團總價</span>}
         </div>
       </div>

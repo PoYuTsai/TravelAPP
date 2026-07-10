@@ -7,8 +7,6 @@ import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, PerPersonPricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
 import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
 
-export { CAR_CHARTER_PUBLIC_COPY }
-
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60
 

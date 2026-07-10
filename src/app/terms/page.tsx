@@ -130,7 +130,7 @@ export default function TermsPage() {
               <li>如需大幅變更行程，請提前一天告知</li>
               <li>標準用車時數為清邁 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時</li>
               <li>超時費為 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}</li>
-              <li>結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘內彈性，超過後依超時時數計費</li>
+              <li>基本用車時間用完後，另有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性，超過後依超時時數計費</li>
             </ul>
           </section>
 

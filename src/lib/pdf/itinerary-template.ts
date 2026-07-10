@@ -12,8 +12,15 @@ interface DayItem {
   lunch?: string
   dinner?: string
   accommodation?: string
-  carPrice?: number
-  guidePrice?: number
+}
+
+interface QuotationItem {
+  date?: string | null
+  description: string
+  unitPrice: number
+  quantity: number
+  unit?: string
+  subtotal?: number
 }
 
 interface ItineraryData {
@@ -22,9 +29,11 @@ interface ItineraryData {
   endDate: string
   adults: number
   children: number
+  infants?: number
   childrenAges?: string
   days: DayItem[]
-  totalPrice?: number
+  quotationItems?: QuotationItem[]
+  quotationTotal?: number
   priceIncludes?: string
   priceExcludes?: string
 }
@@ -60,13 +69,21 @@ export function formatDateRange(start: string, end: string): string {
   return `${startDate.getFullYear()}/${startMonth}/${startDay} - ${endMonth}/${endDay}`
 }
 
-export function formatPeople(adults: number, children: number, childrenAges?: string): string {
+export function formatPeople(
+  adults: number,
+  children: number,
+  childrenAges?: string,
+  infants = 0
+): string {
   let result = `${adults} 大`
   if (children > 0) {
     result += ` ${children} 小`
     if (childrenAges) {
       result += `（${childrenAges}）`
     }
+  }
+  if (infants > 0) {
+    result += ` ${infants} 嬰`
   }
   return result
 }
@@ -76,17 +93,54 @@ export function parseList(text?: string): string[] {
   return text.split('\n').filter((line) => line.trim()).map((line) => line.replace(/^[-•]\s*/, '').trim())
 }
 
+function formatThb(amount: number): string {
+  return `THB ${amount.toLocaleString('en-US')}`
+}
+
+function isCanonicalQuotationItem(item: QuotationItem): boolean {
+  return Boolean(
+    item &&
+    item.description?.trim() &&
+    Number.isFinite(item.unitPrice) &&
+    item.unitPrice >= 0 &&
+    Number.isFinite(item.quantity) &&
+    item.quantity > 0
+  )
+}
+
 export function generateItineraryHTML(data: ItineraryData): string {
-  const { clientName, startDate, endDate, adults, children, childrenAges, days, totalPrice, priceIncludes, priceExcludes } = data
+  const {
+    clientName,
+    startDate,
+    endDate,
+    adults,
+    children,
+    infants = 0,
+    childrenAges,
+    days,
+    quotationItems: rawQuotationItems = [],
+    priceIncludes,
+    priceExcludes,
+  } = data
 
-  const includesList = parseList(priceIncludes)
-  const excludesList = parseList(priceExcludes)
-
-  // 計算每日費用總和
-  const totalCarPrice = days.reduce((sum, day) => sum + (day.carPrice || 0), 0)
-  const totalGuidePrice = days.reduce((sum, day) => sum + (day.guidePrice || 0), 0)
-  const calculatedTotal = totalCarPrice + totalGuidePrice
-  const finalTotal = totalPrice || calculatedTotal
+  const quotationItems = rawQuotationItems.filter(isCanonicalQuotationItem)
+  const hasCanonicalQuote = quotationItems.length > 0
+  const calculatedTotal = quotationItems.reduce(
+    (sum, item) => sum + item.unitPrice * item.quantity,
+    0
+  )
+  // The rows are the canonical source of truth. Sanity only warns when the
+  // stored aggregate is stale, so trusting quotationTotal could expose a
+  // customer-facing total that contradicts the itemized quote.
+  const finalTotal = calculatedTotal
+  const hasGuide = quotationItems.some((item) => /導遊/.test(item.description))
+  const hasInsurance = quotationItems.some((item) => /保險/.test(item.description))
+  const matchesSelectedOptions = (item: string) =>
+    (!/導遊/.test(item) || hasGuide) && (!/保險/.test(item) || hasInsurance)
+  const matchesUnselectedOptions = (item: string) =>
+    (!/導遊/.test(item) || !hasGuide) && (!/保險/.test(item) || !hasInsurance)
+  const includesList = parseList(priceIncludes).filter(matchesSelectedOptions)
+  const excludesList = parseList(priceExcludes).filter(matchesUnselectedOptions)
 
   return `
 <!DOCTYPE html>
@@ -231,7 +285,7 @@ export function generateItineraryHTML(data: ItineraryData): string {
       min-width: 12mm;
     }
 
-    /* 費用說明 */
+    /* Pricing */
     .pricing {
       margin-top: 10mm;
       page-break-inside: avoid;
@@ -242,13 +296,6 @@ export function generateItineraryHTML(data: ItineraryData): string {
       font-weight: 700;
       border-bottom: 2px solid #2563eb;
       padding-bottom: 3mm;
-      margin-bottom: 5mm;
-    }
-
-    .total-price {
-      font-size: 20px;
-      font-weight: 700;
-      color: #2563eb;
       margin-bottom: 5mm;
     }
 
@@ -275,11 +322,6 @@ export function generateItineraryHTML(data: ItineraryData): string {
     .price-table td.number {
       text-align: right;
       font-family: monospace;
-    }
-
-    .price-table tr.subtotal {
-      background: #f8fafc;
-      font-weight: 500;
     }
 
     .price-table tr.total {
@@ -311,15 +353,6 @@ export function generateItineraryHTML(data: ItineraryData): string {
       color: #2563eb;
     }
 
-    .payment-note {
-      margin-top: 5mm;
-      padding: 3mm;
-      background: #f0f9ff;
-      border-radius: 2mm;
-      font-size: 13px;
-      color: #0369a1;
-    }
-
     /* 頁尾 */
     .footer {
       margin-top: 15mm;
@@ -347,7 +380,7 @@ export function generateItineraryHTML(data: ItineraryData): string {
     <div class="cover-title">清邁親子包車行程</div>
     <div class="cover-dates">${formatDateRange(startDate, endDate)}</div>
     <div class="cover-client">${escapeHtml(clientName)}</div>
-    <div class="cover-people">${formatPeople(adults, children, childrenAges)}</div>
+    <div class="cover-people">${escapeHtml(formatPeople(adults, children, childrenAges, infants))}</div>
     <div class="cover-subtitle">專屬行程規劃</div>
   </div>
 
@@ -390,60 +423,47 @@ export function generateItineraryHTML(data: ItineraryData): string {
     `).join('')}
   </div>
 
-  <!-- 費用說明 -->
-  ${finalTotal > 0 || includesList.length > 0 || excludesList.length > 0 ? `
+  <!-- Pricing is rendered only when canonical quotation items exist. -->
+  ${hasCanonicalQuote ? `
     <div class="page">
       <div class="pricing">
         <div class="pricing-title">費用說明</div>
 
-        ${calculatedTotal > 0 ? `
-          <table class="price-table">
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>行程</th>
-                <th style="text-align: right;">車費</th>
-                <th style="text-align: right;">導遊費</th>
-                <th style="text-align: right;">小計</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${days.map((day, index) => {
-                const dayTotal = (day.carPrice || 0) + (day.guidePrice || 0)
-                if (dayTotal === 0) return ''
-                return `
-                  <tr>
-                    <td>Day ${index + 1}</td>
-                    <td>${day.title}</td>
-                    <td class="number">${day.carPrice ? `NT$${day.carPrice.toLocaleString()}` : '-'}</td>
-                    <td class="number">${day.guidePrice ? `NT$${day.guidePrice.toLocaleString()}` : '-'}</td>
-                    <td class="number">NT$${dayTotal.toLocaleString()}</td>
-                  </tr>
-                `
-              }).join('')}
-              <tr class="subtotal">
-                <td colspan="2">小計</td>
-                <td class="number">NT$${totalCarPrice.toLocaleString()}</td>
-                <td class="number">NT$${totalGuidePrice.toLocaleString()}</td>
-                <td class="number">NT$${calculatedTotal.toLocaleString()}</td>
-              </tr>
-              <tr class="total">
-                <td colspan="4">總費用</td>
-                <td class="number">NT$${finalTotal.toLocaleString()}</td>
-              </tr>
-            </tbody>
-          </table>
-        ` : (finalTotal > 0 ? `<div class="total-price">總費用：NT$${finalTotal.toLocaleString()}</div>` : '')}
-
-        <div class="payment-note">
-          付款方式：台幣轉帳
-        </div>
+        <table class="price-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>項目</th>
+              <th style="text-align: right;">單價</th>
+              <th style="text-align: right;">數量</th>
+              <th style="text-align: right;">小計</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${quotationItems.map((item) => {
+              const subtotal = item.unitPrice * item.quantity
+              return `
+                <tr>
+                  <td>${item.date ? escapeHtml(item.date) : '-'}</td>
+                  <td>${escapeHtml(item.description)}</td>
+                  <td class="number">${formatThb(item.unitPrice)}</td>
+                  <td class="number">${item.quantity.toLocaleString('en-US')}${item.unit ? escapeHtml(item.unit) : ''}</td>
+                  <td class="number">${formatThb(subtotal)}</td>
+                </tr>
+              `
+            }).join('')}
+            <tr class="total">
+              <td colspan="4">總費用</td>
+              <td class="number">${formatThb(finalTotal)}</td>
+            </tr>
+          </tbody>
+        </table>
 
         ${includesList.length > 0 ? `
           <div class="price-section">
             <div class="price-section-title">費用包含：</div>
             <ul class="price-list">
-              ${includesList.map((item) => `<li>${item}</li>`).join('')}
+              ${includesList.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
             </ul>
           </div>
         ` : ''}
@@ -451,7 +471,7 @@ export function generateItineraryHTML(data: ItineraryData): string {
           <div class="price-section">
             <div class="price-section-title">費用不包含：</div>
             <ul class="price-list">
-              ${excludesList.map((item) => `<li>${item}</li>`).join('')}
+              ${excludesList.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
             </ul>
           </div>
         ` : ''}

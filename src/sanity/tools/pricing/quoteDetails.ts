@@ -5,6 +5,26 @@ export const TWD_TRANSFER_ACCOUNT = {
   accountNumber: '51619501772100',
 } as const
 
+export const DEFAULT_FORMAL_QUOTE_OPTIONS = {
+  includeGuide: false,
+  includeInsurance: false,
+} as const
+
+export function resolveSavedGuideSelection(savedIncludeGuide?: boolean) {
+  return savedIncludeGuide ?? true
+}
+
+export function getExternalQuoteTotalCopy(
+  totalTHB: number,
+  totalTWD: number,
+  format: (value: number) => string,
+) {
+  return {
+    primary: `THB ${format(totalTHB)}`,
+    twdReference: `約 NT$ ${format(totalTWD)}`,
+  }
+}
+
 export const EXTERNAL_QUOTE_BRAND = {
   brandName: '清微旅行 Chiangway Travel',
   subtitle: '在地清邁包車與客製旅遊報價',

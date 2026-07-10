@@ -25,6 +25,7 @@ vi.mock('@/components/cms', async () => {
 })
 
 import * as carCharterPageModule from '@/app/services/car-charter/page'
+import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
 
 interface PublicCopyContract {
   startingPrices: {
@@ -52,14 +53,9 @@ interface PublicCopyContract {
 }
 
 function canonicalCopy(): PublicCopyContract {
-  const copy = (
-    carCharterPageModule as typeof carCharterPageModule & {
-      CAR_CHARTER_PUBLIC_COPY?: PublicCopyContract
-    }
-  ).CAR_CHARTER_PUBLIC_COPY
+  const copy: PublicCopyContract = CAR_CHARTER_PUBLIC_COPY
 
-  expect(copy, 'page must expose its code-owned canonical public copy').toBeDefined()
-  if (!copy) throw new Error('Missing CAR_CHARTER_PUBLIC_COPY')
+  expect(copy, 'page must consume its code-owned canonical public copy').toBeDefined()
   expect(copy.heroTitle, 'hero title must be code-owned').toEqual(expect.any(String))
   expect(copy.heroCtaText, 'hero CTA must be code-owned').toEqual(expect.any(String))
   expect(copy.heroCtaLink, 'hero CTA link must be code-owned').toEqual(expect.any(String))

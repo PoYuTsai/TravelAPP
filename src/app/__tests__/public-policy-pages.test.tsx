@@ -46,6 +46,9 @@ describe('public charter policy pages', () => {
     expect(text).toContain('中文導遊不另收超時費')
     expect(text).toContain('彈性 30 分鐘')
     expect(text).toContain('一台車超時費 THB 300')
+    expect(text).toContain('範例（訂單 THB 10,000）')
+    expect(text).toContain('範例（訂單 THB 6,000）')
+    expect(text).not.toMatch(/(?:10,000|6,000|5,000|3,000|1,800)\s*元/)
 
     expect(text).not.toContain('各 200 泰銖/小時')
     expect(text).not.toContain('400 泰銖/小時')
@@ -67,6 +70,6 @@ describe('public charter policy pages', () => {
     expect(text).toContain('清邁 10 小時；清萊／金三角 12 小時')
     expect(text).toContain('THB 300／小時／台')
     expect(text).toContain('中文導遊不另收超時費')
-    expect(text).toContain('30 分鐘內彈性')
+    expect(text).toContain('基本用車時間用完後，另有 30 分鐘彈性')
   })
 })

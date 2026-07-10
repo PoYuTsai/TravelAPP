@@ -491,7 +491,7 @@ function OvertimePolicyNotice() {
         超時費用
       </h3>
       <p className="text-[14px] leading-7" style={{ color: '#3A3224' }}>
-        清邁用車 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角用車 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時。超時 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}；結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性。
+        清邁用車 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角用車 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時。基本用車時間用完後，另有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性；超過後 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}。
       </p>
     </motion.div>
   )

@@ -209,7 +209,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
           <ul className="space-y-3 text-sm text-gray-700">
             <li>
-              超時費：清邁一日 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊／金三角一日 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時，結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性；
+              超時費：清邁一日 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊／金三角一日 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時；基本用車時間用完後，另有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性；
               超過後 THB {thb(CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar)}／小時／台，按台實收，導遊不另收超時費
             </li>
             <li>景點門票、餐食（可代訂另計）</li>
