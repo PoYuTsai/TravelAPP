@@ -70,6 +70,11 @@ import {
   resolveQuotePublicPageMode,
   type QuotePublicPageMode,
 } from '@/lib/quote/publicPageMode'
+import {
+  getGuideControlPolicy,
+  getLockedGuideServiceDays,
+  resolveCustomerQuoteGate,
+} from './quotePolicy'
 
 async function loadHtml2Pdf() {
   const html2pdfModule = await import('html2pdf.js')
@@ -1729,7 +1734,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [draggingPhoto, setDraggingPhoto] = useState<{ dayIndex: number; photoKey: string } | null>(null)
 
   // Form states - 成人/小孩/嬰兒三段計費（12+ 全價、3-11 八折、0-2 半價）
-  // 預設 6大2小＝8 佔位（10+ 會觸發拆單提示，別當預設）
+  // 預設 6大2小＝8 佔位
   const [adults, setAdults] = useState(6)
   const [children, setChildren] = useState(2)
   const [infants, setInfants] = useState(0)
@@ -2381,8 +2386,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         isParseConfirmed,
         savedParsedTickets: savedParsedTickets.map((ticket) => ({ ...ticket })),
         thaiDressDay,
-        // 報價快照：展示頁直接讀取，不用重新計算
-        _quoteSnapshot: {
+        // Automatic quotes 才能建立對客快照；manual 狀態仍可保存內部草稿。
+        _quoteSnapshot: externalQuote ? {
           pricingModel: 'perPerson' as const,
           externalQuote: {
             items: externalQuote.items,
@@ -2401,7 +2406,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           totalDeposit: calculation.totalDeposit,
           carCount: calculation.carCount,
           travelerLabel: travelerLabel || undefined,
-        },
+        } : undefined,
       },
     }
     setIsSavingQuote(true)
@@ -2474,6 +2479,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
   // 產生報價連結
   const handleGenerateLink = async () => {
+    if (quoteGate.blocked) {
+      alert(quoteGate.message)
+      return
+    }
+
     setIsGeneratingLink(true)
     try {
       // 先儲存目前報價（確保 Sanity 文件存在），取得實際的 quoteId
@@ -2895,8 +2905,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const totalChildSeatCount = babySeatCount + childSeatCount
 
   useEffect(() => {
-    setGuideServiceDays((prev) => clampGuideServiceDays(prev, tripDays, config.guideDays))
-  }, [config.guideDays, tripDays])
+    setGuideServiceDays(getLockedGuideServiceDays(true, tripDays))
+  }, [tripDays])
 
   useEffect(() => {
     setMealServiceDays((prev) => clampMealServiceDays(prev, tripDays, config.mealDays))
@@ -2934,17 +2944,9 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const calculation = useMemo(() => {
     const {
       mealDays: defaultMealDays,
-      guidePerDay,
       insurancePerPerson,
       thaiDress,
     } = config
-    const guideRate = normalizeGuidePerDayRate(
-      {
-        cost: guideCostPerDay,
-        price: guidePricePerDay,
-      },
-      guidePerDay
-    )
     // 使用動態車費（carFees state）而非 config.dailyCarFees
     const dailyCarFees = carFees
     const carServiceDays = dailyCarFees.length
@@ -2952,7 +2954,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const childSeatDays = totalChildSeatCount > 0
       ? clampChildSeatServiceDays(childSeatServiceDays, carServiceDays, carServiceDays)
       : 0
-    // 人頭計價：座位硬規則配車＋導遊收斂（8-9 強制配、2-3 轎車不配、10+ 拆兩單）
+    // 人頭計價：2–3 人加導遊與 19+ 由 engine 回傳 typed manual quote。
     const perPerson = buildPerPersonQuote({
       days: dailyCarFees,
       adults,
@@ -2961,9 +2963,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       withGuide: includeGuide,
     })
     const guided = perPerson.guided
-    const guideDays = guided
-      ? clampGuideServiceDays(guideServiceDays, carServiceDays, config.guideDays)
-      : 0
+    const guideDays = getLockedGuideServiceDays(guided, carServiceDays)
     const photographerCount = getThaiDressPhotographerCount({
       isSelected: thaiDressPhoto,
       people,
@@ -2972,8 +2972,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 使用多飯店的總晚數
     const nights = totalNights
 
-    // 配車：resolveFleet 座位硬規則（2-3 轎車；4-7 van；8-9 van＋必配導遊；10+ 兩台）
-    const splitOrderRequired = perPerson.splitOrderRequired
+    // 配車：2–3 轎車；4–9 一台 Van；10–18 兩台 Van；19+ 人工報價。
     const vehicleType = perPerson.fleet?.vehicle ?? 'van'
     const carCount = perPerson.fleet?.carCount ?? 1
 
@@ -3057,11 +3056,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       legacyCarPriceReference += (d.price || 0) * carCount
     })
 
-    // Guide cost 側（guided 已按座位規則收斂；售價已攤入人頭團費）
-    const guideCost = guided ? guideRate.cost * guideDays : 0
+    // Guide cost 側：只採 engine 的實際總成本，兩台 Van 不得用舊 1,500/日低估。
+    const guideCost = guided
+      ? perPerson.trip?.guideCostThb ?? (perPerson.manualQuoteRequired ? null : 0)
+      : 0
     const guidePrice = 0
 
-    // 售價側：人頭團費（車＋導遊＋機場行李攤入＋純接送日按車收）
+    // 售價側：人頭團費已含 guide sell anchor；manual quote 必須維持 null。
     const carPriceTotal = perPerson.groupTourPrice
 
     // Luggage：行李車已攤入團費（機場日 ≥8 佔位 700/趟），不另列項
@@ -3071,9 +3072,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const childSeatCost =
       totalChildSeatCount * config.childSeatPerDay * childSeatDays
 
-    const transportCost = carCostTotal + guideCost
-    const transportPrice = carPriceTotal + guidePrice + luggageCost + childSeatCost
-    const transportProfit = transportPrice - transportCost - luggageCost - childSeatCost
+    const transportCost = guideCost === null ? null : carCostTotal + guideCost
+    const transportPrice = carPriceTotal === null
+      ? null
+      : carPriceTotal + guidePrice + luggageCost + childSeatCost
+    const transportProfit = transportPrice === null || transportCost === null
+      ? null
+      : transportPrice - transportCost - luggageCost - childSeatCost
 
     // Tickets - 成人/兒童分開計算（支援覆寫數量和價格）
     let ticketCost = 0, ticketPrice = 0, ticketYourProfit = 0, ticketPartnerProfit = 0
@@ -3164,19 +3169,25 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       : 0
 
     // Totals
-    const totalCost = accommodationCost + mealCost + transportCost + effectiveTicketCost + effectiveThaiDressCost + insuranceCost + luggageCost + outboundStayCost
-    const totalPrice = accommodationCost + mealCost + transportPrice + effectiveTicketPrice + effectiveThaiDressPrice + insuranceCost + outboundStayCost
+    const totalCost = transportCost === null
+      ? null
+      : accommodationCost + mealCost + transportCost + effectiveTicketCost + effectiveThaiDressCost + insuranceCost + luggageCost + outboundStayCost
+    const totalPrice = transportPrice === null
+      ? null
+      : accommodationCost + mealCost + transportPrice + effectiveTicketPrice + effectiveThaiDressPrice + insuranceCost + outboundStayCost
 
-    const yourTotalProfit = transportProfit + (includeTickets ? ticketYourProfit : 0) + (includeTickets ? thaiDressYourProfit : 0)
+    const yourTotalProfit = transportProfit === null
+      ? null
+      : transportProfit + (includeTickets ? ticketYourProfit : 0) + (includeTickets ? thaiDressYourProfit : 0)
     const partnerTotalProfit = (includeTickets ? ticketPartnerProfit : 0) + (includeTickets ? thaiDressPartnerProfit : 0)
 
     // 每人報價只除以成人（小孩不計入每人報價）
-    const perPersonTHB = totalPrice / adults
-    const perPersonTWD = Math.round(perPersonTHB / exchangeRate)
+    const perPersonTHB = totalPrice === null ? null : totalPrice / adults
+    const perPersonTWD = perPersonTHB === null ? null : Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, adults, children, infants, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel, guideCostPerDay: guideRate.cost, guidePricePerDay: guideRate.price,
-      guided, splitOrderRequired, vehicleType, perPerson,
+      people, adults, children, infants, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
+      guided, vehicleType, perPerson,
       includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, quoteHotels, hotelsWithDeposit, totalRoomCapacity,
       includedAccommodationNights, includedAccommodationRoomCount, selfBookedAccommodationNights,
       getHotelCost, getHotelDeposit, getHotelRoomCount, getHotelCapacity, totalDeposit,
@@ -3189,15 +3200,27 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, infants, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, guideServiceDays, guideCostPerDay, guidePricePerDay, carFees, outboundStayEnabled, outboundStayPerNight, outboundStayNights, outboundStayRooms])
+  }, [config, adults, children, infants, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, carFees, outboundStayEnabled, outboundStayPerNight, outboundStayNights, outboundStayRooms])
 
-  const fmt = (n: number) => n.toLocaleString()
+  const fmt = (n: number | null) => n === null ? '待人工確認' : n.toLocaleString()
+  const fmtRounded = (n: number | null) => n === null ? '待人工確認' : fmt(Math.round(n))
+  const roundScaled = (n: number | null, scale: number) => n === null ? null : Math.round(n * scale)
+  const quoteGate = resolveCustomerQuoteGate(calculation.perPerson)
+  const guideControlPolicy = getGuideControlPolicy(calculation.people)
   const formalProfitShares =
-    variant === 'formal'
+    variant === 'formal' && calculation.yourTotalProfit !== null
       ? calculateFormalProfitShares(calculation.yourTotalProfit + calculation.partnerTotalProfit)
       : []
   const externalQuote = useMemo(
     () => {
+      if (
+        calculation.perPerson.manualQuoteRequired ||
+        calculation.carPriceTotal === null ||
+        calculation.totalPrice === null
+      ) {
+        return null
+      }
+
       const breakdown = buildExternalQuoteBreakdown({
         pricingModel: 'perPerson',
         perPersonItems: calculation.perPerson.trip?.items ?? [],
@@ -3460,10 +3483,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <button onClick={() => setActiveTab('input')} style={tabButtonStyle(activeTab === 'input')}>📝 輸入</button>
         <button onClick={() => setActiveTab('internal')} style={tabButtonStyle(activeTab === 'internal')}>📊 內部明細</button>
-        <button onClick={() => setActiveTab('external')} style={tabButtonStyle(activeTab === 'external')}>📄 對外報價單</button>
+        <button
+          onClick={() => setActiveTab('external')}
+          disabled={quoteGate.blocked}
+          style={tabButtonStyle(activeTab === 'external', quoteGate.blocked ? '#999' : undefined)}
+        >📄 對外報價單</button>
         <button onClick={() => {
-          if (calculation.splitOrderRequired) {
-            alert('10 人以上需兩台車，請拆成兩張單各自計價——目前報價不含團費，不能出單')
+          if (quoteGate.blocked) {
+            alert(quoteGate.message)
             return
           }
           // 使用與 UI 相同的行程邏輯
@@ -3475,24 +3502,31 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             hotels,
           })
                           downloadSimpleExternalQuote(calculation, people, exchangeRate, hotels, mealLevel, thaiDressCloth, thaiDressPhoto, makeupCount, config, includeAccommodation, includeMeals, includeGuide, calculation.includedAccommodationNights, calculation.selfBookedAccommodationNights, babySeatCount, childSeatCount, collectDeposit, tripDays, itineraryForPdf)
-        }} disabled={calculation.splitOrderRequired} style={tabButtonStyle(false, calculation.splitOrderRequired ? '#999' : '#b89b4d')}>📥 下載報價</button>
+        }} disabled={quoteGate.blocked} style={tabButtonStyle(false, quoteGate.blocked ? '#999' : '#b89b4d')}>📥 下載報價</button>
         <button
           onClick={() => {
-            if (calculation.splitOrderRequired) {
-              alert('10 人以上需兩台車，請拆成兩張單各自計價——目前報價不含團費，不能出單')
+            if (quoteGate.blocked) {
+              alert(quoteGate.message)
               return
             }
             handleGenerateLink()
           }}
-          disabled={isGeneratingLink || calculation.splitOrderRequired}
-          style={tabButtonStyle(false, isGeneratingLink || calculation.splitOrderRequired ? '#999' : '#2e7d32')}
+          disabled={isGeneratingLink || quoteGate.blocked}
+          style={tabButtonStyle(false, isGeneratingLink || quoteGate.blocked ? '#999' : '#2e7d32')}
         >
           {isGeneratingLink ? '⏳ 產生中...' : '🔗 產生報價連結'}
         </button>
       </div>
 
+      {quoteGate.blocked && (
+        <div style={{ background: '#ffebee', border: '2px solid #c62828', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+          <strong style={{ color: '#c62828' }}>⛔ 此單目前不能產生對客報價</strong>
+          <div style={{ fontSize: 13, marginTop: 4 }}>{quoteGate.message}</div>
+        </div>
+      )}
+
       {/* 報價連結顯示 */}
-      {generatedUrl && (
+      {!quoteGate.blocked && generatedUrl && (
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -3997,18 +4031,17 @@ Day 5｜送機
                 <input type="checkbox" checked={includeInsurance} onChange={e => setIncludeInsurance(e.target.checked)} style={{ width: 16, height: 16 }} />
                 <span>🛡️ 含保險</span>
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: calculation.perPerson.fleet && (calculation.perPerson.fleet.guideRequired || !calculation.perPerson.fleet.guideAllowed) ? 'not-allowed' : 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: guideControlPolicy.disabled ? 'not-allowed' : 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={calculation.guided}
-                  disabled={calculation.perPerson.fleet ? calculation.perPerson.fleet.guideRequired || !calculation.perPerson.fleet.guideAllowed : false}
+                  checked={includeGuide}
+                  disabled={guideControlPolicy.disabled}
                   onChange={e => setIncludeGuide(e.target.checked)}
                   style={{ width: 16, height: 16 }}
                 />
                 <span>
                   🧑‍💼 含導遊
-                  {calculation.perPerson.fleet?.guideRequired ? <span style={{ color: '#c62828', fontSize: 12 }}>（8-9 人必配）</span> : null}
-                  {calculation.perPerson.fleet && !calculation.perPerson.fleet.guideAllowed ? <span style={{ color: '#888', fontSize: 12 }}>（轎車不配導遊）</span> : null}
+                  {guideControlPolicy.note ? <span style={{ color: '#9a6b2a', fontSize: 12 }}>{guideControlPolicy.note}</span> : null}
                 </span>
               </label>
               {calculation.totalDeposit > 0 && (
@@ -4079,58 +4112,16 @@ Day 5｜送機
                       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
                         <span>🗓️ 導遊天數</span>
                         <select
-                          value={guideServiceDays}
-                          onChange={e =>
-                            setGuideServiceDays(
-                              clampGuideServiceDays(
-                                Number(e.target.value),
-                                tripDays,
-                                config.guideDays
-                              )
-                            )
-                          }
+                          value={calculation.guideDays}
+                          disabled
                           style={{
                             ...inputStyle,
                             width: responsive.isCompact ? '100%' : 90,
                             maxWidth: responsive.isCompact ? '100%' : 90,
                           }}
                         >
-                          {Array.from({ length: tripDays }, (_, index) => index + 1).map((day) => (
-                            <option key={`guide-${day}`} value={day}>
-                              {day} 天
-                            </option>
-                          ))}
+                          <option value={calculation.guideDays}>{calculation.guideDays} 天</option>
                         </select>
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
-                        <span>💸 導遊成本/天</span>
-                        <input
-                          type="number"
-                          value={guideCostPerDay}
-                          onChange={e => setGuideCostPerDay(Math.max(0, Number(e.target.value) || 0))}
-                          min={0}
-                          step={100}
-                          style={{
-                            ...inputStyle,
-                            width: responsive.isCompact ? '100%' : 110,
-                            maxWidth: responsive.isCompact ? '100%' : 110,
-                          }}
-                        />
-                      </label>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'bold' }}>
-                        <span>💰 導遊售價/天</span>
-                        <input
-                          type="number"
-                          value={guidePricePerDay}
-                          onChange={e => setGuidePricePerDay(Math.max(0, Number(e.target.value) || 0))}
-                          min={0}
-                          step={100}
-                          style={{
-                            ...inputStyle,
-                            width: responsive.isCompact ? '100%' : 110,
-                            maxWidth: responsive.isCompact ? '100%' : 110,
-                          }}
-                        />
                       </label>
                     </div>
                   )}
@@ -4143,7 +4134,7 @@ Day 5｜送機
                   )}
                   {calculation.guided && (
                     <span style={{ ...noteStyle, color: '#666' }}>
-                      導遊售價已攤入每人團費；此處天數與日價僅影響內部成本（毛利）
+                      導遊已鎖定所有車程日；若只需部分天數請人工調整／另行報價。成本由引擎依車數計算，舊導遊售價欄不參與本版試算。
                     </span>
                   )}
                 </div>
@@ -4541,25 +4532,17 @@ Day 5｜送機
           <Section title="🚗 車導費">
             <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 13 }}>
               <strong>🚐 座位硬規則（人頭計價）</strong><br />
-              • 2~3 人 → 轎車（不配導遊）<br />
-              • 4~7 人 → van（導遊選配）｜8~9 人 → van＋必配導遊<br />
-              • 10 人以上 → 兩台車，拆成兩張單各自計價
+              • 2~3 人 → 轎車（導遊選配；加導遊需確認車型）<br />
+              • 4~9 人 → 1 台 Van（導遊選配）<br />
+              • 10~18 人 → 2 台 Van（導遊選配）｜19 人以上 → 人工報價
             </div>
-            {calculation.splitOrderRequired && (
-              <div style={{ background: '#ffebee', border: '2px solid #c62828', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                <strong style={{ color: '#c62828' }}>⛔ {calculation.people} 人（含嬰兒佔位）需兩台車</strong>
-                <div style={{ fontSize: 13, marginTop: 4 }}>
-                  請拆成兩張單各自計價——本頁下方金額<strong>不含團費</strong>，僅供其他項目參考。
-                </div>
-              </div>
-            )}
             <div style={{ background: '#f8f6f2', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <p style={{ margin: 0, fontWeight: 'bold', color: '#5c4a2a', fontSize: 15 }}>
                 🚗 {calculation.carCount} 台{calculation.vehicleType === 'sedan' ? '轎車' : ' van'}：<span style={{ fontFamily: 'monospace' }}>{calculation.carDistribution}</span>
                 {calculation.needLuggageCar ? ' + 🧳機場日行李車' : ''}
               </p>
               <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#555' }}>
-                舒適配車（單車最多 {calculation.maxPerCar} 人）｜導遊：{calculation.guided ? (calculation.perPerson.fleet?.guideRequired ? '必配（8-9 人）' : '有') : '無'}
+                舒適配車（單車最多 {calculation.maxPerCar} 人）｜導遊：{calculation.guided ? '有' : '無'}
               </p>
             </div>
             {calculation.luggageStatus === 'ok' ? (
@@ -5468,8 +5451,15 @@ Day 5｜送機
                 <DataRow key={`pp-${i}`} name={`${item.label} (${item.quantity} × ${fmt(item.unitPriceThb)})`} cost={0} price={item.subtotalThb} profit={0} className="day-row" />
               ))}
               {calculation.perPerson.transferFee > 0 && <DataRow name={`接送機（${calculation.perPerson.transferTrips}趟，按車收）`} cost={0} price={calculation.perPerson.transferFee} profit={0} className="day-row" />}
-              <DataRow name={`導遊成本 (${calculation.guideDays}天 × ${fmt(calculation.guideCostPerDay)}/天，售價已攤入團費)`} cost={calculation.guideCost} price={0} profit={0} className="day-row" />
-              <SubtotalRow name="團費小計" cost={calculation.carCostTotal + calculation.guideCost} price={calculation.carPriceTotal} profit={calculation.carPriceTotal - calculation.carCostTotal - calculation.guideCost} />
+              <DataRow name="導遊實際成本（引擎依車數與非純接送行程日計算；售價已攤入團費）" cost={calculation.guideCost} price={0} profit={0} className="day-row" />
+              <SubtotalRow
+                name="團費小計"
+                cost={calculation.transportCost}
+                price={calculation.carPriceTotal}
+                profit={calculation.carPriceTotal === null || calculation.transportCost === null
+                  ? null
+                  : calculation.carPriceTotal - calculation.transportCost}
+              />
               {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${totalChildSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
               {calculation.outboundStayCost > 0 && <DataRow name={`外地住宿補貼 (${outboundStayRooms}間 × ${outboundStayNights}晚)`} cost={calculation.outboundStayCost} price={calculation.outboundStayCost} profit={0} />}
               <SubtotalRow name="車導總計" cost={calculation.transportCost} price={calculation.transportPrice} profit={calculation.transportProfit} />
@@ -5569,8 +5559,8 @@ Day 5｜送機
               <SectionRow title="💰 總計" />
               <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>
                 <td style={{ ...tdStyle, textAlign: 'left' }}>總計</td>
-                <td style={tdStyle}>{calculation.totalCost.toLocaleString()}</td>
-                <td style={tdStyle}>{calculation.totalPrice.toLocaleString()}</td>
+                <td style={tdStyle}>{fmt(calculation.totalCost)}</td>
+                <td style={tdStyle}>{fmt(calculation.totalPrice)}</td>
                 <td style={tdStyle}></td>
               </tr>
 
@@ -5602,7 +5592,9 @@ Day 5｜送機
                   </tr>
                   <tr style={{ background: '#fff3cd' }}>
                     <td style={{ ...tdStyle, textAlign: 'left' }}>💵 付給郭姐（成本）</td>
-                    <td style={{ ...tdStyle, fontWeight: 'bold' }}>{fmt(calculation.transportCost + calculation.ticketCost + calculation.mealCost + calculation.thaiDressCost)}</td>
+                    <td style={{ ...tdStyle, fontWeight: 'bold' }}>{fmt(calculation.transportCost === null
+                      ? null
+                      : calculation.transportCost + calculation.ticketCost + calculation.mealCost + calculation.thaiDressCost)}</td>
                     <td style={tdStyle}></td>
                     <td style={tdStyle}></td>
                   </tr>
@@ -5613,7 +5605,7 @@ Day 5｜送機
               <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>
                 <td style={{ ...tdStyle, textAlign: 'left' }}>每人報價</td>
                 <td style={tdStyle}></td>
-                <td style={tdStyle}>{fmt(Math.round(calculation.perPersonTHB))} 泰銖</td>
+                <td style={tdStyle}>{fmtRounded(calculation.perPersonTHB)} 泰銖</td>
                 <td style={{ ...tdStyle, color: '#5c4a2a', fontWeight: 'bold' }}>NT$ {fmt(calculation.perPersonTWD)}</td>
               </tr>
 
@@ -5643,13 +5635,13 @@ Day 5｜送機
       )}
 
       {/* External Tab */}
-      {activeTab === 'external' && calculation.splitOrderRequired && (
+      {activeTab === 'external' && quoteGate.blocked && (
         <div style={{ background: '#ffebee', border: '2px solid #c62828', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-          <strong style={{ color: '#c62828' }}>⛔ {calculation.people} 人（含嬰兒佔位）需兩台車，請拆成兩張單各自計價</strong>
-          <div style={{ fontSize: 13, marginTop: 4 }}>以下報價<strong>不含團費</strong>，不能對客出單。</div>
+          <strong style={{ color: '#c62828' }}>⛔ 對客報價已阻擋</strong>
+          <div style={{ fontSize: 13, marginTop: 4 }}>{quoteGate.message}</div>
         </div>
       )}
-      {activeTab === 'external' && (
+      {activeTab === 'external' && !quoteGate.blocked && externalQuote && (
         <ExternalQuoteTab
           responsive={responsive}
           tripDays={tripDays}
@@ -5798,7 +5790,7 @@ Day 5｜送機
             <div style={{ fontSize: 14, opacity: 0.9 }}>每位成人費用</div>
             <div style={{ fontSize: 36, fontWeight: 'bold', margin: '8px 0' }}>NT$ {fmt(calculation.perPersonTWD)}</div>
             <div style={{ fontSize: 12, opacity: 0.8 }}>
-              約 {fmt(Math.round(calculation.perPersonTHB))} 泰銖 ÷ {adults}成人
+              約 {fmtRounded(calculation.perPersonTHB)} 泰銖 ÷ {adults}成人
               {children > 0 && <span style={{ display: 'block', marginTop: 4 }}>（{children}位小孩已計入總費用）</span>}
             </div>
           </div>
@@ -5840,6 +5832,7 @@ Day 5｜送機
             const insuranceAmount = calculation.insuranceCost
             const mealsTicketsAmount = mealsAmount + actualTicketsAmount + insuranceAmount  // 總額
             const carAmount = calculation.transportPrice
+            if (typeof carAmount !== 'number') return null
 
             // 判斷勾選狀態（標籤用）
             const hasMeals = includeMeals && mealsAmount > 0
@@ -5878,8 +5871,8 @@ Day 5｜送機
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 確認行程後</div>
                       <div style={{ fontSize: 12, color: '#555' }}>• 確認行程細節後支付訂金，即完成預約</div>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginTop: 6 }}>
-                        💰 {fmt(Math.round(carAmount * 0.3))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                        💰 {fmt(roundScaled(carAmount, 0.3))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(roundScaled(carAmount, 0.3 / exchangeRate))}</span>
                       </div>
                     </div>
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
@@ -5890,8 +5883,8 @@ Day 5｜送機
                         • 統一結算超時費（若有）
                       </div>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginTop: 6 }}>
-                        💰 {fmt(Math.round(carAmount * 0.7))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
+                        💰 {fmt(roundScaled(carAmount, 0.7))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(roundScaled(carAmount, 0.7 / exchangeRate))}</span>
                       </div>
                     </div>
                   </>
@@ -5933,7 +5926,7 @@ Day 5｜送機
                       </div>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginTop: 6 }}>
                         💰 {fmt(carAmount)} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount / exchangeRate))}</span>
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(roundScaled(carAmount, 1 / exchangeRate))}</span>
                       </div>
                     </div>
                   </>
@@ -5954,8 +5947,8 @@ Day 5｜送機
                       <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>⏰ 同時支付</div>
                       <div style={{ fontSize: 12, color: '#555' }}>• 確認行程細節後支付訂金，即完成預約</div>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginTop: 6 }}>
-                        💰 {fmt(Math.round(carAmount * 0.3))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                        💰 {fmt(roundScaled(carAmount, 0.3))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(roundScaled(carAmount, 0.3 / exchangeRate))}</span>
                       </div>
                     </div>
                     <div style={{ background: 'white', borderRadius: 6, padding: 12, marginBottom: 8, borderLeft: '4px solid #5c4a2a' }}>
@@ -5966,8 +5959,8 @@ Day 5｜送機
                         • 統一結算超時費（若有）
                       </div>
                       <div style={{ fontWeight: 'bold', color: '#5c4a2a', marginTop: 6 }}>
-                        💰 {fmt(Math.round(carAmount * 0.7))} 泰銖
-                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
+                        💰 {fmt(roundScaled(carAmount, 0.7))} 泰銖
+                        <span style={{ fontWeight: 'normal', color: '#666', marginLeft: 8 }}>≈ NT$ {fmt(roundScaled(carAmount, 0.7 / exchangeRate))}</span>
                       </div>
                     </div>
                   </>
@@ -6037,6 +6030,8 @@ Day 5｜送機
             const insuranceAmount = calculation.insuranceCost
             const mealsTicketsAmount = mealsAmount + actualTicketsAmount + insuranceAmount
             const carAmount = calculation.transportPrice
+            const quotedPerPersonTWD = calculation.perPersonTWD
+            if (typeof carAmount !== 'number' || typeof quotedPerPersonTWD !== 'number') return null
             const hasMeals = includeMeals && mealsAmount > 0
             const hasActualTickets = actualTicketsAmount > 0
             const hasInsurance = insuranceAmount > 0
@@ -6061,11 +6056,11 @@ Day 5｜送機
                       {/* 純包車：30% + 70% */}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>第一階段（訂金 30%）</span>
-                        <span>NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                        <span>NT$ {fmt(roundScaled(carAmount, 0.3 / exchangeRate))}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>第二階段（尾款 70%）</span>
-                        <span>NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
+                        <span>NT$ {fmt(roundScaled(carAmount, 0.7 / exchangeRate))}</span>
                       </div>
                     </>
                   ) : includeAccommodation ? (
@@ -6083,7 +6078,7 @@ Day 5｜送機
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>車{calculation.guided ? '導' : '輛'}費</span>
-                        <span>NT$ {fmt(Math.round(carAmount / exchangeRate))}</span>
+                        <span>NT$ {fmt(roundScaled(carAmount, 1 / exchangeRate))}</span>
                       </div>
                     </>
                   ) : (
@@ -6095,17 +6090,17 @@ Day 5｜送機
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>車{calculation.guided ? '導' : '輛'}訂金 30%</span>
-                        <span>NT$ {fmt(Math.round(carAmount * 0.3 / exchangeRate))}</span>
+                        <span>NT$ {fmt(roundScaled(carAmount, 0.3 / exchangeRate))}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <span>車{calculation.guided ? '導' : '輛'}尾款 70%</span>
-                        <span>NT$ {fmt(Math.round(carAmount * 0.7 / exchangeRate))}</span>
+                        <span>NT$ {fmt(roundScaled(carAmount, 0.7 / exchangeRate))}</span>
                       </div>
                     </>
                   )}
                   <div style={{ borderTop: '1px solid rgba(255,255,255,0.3)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: 15 }}>
                     <span>團費總計</span>
-                    <span>NT$ {fmt(calculation.perPersonTWD * people)}</span>
+                    <span>NT$ {fmt(roundScaled(quotedPerPersonTWD, people))}</span>
                   </div>
                   {calculation.totalDeposit > 0 && collectDeposit && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', color: '#ffcc00', marginTop: 4 }}>
@@ -6594,24 +6589,24 @@ function SectionRow({ title }: { title: string }) {
   return <tr><td colSpan={4} style={{ background: '#5c4a2a', color: 'white', padding: 8, fontWeight: 'bold', textAlign: 'left' }}>{title}</td></tr>
 }
 
-function DataRow({ name, cost, price, profit, className }: { name: string; cost: number; price: number; profit: number; className?: string }) {
+function DataRow({ name, cost, price, profit, className }: { name: string; cost: number | null; price: number | null; profit: number | null; className?: string }) {
   return (
     <tr style={className === 'day-row' ? { background: '#fafafa' } : {}}>
       <td style={{ ...tdStyle, textAlign: 'left' }}>{name}</td>
-      <td style={tdStyle}>{cost.toLocaleString()}</td>
-      <td style={tdStyle}>{price.toLocaleString()}</td>
-      <td style={tdStyle}>{profit > 0 ? profit.toLocaleString() : '-'}</td>
+      <td style={tdStyle}>{cost === null ? '待人工確認' : cost.toLocaleString()}</td>
+      <td style={tdStyle}>{price === null ? '待人工確認' : price.toLocaleString()}</td>
+      <td style={tdStyle}>{profit === null ? '待人工確認' : profit > 0 ? profit.toLocaleString() : '-'}</td>
     </tr>
   )
 }
 
-function SubtotalRow({ name, cost, price, profit }: { name: string; cost: number; price: number; profit: number }) {
+function SubtotalRow({ name, cost, price, profit }: { name: string; cost: number | null; price: number | null; profit: number | null }) {
   return (
     <tr style={{ background: '#f9f8f6', fontWeight: 'bold' }}>
       <td style={{ ...tdStyle, textAlign: 'left' }}>{name}</td>
-      <td style={tdStyle}>{cost.toLocaleString()}</td>
-      <td style={tdStyle}>{price.toLocaleString()}</td>
-      <td style={tdStyle}>{profit.toLocaleString()}</td>
+      <td style={tdStyle}>{cost === null ? '待人工確認' : cost.toLocaleString()}</td>
+      <td style={tdStyle}>{price === null ? '待人工確認' : price.toLocaleString()}</td>
+      <td style={tdStyle}>{profit === null ? '待人工確認' : profit.toLocaleString()}</td>
     </tr>
   )
 }
