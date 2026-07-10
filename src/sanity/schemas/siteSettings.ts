@@ -1,4 +1,10 @@
 import { defineArrayMember, defineField, defineType } from 'sanity'
+import {
+  HOME_PUBLIC_COPY,
+  PUBLIC_PRICE_RANGE,
+  SITEWIDE_METADATA_DESCRIPTION,
+} from '@/lib/home-public-copy'
+import { defaultSiteSettings } from '@/lib/site-settings'
 
 export default defineType({
   name: 'siteSettings',
@@ -26,7 +32,8 @@ export default defineType({
       type: 'text',
       rows: 3,
       group: 'brand',
-      description: '用於全站 LocalBusiness / Organization schema，也會影響 AI 摘要與搜尋片段。',
+      initialValue: SITEWIDE_METADATA_DESCRIPTION,
+      description: 'Production 使用程式內 canonical 描述；此欄保留作 Studio 參考。',
       validation: (Rule) => Rule.required().max(220),
     }),
     defineField({
@@ -50,8 +57,8 @@ export default defineType({
       title: 'Price Range / 價格區間',
       type: 'string',
       group: 'brand',
-      initialValue: 'NT$ 3,000 - 10,000',
-      description: '主要給 schema 與信任資訊使用，不是精準報價。',
+      initialValue: PUBLIC_PRICE_RANGE,
+      description: 'Production 使用程式內 canonical THB 區間；此欄保留作 Studio 參考。',
     }),
     defineField({
       name: 'areaServed',
@@ -68,8 +75,7 @@ export default defineType({
       group: 'brand',
       description: '控制網站頁尾的品牌說明、地址與聯絡電話。',
       initialValue: {
-        description:
-          '爸媽開的清邁親子包車。台灣爸爸 Eric × 泰國媽媽 Min，司機導遊專業分工，專為帶小孩的家庭設計，深受台灣家庭信賴。',
+        description: HOME_PUBLIC_COPY.footerDescription,
         addressText: '444, Wiang, Fang District, Chiang Mai 50110',
         addressUrl: 'https://share.google/p6anNFwTvi9Sc7JAt',
         taiwanPhone: '+886 987-591-322',
@@ -129,9 +135,9 @@ export default defineType({
         eyebrow: 'About Chiangway',
         imageAlt: 'Eric 與 Min，清微旅行在地家庭團隊',
         name: 'Eric & Min',
-        description: '爸媽開的清邁親子包車，由台灣爸爸 Eric 與泰國媽媽 Min 經營，專為帶小孩的家庭設計。',
+        description: '清微旅行由台灣爸爸 Eric 與泰國媽媽 Min 在地經營；標準泰國司機與 LINE 中文支援，中文導遊依需求選配。',
         serviceLabel: '服務方式',
-        serviceValue: '司機 + 導遊',
+        serviceValue: '標準泰國司機｜中文導遊選配',
         summary: '文章內容會從親子旅行、交通、景點與在地生活角度出發，幫你把清邁自由行需要的資訊先整理順。',
         primaryCtaText: 'LINE 詢問清邁行程',
         secondaryCtaText: '看行程案例',
@@ -174,7 +180,7 @@ export default defineType({
           name: 'serviceValue',
           title: 'Service Value / 服務值',
           type: 'string',
-          initialValue: '司機 + 導遊',
+          initialValue: '標準泰國司機｜中文導遊選配',
         }),
         defineField({
           name: 'summary',
@@ -257,7 +263,8 @@ export default defineType({
       title: 'Home FAQ / 首頁 FAQ',
       type: 'array',
       group: 'seo',
-      description: '首頁 FAQ 與 FAQPage schema 會直接吃這裡的內容。',
+      initialValue: defaultSiteSettings.homeFaq,
+      description: 'Production 首頁 FAQ 與 FAQPage schema 使用程式內 canonical 版本；此欄保留作 Studio 參考。',
       validation: (Rule) => Rule.min(1),
       of: [
         defineArrayMember({

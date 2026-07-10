@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import SectionTitle from '@/components/ui/SectionTitle'
+import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
 
 // Star icon
 function StarIcon({ className }: { className?: string }) {
@@ -175,6 +176,10 @@ export default function Testimonials({ testimonials = defaultTestimonials }: Tes
           title="Google 五星真實評價"
           subtitle="聽聽其他爸媽怎麼說"
         />
+
+        <p className="mx-auto mb-8 max-w-3xl rounded-xl bg-amber-50 px-4 py-3 text-center text-sm leading-relaxed text-amber-900">
+          {HOME_PUBLIC_COPY.testimonialDisclaimer}
+        </p>
 
         {/* Desktop: Grid view - 3 columns, 2 rows */}
         <div className="hidden md:grid md:grid-cols-3 gap-6">

@@ -36,7 +36,7 @@ export default function TermsPage() {
       '@type': 'Organization',
       '@id': 'https://chiangway-travel.com/#organization',
     },
-    dateModified: '2026-01-01',
+    dateModified: '2026-07-10',
   }
 
   return (
@@ -54,7 +54,7 @@ export default function TermsPage() {
 
         <div className="prose prose-lg max-w-none">
           <p className="text-gray-600 mb-6">
-            最後更新日期：2026 年 1 月
+            最後更新日期：2026 年 7 月
           </p>
 
           <section className="mb-8">
@@ -63,8 +63,8 @@ export default function TermsPage() {
               清微旅行提供清邁地區的包車服務及民宿住宿服務。我們的服務包含：
             </p>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
-              <li>親子包車服務（含司機、車輛）</li>
-              <li>中文導遊服務</li>
+              <li>親子包車服務（標準泰國司機）</li>
+              <li>中文導遊服務（依需求選配）</li>
               <li>機場接送服務</li>
               <li>芳縣民宿住宿</li>
             </ul>
@@ -98,17 +98,17 @@ export default function TermsPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">4. 服務內容</h2>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">包車服務包含：</h3>
             <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-              <li>車輛使用</li>
-              <li>專屬司機</li>
-              <li>油資</li>
-              <li>過路費</li>
-              <li>兒童安全座椅（需事先告知）</li>
+              <li>車輛、泰國司機、油資、過路費、停車費與 LINE 中文支援</li>
             </ul>
+            <p className="text-gray-700 mb-4">
+              標準泰國司機通常不以中文服務；行程會在出發前確認。需要隨車中文溝通或導覽時，可選配中文導遊。中文導遊僅在選配方案中包含。
+            </p>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">不包含：</h3>
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>景點門票</li>
               <li>餐飲費用</li>
-              <li>導遊服務（另計）</li>
+              <li>中文導遊服務（選配方案另計）</li>
+              <li>兒童安全座椅：THB 500／日／張，且佔一個座位；每位乘客（含嬰幼兒）各佔一席，安全座椅安裝於該乘客座位，不另加算一人</li>
               <li>小費（建議但非強制）</li>
             </ul>
           </section>
@@ -121,7 +121,9 @@ export default function TermsPage() {
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>行程當天可依孩子狀況調整景點順序</li>
               <li>如需大幅變更行程，請提前一天告知</li>
-              <li>超時服務將依實際時數加收費用</li>
+              <li>標準用車時數為清邁 10 小時；清萊／金三角 12 小時</li>
+              <li>超時費為 THB 300／小時／台，中文導遊不另收超時費</li>
+              <li>結束時間有 30 分鐘內彈性，超過後依超時時數計費</li>
             </ul>
           </section>
 

@@ -1,0 +1,48 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('next/script', () => ({
+  default: ({ children: _children, ...props }: React.ComponentProps<'script'>) => <script {...props} />,
+}))
+
+import CancellationPage from '@/app/cancellation/page'
+import TermsPage from '@/app/terms/page'
+
+function renderedText(page: React.ReactElement) {
+  return renderToStaticMarkup(page).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+}
+
+describe('public charter policy pages', () => {
+  it('renders the canonical driver and overtime policy on the cancellation page', () => {
+    const text = renderedText(<CancellationPage />)
+
+    expect(text).toContain('標準服務安排泰國司機，通常不以中文服務')
+    expect(text).toContain('行程會在出發前確認')
+    expect(text).toContain('LINE 中文支援')
+    expect(text).toContain('需要隨車中文溝通或導覽時，再選配中文導遊')
+    expect(text).toContain('清萊／金三角用車：12 小時')
+    expect(text).toContain('THB 300／小時／台')
+    expect(text).toContain('中文導遊不另收超時費')
+    expect(text).toContain('彈性 30 分鐘')
+    expect(text).toContain('一台車超時費 THB 300')
+
+    expect(text).not.toContain('各 200 泰銖/小時')
+    expect(text).not.toContain('400 泰銖/小時')
+  })
+
+  it('renders exact standard inclusions, paid child seats and overtime terms', () => {
+    const html = renderToStaticMarkup(<TermsPage />)
+    const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
+    expect(text).toContain('最後更新日期：2026 年 7 月')
+    expect(html).toContain('2026-07')
+    expect(text).toContain('車輛、泰國司機、油資、過路費、停車費與 LINE 中文支援')
+    expect(text).toContain('中文導遊僅在選配方案中包含')
+    expect(text).toContain('兒童安全座椅：THB 500／日／張，且佔一個座位')
+    expect(text).toContain('安全座椅安裝於該乘客座位，不另加算一人')
+    expect(text).toContain('清邁 10 小時；清萊／金三角 12 小時')
+    expect(text).toContain('THB 300／小時／台')
+    expect(text).toContain('中文導遊不另收超時費')
+    expect(text).toContain('30 分鐘內彈性')
+  })
+})

@@ -3,24 +3,24 @@ import SectionTitle from '@/components/ui/SectionTitle'
 // Default values
 const defaultReasons = [
   {
+    icon: '🚐',
+    title: '標準泰國司機',
+    description: '標準服務由泰國司機專心駕駛，通常不以中文服務；行程會在出發前確認。',
+  },
+  {
+    icon: '💬',
+    title: 'LINE 中文支援',
+    description: '行前先把路線與節奏排好，旅途中需要協助時可透過 LINE 中文支援聯繫。',
+  },
+  {
+    icon: '🧭',
+    title: '中文導遊依需求選配',
+    description: '需要隨車中文溝通或景點導覽時再選配中文導遊；不是中文司機一人包辦。',
+  },
+  {
     icon: '🏠',
     title: '在地家庭經營',
-    description: '不是旅行社，是住在清邁的真實家庭。台灣爸爸 + 泰國媽媽，給您最真實的在地體驗。',
-  },
-  {
-    icon: '👶',
-    title: '自己也是爸媽',
-    description: '我們有女兒，懂帶小孩出遊的眉角。行程節奏、休息時間、用餐地點，都從爸媽角度思考。',
-  },
-  {
-    icon: '🚐',
-    title: '司機導遊分工',
-    description: '專業分工，司機專心開車，導遊專心服務。不是中文司機一人包辦，服務品質更好。',
-  },
-  {
-    icon: '✨',
-    title: '客製化行程',
-    description: '根據孩子年齡、體力量身打造。不跑固定路線，不趕行程，玩得輕鬆才是真的玩。',
+    description: '台灣爸爸與泰國媽媽在地協助，依孩子年齡、體力與家庭節奏安排路線。',
   },
 ]
 
@@ -38,7 +38,7 @@ interface WhyUsProps {
 
 export default function WhyUs({
   sectionTitle = '為什麼選擇清微旅行',
-  sectionSubtitle = '不只是包車，更是您在清邁的家人',
+  sectionSubtitle = '服務內容先說清楚，再依你們家的需求安排',
   reasons,
 }: WhyUsProps) {
   const items = reasons && reasons.length > 0 ? reasons : defaultReasons

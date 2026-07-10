@@ -3,35 +3,17 @@ import Button from '@/components/ui/Button'
 import LineCTAButton from '@/components/ui/LineCTAButton'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
+import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
 
 // Simple blur placeholder (light golden gradient matching brand)
 const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBQYSIRMxQWH/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8AotuXM19qN5cXEhmWOdkjQnpFXrgA/PtZpSlIr//Z'
 
-// Default values - Brand: 清微旅行 + Eric & Min 強調品牌與家庭定位
-const defaults = {
-  title: '爸媽開的清邁親子包車',
-  subtitle: '台灣爸爸 Eric × 泰國媽媽 Min，深受台灣家庭信賴',
-  description: '司機導遊專業分工，專為帶小孩的家庭設計',
-  primaryCta: { text: 'LINE 聊聊你的清邁計畫', link: 'https://line.me/R/ti/p/@037nyuwk' },
-  secondaryCta: { text: '看行程案例', link: '/tours' },
-}
-
 interface HeroProps {
   backgroundImage?: { asset: SanityImageSource; alt?: string }
-  title?: string
-  subtitle?: string
-  description?: string
-  primaryCta?: { text?: string; link?: string }
-  secondaryCta?: { text?: string; link?: string }
 }
 
 export default function Hero({
   backgroundImage,
-  title = defaults.title,
-  subtitle = defaults.subtitle,
-  description = defaults.description,
-  primaryCta,
-  secondaryCta,
 }: HeroProps) {
   const heroImageSrc = backgroundImage?.asset
     ? urlFor(backgroundImage.asset).width(1920).height(960).url()
@@ -57,24 +39,24 @@ export default function Hero({
       <div className="bg-white py-8 md:py-12">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-2xl md:text-4xl font-bold text-gray-900 mb-4">
-            {title}
+            {HOME_PUBLIC_COPY.hero.title}
           </h1>
           <p className="text-lg md:text-xl text-gray-600 mb-2">
-            {subtitle}
+            {HOME_PUBLIC_COPY.hero.subtitle}
           </p>
           <p className="text-base text-gray-500 mb-6">
-            {description}
+            {HOME_PUBLIC_COPY.hero.description}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <LineCTAButton location="Hero - Primary CTA">
-              {primaryCta?.text || defaults.primaryCta.text}
+              {HOME_PUBLIC_COPY.hero.primaryCta.text}
             </LineCTAButton>
             <Button
-              href={secondaryCta?.link || defaults.secondaryCta.link}
+              href={HOME_PUBLIC_COPY.hero.secondaryCta.link}
               variant="outline"
               size="lg"
             >
-              {secondaryCta?.text || defaults.secondaryCta.text}
+              {HOME_PUBLIC_COPY.hero.secondaryCta.text}
             </Button>
           </div>
         </div>

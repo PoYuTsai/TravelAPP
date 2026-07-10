@@ -5,6 +5,10 @@ import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import FloatingLineButton from '@/components/ui/FloatingLineButton'
 import AdLineLinkSwap from '@/components/AdLineLinkSwap'
+import {
+  PUBLIC_PRICE_RANGE,
+  SITEWIDE_METADATA_DESCRIPTION,
+} from '@/lib/home-public-copy'
 
 // Google Tag Manager ID
 const GTM_ID = 'GTM-5WH32MLX'
@@ -23,7 +27,7 @@ export const metadata: Metadata = {
     default: '清微旅行 Chiangway Travel | 清邁親子包車',
     template: '%s | 清微旅行',
   },
-  description: '爸媽開的清邁親子包車 — 台灣爸爸 Eric × 泰國媽媽 Min 經營，司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
+  description: SITEWIDE_METADATA_DESCRIPTION,
   keywords: ['清邁親子自由行', '清邁包車', '清邁中文導遊', '清邁家庭旅遊', '清邁親子景點', '清邁自由行', '泰國親子旅遊'],
   authors: [{ name: '清微旅行' }],
   metadataBase: new URL('https://chiangway-travel.com'),
@@ -49,6 +53,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'zh_TW',
     siteName: '清微旅行 Chiangway Travel',
+    description: SITEWIDE_METADATA_DESCRIPTION,
     images: [
       {
         url: '/images/og-image.png',
@@ -61,7 +66,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: '清微旅行 Chiangway Travel | 清邁親子包車',
-    description: '爸媽開的清邁親子包車 — 台灣爸爸 Eric × 泰國媽媽 Min 經營，司機導遊專業分工，深受台灣家庭信賴。',
+    description: SITEWIDE_METADATA_DESCRIPTION,
     images: ['/images/og-image.png'],
   },
 }
@@ -72,7 +77,7 @@ const localBusinessSchema = {
   '@type': 'LocalBusiness',
   '@id': 'https://chiangway-travel.com/#business',
   name: '清微旅行 Chiangway Travel',
-  description: '爸媽開的清邁親子包車 — 台灣爸爸 Eric × 泰國媽媽 Min 經營，司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
+  description: SITEWIDE_METADATA_DESCRIPTION,
   url: 'https://chiangway-travel.com',
   telephone: '+66-63-790-0666',
   email: 'eric19921204@gmail.com',
@@ -90,7 +95,7 @@ const localBusinessSchema = {
     '@type': 'City',
     name: 'Chiang Mai',
   },
-  priceRange: 'NT$ 3,000 - 10,000',
+  priceRange: PUBLIC_PRICE_RANGE,
   openingHoursSpecification: {
     '@type': 'OpeningHoursSpecification',
     dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
@@ -120,7 +125,7 @@ const organizationSchema = {
   name: '清微旅行 Chiangway Travel',
   url: 'https://chiangway-travel.com',
   logo: 'https://chiangway-travel.com/icons/apple-touch-icon.png',
-  description: '爸媽開的清邁親子包車，台灣爸爸 Eric × 泰國媽媽 Min 經營',
+  description: SITEWIDE_METADATA_DESCRIPTION,
   sameAs: [
     'https://line.me/R/ti/p/@037nyuwk',
     'https://www.facebook.com/profile.php?id=61569067776768',
