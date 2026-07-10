@@ -32,6 +32,8 @@ export interface QuoteData {
   itinerary: QuoteItineraryDay[]
 
   quote: ExternalQuoteBreakdown | null
+  /** 無此欄位＝舊成本拆項快照，前台走現行渲染 */
+  pricingModel?: 'perPerson'
 
   collectDeposit: boolean
   hotelsWithDeposit: { name: string; deposit: number; rooms: number }[]

@@ -225,6 +225,8 @@ export async function fetchQuoteBySlug(
     exchangeRate,
     itinerary,
     quote,
+    pricingModel:
+      snapshot?.pricingModel === 'perPerson' ? ('perPerson' as const) : undefined,
     collectDeposit: snapshot?.collectDeposit ?? false,
     hotelsWithDeposit: snapshot?.hotelsWithDeposit ?? [],
     totalDeposit: snapshot?.totalDeposit ?? 0,

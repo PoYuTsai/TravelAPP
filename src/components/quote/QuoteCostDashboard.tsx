@@ -231,6 +231,7 @@ function LineItemBreakdown({
   adults,
   childCount,
   isPackageShowcase,
+  isPerPerson,
 }: {
   items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
   tripDays: number
@@ -238,6 +239,7 @@ function LineItemBreakdown({
   adults: number
   childCount: number
   isPackageShowcase: boolean
+  isPerPerson: boolean
 }) {
   return (
     <motion.div
@@ -293,10 +295,10 @@ function LineItemBreakdown({
               </div>
               <div className="shrink-0 text-right">
                 <p className="text-[14px] font-semibold" style={{ color: '#0F0B05' }}>
-                  NT$ {fmt(item.amountTWD)}
+                  {isPerPerson ? `${fmt(item.amountTHB)} THB` : `NT$ ${fmt(item.amountTWD)}`}
                 </p>
                 <p className="text-[12px]" style={{ color: '#7A6F5C' }}>
-                  {fmt(item.amountTHB)} THB
+                  {isPerPerson ? `約 NT$ ${fmt(item.amountTWD)}` : `${fmt(item.amountTHB)} THB`}
                 </p>
               </div>
             </div>
@@ -357,6 +359,7 @@ function TotalQuoteCard({
   exchangeRate,
   isPackageShowcase,
   basisLabel,
+  isPerPerson,
 }: {
   name: string
   totalTHB: number
@@ -364,6 +367,7 @@ function TotalQuoteCard({
   exchangeRate: number
   isPackageShowcase: boolean
   basisLabel: string
+  isPerPerson: boolean
 }) {
   return (
     <motion.div
@@ -412,7 +416,7 @@ function TotalQuoteCard({
           {isPackageShowcase ? `${name} 參考試算價格` : `${name} 專屬行程總報價`}
         </div>
 
-        {/* Big price — NT$ prominent for Taiwan customers */}
+        {/* Big price — perPerson 快照以 THB 為對外幣別（收現金），TWD 縮為約值；舊快照維持 NT$ 大字 */}
         <div className="mt-6 flex flex-wrap items-end justify-center gap-3">
           <span
             className="font-black leading-[0.9]"
@@ -422,11 +426,13 @@ function TotalQuoteCard({
               letterSpacing: '-0.02em',
             }}
           >
-            NT$ {fmt(totalTWD)}
+            {isPerPerson ? `THB ${fmt(totalTHB)}` : `NT$ ${fmt(totalTWD)}`}
           </span>
         </div>
         <div className="mt-3 text-[16px] font-bold md:text-[18px]" style={{ color: 'rgba(253,251,244,0.6)' }}>
-          約 {fmt(totalTHB)} 泰銖 · 匯率 {exchangeRate.toFixed(3)}
+          {isPerPerson
+            ? `約 NT$ ${fmt(totalTWD)} · 匯率 ${exchangeRate.toFixed(3)}`
+            : `約 ${fmt(totalTHB)} 泰銖 · 匯率 ${exchangeRate.toFixed(3)}`}
         </div>
 
         {isPackageShowcase && (
@@ -647,6 +653,7 @@ interface QuoteCostDashboardProps {
 
 export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
   const breakdown = quote.quote
+  const isPerPerson = quote.pricingModel === 'perPerson'
   const isPackageShowcase = quote.publicPageMode === 'package'
   const packageEstimateBasis = formatPackageEstimateBasis({
     adults: quote.adults,
@@ -733,6 +740,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               adults={quote.adults}
               childCount={quote.children}
               isPackageShowcase={isPackageShowcase}
+              isPerPerson={isPerPerson}
             />
 
             {/* 3. Total Quote Card */}
@@ -743,6 +751,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               exchangeRate={quote.exchangeRate}
               isPackageShowcase={isPackageShowcase}
               basisLabel={packageEstimateBasis}
+              isPerPerson={isPerPerson}
             />
 
             {/* 付款說明、匯款帳號已移除 — 在 LINE 私訊溝通 */}

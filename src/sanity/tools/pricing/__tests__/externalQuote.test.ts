@@ -144,9 +144,10 @@ describe('pricing external quote breakdown', () => {
       breakdown.items.find((item) => item.label === '接送機')?.description
     ).toBe('1 趟（按車計）')
 
-    // included 是服務清單而不是計價人頭
+    // included 是服務清單而不是計價人頭（對齊黃表：含超時費）
     expect(breakdown.included).toContain('中文導遊')
     expect(breakdown.included).toContain('車資、油費、過路費、停車費')
+    expect(breakdown.included).toContain('超時費')
     expect(breakdown.included).not.toContain('大人')
     expect(breakdown.excluded).not.toContain('中文導遊')
     expect(breakdown.totalTHB).toBe(63600)

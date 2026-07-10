@@ -197,6 +197,7 @@ export function buildExternalQuoteBreakdown(
         '車資、油費、過路費、停車費',
         '專業司機',
         ...(input.includeGuide ? ['中文導遊'] : []),
+        '超時費',
         '貼心中文客服',
         ...items
           .filter((item) => !perPersonLabels.has(item.label) && item.label !== '接送機')
