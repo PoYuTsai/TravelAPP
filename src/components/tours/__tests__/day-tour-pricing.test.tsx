@@ -157,6 +157,20 @@ describe('day-tour canonical public pricing', () => {
     expect(container.textContent).not.toContain('3,200')
   })
 
+  it('keeps both deep-link sections available when Sanity returns empty arrays', () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
+    const { container } = render(
+      <ToursPageClient packages={[]} dayTours={[]} />
+    )
+
+    expect(container.querySelector('#packages')?.tagName).toBe('SECTION')
+    expect(container.querySelector('#day-tours')?.tagName).toBe('SECTION')
+    expect(container.textContent).toContain('行程範例整理中，先看包車價格')
+    expect(container.textContent).toContain('一日遊範例整理中，歡迎先用 LINE 詢問')
+    expect(container.querySelector('a[href="/services/car-charter#pricing"]')).not.toBeNull()
+    expect(container.querySelector('a[href="https://line.me/R/ti/p/@037nyuwk"]')).not.toBeNull()
+  })
+
   it('fetches only pricingTier for day tours on the listing page', async () => {
     mocks.sanityFetch.mockResolvedValue([])
     mocks.familyCount.mockResolvedValue(110)

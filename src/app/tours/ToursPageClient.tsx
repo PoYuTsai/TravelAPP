@@ -149,12 +149,12 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
         </section>
 
         {/* Signature Packages Section */}
-        {packages.length > 0 && (
-          <section id="packages" className="mb-20 scroll-mt-24">
-            <SectionTitle
-              title="給第一次來清邁的你"
-              subtitle="我們設計好了，你只要帶孩子來"
-            />
+        <section id="packages" className="mb-20 scroll-mt-24">
+          <SectionTitle
+            title="給第一次來清邁的你"
+            subtitle="我們設計好了，你只要帶孩子來"
+          />
+          {packages.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               {packages.slice(0, 2).map((pkg) => (
                 <PackageCard
@@ -168,16 +168,23 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
                 />
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="rounded-2xl bg-gray-50 p-8 text-center">
+              <p className="text-gray-600 mb-4">行程範例整理中，先看包車價格</p>
+              <Button href="/services/car-charter#pricing" variant="outline" size="sm">
+                查看包車價格
+              </Button>
+            </div>
+          )}
+        </section>
 
         {/* Day Tours Section */}
-        {dayTours.length > 0 && (
-          <section id="day-tours" className="mb-20 scroll-mt-24">
-            <SectionTitle
-              title="想自己排行程？"
-              subtitle="這些一日遊隨你搭"
-            />
+        <section id="day-tours" className="mb-20 scroll-mt-24">
+          <SectionTitle
+            title="想自己排行程？"
+            subtitle="這些一日遊隨你搭"
+          />
+          {dayTours.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
               {dayTours.map((tour) => (
                 <DayTourCard
@@ -191,8 +198,15 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
                 />
               ))}
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="rounded-2xl bg-gray-50 p-8 text-center">
+              <p className="text-gray-600 mb-4">一日遊範例整理中，歡迎先用 LINE 詢問</p>
+              <Button href="https://line.me/R/ti/p/@037nyuwk" external size="sm">
+                LINE 詢問
+              </Button>
+            </div>
+          )}
+        </section>
 
         {/* Recent Cases Section */}
         <section id="recent-cases" className="mb-16">
