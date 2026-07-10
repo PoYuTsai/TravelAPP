@@ -6,6 +6,21 @@
 >
 > **Current service truth (2026-07-10):** the standard arrangement is a Thai driver with itinerary confirmation and LINE Chinese support. A Chinese-speaking guide is optional and is a separate professional role. Passenger count does not automatically force a guide. Use `docs/plans/2026-07-10-per-person-pricing-framework.md` for fleet, family-discount, and manual-quote rules.
 
+**Current pricing guardrails**:
+
+- The public all-adult reference range is THB 750–4,750 per person per service day.
+- For 2–3 guests, the default is a sedan with a Thai driver, but a Chinese-speaking guide may be selected at a sell price of THB 2,500/day. This is a normal selectable option, not a forced inclusion and not a manual vehicle exception.
+- Publicly, 4–5 guests are always shown and quoted as a Van. An SUV is never a public vehicle or price promise; operations may use one only as an availability-based, same-price internal dispatch/upgrade. A customer-requested SUV or unusual luggage, safety-seat, or seating needs require manual confirmation.
+
+Exact 2–3 guest all-adult reference prices (THB/person/day):
+
+| Tier | 2 guests, driver only | 2 guests, with guide | 3 guests, driver only | 3 guests, with guide |
+|---|---:|---:|---:|---:|
+| T1 | 2,300 | 3,550 | 1,600 | 2,450 |
+| T2 | 2,550 | 3,800 | 1,750 | 2,600 |
+| T3 | 3,200 | 4,450 | 2,200 | 3,050 |
+| T4 | 3,500 | 4,750 | 2,400 | 3,250 |
+
 ## Package 1: 清邁 5 天 4 夜 親子家庭包車
 
 **Target**: Families with children 3–12, requesting a relaxed-to-normal pace.
@@ -27,7 +42,7 @@ D5: Checkout → airport dropoff (departure day per flight time)
 - Fuel, parking, tolls
 
 **Optional / quote-specific**:
-- Chinese-speaking guide on the confirmed non-transfer service days; a guide is not automatically included on every active day
+- Chinese-speaking guide on the confirmed non-transfer service days, including for 2–3 guests; a guide is not automatically included on every active day
 - Passenger insurance (THB 100/person/trip)
 - Child safety seat (THB 500/day/seat); it is installed on that child's passenger seat and does not add another traveler, but must be considered in the vehicle seating layout
 

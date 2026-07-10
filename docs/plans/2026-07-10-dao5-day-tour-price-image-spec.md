@@ -10,7 +10,7 @@
 
 1. 一日遊是半客製私家團：不併團、行程可依家庭節奏調整；不是含票含餐的制式團。
 2. 公開標準服務為泰國司機、行程事先確認與 LINE 中文支援；中文導遊依需求選配。
-3. 2–3 人是轎車＋泰國司機、不含中文導遊。4–9 人在這張**一日遊價目圖**採「含中文導遊一日遊方案」，必須清楚標示這是選配後的方案，而不是依人數或法規強制。
+3. 2–3 人可選「轎車＋泰國司機」標準方案，或加選中文導遊；兩種成人價必須同時清楚展示，不能讓人誤以為小團不能請導遊或必須請導遊。4–9 人在這張**一日遊價目圖**採「含中文導遊一日遊方案」，也必須標示這是選配後的方案，而不是依人數或法規強制。
 4. 10–18 人為兩台 Van，圖上不塞完整價表，統一引導 LINE 取得整團報價；19 人以上人工確認。
 5. 兒童 8 折與嬰幼兒半價都只能稱為「試算」；每位乘客（含嬰幼兒）各佔一席，正式總價受最低成團／核心團費保護。
 6. 門票、餐食、保險、安全座椅與超時另計；圖片不得把付費項目放進「包含」。
@@ -52,7 +52,7 @@ Layout constraints:
 - high contrast must be possible for dark charcoal overlay text.
 
 Strict exclusions:
-NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, NO currency symbols, NO logo, NO brand mark, NO watermark, NO road signs, NO shop signs, NO license-plate lettering, NO tables, NO UI labels, NO pseudo-text or gibberish. Do not draw a tour guide badge or imply that every group includes a guide.
+NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, NO currency symbols, NO logo, NO brand mark, NO watermark, NO road signs, NO shop signs, NO license-plate lettering, NO tables, NO UI labels, NO pseudo-text or gibberish, NO SUV. Do not draw a tour guide badge or imply that every group includes a guide.
 ```
 
 ### 2.2 確定性文字 overlay 規格
@@ -75,7 +75,7 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 
 ```text
 清微旅行｜清邁私家一日遊
-成人每人參考價・泰銖 THB
+成人每人參考價 THB 750–4,750／人／日
 不併團・行程可調整・爸媽開的親子包車
 ```
 
@@ -84,11 +84,14 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 ```text
 市區線｜泰服體驗
 2人 2,300｜3人 1,600
-轎車＋泰國司機｜不含中文導遊
+轎車＋泰國司機｜標準方案・不含中文導遊
+
+2人 3,550｜3人 2,450
+轎車＋泰國司機＋中文導遊｜選配方案・不強制
 
 4人 2,050｜5人 1,650｜6人 1,400
 7人 1,250｜8人 1,100｜9人 1,000
-含中文導遊一日遊方案（選配方案）
+Van＋泰國司機＋中文導遊｜選配方案・不強制
 ```
 
 #### 卡 2：T2 近郊線
@@ -96,11 +99,14 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 ```text
 近郊線｜大象保護營・茵他儂・南邦・南奔
 2人 2,550｜3人 1,750
-轎車＋泰國司機｜不含中文導遊
+轎車＋泰國司機｜標準方案・不含中文導遊
+
+2人 3,800｜3人 2,600
+轎車＋泰國司機＋中文導遊｜選配方案・不強制
 
 4人 2,250｜5人 1,850｜6人 1,550
 7人 1,350｜8人 1,200｜9人 1,100
-含中文導遊一日遊方案（選配方案）
+Van＋泰國司機＋中文導遊｜選配方案・不強制
 ```
 
 #### 卡 3：T3 清萊線
@@ -108,11 +114,14 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 ```text
 清萊線｜清萊白廟（12 小時日）
 2人 3,200｜3人 2,200
-轎車＋泰國司機｜不含中文導遊
+轎車＋泰國司機｜標準方案・不含中文導遊
+
+2人 4,450｜3人 3,050
+轎車＋泰國司機＋中文導遊｜選配方案・不強制
 
 4人 2,550｜5人 2,100｜6人 1,750
 7人 1,550｜8人 1,350｜9人 1,250
-含中文導遊一日遊方案（選配方案）
+Van＋泰國司機＋中文導遊｜選配方案・不強制
 ```
 
 #### 包含／不含與說明
@@ -121,7 +130,7 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 包含
 車輛・泰國司機・油費・過路費・停車費
 行程事先確認・LINE 中文支援
-4–9 人上列方案另含中文導遊
+只有同列明確標示「＋中文導遊」的選配方案才包含導遊
 
 另計
 門票・餐食・小費
@@ -143,6 +152,7 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 10–18 人：兩台 Van，請 LINE 取得整團報價
 19 人以上：人工確認車輛與服務安排
 不需要導遊？官網另有泰國司機方案。
+中文導遊是選配，不依人數強制。
 
 以上為行程範例，停點可依家庭需求調整。
 多日客製與正式報價｜LINE @037nyuwk
@@ -152,8 +162,8 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 
 1. 首屏先看懂「每人參考價・THB」與私家團。
 2. 三張卡各只保留價格帶、路線名、人數價與服務標籤；不得加入逐站行程。
-3. 每張卡把 2–3 人與 4–9 人視覺分區，避免讀者誤以為同一人力配置。
-4. 「含中文導遊一日遊方案（選配方案）」必須與價格同卡、同視線範圍，不能只放最底小字。
+3. 每張卡分成三個價格區塊：2–3 人泰國司機標準方案、2–3 人加中文導遊選配方案、4–9 人 Van 加中文導遊選配方案，避免讀者混淆人力配置。
+4. 每一組「＋中文導遊」都必須在同卡、同視線範圍標示「選配方案・不強制」，不能只放最底小字。
 5. 兒童試算、最低成團保護、10–18 兩車與 19+ 人工不可刪除；若版面不足，先刪裝飾或次要圖示。
 
 ## 3. 夥伴快查卡（LINE 內部貼文）
@@ -169,10 +179,17 @@ NO text, NO Chinese characters, NO Latin letters, NO numbers, NO price symbols, 
 【看總佔位人數】成人＋兒童＋嬰幼兒；每位乘客各佔一席
 安全座椅裝在該孩子的座位，不另加算一人，但要納入車內配置
 1人＝人工確認
-2–3人＝轎車＋泰國司機；加導遊須先確認車型
+2–3人＝轎車＋泰國司機；可直接選配中文導遊，不強制
 4–9人＝Van×1＋泰國司機；導遊可選配
 10–18人＝Van×2＋泰國司機×2；導遊可選配1位、兩車共用
 19人以上＝人工報價，不拆單
+
+【2–3人成人每人參考價｜前者不含／後者含中文導遊】
+T1：2人 2,300／3,550｜3人 1,600／2,450
+T2：2人 2,550／3,800｜3人 1,750／2,600
+T3：2人 3,200／4,450｜3人 2,200／3,050
+T4：2人 3,500／4,750｜3人 2,400／3,250
+公開成人參考價範圍：THB 750–4,750／人／日
 
 【親子試算】
 12+成人價｜3–11歲8折試算｜0–2歲半價試算
@@ -198,11 +215,13 @@ docs/plans/2026-07-10-per-person-pricing-framework.md
 
 J 姊偶發可開轎車只屬內部供應例外，不能出現在快查對客話術、價目圖或公開 FAQ；會中文也不代表包含導覽。
 
+SUV 不得作為公開車型或價目。4–5 人對外仍報 Van；若當日有合適車輛，可由內部把 Van 訂單同價調度／升等為 SUV，但不可事先承諾。客人指定 SUV，或有特殊行李、安全座椅、座位配置需求時，一律人工確認。
+
 ## 4. 產圖與上線驗收
 
 - [ ] 背景像素內沒有任何文字、數字、Logo、價錢、招牌或偽文字。
 - [ ] Overlay 價格由 `calcPerPersonDay()` 產生，與本文件三卡逐項比對。
-- [ ] 2–3 人寫「泰國司機／不含中文導遊」。
+- [ ] 2–3 人同卡展示泰國司機標準方案與中文導遊選配方案，六組 T1–T3 價格全部正確。
 - [ ] 4–9 人清楚寫「含中文導遊一日遊方案（選配方案）」。
 - [ ] 沒有法規強制導遊、中文司機、拆單或 8–9 人自動導遊說法。
 - [ ] 兒童兩種優惠都標「試算」、嬰幼兒佔位、最低成團保護完整可讀。
