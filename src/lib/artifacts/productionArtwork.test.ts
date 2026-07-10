@@ -8,6 +8,7 @@ import {
 } from './productionArtwork'
 import {
   buildPricingArtworkOverlaySvg,
+  buildLinePricingArtworkSvg,
   buildRichMenuSvg,
   PRICING_ARTWORK_CTA_CONTENT_BOUNDS,
   PRICING_ARTWORK_HEADLINE_CONTENT_BOUNDS,
@@ -15,6 +16,7 @@ import {
   PRICING_ARTWORK_SAFE_AREA,
   renderArtworkSvgWithFont,
   renderPricingArtworkPng,
+  renderLinePricingArtworkPng,
   renderRichMenuPng,
 } from './productionArtworkRenderer'
 import sharp from 'sharp'
@@ -42,6 +44,14 @@ describe('production artwork data', () => {
           { people: 2, thb: 3550 },
           { people: 3, thb: 2450 },
         ],
+        unguidedVan: [
+          { people: 4, thb: 1400 },
+          { people: 5, thb: 1150 },
+          { people: 6, thb: 1000 },
+          { people: 7, thb: 900 },
+          { people: 8, thb: 800 },
+          { people: 9, thb: 750 },
+        ],
         guidedVan: [
           { people: 4, thb: 2050 },
           { people: 5, thb: 1650 },
@@ -63,6 +73,14 @@ describe('production artwork data', () => {
           { people: 2, thb: 3800 },
           { people: 3, thb: 2600 },
         ],
+        unguidedVan: [
+          { people: 4, thb: 1600 },
+          { people: 5, thb: 1350 },
+          { people: 6, thb: 1150 },
+          { people: 7, thb: 1000 },
+          { people: 8, thb: 900 },
+          { people: 9, thb: 800 },
+        ],
         guidedVan: [
           { people: 4, thb: 2250 },
           { people: 5, thb: 1850 },
@@ -83,6 +101,14 @@ describe('production artwork data', () => {
         guidedSedan: [
           { people: 2, thb: 4450 },
           { people: 3, thb: 3050 },
+        ],
+        unguidedVan: [
+          { people: 4, thb: 1950 },
+          { people: 5, thb: 1600 },
+          { people: 6, thb: 1350 },
+          { people: 7, thb: 1200 },
+          { people: 8, thb: 1050 },
+          { people: 9, thb: 950 },
         ],
         guidedVan: [
           { people: 4, thb: 2550 },
@@ -301,5 +327,49 @@ describe('production artwork data', () => {
     const png = await renderPricingArtworkPng({ fontPaths: ARTWORK_FONT_PATHS })
     const metadata = await sharp(png).metadata()
     expect(metadata).toMatchObject({ width: 2160, height: 2700, format: 'png' })
+  }, 15_000)
+
+  it('splits adult per-person LINE prices into readable Chiang Mai and Chiang Rai sheets', async () => {
+    const chiangMaiSvg = buildLinePricingArtworkSvg('chiang-mai')
+    const chiangRaiSvg = buildLinePricingArtworkSvg('chiang-rai')
+
+    for (const svg of [chiangMaiSvg, chiangRaiSvg]) {
+      expect(svg).toContain('全成人同行參考')
+      expect(svg).toContain('以下皆為 THB／人／日')
+      expect(svg).toContain('方案 A｜泰國司機包車')
+      expect(svg).toContain('方案 B｜泰國司機＋中文導遊')
+      expect(svg).toContain('親子家庭・8人（含）以上推薦')
+      expect(svg).toContain('8人（含）以上同行，建議安排中文導遊')
+      expect(svg).toContain('2–3人轎車・4–9人 Van')
+      expect(svg).toContain('有小朋友？提供年齡，直接報全家總價')
+      expect(svg).toContain('10人以上 LINE 整團報價')
+      expect(svg).not.toContain('8折')
+      expect(svg).not.toContain('半價')
+      expect(svg).not.toContain('10–18人')
+      expect(svg).not.toContain('最低成團價')
+      expect(svg).not.toContain('SUV')
+      expect(svg).not.toContain('必配')
+      expect(svg).not.toContain('泰國法規')
+      expect(svg).toContain('.linePrice { font-size: 40px')
+    }
+
+    expect(chiangMaiSvg).toContain('清邁市區・近郊')
+    expect(chiangMaiSvg).toContain('aria-label="T1 2人 泰國司機 2,300"')
+    expect(chiangMaiSvg).toContain('aria-label="T2 9人 含中文導遊 1,100"')
+    expect(chiangMaiSvg).not.toContain('金三角')
+
+    expect(chiangRaiSvg).toContain('清萊・金三角')
+    expect(chiangRaiSvg).toContain('aria-label="T3 2人 泰國司機 3,200"')
+    expect(chiangRaiSvg).toContain('aria-label="T4 9人 含中文導遊 1,350"')
+    expect(chiangRaiSvg).not.toContain('清邁市區')
+
+    expect(40 * (375 / 1080)).toBeGreaterThanOrEqual(13)
+
+    for (const sheet of ['chiang-mai', 'chiang-rai'] as const) {
+      const png = await renderLinePricingArtworkPng(sheet, ARTWORK_FONT_PATHS)
+      const metadata = await sharp(png).metadata()
+      expect(metadata).toMatchObject({ width: 2160, height: 2700, format: 'png' })
+      expect(png.byteLength).toBeLessThan(10_000_000)
+    }
   }, 15_000)
 })

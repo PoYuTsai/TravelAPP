@@ -12,6 +12,8 @@ import {
   CHILD_SEAT_FEE_PER_DAY,
   INFANT_PRICE_RATIO,
   INSURANCE_FEE_PER_PERSON,
+  calcPerPersonDay,
+  type Tier,
 } from '@/lib/pricing/perPersonRates'
 import {
   CHARTER_OVERTIME_POLICY,
@@ -21,6 +23,8 @@ import {
 const ARTWORK_FONT_FAMILY = 'Chiangway Artwork Sans'
 const PRICE_WIDTH = 2160
 const PRICE_HEIGHT = 2700
+const LINE_PRICE_WIDTH = 1080
+const LINE_PRICE_HEIGHT = 1350
 
 export const PRICING_ARTWORK_SAFE_AREA = {
   left: 144,
@@ -68,6 +72,7 @@ function assertTrueTypeFont(fontPath: string): void {
 export function renderArtworkSvgWithFont(
   svg: string,
   fontPaths: readonly string[],
+  outputWidth?: number,
 ): Buffer {
   if (fontPaths.length === 0) {
     throw new Error('Artwork font list cannot be empty')
@@ -82,6 +87,9 @@ export function renderArtworkSvgWithFont(
     },
     shapeRendering: 2,
     textRendering: 2,
+    ...(outputWidth
+      ? { fitTo: { mode: 'width' as const, value: outputWidth } }
+      : {}),
   })
 
   return renderer.render().asPng()
@@ -240,6 +248,169 @@ export function buildPricingArtworkOverlaySvg(): string {
 
     <text x="1080" y="2635" text-anchor="middle" class="infoSmall">以上為行程範例・停點可依家庭需求調整</text>
   </svg>`
+}
+
+export type LinePricingSheet = 'chiang-mai' | 'chiang-rai'
+
+interface LineRouteColumn {
+  tier: Tier
+  label: string
+  hours: number
+}
+
+const LINE_PRICING_SHEETS: Record<
+  LinePricingSheet,
+  { title: string; routes: [LineRouteColumn, LineRouteColumn] }
+> = {
+  'chiang-mai': {
+    title: '清邁市區・近郊',
+    routes: [
+      { tier: 'T1', label: '清邁市區', hours: 10 },
+      { tier: 'T2', label: '清邁近郊', hours: 10 },
+    ],
+  },
+  'chiang-rai': {
+    title: '清萊・金三角',
+    routes: [
+      { tier: 'T3', label: '清萊', hours: 12 },
+      { tier: 'T4', label: '金三角', hours: 12 },
+    ],
+  },
+}
+
+function linePricingTable(
+  y: number,
+  title: string,
+  withGuide: boolean,
+  accent: string,
+  routes: readonly [LineRouteColumn, LineRouteColumn],
+  recommendation?: string,
+): string {
+  const columnCenters = [480, 820]
+  const rows = Array.from({ length: 8 }, (_, index) => index + 2)
+    .map((people, rowIndex) => {
+      const rowTop = y + 168 + rowIndex * 40
+      const baseline = y + 198 + rowIndex * 40
+      const values = routes.map((route, columnIndex) => {
+        const price = calcPerPersonDay(route.tier, people, withGuide)
+        const planLabel = withGuide ? '含中文導遊' : '泰國司機'
+        return `
+          <text
+            x="${columnCenters[columnIndex]}"
+            y="${baseline}"
+            text-anchor="middle"
+            class="linePrice"
+            aria-label="${route.tier} ${people}人 ${planLabel} ${formatThb(price)}"
+          >${formatThb(price)}</text>`
+      }).join('')
+
+      return `
+        <g>
+          <rect x="72" y="${rowTop}" width="936" height="40" rx="10" fill="${rowIndex % 2 === 0 ? '#FFFDF7' : '#F8F2E5'}"/>
+          <text x="150" y="${baseline}" text-anchor="middle" class="linePeople">${people}人</text>
+          ${values}
+        </g>`
+    })
+    .join('')
+
+  return `
+    <g>
+      <rect x="48" y="${y}" width="984" height="505" rx="30" fill="#FFFEFA" filter="url(#lineCardShadow)"/>
+      <rect x="48" y="${y}" width="14" height="505" rx="7" fill="${accent}"/>
+      <text x="84" y="${y + 46}" class="linePlanTitle">${escapeXml(title)}</text>
+      <text x="84" y="${y + 82}" class="linePlanMeta">2–3人轎車・4–9人 Van</text>
+      ${recommendation
+        ? `<rect x="650" y="${y + 54}" width="350" height="36" rx="18" fill="#F4B918"/>
+           <text x="825" y="${y + 79}" text-anchor="middle" class="lineRecommend">${escapeXml(recommendation)}</text>`
+        : ''}
+      <rect x="72" y="${y + 102}" width="936" height="62" rx="15" fill="${accent}" fill-opacity="0.18"/>
+      <text x="150" y="${y + 142}" text-anchor="middle" class="lineTableHead">人數</text>
+      ${routes
+        .map(
+          (route, index) => `
+            <text x="${columnCenters[index]}" y="${y + 132}" text-anchor="middle" class="lineTableHead">${escapeXml(route.label)}</text>
+            <text x="${columnCenters[index]}" y="${y + 157}" text-anchor="middle" class="lineTableSub">${route.hours} 小時</text>`,
+        )
+        .join('')}
+      ${rows}
+      <line x1="72" y1="${y + 248}" x2="1008" y2="${y + 248}" stroke="${accent}" stroke-width="3" stroke-dasharray="10 10"/>
+    </g>`
+}
+
+/** LINE-chat price sheet: one route pair per readable 4:5 image. */
+export function buildLinePricingArtworkSvg(sheet: LinePricingSheet): string {
+  const config = LINE_PRICING_SHEETS[sheet]
+  const unguided = linePricingTable(
+    215,
+    '方案 A｜泰國司機包車',
+    false,
+    '#29465F',
+    config.routes,
+  )
+  const guided = linePricingTable(
+    735,
+    '方案 B｜泰國司機＋中文導遊',
+    true,
+    '#D77532',
+    config.routes,
+    '親子家庭・8人（含）以上推薦',
+  )
+
+  return `
+  <svg xmlns="http://www.w3.org/2000/svg" width="${LINE_PRICE_WIDTH}" height="${LINE_PRICE_HEIGHT}" viewBox="0 0 ${LINE_PRICE_WIDTH} ${LINE_PRICE_HEIGHT}">
+    <defs>
+      <filter id="lineCardShadow" x="-10%" y="-10%" width="120%" height="130%">
+        <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#463D2B" flood-opacity="0.12"/>
+      </filter>
+      <linearGradient id="lineBackground" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#FFF9E8"/>
+        <stop offset="0.58" stop-color="#FBF6EC"/>
+        <stop offset="1" stop-color="#EAF1E8"/>
+      </linearGradient>
+      <style>
+        text { font-family: '${ARTWORK_FONT_FAMILY}'; fill: #171512; }
+        .lineBrand { font-size: 25px; font-weight: 900; letter-spacing: 2px; }
+        .lineHero { font-size: 54px; font-weight: 900; }
+        .lineUnit { font-size: 34px; font-weight: 900; fill: #493900; }
+        .linePlanTitle { font-size: 34px; font-weight: 900; }
+        .linePlanMeta { font-size: 26px; font-weight: 750; fill: #62594B; }
+        .lineRecommend { font-size: 18px; font-weight: 900; fill: #171512; }
+        .lineTableHead { font-size: 28px; font-weight: 900; }
+        .lineTableSub { font-size: 20px; font-weight: 700; fill: #6C6252; }
+        .linePeople { font-size: 32px; font-weight: 850; fill: #5C5346; }
+        .linePrice { font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; }
+        .lineFootStrong { font-size: 23px; font-weight: 900; fill: #263F51; }
+        .lineFoot { font-size: 21px; font-weight: 750; fill: #645C50; }
+      </style>
+    </defs>
+
+    <rect width="1080" height="1350" fill="url(#lineBackground)"/>
+    <path d="M760 0C820 56 900 64 1080 38" fill="none" stroke="#DDE8D6" stroke-width="28" opacity="0.65"/>
+    <path d="M840 84C930 128 1000 98 1080 134" fill="none" stroke="#F5D97D" stroke-width="12" opacity="0.45"/>
+    <circle cx="1010" cy="75" r="12" fill="#D77532" opacity="0.35"/>
+    <rect x="48" y="24" width="365" height="44" rx="22" fill="#F4BE19"/>
+    <text x="72" y="55" class="lineBrand">清微旅行 CHIANGWAY</text>
+    <text x="48" y="125" class="lineHero">${escapeXml(config.title)}</text>
+    <rect x="48" y="146" width="984" height="54" rx="20" fill="#FFF1AA"/>
+    <text x="540" y="182" text-anchor="middle" class="lineUnit">全成人同行參考｜以下皆為 THB／人／日</text>
+
+    ${unguided}
+    ${guided}
+
+    <text x="540" y="1288" text-anchor="middle" class="lineFootStrong">8人（含）以上同行，建議安排中文導遊</text>
+    <text x="540" y="1322" text-anchor="middle" class="lineFoot">有小朋友？提供年齡，直接報全家總價｜10人以上 LINE 整團報價</text>
+  </svg>`
+}
+
+export async function renderLinePricingArtworkPng(
+  sheet: LinePricingSheet,
+  fontPaths: readonly string[],
+): Promise<Buffer> {
+  return renderArtworkSvgWithFont(
+    buildLinePricingArtworkSvg(sheet),
+    fontPaths,
+    LINE_PRICE_WIDTH * 2,
+  )
 }
 
 function richMenuIcon(index: number, x: number, y: number, stroke: string): string {

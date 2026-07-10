@@ -109,6 +109,7 @@ describe('car-charter canonical public copy', () => {
     expect(copy.heroSubtitle).toContain('標準安排為泰國司機')
     expect(copy.heroSubtitle).toContain('LINE 中文支援')
     expect(copy.heroSubtitle).toMatch(/中文導遊.*(?:選配|加聘)/)
+    expect(copy.pricingSectionTitle).toContain('全成人同行')
 
     expect(copy.features.map((feature) => feature.title)).toEqual(
       expect.arrayContaining([
@@ -133,6 +134,7 @@ describe('car-charter canonical public copy', () => {
 
     const guideFaq = copy.faq.find((item) => item.question === '中文導遊一定要加嗎？')
     expect(guideFaq?.answer).toContain('2–18 人皆可選配')
+    expect(guideFaq?.answer).toContain('8 人（含）以上同行，建議安排中文導遊')
     expect(guideFaq?.answer).toMatch(/3 人.*導遊.*一般 5 人座.*剛好滿/)
     expect(guideFaq?.answer).toMatch(/安全座椅.*行李.*舒適度.*調度.*確認車型/)
     expect(guideFaq?.answer).not.toContain('需先確認車型')
@@ -204,10 +206,15 @@ describe('car-charter canonical public copy', () => {
     expect(container.querySelector(`#${copy.sectionIds.faq}`)?.tagName).toBe('SECTION')
 
     // Render the real component, rather than source-grepping for price-table words.
-    expect(text).toContain('轎車＋泰國司機')
-    expect(text).toContain('轎車＋泰國司機＋中文導遊')
-    expect(text).toContain('Van＋泰國司機＋中文導遊')
-    expect(text).toContain('最低成團價')
+    expect(text).toContain('方案 A｜泰國司機包車')
+    expect(text).toContain('方案 B｜泰國司機＋中文導遊同行')
+    expect(text).toContain('2–3 人使用轎車')
+    expect(text).toContain('4–9 人使用 Van')
+    expect(text).toContain('8 人（含）以上同行，建議安排中文導遊')
+    expect(text).toContain('以下金額皆為 THB／人／日')
+    expect(text).toContain('有小朋友？不用自己拆帳')
+    expect(text).toContain('全家包車總價')
+    expect(text).not.toContain('最低成團價')
 
     const schemas = Array.from(
       container.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]')

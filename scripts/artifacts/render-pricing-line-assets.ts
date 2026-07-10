@@ -5,12 +5,15 @@ import path from 'node:path'
 import sharp from 'sharp'
 import { RICH_MENU_SPEC } from '../../src/lib/artifacts/productionArtwork'
 import {
+  renderLinePricingArtworkPng,
   renderPricingArtworkPng,
   renderRichMenuPng,
+  type LinePricingSheet,
 } from '../../src/lib/artifacts/productionArtworkRenderer'
 
 const ROOT = process.cwd()
 const VERSION = '2026-07-10'
+const LINE_PRICE_VERSION = '2026-07-11-v2'
 const PRICING_DIR = path.join(ROOT, 'public', 'images', 'pricing')
 const LINE_DIR = path.join(ROOT, 'public', 'images', 'line')
 const LINE_SCRIPT_DIR = path.join(ROOT, 'scripts', 'line')
@@ -27,6 +30,10 @@ const ARTWORK_FONT_PATHS = ['Regular', 'Bold', 'Black'].map((weight) =>
     `ChiangwayArtworkSans-${weight}-subset.ttf`,
   ),
 )
+const LINE_PRICE_SHEETS: Array<{ sheet: LinePricingSheet; stem: string }> = [
+  { sheet: 'chiang-mai', stem: 'charter-price-chiang-mai' },
+  { sheet: 'chiang-rai', stem: 'charter-price-chiang-rai' },
+]
 
 interface ArtifactRecord {
   path: string
@@ -79,6 +86,38 @@ async function writeLineArtifacts(fontPaths: readonly string[]): Promise<Artifac
   return Promise.all([artifactRecord(masterPath), artifactRecord(previewPath)])
 }
 
+async function writeLinePricingArtwork(
+  fontPaths: readonly string[],
+): Promise<ArtifactRecord[]> {
+  await mkdir(LINE_DIR, { recursive: true })
+
+  const outputPaths = await Promise.all(
+    LINE_PRICE_SHEETS.map(async ({ sheet, stem }) => {
+      const masterPath = path.join(
+        LINE_DIR,
+        `${stem}-v${LINE_PRICE_VERSION}.png`,
+      )
+      const previewPath = path.join(
+        LINE_DIR,
+        `${stem}-v${LINE_PRICE_VERSION}-preview.png`,
+      )
+      const master = await renderLinePricingArtworkPng(sheet, fontPaths)
+      const preview = await sharp(master)
+        .resize(375, 469, { fit: 'fill' })
+        .png({ compressionLevel: 9 })
+        .toBuffer()
+
+      await Promise.all([
+        writeFile(masterPath, master),
+        writeFile(previewPath, preview),
+      ])
+      return [masterPath, previewPath]
+    }),
+  )
+
+  return Promise.all(outputPaths.flat().map(artifactRecord))
+}
+
 async function writePricingArtifacts(fontPaths: readonly string[]): Promise<ArtifactRecord[]> {
   if (!existsSync(BACKGROUND_PATH)) {
     throw new Error(
@@ -126,7 +165,10 @@ async function main() {
     throw new Error(`Missing artwork font: ${path.relative(ROOT, missingFont)}`)
   }
   const fontData = await Promise.all(ARTWORK_FONT_PATHS.map((fontPath) => readFile(fontPath)))
-  const records = await writeLineArtifacts(ARTWORK_FONT_PATHS)
+  const records = [
+    ...(await writeLineArtifacts(ARTWORK_FONT_PATHS)),
+    ...(await writeLinePricingArtwork(ARTWORK_FONT_PATHS)),
+  ]
 
   if (layoutPreview) {
     records.push(...(await writePricingLayoutPreview(ARTWORK_FONT_PATHS)))

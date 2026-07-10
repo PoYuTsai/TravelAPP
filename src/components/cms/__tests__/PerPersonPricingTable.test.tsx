@@ -15,7 +15,7 @@ function rateRowsFor(title: string) {
   const heading = Array.from(container.querySelectorAll('h3')).find(
     (element) => element.textContent === title,
   )
-  const card = heading?.closest('div.overflow-hidden')
+  const card = heading?.closest('article')
   if (!card) throw new Error(`Missing rate card: ${title}`)
 
   return Array.from(card.querySelectorAll('tbody tr')).map((row) =>
@@ -24,27 +24,25 @@ function rateRowsFor(title: string) {
 }
 
 describe('PerPersonPricingTable', () => {
-  it('keeps desktop rate cards wide enough to show all four regions', () => {
+  it('organizes every public rate under exactly two service plans', () => {
     const { container } = render(<PerPersonPricingTable />)
-    const rateGrid = Array.from(container.querySelectorAll('div')).find(
-      (element) =>
-        element.className.includes('grid-cols-1') &&
-        element.querySelectorAll('table').length === 4,
-    )
+    const planCards = container.querySelectorAll('article[data-pricing-plan]')
 
-    expect(rateGrid?.className).toContain('lg:grid-cols-2')
-    expect(rateGrid?.className).not.toContain('xl:grid-cols-4')
+    expect(planCards).toHaveLength(2)
+    expect(Array.from(planCards).map((card) => card.querySelector('h3')?.textContent)).toEqual([
+      '方案 A｜泰國司機包車',
+      '方案 B｜泰國司機＋中文導遊同行',
+    ])
+    expect(Array.from(planCards).every((card) => card.querySelectorAll('tbody tr').length === 8)).toBe(true)
   })
 
-  it('renders four public price cards with exact guided sedan rates', () => {
+  it('publishes complete driver and guided prices including guided sedan rates', () => {
     const text = renderPricingCopy()
 
-    expect(text).toContain('轎車＋泰國司機')
-    expect(text).toContain('2–3 人')
-    expect(text).toContain('轎車＋泰國司機＋中文導遊')
-    expect(text).toContain('Van＋泰國司機')
-    expect(text).toContain('4–9 人')
-    expect(text).toContain('Van＋泰國司機＋中文導遊')
+    expect(text).toContain('方案 A｜泰國司機包車')
+    expect(text).toContain('方案 B｜泰國司機＋中文導遊同行')
+    expect(text).toContain('2–3 人使用轎車')
+    expect(text).toContain('4–9 人使用 Van')
 
     // 轎車：2 人 T1 = 2,300；3 人 T4 = 2,400
     expect(text).toContain('2,300')
@@ -56,10 +54,16 @@ describe('PerPersonPricingTable', () => {
     expect(text).toContain('2,050')
     expect(text).toContain('1,000')
 
-    expect(rateRowsFor('轎車＋泰國司機＋中文導遊')).toEqual([
-      ['2 人', '3,550', '3,800', '4,450', '4,750'],
-      ['3 人', '2,450', '2,600', '3,050', '3,250'],
+    expect(rateRowsFor('方案 B｜泰國司機＋中文導遊同行').slice(0, 2)).toEqual([
+      ['2 人', '轎車', '3,550', '3,800', '4,450', '4,750'],
+      ['3 人', '轎車', '2,450', '2,600', '3,050', '3,250'],
     ])
+  })
+
+  it('tells mobile visitors that every regional price remains available by horizontal scroll', () => {
+    const text = renderPricingCopy()
+
+    expect(text.match(/左右滑動查看全部地區價格/g)).toHaveLength(2)
   })
 
   it('states the driver, optional-guide and fleet rules without legacy claims', () => {
@@ -75,6 +79,8 @@ describe('PerPersonPricingTable', () => {
     expect(text).toMatch(/3 人.*導遊.*一般 5 人座.*剛好滿/)
     expect(text).toMatch(/座位.*安全座椅.*行李.*舒適度.*調度.*確認車型/)
     expect(text).toMatch(/10–18 人.*中文導遊.*共用一位/)
+    expect(text).toContain('8 人（含）以上同行，建議安排中文導遊')
+    expect(text).toContain('親子家庭、8 人（含）以上推薦')
 
     expect(text).not.toContain('泰國法規')
     expect(text).not.toContain('必配持證')
@@ -83,16 +89,22 @@ describe('PerPersonPricingTable', () => {
     expect(text).not.toMatch(/SUV/i)
   })
 
-  it('labels child rates as estimates protected by family composition and the minimum group price', () => {
+  it('shows adult per-person references but gives families one total instead of child unit prices', () => {
     const text = renderPricingCopy()
 
+    expect(text).toContain('全成人同行參考')
+    expect(text).toContain('以下金額皆為 THB／人／日')
     expect(text).toContain('嬰幼兒皆佔位')
-    expect(text).toContain('兒童優惠試算')
-    expect(text).toContain('8 折試算')
-    expect(text).toContain('半價試算')
-    expect(text).toContain('家庭組合')
-    expect(text).toContain('最低成團價')
-    expect(text).toContain('正式報價')
+    expect(text).toContain('有小朋友？不用自己拆帳')
+    expect(text).toContain('親子優惠')
+    expect(text).toContain('全家包車總價')
+    expect(text).toContain('成人幾位')
+    expect(text).toContain('小孩年齡')
+    expect(text).toContain('安全座椅')
+
+    expect(text).not.toContain('8 折試算')
+    expect(text).not.toContain('半價試算')
+    expect(text).not.toContain('最低成團價')
   })
 
   it('lists paid add-ons and overtime with their exact units', () => {

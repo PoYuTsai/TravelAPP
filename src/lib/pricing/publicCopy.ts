@@ -35,7 +35,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     '清微旅行的清邁親子包車，標準安排為泰國司機；行程會先確認，旅途中提供 LINE 中文支援。\n需要隨車中文溝通或導覽時，中文導遊可選配。',
   heroCtaText: 'LINE 聊聊你的行程',
   heroCtaLink: 'https://line.me/R/ti/p/@037nyuwk',
-  pricingSectionTitle: '包車價格參考',
+  pricingSectionTitle: '包車價格｜全成人同行參考',
   pricingFootnotes: [] as string[],
   features: [
     {
@@ -83,7 +83,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     {
       question: '中文導遊一定要加嗎？',
       answer:
-        '不一定，2–18 人皆可選配。2–3 人為轎車方案；3 人加導遊時，一般 5 人座剛好滿座，座位、安全座椅、行李較多或舒適度需求會由調度確認車型。10–18 人安排兩台 Van 時，選配導遊由兩台車共用一位。19 人以上請由 LINE 人工確認。',
+        '不一定，2–18 人皆可選配；8 人（含）以上同行，建議安排中文導遊，協助現場溝通、導覽與多人行程節奏。2–3 人為轎車方案；3 人加導遊時，一般 5 人座剛好滿座，座位、安全座椅、行李較多或舒適度需求會由調度確認車型。10–18 人安排兩台 Van 時，選配導遊由兩台車共用一位。19 人以上請由 LINE 人工確認。',
     },
     {
       question: '超時怎麼計算？',

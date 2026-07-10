@@ -175,7 +175,7 @@ export default async function CarCharterPage() {
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <SectionTitle
               title={CAR_CHARTER_PUBLIC_COPY.pricingSectionTitle}
-              subtitle="以人數計價，人越多每人越划算"
+              subtitle="以同行總人數計價；以下皆為每人每日價，親子家庭直接看全家總價"
             />
             <PerPersonPricingTable footnotes={CAR_CHARTER_PUBLIC_COPY.pricingFootnotes} />
 

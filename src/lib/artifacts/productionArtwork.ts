@@ -11,6 +11,7 @@ export interface DayTourArtworkTier {
   routes: string
   sedan: ArtworkPrice[]
   guidedSedan: ArtworkPrice[]
+  unguidedVan: ArtworkPrice[]
   guidedVan: ArtworkPrice[]
 }
 
@@ -42,6 +43,7 @@ export const DAY_TOUR_ARTWORK_TIERS: DayTourArtworkTier[] =
     routes,
     sedan: pricesFor(tier, [2, 3], false),
     guidedSedan: pricesFor(tier, [2, 3], true),
+    unguidedVan: pricesFor(tier, [4, 5, 6, 7, 8, 9], false),
     guidedVan: pricesFor(tier, [4, 5, 6, 7, 8, 9], true),
   }))
 
