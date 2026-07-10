@@ -202,5 +202,12 @@ describe('day-tour canonical public pricing', () => {
       expect(legacy).toMatchObject({ hidden: true, readOnly: true })
       expect(legacy?.description).toMatch(/deprecated/i)
     }
+
+    for (const name of ['includes', 'excludes']) {
+      const codeOwned = fields.find((field) => field.name === name)
+      expect(codeOwned).toMatchObject({ hidden: true, readOnly: true })
+      expect(codeOwned?.description).toMatch(/deprecated/i)
+      expect(codeOwned?.description).toMatch(/code-owned/i)
+    }
   })
 })
