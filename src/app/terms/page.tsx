@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
 import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 export const metadata: Metadata = {
   title: '服務條款',
@@ -21,6 +22,11 @@ export const metadata: Metadata = {
 }
 
 export default function TermsPage() {
+  const guideOvertimeText =
+    CHARTER_OVERTIME_POLICY.guideFeeThbPerHour === 0
+      ? '中文導遊不另收超時費'
+      : `中文導遊超時費為 THB ${CHARTER_OVERTIME_POLICY.guideFeeThbPerHour}／小時`
+
   // Static schema - no user input, safe to use
   const webPageSchema = {
     '@context': 'https://schema.org',
@@ -122,9 +128,9 @@ export default function TermsPage() {
             <ul className="list-disc pl-6 text-gray-700 space-y-2">
               <li>行程當天可依孩子狀況調整景點順序</li>
               <li>如需大幅變更行程，請提前一天告知</li>
-              <li>標準用車時數為清邁 10 小時；清萊／金三角 12 小時</li>
-              <li>超時費為 THB 300／小時／台，中文導遊不另收超時費</li>
-              <li>結束時間有 30 分鐘內彈性，超過後依超時時數計費</li>
+              <li>標準用車時數為清邁 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時</li>
+              <li>超時費為 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}</li>
+              <li>結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘內彈性，超過後依超時時數計費</li>
             </ul>
           </section>
 

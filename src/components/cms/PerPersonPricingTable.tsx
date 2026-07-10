@@ -1,11 +1,14 @@
 import {
   AIRPORT_TRANSFER_FEES,
+  CHILD_PRICE_RATIO,
   CHILD_SEAT_FEE_PER_DAY,
+  INFANT_PRICE_RATIO,
   INSURANCE_FEE_PER_PERSON,
   LUGGAGE_VAN_FEE,
   calcPerPersonDay,
   type Tier,
 } from '@/lib/pricing/perPersonRates'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 import { CHILD_SEAT_OCCUPANCY_POLICY } from '@/lib/home-public-copy'
 
 /**
@@ -13,9 +16,6 @@ import { CHILD_SEAT_OCCUPANCY_POLICY } from '@/lib/home-public-copy'
  * 價格一律由 perPersonRates 引擎推導，單一事實來源，不另存數字。
  * 規格：docs/plans/2026-07-10-per-person-pricing-framework.md
  */
-
-/** 超時費（不含項，按台實收）THB/小時/台 */
-const OVERTIME_FEE_PER_HOUR_PER_CAR = 300
 
 const TIER_COLUMNS: Array<{ tier: Tier; label: string }> = [
   { tier: 'T1', label: '清邁市區' },
@@ -72,8 +72,8 @@ const SEAT_RULES = [
 
 const CHILD_RULES = [
   { age: '12 歲以上', price: '成人價' },
-  { age: '3–11 歲', price: '成人價 × 0.8（8 折試算）' },
-  { age: '0–2 歲', price: '成人價 × 0.5（半價試算）' },
+  { age: '3–11 歲', price: `成人價 × ${CHILD_PRICE_RATIO}（${CHILD_PRICE_RATIO * 10} 折試算）` },
+  { age: '0–2 歲', price: `成人價 × ${INFANT_PRICE_RATIO}（半價試算）` },
 ]
 
 function thb(amount: number): string {
@@ -209,8 +209,8 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
           <ul className="space-y-3 text-sm text-gray-700">
             <li>
-              超時費：清邁一日 10 小時、清萊／金三角一日 12 小時，結束時間有 30 分鐘彈性；
-              超過後 THB {thb(OVERTIME_FEE_PER_HOUR_PER_CAR)}／小時／台，按台實收，導遊不另收超時費
+              超時費：清邁一日 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊／金三角一日 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時，結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性；
+              超過後 THB {thb(CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar)}／小時／台，按台實收，導遊不另收超時費
             </li>
             <li>景點門票、餐食（可代訂另計）</li>
           </ul>

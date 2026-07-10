@@ -1,5 +1,6 @@
 import { calcPerPersonDay } from './perPersonRates'
 import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
+import { CHARTER_OVERTIME_POLICY } from './publicPolicy'
 
 export interface CarCharterPublicFeature {
   icon?: string
@@ -86,8 +87,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     },
     {
       question: '超時怎麼計算？',
-      answer:
-        '清邁一日用車 10 小時、清萊與金三角一日 12 小時，結束時間有 30 分鐘彈性。超過後，超時費為 THB 300／小時／台，按台計收；中文導遊不另收超時費。',
+      answer: `清邁一日用車 ${CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時、清萊與金三角一日 ${CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時，結束時間有 ${CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性。超過後，超時費為 THB ${CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，按台計收；中文導遊不另收超時費。`,
     },
     {
       question: '可以帶嬰兒車嗎？',

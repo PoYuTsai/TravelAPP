@@ -23,6 +23,7 @@ import type { ComponentType } from 'react'
 import type { QuoteData } from '@/lib/quote/types'
 import { getIncludedDisplayLabel } from '@/lib/quote/quoteDisplay'
 import { formatPackageEstimateBasis } from '@/lib/quote/publicPageMode'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
@@ -463,6 +464,11 @@ function TotalQuoteCard({
 /* ─── Sub: Overtime policy ─── */
 
 function OvertimePolicyNotice() {
+  const guideOvertimeText =
+    CHARTER_OVERTIME_POLICY.guideFeeThbPerHour === 0
+      ? '中文導遊不另收超時費'
+      : `中文導遊超時費為 THB ${CHARTER_OVERTIME_POLICY.guideFeeThbPerHour}／小時`
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -485,7 +491,7 @@ function OvertimePolicyNotice() {
         超時費用
       </h3>
       <p className="text-[14px] leading-7" style={{ color: '#3A3224' }}>
-        清邁用車 10 小時；清萊／金三角用車 12 小時。超時 THB 300／小時／台，中文導遊不另收超時費；結束時間有 30 分鐘彈性。
+        清邁用車 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角用車 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時。超時 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}；結束時間有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性。
       </p>
     </motion.div>
   )

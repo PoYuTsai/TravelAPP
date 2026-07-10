@@ -1,4 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('next/script', () => ({
@@ -13,6 +15,25 @@ function renderedText(page: React.ReactElement) {
 }
 
 describe('public charter policy pages', () => {
+  it.each([
+    ['cancellation page', 'src/app/cancellation/page.tsx'],
+    ['terms page', 'src/app/terms/page.tsx'],
+  ])('derives overtime numbers from the canonical policy in the %s', (_label, relativePath) => {
+    const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8')
+
+    expect(source).toContain("from '@/lib/pricing/publicPolicy'")
+    for (const field of [
+      'chiangMaiHours',
+      'chiangRaiGoldenTriangleHours',
+      'graceMinutes',
+      'feeThbPerHourPerCar',
+      'guideFeeThbPerHour',
+    ]) {
+      expect(source).toContain(`CHARTER_OVERTIME_POLICY.${field}`)
+    }
+    expect(source).not.toMatch(/(?:10|12) 小時|30 分鐘|THB 300/)
+  })
+
   it('renders the canonical driver and overtime policy on the cancellation page', () => {
     const text = renderedText(<CancellationPage />)
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 export const metadata: Metadata = {
   title: '取消與退款政策',
@@ -20,6 +21,11 @@ export const metadata: Metadata = {
 }
 
 export default function CancellationPage() {
+  const guideOvertimeText =
+    CHARTER_OVERTIME_POLICY.guideFeeThbPerHour === 0
+      ? '中文導遊不另收超時費'
+      : `中文導遊超時費為 THB ${CHARTER_OVERTIME_POLICY.guideFeeThbPerHour}／小時`
+
   // Static schema - no user input, safe to use
   const webPageSchema = {
     '@context': 'https://schema.org',
@@ -116,23 +122,23 @@ export default function CancellationPage() {
               <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 mb-2">⏰ 用車時數限制</h3>
                 <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                  <li><strong>清邁用車：</strong>10 小時</li>
-                  <li><strong>清萊／金三角用車：</strong>12 小時</li>
+                  <li><strong>清邁用車：</strong>{CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時</li>
+                  <li><strong>清萊／金三角用車：</strong>{CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時</li>
                 </ul>
               </div>
               <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 mb-2">💵 超時費計算</h3>
                 <p className="text-gray-700">
-                  標準用車時數結束後有彈性 30 分鐘；超過彈性後，每台車收取 <strong>THB 300／小時／台</strong>，中文導遊不另收超時費。
+                  標準用車時數結束後有彈性 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘；超過彈性後，每台車收取 <strong>THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台</strong>，{guideOvertimeText}。
                 </p>
               </div>
               <div className="p-4 bg-white rounded-lg border border-orange-100">
                 <p className="text-gray-700 text-sm">
-                  <strong>範例：</strong>清萊一日遊（12 小時）8:00 出發 → 20:00 結束
+                  <strong>範例：</strong>清萊一日遊（{CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時）8:00 出發 → 20:00 結束
                 </p>
                 <ul className="text-gray-600 text-sm mt-2 space-y-1">
-                  <li>• 20:30 前結束：<span className="text-green-600 font-medium">不收超時費</span>（彈性 30 分鐘）</li>
-                  <li>• 20:40 後結束：一台車超時費 THB 300；如為多台車，依實際車數計費</li>
+                  <li>• 20:30 前結束：<span className="text-green-600 font-medium">不收超時費</span>（彈性 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘）</li>
+                  <li>• 20:40 後結束：一台車超時費 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}；如為多台車，依實際車數計費</li>
                 </ul>
               </div>
             </div>

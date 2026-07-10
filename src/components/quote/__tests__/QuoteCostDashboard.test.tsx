@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
@@ -65,6 +67,25 @@ function buildQuote(overrides: Partial<QuoteData> = {}): QuoteData {
 }
 
 describe('QuoteCostDashboard 幣別主次分流', () => {
+  it('derives overtime numbers from the canonical public policy', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/quote/QuoteCostDashboard.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("from '@/lib/pricing/publicPolicy'")
+    for (const field of [
+      'chiangMaiHours',
+      'chiangRaiGoldenTriangleHours',
+      'graceMinutes',
+      'feeThbPerHourPerCar',
+      'guideFeeThbPerHour',
+    ]) {
+      expect(source).toContain(`CHARTER_OVERTIME_POLICY.${field}`)
+    }
+    expect(source).not.toMatch(/(?:10|12) 小時|30 分鐘|THB 300/)
+  })
+
   it('perPerson 快照：主金額 THB 大字、TWD 縮為約值註記', () => {
     render(<QuoteCostDashboard quote={buildQuote({ pricingModel: 'perPerson' })} />)
 

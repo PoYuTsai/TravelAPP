@@ -2,6 +2,7 @@ import {
   dayTypeToTier,
   type PerPersonManualQuoteReason,
 } from './perPersonAdapter'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 export type CustomerQuoteGate =
   | { blocked: false; message: null }
@@ -78,10 +79,11 @@ export function resolveGuideService(
 export function getCharterOvertimePolicyCopy(
   carCount: number,
 ): CharterOvertimePolicyCopy {
+  const policy = CHARTER_OVERTIME_POLICY
   return {
-    serviceHours: '清邁行程：每日 10 小時；清萊／金三角行程：每日 12 小時',
-    grace: '結束時間有 30 分鐘彈性',
-    fee: `超過後按 THB 300／小時／台計收（${carCount} 台車按台計）；中文導遊不另收超時費`,
-    excludedLabel: '超時費（30 分鐘彈性後，THB 300／小時／台；中文導遊不另收）',
+    serviceHours: `清邁行程：每日 ${policy.chiangMaiHours} 小時；清萊／金三角行程：每日 ${policy.chiangRaiGoldenTriangleHours} 小時`,
+    grace: `結束時間有 ${policy.graceMinutes} 分鐘彈性`,
+    fee: `超過後按 THB ${policy.feeThbPerHourPerCar}／小時／台計收（${carCount} 台車按台計）；中文導遊不另收超時費`,
+    excludedLabel: `超時費（${policy.graceMinutes} 分鐘彈性後，THB ${policy.feeThbPerHourPerCar}／小時／台；中文導遊不另收）`,
   }
 }
