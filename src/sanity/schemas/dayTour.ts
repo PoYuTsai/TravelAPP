@@ -158,11 +158,30 @@ export default defineType({
 
     // === 價格資訊 ===
     defineField({
+      name: 'pricingTier',
+      title: '人頭計價區域',
+      type: 'string',
+      group: 'pricing',
+      description: '官網依總佔位人數與此服務區域說明計價。',
+      options: {
+        list: [
+          { title: 'T1 市區', value: 'T1' },
+          { title: 'T2 近郊', value: 'T2' },
+          { title: 'T3 清萊', value: 'T3' },
+          { title: 'T4 金三角', value: 'T4' },
+        ],
+        layout: 'radio',
+      },
+      validation: (Rule) => Rule.required(),
+    }),
+    defineField({
       name: 'basePrice',
       title: '基本價格',
       type: 'number',
       group: 'pricing',
-      description: '例：4000',
+      hidden: true,
+      readOnly: true,
+      description: 'DEPRECATED：舊固定團價，僅保留資料相容，不得用於公開呈現。',
     }),
     defineField({
       name: 'priceUnit',
@@ -170,21 +189,27 @@ export default defineType({
       type: 'string',
       group: 'pricing',
       initialValue: '/團',
-      description: '例：/團、/人',
+      hidden: true,
+      readOnly: true,
+      description: 'DEPRECATED：舊價格單位，僅保留資料相容，不得用於公開呈現。',
     }),
     defineField({
       name: 'priceNote',
       title: '價格說明',
       type: 'string',
       group: 'pricing',
-      description: '例：包車VIP豪華9人座',
+      hidden: true,
+      readOnly: true,
+      description: 'DEPRECATED：舊價格備註，僅保留資料相容，不得用於公開呈現。',
     }),
     defineField({
       name: 'guidePrice',
       title: '導遊加購價',
       type: 'number',
       group: 'pricing',
-      description: '例：2500',
+      hidden: true,
+      readOnly: true,
+      description: 'DEPRECATED：舊固定導遊加價，僅保留資料相容，不得用於公開呈現。',
     }),
     defineField({
       name: 'includes',

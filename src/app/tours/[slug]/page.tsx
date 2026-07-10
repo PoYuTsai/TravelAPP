@@ -2,8 +2,8 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { client, urlFor } from '@/sanity/client'
-import Button from '@/components/ui/Button'
 import LineCTAButton from '@/components/ui/LineCTAButton'
 import StopsCarousel from '@/components/tours/StopsCarousel'
 import TourViewTracker from '@/components/tours/TourViewTracker'
@@ -11,6 +11,11 @@ import RelatedTours from '@/components/tours/RelatedTours'
 import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import OverviewVideo from '@/components/tours/OverviewVideo'
+import {
+  DAY_TOUR_PRICING_TIER_LABELS,
+  DAY_TOUR_PUBLIC_PRICING,
+  type DayTourPricingTier,
+} from '@/lib/pricing/dayTourPricing'
 
 // === Types ===
 
@@ -56,12 +61,7 @@ interface DayTour {
   stops?: Stop[]
   tips?: string[]
   additionalInfo?: string
-  basePrice?: number
-  priceUnit?: string
-  priceNote?: string
-  guidePrice?: number
-  includes?: string[]
-  excludes?: string[]
+  pricingTier?: DayTourPricingTier
 }
 
 type TourData = TourPackage | DayTour
@@ -96,12 +96,7 @@ const dayTourQuery = `*[_type == "dayTour" && slug.current == $slug][0]{
   stops,
   tips,
   additionalInfo,
-  basePrice,
-  priceUnit,
-  priceNote,
-  guidePrice,
-  includes,
-  excludes
+  pricingTier
 }`
 
 async function getTourData(slug: string): Promise<TourData | null> {
@@ -193,10 +188,10 @@ export default async function TourDetailPage({
   const isPackage = tour._type === 'tourPackage'
   const isDayTour = tour._type === 'dayTour'
 
-  // Generate TourPackage/Product Schema for SEO
+  // Both packages and day tours are trips; day tours intentionally expose no stale price offer.
   const tourSchema = {
     '@context': 'https://schema.org',
-    '@type': isPackage ? 'TouristTrip' : 'Product',
+    '@type': 'TouristTrip',
     name: tour.title,
     description: tour.subtitle || `${tour.title} - 清微旅行精選行程`,
     ...(tour.coverImage && {
@@ -211,14 +206,6 @@ export default async function TourDetailPage({
       itinerary: {
         '@type': 'ItemList',
         numberOfItems: (tour as TourPackage).dailySchedule?.length || 0,
-      },
-    }),
-    ...(isDayTour && (tour as DayTour).basePrice && {
-      offers: {
-        '@type': 'Offer',
-        price: (tour as DayTour).basePrice,
-        priceCurrency: 'THB',
-        availability: 'https://schema.org/InStock',
       },
     }),
     aggregateRating: {
@@ -409,14 +396,65 @@ export default async function TourDetailPage({
           </section>
         )}
 
-        {/* Includes/Excludes Section */}
-        {(tour.includes?.length || tour.excludes?.length) && (
-          <section className="mb-12 grid md:grid-cols-2 gap-6">
-            {tour.includes && tour.includes.length > 0 && (
+        {/* Day-tour pricing and inclusions are code-owned to prevent stale CMS claims. */}
+        {isDayTour && (
+          <section className="mb-12 space-y-6">
+            <div className="bg-gray-50 rounded-2xl p-6 md:p-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-3">一日遊計價方式</h2>
+              <p className="text-gray-700 leading-relaxed">
+                {DAY_TOUR_PUBLIC_PRICING.disclosure.join('；')}。
+              </p>
+              {(tour as DayTour).pricingTier && (
+                <p className="mt-3 text-sm font-medium text-primary">
+                  服務區域：{DAY_TOUR_PRICING_TIER_LABELS[(tour as DayTour).pricingTier!]}
+                </p>
+              )}
+              <Link
+                href={DAY_TOUR_PUBLIC_PRICING.pricingHref}
+                className="inline-flex mt-4 text-primary font-medium hover:underline"
+              >
+                查看包車人頭計價表
+              </Link>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6">
               <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">費用包含</h3>
                 <ul className="space-y-2">
-                  {tour.includes.map((item, i) => (
+                  {DAY_TOUR_PUBLIC_PRICING.included.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-gray-700">
+                      <span className="text-green-500">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 text-sm text-gray-600">
+                  {DAY_TOUR_PUBLIC_PRICING.guideNote}
+                </p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
+                <ul className="space-y-2">
+                  {DAY_TOUR_PUBLIC_PRICING.excluded.map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-gray-500">
+                      <span className="text-gray-400">✗</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Package CMS inclusions remain unchanged. */}
+        {isPackage && ((tour as TourPackage).includes?.length || (tour as TourPackage).excludes?.length) && (
+          <section className="mb-12 grid md:grid-cols-2 gap-6">
+            {(tour as TourPackage).includes && (tour as TourPackage).includes!.length > 0 && (
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">費用包含</h3>
+                <ul className="space-y-2">
+                  {(tour as TourPackage).includes!.map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-gray-700">
                       <span className="text-green-500">✓</span>
                       {item}
@@ -425,11 +463,11 @@ export default async function TourDetailPage({
                 </ul>
               </div>
             )}
-            {tour.excludes && tour.excludes.length > 0 && (
+            {(tour as TourPackage).excludes && (tour as TourPackage).excludes!.length > 0 && (
               <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
                 <ul className="space-y-2">
-                  {tour.excludes.map((item, i) => (
+                  {(tour as TourPackage).excludes!.map((item, i) => (
                     <li key={i} className="flex items-start gap-2 text-gray-500">
                       <span className="text-gray-400">✗</span>
                       {item}
@@ -450,23 +488,6 @@ export default async function TourDetailPage({
             </div>
             {(tour as TourPackage).priceNote && (
               <p className="text-gray-500 text-sm">（{(tour as TourPackage).priceNote}）</p>
-            )}
-          </section>
-        )}
-
-        {isDayTour && (tour as DayTour).basePrice && (
-          <section className="mb-12 bg-gray-50 rounded-2xl p-6 md:p-8 text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">包車費用</h2>
-            <div className="text-3xl font-bold text-primary mb-2">
-              ${(tour as DayTour).basePrice?.toLocaleString()}{(tour as DayTour).priceUnit || '/團'}
-            </div>
-            {(tour as DayTour).priceNote && (
-              <p className="text-gray-500 text-sm">（{(tour as DayTour).priceNote}）</p>
-            )}
-            {(tour as DayTour).guidePrice && (
-              <p className="text-gray-600 mt-2 text-sm">
-                中文導遊加購：${(tour as DayTour).guidePrice?.toLocaleString()}/團
-              </p>
             )}
           </section>
         )}

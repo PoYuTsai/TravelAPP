@@ -9,6 +9,7 @@ import TrustNumbers from '@/components/sections/TrustNumbers'
 import PackageCard from '@/components/tours/PackageCard'
 import DayTourCard from '@/components/tours/DayTourCard'
 import CaseCard from '@/components/tours/CaseCard'
+import type { DayTourPricingTier } from '@/lib/pricing/dayTourPricing'
 
 interface Package {
   title: string
@@ -26,7 +27,7 @@ interface DayTour {
   location?: string
   coverImage?: any
   highlights?: string[]
-  basePrice?: number
+  pricingTier?: DayTourPricingTier
 }
 
 interface Case {
@@ -149,7 +150,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
 
         {/* Signature Packages Section */}
         {packages.length > 0 && (
-          <section className="mb-20">
+          <section id="packages" className="mb-20 scroll-mt-24">
             <SectionTitle
               title="給第一次來清邁的你"
               subtitle="我們設計好了，你只要帶孩子來"
@@ -172,7 +173,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
 
         {/* Day Tours Section */}
         {dayTours.length > 0 && (
-          <section className="mb-20">
+          <section id="day-tours" className="mb-20 scroll-mt-24">
             <SectionTitle
               title="想自己排行程？"
               subtitle="這些一日遊隨你搭"
@@ -186,7 +187,7 @@ export default function ToursPageClient({ packages, dayTours = [], familyCount }
                   location={tour.location}
                   coverImage={tour.coverImage}
                   highlights={tour.highlights}
-                  priceFrom={tour.basePrice}
+                  pricingTier={tour.pricingTier}
                 />
               ))}
             </div>

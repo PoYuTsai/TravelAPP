@@ -46,7 +46,7 @@ const dayToursQuery = `*[_type == "dayTour"] | order(order asc) {
   location,
   coverImage,
   highlights,
-  basePrice
+  pricingTier
 }`
 
 async function getPackages() {
