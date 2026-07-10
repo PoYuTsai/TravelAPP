@@ -197,7 +197,6 @@ export function buildExternalQuoteBreakdown(
         '車資、油費、過路費、停車費',
         '專業司機',
         ...(input.includeGuide ? ['中文導遊'] : []),
-        '超時費',
         '貼心中文客服',
         ...items
           .filter((item) => !perPersonLabels.has(item.label) && item.label !== '接送機')
@@ -217,6 +216,8 @@ export function buildExternalQuoteBreakdown(
     '機票',
     '個人消費',
     '司機導遊小費',
+    // 超時費按台實收（清邁 10hr、清萊/金三角 12hr 後），不進包含清單
+    isPerPerson ? '超時費（THB 300/小時/台）' : null,
   ].filter((item): item is string => Boolean(item))
 
   const hasPrepaidItems =

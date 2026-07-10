@@ -79,6 +79,19 @@ describe('QuoteCostDashboard 幣別主次分流', () => {
     expect(screen.getByText('22,000 THB')).toBeTruthy()
   })
 
+  it('套餐展示頁（package mode）：不露價格明細區塊', () => {
+    render(
+      <QuoteCostDashboard
+        quote={buildQuote({ pricingModel: 'perPerson', publicPageMode: 'package' })}
+      />
+    )
+
+    expect(screen.queryByText('參考價格明細')).toBeNull()
+    expect(screen.queryByText('價格明細')).toBeNull()
+    // 總價卡仍在
+    expect(screen.getByText(/THB 25,300/)).toBeTruthy()
+  })
+
   it('舊快照（無 pricingModel）：維持 NT$ 大字現行渲染', () => {
     render(<QuoteCostDashboard quote={buildQuote()} />)
 

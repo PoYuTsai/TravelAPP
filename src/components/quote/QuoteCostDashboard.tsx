@@ -732,16 +732,18 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               includedItems={breakdown.items}
             />
 
-            {/* 2. Line Item Breakdown */}
-            <LineItemBreakdown
-              items={breakdown.items}
-              tripDays={quote.tripDays}
-              tripNights={quote.tripNights}
-              adults={quote.adults}
-              childCount={quote.children}
-              isPackageShowcase={isPackageShowcase}
-              isPerPerson={isPerPerson}
-            />
+            {/* 2. Line Item Breakdown — 套餐展示頁不露細項（2026-07-10 Eric 定案），對客只看總價＋包含清單 */}
+            {!isPackageShowcase && (
+              <LineItemBreakdown
+                items={breakdown.items}
+                tripDays={quote.tripDays}
+                tripNights={quote.tripNights}
+                adults={quote.adults}
+                childCount={quote.children}
+                isPackageShowcase={isPackageShowcase}
+                isPerPerson={isPerPerson}
+              />
+            )}
 
             {/* 3. Total Quote Card */}
             <TotalQuoteCard
