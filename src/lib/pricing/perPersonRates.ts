@@ -32,9 +32,9 @@ export const PER_PERSON_DAY_MARKUP = 150
 /** 持證中文導遊（THB/日） */
 export const GUIDE_FEE_PER_DAY = 2500
 
-/** 機場日佔位 ≥8 自動加行李車（THB/趟，攤入該日團費） */
+/** 單車載客達 7 位時需確認行李空間；確認需要後才加行李車 */
 export const LUGGAGE_VAN_FEE = 700
-export const LUGGAGE_VAN_SEAT_THRESHOLD = 8
+export const LUGGAGE_VAN_SEAT_THRESHOLD = 7
 
 /** 僅接送日（接機/送機無排行程）按車收單趟價，不算一日團費 */
 export const AIRPORT_TRANSFER_FEES: Record<Vehicle, number> = {
@@ -70,21 +70,40 @@ export interface Fleet {
   guideAllowed: boolean
 }
 
-/** 座位硬規則：2-3 轎車；4-7 van 導遊選配；8-9 van 必配導遊；10+ 兩台 */
+/** 配車規則：2-3 轎車；4-9 一台 van；10+ 兩台 van。中文導遊皆可選配。 */
 export function resolveFleet(occupiedSeats: number): Fleet {
   if (!Number.isInteger(occupiedSeats) || occupiedSeats < 1) {
     throw new Error(`佔位人數無效：${occupiedSeats}`)
   }
   if (occupiedSeats <= 3) {
-    return { vehicle: 'sedan', carCount: 1, guideRequired: false, guideAllowed: false }
+    return { vehicle: 'sedan', carCount: 1, guideRequired: false, guideAllowed: true }
   }
   if (occupiedSeats <= 7) {
     return { vehicle: 'van', carCount: 1, guideRequired: false, guideAllowed: true }
   }
   if (occupiedSeats <= 9) {
-    return { vehicle: 'van', carCount: 1, guideRequired: true, guideAllowed: true }
+    return { vehicle: 'van', carCount: 1, guideRequired: false, guideAllowed: true }
   }
-  return { vehicle: 'van', carCount: 2, guideRequired: true, guideAllowed: true }
+  return { vehicle: 'van', carCount: 2, guideRequired: false, guideAllowed: true }
+}
+
+/** 平均配車後，計算有幾台車載客達 7 位，需要逐台確認行李空間。 */
+export function countLuggageCheckCars(occupiedSeats: number, carCount: number): number {
+  if (!Number.isInteger(occupiedSeats) || occupiedSeats < 0) {
+    throw new Error(`佔位人數無效：${occupiedSeats}`)
+  }
+  if (!Number.isInteger(carCount) || carCount < 1) {
+    throw new Error(`車輛數無效：${carCount}`)
+  }
+
+  const basePerCar = Math.floor(occupiedSeats / carCount)
+  const remainder = occupiedSeats % carCount
+  let checkCount = 0
+  for (let index = 0; index < carCount; index += 1) {
+    const passengers = basePerCar + (index < remainder ? 1 : 0)
+    if (passengers >= LUGGAGE_VAN_SEAT_THRESHOLD) checkCount += 1
+  }
+  return checkCount
 }
 
 export function roundUpTo50(amount: number): number {
@@ -136,6 +155,8 @@ export interface TripAddons {
   insurancePersons?: number
   /** 司導過夜房數合計（750/房/晚，攤入每人價） */
   overnightRoomNights?: number
+  /** 每個含機場接送的行程日，已向客人確認需要的行李車台數 */
+  luggageVansPerAirportDay?: number
 }
 
 export interface TripInput {
@@ -184,10 +205,10 @@ export function calcTrip(input: TripInput): TripQuote {
   const discount = longTripDiscountPerDay(days.length)
 
   const perPersonDayPrices = days.map((day) => {
-    const luggage =
-      day.isAirportDay && occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD
-        ? LUGGAGE_VAN_FEE
-        : 0
+    const confirmedLuggageVans = addons.luggageVansPerAirportDay ?? 0
+    const luggage = day.isAirportDay
+      ? Math.max(0, confirmedLuggageVans) * LUGGAGE_VAN_FEE
+      : 0
     const total = dayTotalThb(day.tier, occupiedSeats, guided, luggage)
     return roundUpTo50(total / occupiedSeats) - discount
   })

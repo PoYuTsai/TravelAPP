@@ -1,5 +1,7 @@
 # 刀5 規格：對外一日遊價目圖 ＋ 夥伴快查卡（2026-07-10 定案）
 
+> **已被新規則取代：** 本文件保留作為舊圖規格紀錄。接送機行李車請以 `2026-07-11-public-pricing-alignment.md` 為準：每台 Van 載客達 7 位須逐台確認行李與嬰兒車，確認需要後才加 THB 700／台／趟，不再自動加價。
+
 > 前置定案見 `2026-07-10-per-person-pricing-framework.md`、`2026-07-10-package-pricing-proposal.md`。
 > 分工：GPT 5.6 生圖，CC 出本規格；夥伴快查卡為純文字，Eric 直接貼 LINE 群。
 

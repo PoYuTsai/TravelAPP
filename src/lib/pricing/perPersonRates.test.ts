@@ -4,6 +4,7 @@ import {
   DEFAULT_THB_PER_TWD,
   calcPerPersonDay,
   calcTrip,
+  countLuggageCheckCars,
   resolveFleet,
 } from '@/lib/pricing/perPersonRates'
 
@@ -14,12 +15,12 @@ describe('純接送日按車收（framework 第 5 節規則 2）', () => {
 })
 
 describe('resolveFleet', () => {
-  it('assigns sedan without guide for 2-3 seats', () => {
+  it('assigns sedan with an optional guide for 2-3 seats', () => {
     expect(resolveFleet(2)).toEqual({
       vehicle: 'sedan',
       carCount: 1,
       guideRequired: false,
-      guideAllowed: false,
+      guideAllowed: true,
     })
     expect(resolveFleet(3).vehicle).toBe('sedan')
   })
@@ -34,14 +35,14 @@ describe('resolveFleet', () => {
     expect(resolveFleet(7).guideRequired).toBe(false)
   })
 
-  it('requires licensed guide for 8-9 seats', () => {
+  it('keeps the guide optional for 8-9 seats', () => {
     expect(resolveFleet(8)).toEqual({
       vehicle: 'van',
       carCount: 1,
-      guideRequired: true,
+      guideRequired: false,
       guideAllowed: true,
     })
-    expect(resolveFleet(9).guideRequired).toBe(true)
+    expect(resolveFleet(9).guideRequired).toBe(false)
   })
 
   it('requires two cars for 10+ seats', () => {
@@ -55,7 +56,9 @@ describe('resolveFleet', () => {
 })
 
 describe('calcPerPersonDay — 對照 framework 第 6 節價目表', () => {
-  it('matches the guided van table (8-9 guide forced)', () => {
+  it('matches the guided table for 2-9 seats', () => {
+    expect(calcPerPersonDay('T1', 2, true)).toBe(3550)
+    expect(calcPerPersonDay('T4', 3, true)).toBe(3250)
     expect(calcPerPersonDay('T1', 4, true)).toBe(2050)
     expect(calcPerPersonDay('T2', 5, true)).toBe(1850)
     expect(calcPerPersonDay('T3', 7, true)).toBe(1550)
@@ -63,10 +66,12 @@ describe('calcPerPersonDay — 對照 framework 第 6 節價目表', () => {
     expect(calcPerPersonDay('T1', 8, true)).toBe(1100)
   })
 
-  it('matches the no-guide van table (4-7 only)', () => {
+  it('matches the no-guide van table for 4-9 seats', () => {
     expect(calcPerPersonDay('T1', 4, false)).toBe(1400)
     expect(calcPerPersonDay('T2', 6, false)).toBe(1150)
     expect(calcPerPersonDay('T4', 7, false)).toBe(1350)
+    expect(calcPerPersonDay('T1', 8, false)).toBe(800)
+    expect(calcPerPersonDay('T4', 9, false)).toBe(1050)
   })
 
   it('matches the sedan table (2-3, never guided)', () => {
@@ -76,12 +81,8 @@ describe('calcPerPersonDay — 對照 framework 第 6 節價目表', () => {
     expect(calcPerPersonDay('T4', 3, false)).toBe(2400)
   })
 
-  it('forces guide pricing at 8-9 even if withGuide=false is passed', () => {
-    expect(calcPerPersonDay('T1', 8, false)).toBe(1100)
-  })
-
-  it('ignores withGuide=true for sedan groups', () => {
-    expect(calcPerPersonDay('T1', 2, true)).toBe(2300)
+  it('adds guide pricing when a sedan group selects a guide', () => {
+    expect(calcPerPersonDay('T1', 2, true)).toBe(3550)
   })
 })
 
@@ -117,7 +118,7 @@ describe('calcTrip — 單日基本盤', () => {
     expect(trip.totalThb).toBe(4 * 1400 + 2 * 1120)
   })
 
-  it('counts infants toward the seat bracket and forces guide at 8', () => {
+  it('counts infants toward the seat bracket without forcing a guide at 8', () => {
     const trip = calcTrip({
       days: [{ tier: 'T1' }],
       adults: 6,
@@ -126,10 +127,10 @@ describe('calcTrip — 單日基本盤', () => {
       withGuide: false,
     })
     expect(trip.occupiedSeats).toBe(8)
-    expect(trip.fleet.withGuide).toBe(true)
-    expect(trip.perPerson.adult).toBe(1100)
-    expect(trip.perPerson.infant).toBe(550)
-    expect(trip.totalThb).toBe(6 * 1100 + 2 * 550)
+    expect(trip.fleet.withGuide).toBe(false)
+    expect(trip.perPerson.adult).toBe(800)
+    expect(trip.perPerson.infant).toBe(400)
+    expect(trip.totalThb).toBe(6 * 800 + 2 * 400)
   })
 
   it('throws for 10+ seats (拆兩單)', () => {
@@ -146,7 +147,7 @@ describe('calcTrip — 單日基本盤', () => {
 })
 
 describe('calcTrip — 機場日行李車', () => {
-  it('adds the 700 THB luggage van into the day price when seats >= 8', () => {
+  it('does not add a luggage van from headcount alone', () => {
     const trip = calcTrip({
       days: [{ tier: 'T1', isAirportDay: true }],
       adults: 8,
@@ -154,19 +155,29 @@ describe('calcTrip — 機場日行李車', () => {
       infants: 0,
       withGuide: true,
     })
-    // (4000 + 2500 + 1000 + 8×150 + 700) / 8 = 1175 → 1200
-    expect(trip.perPerson.adult).toBe(1200)
+    expect(trip.perPerson.adult).toBe(1100)
   })
 
-  it('does not add a luggage van below 8 seats', () => {
+  it('adds the confirmed luggage van count to an airport service day', () => {
     const trip = calcTrip({
       days: [{ tier: 'T1', isAirportDay: true }],
-      adults: 6,
+      adults: 8,
       children: 0,
       infants: 0,
       withGuide: true,
+      addons: { luggageVansPerAirportDay: 1 },
     })
-    expect(trip.perPerson.adult).toBe(1400)
+    expect(trip.perPerson.adult).toBe(1200)
+  })
+})
+
+describe('countLuggageCheckCars', () => {
+  it('checks each car separately once that car carries 7 or more guests', () => {
+    expect(countLuggageCheckCars(6, 1)).toBe(0)
+    expect(countLuggageCheckCars(7, 1)).toBe(1)
+    expect(countLuggageCheckCars(13, 2)).toBe(1)
+    expect(countLuggageCheckCars(14, 2)).toBe(2)
+    expect(countLuggageCheckCars(18, 2)).toBe(2)
   })
 })
 

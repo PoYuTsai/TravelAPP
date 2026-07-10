@@ -42,25 +42,37 @@ describe('buildPerPersonQuote', () => {
     { name: '送機', type: 'airport' },
   ]
 
-  it('8 人：5 個整日進引擎、送機日按車收 van 700＋行李車 700', () => {
+  it('8 人未確認行李車：送機只收 van 700，並標示需確認一台車的行李', () => {
     const result = buildPerPersonQuote({
       days: sixDays,
       adults: 6,
       children: 2,
       infants: 0,
-      withGuide: false, // 8 人強制導遊，應被覆寫
+      withGuide: false,
     })
     expect(result.splitOrderRequired).toBe(false)
-    expect(result.guided).toBe(true)
+    expect(result.guided).toBe(false)
     expect(result.fleet?.vehicle).toBe('van')
-    // 送機日：van 700 × 1 台 ＋ ≥8 人行李車 700
-    expect(result.transferFee).toBe(1400)
+    expect(result.luggageCheckCarCount).toBe(1)
+    expect(result.transferFee).toBe(700)
     expect(result.trip).not.toBeNull()
     expect(result.trip!.perPersonDayPrices).toHaveLength(5)
-    expect(result.groupTourPrice).toBe(result.trip!.totalThb + 1400)
+    expect(result.groupTourPrice).toBe(result.trip!.totalThb + 700)
   })
 
-  it('整日接機日會攤入行李車（isAirportDay 傳進引擎）', () => {
+  it('adds a luggage van only after it is explicitly confirmed', () => {
+    const result = buildPerPersonQuote({
+      days: sixDays,
+      adults: 8,
+      children: 0,
+      infants: 0,
+      withGuide: false,
+      luggageVansPerAirportDay: 1,
+    })
+    expect(result.transferFee).toBe(1400)
+  })
+
+  it('整日接機日不因人數自動攤入行李車', () => {
     const result = buildPerPersonQuote({
       days: sixDays,
       adults: 8,
@@ -84,7 +96,7 @@ describe('buildPerPersonQuote', () => {
     expect(result.trip!.totalThb).toBe(expected.totalThb)
   })
 
-  it('3 人轎車不配導遊，withGuide=true 也被覆寫為 false；接送按轎車 500', () => {
+  it('3 人轎車可選中文導遊；接送仍按轎車 500', () => {
     const result = buildPerPersonQuote({
       days: sixDays,
       adults: 2,
@@ -92,7 +104,7 @@ describe('buildPerPersonQuote', () => {
       infants: 0,
       withGuide: true,
     })
-    expect(result.guided).toBe(false)
+    expect(result.guided).toBe(true)
     expect(result.fleet?.vehicle).toBe('sedan')
     // 送機日：sedan 500 × 1 台，人數 <8 無行李車
     expect(result.transferFee).toBe(500)

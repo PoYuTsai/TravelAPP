@@ -65,6 +65,7 @@ const siteConnectSources = uniqueSources([
   'https://*.analytics.google.com',
   'https://www.googleadservices.com',
   'https://googleads.g.doubleclick.net',
+  'https://ad.doubleclick.net',
   'https://stats.g.doubleclick.net',
   'https://*.g.doubleclick.net',
   'https://pagead2.googlesyndication.com',

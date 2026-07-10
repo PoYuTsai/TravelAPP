@@ -21,7 +21,7 @@
 - `resolveFleet(occupiedSeats)` → 車型/台數/導遊是否必配（2-3 轎車；4-7 van 導遊選配；8-9 van＋必配導遊；10+ 兩台）
 - `calcPerPersonDay(tier, groupSize, withGuide)` → 每人日價
 - `calcTrip({ days:[{tier, isAirportDay}], adults, children, infants, addons })` → 總價＋售價結構 items
-- 規則內建：機場日佔位 ≥8 自動加行李車 700/趟；級距用總佔位數、收費分三段
+- 規則內建：接送機每台 Van 載客達 7 位須逐台確認；確認需要後才加行李車 700／台／趟。級距用總佔位數、收費分三段
 - 匯率 fallback 統一（後台 0.93 vs 前台 `fetchQuote.ts:169` 的 1.1 目前不一致，一併修）
 
 ## Phase 1 — 後台報價器（PricingCalculator.tsx）

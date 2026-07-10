@@ -7,8 +7,8 @@
 import {
   AIRPORT_TRANSFER_FEES,
   LUGGAGE_VAN_FEE,
-  LUGGAGE_VAN_SEAT_THRESHOLD,
   calcTrip,
+  countLuggageCheckCars,
   resolveFleet,
   type Fleet,
   type Tier,
@@ -33,7 +33,7 @@ export function dayTypeToTier(type: string): Tier | 'transfer' {
   }
 }
 
-/** 整日行程中含接機/送機 → 機場日（佔位 ≥8 引擎自動攤行李車） */
+/** 整日行程中含接機/送機 → 機場日；行李車僅在逐車確認需要後計入 */
 export function isAirportServiceDay(name: string): boolean {
   return /接機|送機|機場/.test(name)
 }
@@ -49,17 +49,21 @@ export interface PerPersonQuoteInput {
   children: number // 3-11 歲
   infants: number // 0-2 歲
   withGuide: boolean
+  /** 每個機場接送日已確認需要的行李車台數；未確認時為 0 */
+  luggageVansPerAirportDay?: number
 }
 
 export interface PerPersonQuoteResult {
   occupiedSeats: number
   fleet: Fleet | null
-  /** 座位規則收斂後實際是否配導遊（8-9 強制、2-3 轎車不配） */
+  /** 依客人選擇決定是否配中文導遊 */
   guided: boolean
+  /** 平均配車後，有幾台載客達 7 位，需逐台確認行李空間 */
+  luggageCheckCarCount: number
   /** 佔位 ≥10 需兩台車 → 拆兩張單各自計價 */
   splitOrderRequired: boolean
   trip: TripQuote | null
-  /** 純接送日合計（按車收，含 ≥8 行李車） */
+  /** 純接送日合計（按車收，另含已確認需要的行李車） */
   transferFee: number
   transferTrips: number
   /** 團費售價總額 = 引擎人頭總價 + 接送費（拆單時為 0） */
@@ -70,6 +74,7 @@ const EMPTY_RESULT: PerPersonQuoteResult = {
   occupiedSeats: 0,
   fleet: null,
   guided: false,
+  luggageCheckCarCount: 0,
   splitOrderRequired: false,
   trip: null,
   transferFee: 0,
@@ -78,12 +83,20 @@ const EMPTY_RESULT: PerPersonQuoteResult = {
 }
 
 export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteResult {
-  const { days, adults, children, infants, withGuide } = input
+  const {
+    days,
+    adults,
+    children,
+    infants,
+    withGuide,
+    luggageVansPerAirportDay = 0,
+  } = input
   const occupiedSeats = adults + children + infants
   if (occupiedSeats < 1) return EMPTY_RESULT
 
   const fleet = resolveFleet(occupiedSeats)
   const guided = fleet.guideRequired ? true : fleet.guideAllowed ? withGuide : false
+  const luggageCheckCarCount = countLuggageCheckCars(occupiedSeats, fleet.carCount)
 
   if (fleet.carCount > 1) {
     return {
@@ -91,6 +104,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
       occupiedSeats,
       fleet,
       guided,
+      luggageCheckCarCount,
       splitOrderRequired: true,
     }
   }
@@ -103,21 +117,29 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     }))
 
   const transferTrips = days.length - tripDays.length
-  const luggagePerTrip =
-    occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD ? LUGGAGE_VAN_FEE : 0
+  const confirmedLuggageFeePerTrip =
+    Math.max(0, luggageVansPerAirportDay) * LUGGAGE_VAN_FEE
   const transferFee =
     transferTrips *
-    (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + luggagePerTrip)
+    (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + confirmedLuggageFeePerTrip)
 
   const trip =
     tripDays.length > 0
-      ? calcTrip({ days: tripDays, adults, children, infants, withGuide: guided })
+      ? calcTrip({
+          days: tripDays,
+          adults,
+          children,
+          infants,
+          withGuide: guided,
+          addons: { luggageVansPerAirportDay },
+        })
       : null
 
   return {
     occupiedSeats,
     fleet,
     guided,
+    luggageCheckCarCount,
     splitOrderRequired: false,
     trip,
     transferFee,
