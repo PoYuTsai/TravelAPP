@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { client } from '@/sanity/client'
-import { SITEWIDE_METADATA_DESCRIPTION } from '@/lib/home-public-copy'
+import { HOME_PUBLIC_COPY, SITEWIDE_METADATA_DESCRIPTION } from '@/lib/home-public-copy'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 
 // ISR: Revalidate every 60 seconds
@@ -46,14 +46,13 @@ import CTA from '@/components/sections/CTA'
 import HomePageFaqSchema from '@/components/schema/HomePageFaqSchema'
 
 const landingPageQuery = `*[_type == "landingPage"][0]{
-  heroBackgroundImage,
+  heroBackgroundImage{
+    asset
+  },
   whoWeAreVideoUrl,
   whoWeAreVideoPoster,
   whoWeAreVideoAspect,
   whoWeAreStoryLink,
-  whoWeAreStoryLinkText,
-  articlesSectionTitle,
-  articlesSectionSubtitle,
   articlesShowCount
 }`
 
@@ -83,13 +82,12 @@ export default async function Home() {
         videoPoster={data?.whoWeAreVideoPoster}
         videoAspect={data?.whoWeAreVideoAspect}
         storyLink={data?.whoWeAreStoryLink || '/blog/eric-story-taiwan-to-chiang-mai'}
-        storyLinkText={data?.whoWeAreStoryLinkText || '閱讀我們的故事'}
       />
       <ToursPreview />
       <Testimonials />
       <FeaturedArticles
-        sectionTitle={data?.articlesSectionTitle}
-        sectionSubtitle={data?.articlesSectionSubtitle}
+        sectionTitle={HOME_PUBLIC_COPY.articles.sectionTitle}
+        sectionSubtitle={HOME_PUBLIC_COPY.articles.sectionSubtitle}
         showCount={data?.articlesShowCount}
       />
       <CTA />

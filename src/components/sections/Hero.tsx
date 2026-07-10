@@ -9,7 +9,7 @@ import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
 const blurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAgEDBAMBAAAAAAAAAAAAAQIDAAQRBQYSIRMxQWH/xAAVAQEBAAAAAAAAAAAAAAAAAAAAAf/EABYRAQEBAAAAAAAAAAAAAAAAAAABEf/aAAwDAQACEQMRAD8AotuXM19qN5cXEhmWOdkjQnpFXrgA/PtZpSlIr//Z'
 
 interface HeroProps {
-  backgroundImage?: { asset: SanityImageSource; alt?: string }
+  backgroundImage?: { asset: SanityImageSource }
 }
 
 export default function Hero({
@@ -25,7 +25,7 @@ export default function Hero({
       <div className="relative w-full aspect-[2/1] bg-primary-light">
         <Image
           src={heroImageSrc}
-          alt={backgroundImage?.alt || '清微旅行 - 清邁親子包車'}
+          alt={HOME_PUBLIC_COPY.hero.imageAlt}
           fill
           sizes="100vw"
           className="object-cover object-center"

@@ -14,7 +14,6 @@ interface WhoWeAreProps {
   videoPoster?: any
   videoAspect?: 'portrait' | 'landscape' | 'square' | 'responsive'
   storyLink?: string
-  storyLinkText?: string
 }
 
 export default function WhoWeAre({
@@ -22,7 +21,6 @@ export default function WhoWeAre({
   videoPoster,
   videoAspect = 'responsive',
   storyLink = '/blog/eric-story-taiwan-to-chiang-mai',
-  storyLinkText = '閱讀我們的故事',
 }: WhoWeAreProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -123,7 +121,7 @@ export default function WhoWeAre({
             href={storyLink}
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full transition-colors group"
           >
-            {storyLinkText}
+            {HOME_PUBLIC_COPY.whoWeAre.storyLinkText}
             <svg
               className="w-5 h-5 transform transition-transform group-hover:translate-x-1"
               fill="none"

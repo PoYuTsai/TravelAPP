@@ -11,6 +11,7 @@ export const SITEWIDE_METADATA_DESCRIPTION =
 
 export const HOME_PUBLIC_COPY = {
   hero: {
+    imageAlt: '清微旅行清邁親子包車家庭旅遊服務',
     title: '爸媽開的清邁親子包車',
     subtitle: '台灣爸爸 Eric × 泰國媽媽 Min，陪你把親子行程先安排好',
     description: `${STANDARD_SERVICE_POLICY}${PAID_CHILD_SEAT_POLICY}`,
@@ -26,6 +27,11 @@ export const HOME_PUBLIC_COPY = {
       { text: '行程事先確認，旅途中提供 LINE 中文支援' },
       { text: '需要隨車中文溝通或導覽時，中文導遊依需求選配' },
     ],
+    storyLinkText: '閱讀我們的故事',
+  },
+  articles: {
+    sectionTitle: '精選文章',
+    sectionSubtitle: '在地爸媽的清邁旅遊攻略',
   },
   cta: {
     title: '先把你們家的清邁行程聊清楚',
