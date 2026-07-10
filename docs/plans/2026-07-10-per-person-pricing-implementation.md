@@ -59,12 +59,14 @@
 | 順序 | 內容 | 依賴 |
 |------|------|------|
 | 刀1 ✅ | Phase 0 引擎＋tests（2026-07-10 完成，a189e0e） | 無 |
-| 刀2 | Phase 1 報價器 | 刀1 |
+| 刀2 ✅ | Phase 1 報價器（2026-07-10 完成，eae12ed） | 刀1 |
 | 刀3 | Phase 2 前台報價頁＋重出三張套餐報價 | 刀2 |
 | 刀4 | Phase 3 公開價目頁 | 刀1（可與刀3 並行） |
 | 刀5 | Phase 4 選單＋快查卡 | 刀4 上線後 |
 
 刀1 完成紀錄（a189e0e）：`src/lib/pricing/perPersonRates.ts`＋22 unit tests；匯率 fallback 單一事實來源 `DEFAULT_THB_PER_TWD=1.1`（TWD=THB÷rate；後台舊值 0.93 是方向錯誤、TWD 會灌水 ~7.5%，`PricingCalculator` 三處與 `src/lib/quote/fetchQuote.ts:169` 均改引常數）。
+
+刀2 完成紀錄（eae12ed）：引擎補 `AIRPORT_TRANSFER_FEES`（純接送日按車收 500/700，第5節規則2）；新增 `perPersonAdapter.ts`（type→tier 映射含 goldentriangle T4、機場日 name 推斷、10+ 拆單降級）；報價器三欄人數（嬰兒佔位計級距、餐費排除）、resolveFleet 配車、售價=人頭團費（黃表降內部成本毛利參考）、10+ 擋下載/產連結；externalQuote perPerson 售價結構 items＋`_quoteSnapshot.pricingModel:'perPerson'`（舊 snapshot 路徑不動）；載入舊 quote 匯率 <0.9 自動重設 1.1。Review 遺留建議（未做）：needLuggageCar 文案純看人數不看有無機場日、對外 tab「÷N 成人」舊口徑殘留、`downloadExternalQuote` dead code 可刪、保險改含嬰兒 +100/人需 Eric 確認。
 
 風險：
 - 舊 snapshot 相容（前台以 `pricingModel` 判別，舊格式走現行路徑）
