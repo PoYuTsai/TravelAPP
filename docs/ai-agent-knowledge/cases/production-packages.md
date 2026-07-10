@@ -1,8 +1,8 @@
 # Production Packages
 
-> These are representative package structures from the Chiangway LINE rich menu and confirmed client cases. They are reference templates — actual pricing and itinerary details vary per case and must be confirmed with Eric.
+> These are representative package structures from the Chiangway LINE rich menu and confirmed client cases. They are reference templates — case-specific itinerary details and final mixed-age totals vary, but the current rates and rules explicitly marked below are locked.
 >
-> All prices below are placeholders / approximate structures. Always use the internal quote calculator for real pricing. Mark as `需驗證` any price you cannot confirm.
+> The current rates below are not placeholders. Derive the final quote from the internal quote calculator; do not mark a listed locked rate as `需驗證`. Mark only genuinely unlisted or case-specific amounts for human confirmation.
 >
 > **Current service truth (2026-07-10):** the standard arrangement is a Thai driver with itinerary confirmation and LINE Chinese support. A Chinese-speaking guide is optional and is a separate professional role. Passenger count does not automatically force a guide. Use `docs/plans/2026-07-10-per-person-pricing-framework.md` for fleet, family-discount, and manual-quote rules.
 
@@ -10,9 +10,12 @@
 
 - The public all-adult reference range is THB 750–4,750 per person per service day.
 - For 2–3 guests, the default is a sedan with a Thai driver, but a Chinese-speaking guide may be selected at a sell price of THB 2,500/day. This is a normal selectable option, not a forced inclusion and not a manual vehicle exception.
+- Fleet by total occupied seats: 2–3 guests use one sedan, 4–9 use one Van, 10–18 use two Vans, and 19+ is manual. Every adult, child, and infant occupies a seat, so a four-person family is quoted as a Van even when some passengers are children.
 - Publicly, 4–5 guests are always shown and quoted as a Van. An SUV is never a public vehicle or price promise; operations may use one only as an availability-based, same-price internal dispatch/upgrade. A customer-requested SUV or unusual luggage, safety-seat, or seating needs require manual confirmation.
+- Optional insurance is THB 100/person/trip. An airport-only one-way transfer is THB 500 by sedan or THB 700 by Van; a transfer day is not a full charter day.
+- Chiang Mai service includes 10 hours and Chiang Rai/Golden Triangle service includes 12 hours. Allow 30 minutes of on-site flexibility, then charge THB 300/hour/car with no separate guide overtime.
 
-Exact 2–3 guest all-adult reference prices (THB/person/day):
+Locked 2–3 guest all-adult reference prices (THB/person/day):
 
 | Tier | 2 guests, driver only | 2 guests, with guide | 3 guests, driver only | 3 guests, with guide |
 |---|---:|---:|---:|---:|
@@ -50,7 +53,7 @@ D5: Checkout → airport dropoff (departure day per flight time)
 - All meals
 - All attraction tickets (Night Safari, elephant camp, water park listed separately when included)
 - Tips
-- Overtime
+- Overtime after the included hours and 30-minute flexibility: THB 300/hour/car; no separate guide overtime
 
 **Key requirements to collect**:
 - Child ages (for car seats, ticket pricing, pacing)

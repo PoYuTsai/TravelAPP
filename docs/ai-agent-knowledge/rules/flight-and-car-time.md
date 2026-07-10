@@ -24,7 +24,7 @@
 | 10:00–14:00 | Light morning stop (1 stop max, near airport or en route) |
 | After 14:00 | Half-day touring possible; confirm with team |
 
-**Rule**: Point transfer (接送機) is typically priced as one-day car fee. See quote-included-excluded.md for pricing exceptions.
+**Rule**: A pure airport-only one-way transfer is THB 500 by sedan or THB 700 by Van; it is not a full charter day. If the day also contains meaningful touring, use the applicable charter-day price.
 
 ## Car Time Standards
 
@@ -33,7 +33,7 @@
 - Typical depart 08:30 → return 18:30.
 - City circuit stops within 10h easily for 3–4 attractions.
 
-### Chiang Rai (清萊)
+### Chiang Rai / Golden Triangle (清萊／金三角)
 - **Standard day**: 12 hours car time included.
 - Departure by 07:00–07:30 from Chiang Mai hotel.
 - Allows: White Temple (白廟), Blue Temple (藍廟), Baan Dam (黑屋), Golden Triangle (金三角), optional Singha Park (幸福農場) on the way back.
@@ -46,27 +46,32 @@
 
 ## Overtime Policy
 
-- 需驗證: Exact overtime rate — web-search or confirm with Eric before quoting.
-- Standard practice: overtime is charged per hour after the included car time.
-- Overtime applies per vehicle per hour; round up to nearest hour.
+- Chiang Mai includes 10 hours; Chiang Rai and Golden Triangle include 12 hours.
+- Allow 30 minutes of on-site flexibility after the included car time.
+- After that flexibility, overtime is THB 300 per hour per vehicle.
+- Do not add a separate guide overtime charge.
 - Must be listed as "超時費" in the quote excluded items if not pre-included.
 
 ## Point Transfer Pricing
 
-- Airport or train station pickup/dropoff on arrival or departure day.
-- Usually priced at one-day car fee (same as a full charter day).
+- Airport-only pickup/dropoff on an arrival or departure day is one-way: THB 500 by sedan or THB 700 by Van.
+- Train-station and other point transfers are not covered by the airport-only fixed price unless explicitly confirmed.
 - **Exception cases requiring manual judgment**: mountain resort (e.g., Doi Inthanon resort), elephant camp resort, or any dropoff > 45 min from Chiang Mai city that returns same-day.
 - If the same day includes both a point transfer AND significant touring, charge as a full-day charter, not a point transfer.
 
 ## Car Count Guidelines
 
-| Group size | Car recommendation |
+| Total occupied passengers | Car recommendation |
 |-----------|-------------------|
-| 1–6 adults + 0–2 children | 1 large van (7–10 seats) |
-| 7–10 adults + children | 2 cars |
-| 11+ adults | 2–3 cars; confirm with Eric |
+| 1 | Manual confirmation |
+| 2–3 | 1 sedan |
+| 4–9 | 1 Toyota Commuter 10-seat Van |
+| 10–18 | 2 Toyota Commuter 10-seat Vans |
+| 19+ | Manual fleet and quote confirmation |
 
-Car count affects day fee math. Confirm before finalizing quote.
+Every adult, child, and infant occupies a passenger seat. Therefore a four-person family uses Van pricing even when some passengers are children. A child seat is installed on that child's seat and does not add another passenger.
+
+SUV is not a public vehicle or price option. It may appear only as an availability-based, same-price internal dispatch/upgrade for a Van booking; a customer-requested SUV or unusual luggage/seating requirement is manual.
 
 ## Known Closure / Transfer Special Notes (需驗證 — web-search before use)
 

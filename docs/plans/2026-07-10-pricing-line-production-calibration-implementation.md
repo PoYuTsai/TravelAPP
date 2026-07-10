@@ -22,13 +22,14 @@
 Add tests that require:
 
 - `resolveFleet(9)` → one Van, `resolveFleet(10|18)` → two Vans.
-- `resolveFleet(19|27)` → three Vans and manual quote.
-- `resolveFleet(28)` → four Vans and manual quote.
+- `resolveFleet(19|27|28)` → `manualQuoteRequired: true`; any computed Van count is an internal capacity estimate, never a public automatic fleet or final price.
 - No fleet automatically sets `guideRequired` because of passenger count.
 - `resolveGuidePricing(1, true)` → cost 1,500, sell 2,500.
 - `resolveGuidePricing(2, true)` → cost 2,000, sell 2,500.
 - `resolveGuidePricing(3, true)` → cost 2,500 and manual quote because the sell anchor is unset.
-- A guided 2–3-person request is manual vehicle confirmation rather than a Chinese-driver fallback.
+- A guided 2–3-person request is a normal automatic sedan quote, never a Chinese-driver fallback.
+- The exact guided-sedan prices are locked: T1 `3,550／2,450`, T2 `3,800／2,600`, T3 `4,450／3,050`, and T4 `4,750／3,250` for 2／3 guests respectively.
+- Four occupied seats resolve to one Van even when the group contains children.
 
 **Step 2: Run the targeted test and confirm RED**
 
@@ -62,6 +63,7 @@ Cover at minimum:
 - T2 guided, two Vans, `3A+4C+3I` → floor THB 14,100.
 - Adding one adult, child, or infant never lowers the core group fare for every T1–T4, guided/unguided, valid 2–18-person combination with at least one adult.
 - Child seat and insurance remain fully additive after protection.
+- Insurance is optional at THB 100/person/trip; an airport-only one-way transfer is THB 500 by sedan or THB 700 by Van and is not a full charter day.
 
 **Step 5: Run tests and confirm RED**
 
@@ -168,6 +170,9 @@ Assert that rendered pricing/service copy:
 - Shows 4–9 and 10–18 configurations.
 - Says infants occupy seats and family discounts are subject to a minimum group fare.
 - Shows THB 300/hour/car overtime and THB 500/day/seat child seat.
+- Shows Chiang Mai 10 hours, Chiang Rai/Golden Triangle 12 hours, 30-minute flexibility, and no separate guide overtime.
+- Shows optional insurance at THB 100/person/trip and airport-only one-way transfer at THB 500/sedan or THB 700/Van.
+- Keeps 2–3 guided sedan automatic, four occupied seats on Van pricing, and SUV out of the public fleet.
 
 **Step 2: Run tests and confirm RED**
 
@@ -273,6 +278,8 @@ npm.cmd test -- --run src/lib/pricing/production-copy-tripwire.test.ts
 
 - Overtime: city 10 hours, Chiang Rai/Golden Triangle 12 hours, THB 300/hour/car, no separate guide overtime, 30-minute flexibility.
 - Child seat: THB 500/day/seat and occupies one seat.
+- Insurance: optional THB 100/person/trip.
+- Airport-only one-way transfer: sedan THB 500 or Van THB 700; never label it a full charter day.
 - Standard Thai driver, optional Chinese guide.
 - LocalBusiness price range in THB.
 
@@ -313,8 +320,9 @@ Do not ask an image model to typeset Chinese prices. Define:
 
 - 4:5 master artwork and deterministic text overlay.
 - Three pricing cards and six route names, without dense stop lists.
-- Correct 2–3 Thai-driver/no-guide and 4–9 guided-one-day-plan labels.
-- Child/floor disclaimer, add-ons, hours, and 10+ LINE CTA.
+- Three exact-price columns on every T1/T2/T3 card: 2–3 Thai-driver/no-guide, 2–3 guided sedan, and 4–9 guided Van.
+- Child/floor disclaimer, optional insurance, airport-only transfer, child seat, hours/overtime, and 10+ LINE CTA.
+- No SUV label or promise in public artwork; 4–5 guests remain Van pricing.
 
 **Step 3: Add LINE six-grid production spec**
 
