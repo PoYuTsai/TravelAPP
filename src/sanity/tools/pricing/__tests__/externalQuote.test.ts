@@ -94,6 +94,103 @@ describe('pricing external quote breakdown', () => {
     expect(breakdown.paymentNotes.join(' ')).not.toContain('70%')
   })
 
+  it('perPerson 模式：items 改售價結構（大人/兒童/接送機），不出現成本拆項', () => {
+    const breakdown = buildExternalQuoteBreakdown({
+      pricingModel: 'perPerson',
+      perPersonItems: [
+        { label: '大人', quantity: 6, unitPriceThb: 7750, subtotalThb: 46500 },
+        { label: '兒童（3-11歲）', quantity: 2, unitPriceThb: 6200, subtotalThb: 12400 },
+      ],
+      transferFee: 1400,
+      transferTrips: 1,
+      includeAccommodation: false,
+      includeMeals: false,
+      includeGuide: true,
+      includeInsurance: true,
+      accommodationCost: 0,
+      mealCost: 0,
+      carPriceTotal: 60300,
+      guidePrice: 0,
+      luggageCost: 0,
+      childSeatCost: 2500,
+      ticketPrice: 0,
+      thaiDressPrice: 0,
+      insuranceCost: 800,
+      totalPrice: 63600,
+      exchangeRate: 1.1,
+      totalNights: 0,
+      mealDays: 0,
+      guideDays: 5,
+      carServiceDays: 6,
+      carCount: 1,
+      childSeatDays: 5,
+      totalChildSeatCount: 1,
+      selectedTicketCount: 0,
+      hasThaiDress: false,
+      travelerCount: 8,
+    })
+
+    const labels = breakdown.items.map((item) => item.label)
+    expect(labels).toEqual(['大人', '兒童（3-11歲）', '接送機', '兒童安全座椅', '旅遊保險'])
+    expect(labels).not.toContain('包車費用')
+    expect(labels).not.toContain('中文導遊')
+    expect(labels).not.toContain('行李加大車')
+
+    const adult = breakdown.items.find((item) => item.label === '大人')
+    expect(adult?.amountTHB).toBe(46500)
+    expect(adult?.amountTWD).toBe(Math.round(46500 / 1.1))
+    expect(adult?.description).toBe('6 位 × 7,750')
+    expect(
+      breakdown.items.find((item) => item.label === '接送機')?.description
+    ).toBe('1 趟（按車計）')
+
+    // included 是服務清單而不是計價人頭
+    expect(breakdown.included).toContain('中文導遊')
+    expect(breakdown.included).toContain('車資、油費、過路費、停車費')
+    expect(breakdown.included).not.toContain('大人')
+    expect(breakdown.excluded).not.toContain('中文導遊')
+    expect(breakdown.totalTHB).toBe(63600)
+  })
+
+  it('perPerson 模式：不含導遊時 included 無導遊、excluded 有導遊', () => {
+    const breakdown = buildExternalQuoteBreakdown({
+      pricingModel: 'perPerson',
+      perPersonItems: [
+        { label: '大人', quantity: 4, unitPriceThb: 6000, subtotalThb: 24000 },
+      ],
+      transferFee: 0,
+      transferTrips: 0,
+      includeAccommodation: false,
+      includeMeals: false,
+      includeGuide: false,
+      includeInsurance: false,
+      accommodationCost: 0,
+      mealCost: 0,
+      carPriceTotal: 24000,
+      guidePrice: 0,
+      luggageCost: 0,
+      childSeatCost: 0,
+      ticketPrice: 0,
+      thaiDressPrice: 0,
+      insuranceCost: 0,
+      totalPrice: 24000,
+      exchangeRate: 1.1,
+      totalNights: 0,
+      mealDays: 0,
+      guideDays: 0,
+      carServiceDays: 4,
+      carCount: 1,
+      childSeatDays: 0,
+      totalChildSeatCount: 0,
+      selectedTicketCount: 0,
+      hasThaiDress: false,
+    })
+
+    expect(breakdown.items.map((item) => item.label)).toEqual(['大人'])
+    expect(breakdown.included).not.toContain('中文導遊')
+    expect(breakdown.excluded).toContain('中文導遊')
+  })
+
   it('keeps self-booked accommodation nights out of the included accommodation total', () => {
     const breakdown = buildExternalQuoteBreakdown({
       includeAccommodation: true,

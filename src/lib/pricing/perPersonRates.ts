@@ -36,6 +36,12 @@ export const GUIDE_FEE_PER_DAY = 2500
 export const LUGGAGE_VAN_FEE = 700
 export const LUGGAGE_VAN_SEAT_THRESHOLD = 8
 
+/** 僅接送日（接機/送機無排行程）按車收單趟價，不算一日團費 */
+export const AIRPORT_TRANSFER_FEES: Record<Vehicle, number> = {
+  sedan: 500,
+  van: 700,
+}
+
 /** 收費三段制 */
 export const CHILD_PRICE_RATIO = 0.8 // 3-11 歲
 export const INFANT_PRICE_RATIO = 0.5 // 0-2 歲

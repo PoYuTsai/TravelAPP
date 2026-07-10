@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AIRPORT_TRANSFER_FEES,
   DEFAULT_THB_PER_TWD,
   calcPerPersonDay,
   calcTrip,
   resolveFleet,
 } from '@/lib/pricing/perPersonRates'
+
+describe('純接送日按車收（framework 第 5 節規則 2）', () => {
+  it('接送機單趟：轎車 500 / van 700，按車收不算一日團費', () => {
+    expect(AIRPORT_TRANSFER_FEES).toEqual({ sedan: 500, van: 700 })
+  })
+})
 
 describe('resolveFleet', () => {
   it('assigns sedan without guide for 2-3 seats', () => {

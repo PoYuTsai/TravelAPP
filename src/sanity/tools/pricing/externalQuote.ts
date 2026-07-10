@@ -1,4 +1,17 @@
+export interface ExternalQuotePerPersonItem {
+  label: string
+  quantity: number
+  unitPriceThb: number
+  subtotalThb: number
+}
+
 export interface ExternalQuoteBreakdownInput {
+  /** 'perPerson'：items 走售價結構（大人/兒童/嬰兒＋接送機），不出現成本拆項 */
+  pricingModel?: 'perPerson'
+  perPersonItems?: ExternalQuotePerPersonItem[]
+  /** 純接送日按車收合計（THB） */
+  transferFee?: number
+  transferTrips?: number
   includeAccommodation: boolean
   includeMeals: boolean
   includeGuide: boolean
@@ -73,32 +86,56 @@ export function buildExternalQuoteBreakdown(
 ): ExternalQuoteBreakdown {
   const items: ExternalQuoteBreakdownItem[] = []
   const activityAmount = input.ticketPrice + input.thaiDressPrice
+  const isPerPerson = input.pricingModel === 'perPerson'
+  const perPersonLabels = new Set<string>()
 
-  if (input.carPriceTotal > 0) {
-    items.push({
-      label: '包車費用',
-      amountTHB: input.carPriceTotal,
-      amountTWD: toTwd(input.carPriceTotal, input.exchangeRate),
-      description: `${input.carServiceDays} 天 / ${input.carCount} 台`,
-    })
-  }
+  if (isPerPerson) {
+    // 售價結構：團費按人頭列（車＋導遊＋機場行李已攤入每人價）
+    for (const item of input.perPersonItems ?? []) {
+      if (item.subtotalThb <= 0) continue
+      perPersonLabels.add(item.label)
+      items.push({
+        label: item.label,
+        amountTHB: item.subtotalThb,
+        amountTWD: toTwd(item.subtotalThb, input.exchangeRate),
+        description: `${item.quantity} 位 × ${item.unitPriceThb.toLocaleString()}`,
+      })
+    }
+    if ((input.transferFee ?? 0) > 0) {
+      items.push({
+        label: '接送機',
+        amountTHB: input.transferFee!,
+        amountTWD: toTwd(input.transferFee!, input.exchangeRate),
+        description: `${input.transferTrips ?? 1} 趟（按車計）`,
+      })
+    }
+  } else {
+    if (input.carPriceTotal > 0) {
+      items.push({
+        label: '包車費用',
+        amountTHB: input.carPriceTotal,
+        amountTWD: toTwd(input.carPriceTotal, input.exchangeRate),
+        description: `${input.carServiceDays} 天 / ${input.carCount} 台`,
+      })
+    }
 
-  if (input.includeGuide && input.guidePrice > 0) {
-    items.push({
-      label: '中文導遊',
-      amountTHB: input.guidePrice,
-      amountTWD: toTwd(input.guidePrice, input.exchangeRate),
-      description: `${input.guideDays} 天`,
-    })
-  }
+    if (input.includeGuide && input.guidePrice > 0) {
+      items.push({
+        label: '中文導遊',
+        amountTHB: input.guidePrice,
+        amountTWD: toTwd(input.guidePrice, input.exchangeRate),
+        description: `${input.guideDays} 天`,
+      })
+    }
 
-  if (input.luggageCost > 0) {
-    items.push({
-      label: '行李加大車',
-      amountTHB: input.luggageCost,
-      amountTWD: toTwd(input.luggageCost, input.exchangeRate),
-      description: '行李車放置行李',
-    })
+    if (input.luggageCost > 0) {
+      items.push({
+        label: '行李加大車',
+        amountTHB: input.luggageCost,
+        amountTWD: toTwd(input.luggageCost, input.exchangeRate),
+        description: '行李車放置行李',
+      })
+    }
   }
 
   if (input.childSeatCost > 0) {
@@ -154,7 +191,18 @@ export function buildExternalQuoteBreakdown(
     })
   }
 
-  const included = items.map((item) => item.label)
+  // perPerson：included 是服務清單（人頭計價的大人/兒童/接送機不是「包含項目」）
+  const included = isPerPerson
+    ? [
+        '車資、油費、過路費、停車費',
+        '專業司機',
+        ...(input.includeGuide ? ['中文導遊'] : []),
+        '貼心中文客服',
+        ...items
+          .filter((item) => !perPersonLabels.has(item.label) && item.label !== '接送機')
+          .map((item) => item.label),
+      ]
+    : items.map((item) => item.label)
   const selfBookedAccommodationNights = Math.max(0, input.selfBookedAccommodationNights ?? 0)
   const excluded = [
     !input.includeAccommodation ? '住宿' : null,
