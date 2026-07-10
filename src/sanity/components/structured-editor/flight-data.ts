@@ -74,10 +74,8 @@ export const DEPARTURE_FLIGHTS: FlightOption[] = [
 ]
 
 export const VEHICLE_TYPES = [
-  { value: 'sedan', label: '4人座小車' },
-  { value: 'suv', label: '7人座休旅車' },
-  { value: 'van', label: '10人座大車（麵包車）' },
-  { value: 'custom', label: '其他' },
+  { value: 'sedan', label: '小轎車（2–3 位乘客）' },
+  { value: 'van', label: 'Van（4–9 位 1 台；10–18 位 2 台）' },
 ]
 
 export function getFlightHint(flights: FlightOption[], value: string): string {

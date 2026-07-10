@@ -1,6 +1,7 @@
 // src/sanity/components/structured-editor/ValidationStatus.tsx
 import { Box, Text, Stack, Card } from '@sanity/ui'
 import { CheckmarkCircleIcon, CloseCircleIcon, CircleIcon } from '@sanity/icons'
+import { resolveFleet } from '@/lib/pricing/perPersonRates'
 import type { BasicInfo, OtherQuotationItem } from './types'
 
 interface Props {
@@ -76,18 +77,24 @@ export function ValidationStatus({ basicInfo, otherItems }: Props) {
   }
 
   // 人數驗證
-  const totalPeople = basicInfo.adults + basicInfo.children
-  if (totalPeople > 0) {
+  const totalPeople = basicInfo.adults + basicInfo.children + basicInfo.infants
+  if (totalPeople < 2) {
     validations.push({
       label: '人數',
-      status: 'success',
-      message: `${basicInfo.adults}大${basicInfo.children}小 = ${totalPeople}人`,
+      status: 'error',
+      message: '自動報價至少需要 2 位旅客；1 位請人工確認',
+    })
+  } else if (resolveFleet(totalPeople).manualQuoteRequired) {
+    validations.push({
+      label: '人數',
+      status: 'error',
+      message: '19 人以上需人工報價',
     })
   } else {
     validations.push({
       label: '人數',
-      status: 'error',
-      message: '至少需要 1 人',
+      status: 'success',
+      message: `${basicInfo.adults}大${basicInfo.children}小${basicInfo.infants}嬰 = ${totalPeople}人`,
     })
   }
 
@@ -127,13 +134,13 @@ export function ValidationStatus({ basicInfo, otherItems }: Props) {
   if (basicInfo.extraVehicle.required) {
     const hasExtraVehicle = otherItems.some((i) => i.type === 'extraVehicle' && i.unitPrice > 0)
     validations.push({
-      label: '雙條車',
+      label: '額外行李車',
       status: hasExtraVehicle ? 'success' : 'error',
-      message: hasExtraVehicle ? '已勾選，報價已包含' : '已勾選，但報價中沒有雙條車費用',
+      message: hasExtraVehicle ? '已勾選，報價已包含' : '已勾選，但報價中沒有額外行李車費用',
     })
   } else {
     validations.push({
-      label: '雙條車',
+      label: '額外行李車',
       status: 'inactive',
       message: '未勾選',
     })
@@ -185,9 +192,11 @@ export function validateEditor(
     errors.push('結束日期必須在開始日期之後')
   }
 
-  const totalPeople = basicInfo.adults + basicInfo.children
-  if (totalPeople <= 0) {
-    errors.push('至少需要 1 人')
+  const totalPeople = basicInfo.adults + basicInfo.children + basicInfo.infants
+  if (totalPeople < 2) {
+    errors.push('自動報價至少需要 2 位旅客；1 位請人工確認')
+  } else if (resolveFleet(totalPeople).manualQuoteRequired) {
+    errors.push('19 人以上需人工報價')
   }
 
   // 服務選項驗證
@@ -208,7 +217,7 @@ export function validateEditor(
   if (basicInfo.extraVehicle.required) {
     const hasExtraVehicle = otherItems.some((i) => i.type === 'extraVehicle' && i.unitPrice > 0)
     if (!hasExtraVehicle) {
-      errors.push('已勾選需要雙條車，但報價中沒有雙條車費用')
+      errors.push('已勾選需要額外行李車，但報價中沒有額外行李車費用')
     }
   }
 

@@ -2,6 +2,14 @@
 import { Fragment } from 'react'
 import { Box, Text, Stack, Flex, Card, TextInput, Button } from '@sanity/ui'
 import { AddIcon, TrashIcon } from '@sanity/icons'
+import {
+  AIRPORT_TRANSFER_FEES,
+  CHILD_SEAT_FEE_PER_DAY,
+  DRIVER_GUIDE_ROOM_FEE_PER_NIGHT,
+  GUIDE_FEE_PER_DAY,
+  INSURANCE_FEE_PER_PERSON,
+  resolveFleet,
+} from '@/lib/pricing/perPersonRates'
 import type { BasicInfo, DailyQuotationItem, OtherQuotationItem } from './types'
 import { getWeekday, generateDateRange } from './types'
 
@@ -15,11 +23,155 @@ interface Props {
 
 // 預設單價
 const DEFAULT_PRICES = {
-  guide: 2500,
-  childSeat: 200,
   extraVehicle: 1500,
-  insurance: 100,
-  outOfTownStay: 500,
+  outOfTownStay: DRIVER_GUIDE_ROOM_FEE_PER_NIGHT,
+}
+
+export function legacyAirportTransferFee(vehicleType: string): number {
+  return vehicleType === 'sedan'
+    ? AIRPORT_TRANSFER_FEES.sedan
+    : AIRPORT_TRANSFER_FEES.van
+}
+
+export function resolveLegacyDailyQuotationItems(
+  basicInfo: BasicInfo,
+  dailyItems: DailyQuotationItem[],
+): DailyQuotationItem[] {
+  if (!basicInfo.startDate || !basicInfo.endDate) return dailyItems
+
+  const dates = generateDateRange(basicInfo.startDate, basicInfo.endDate)
+  const occupiedSeats = Math.max(
+    1,
+    basicInfo.adults + basicInfo.children + basicInfo.infants,
+  )
+  const fleet = resolveFleet(occupiedSeats)
+
+  return dates.map((date, index) => {
+    const existing = dailyItems.find((item) => item.date === date)
+    const isFirst = index === 0
+    const isLast = index === dates.length - 1
+    if (existing) {
+      const isPureAirportDropOff =
+        isLast && /^(?:機場)?送機(?:服務)?$/.test(existing.description.trim())
+      return isPureAirportDropOff
+        ? { ...existing, price: legacyAirportTransferFee(fleet.vehicle) }
+        : existing
+    }
+
+    let description = ''
+    let price = 4000
+
+    if (isFirst) {
+      description = '接機+市區'
+      price = 3700
+    } else if (isLast) {
+      description = '送機'
+      price = legacyAirportTransferFee(fleet.vehicle)
+    }
+
+    return {
+      date,
+      weekday: getWeekday(date),
+      description,
+      price,
+    }
+  })
+}
+
+/**
+ * Resolve the legacy editor add-ons from canonical policy constants.
+ * Presence of an insurance row is the explicit opt-in; it is never added by default.
+ */
+export function buildLegacyOtherQuotationItems(
+  basicInfo: BasicInfo,
+  otherItems: OtherQuotationItem[],
+): OtherQuotationItem[] {
+  const items: OtherQuotationItem[] = []
+  const occupiedSeats = Math.max(
+    1,
+    basicInfo.adults + basicInfo.children + basicInfo.infants,
+  )
+  const fleet = resolveFleet(occupiedSeats)
+
+  if (basicInfo.guideService.required) {
+    const quantity = basicInfo.guideService.quantity || 1
+    const days = basicInfo.guideService.days || 1
+    items.push({
+      type: 'guide',
+      description: '中文導遊（選配）',
+      unitPrice: GUIDE_FEE_PER_DAY,
+      quantity,
+      days,
+      subtotal: GUIDE_FEE_PER_DAY * quantity * days,
+    })
+  }
+
+  if (basicInfo.childSeat.required) {
+    const quantity = basicInfo.childSeat.quantity || 1
+    const days = basicInfo.childSeat.days || 1
+    items.push({
+      type: 'childSeat',
+      description: '兒童安全座椅',
+      unitPrice: CHILD_SEAT_FEE_PER_DAY,
+      quantity,
+      days,
+      subtotal: CHILD_SEAT_FEE_PER_DAY * quantity * days,
+    })
+  }
+
+  if (basicInfo.extraVehicle.required) {
+    const quantity = basicInfo.extraVehicle.quantity || 1
+    const days = basicInfo.extraVehicle.days || 1
+    const unitPrice =
+      otherItems.find((item) => item.type === 'extraVehicle')?.unitPrice ||
+      DEFAULT_PRICES.extraVehicle
+    items.push({
+      type: 'extraVehicle',
+      description: '額外行李車（人工確認）',
+      unitPrice,
+      quantity,
+      days,
+      subtotal: unitPrice * quantity * days,
+    })
+  }
+
+  // The row itself is the legacy editor's explicit insurance selection.
+  if (otherItems.some((item) => item.type === 'insurance')) {
+    const quantity = basicInfo.adults + basicInfo.children + basicInfo.infants
+    items.push({
+      type: 'insurance',
+      description: '旅遊保險（選配）',
+      unitPrice: INSURANCE_FEE_PER_PERSON,
+      quantity,
+      days: 1,
+      subtotal: INSURANCE_FEE_PER_PERSON * quantity,
+    })
+  }
+
+  const existingOutOfTown = otherItems.find((item) => item.type === 'outOfTownStay')
+  const outOfTownNights = existingOutOfTown?.days || 0
+  if (outOfTownNights > 0) {
+    const staffCount =
+      fleet.carCount +
+      (basicInfo.guideService.required ? basicInfo.guideService.quantity : 0)
+    items.push({
+      type: 'outOfTownStay',
+      description: '外地住宿補貼',
+      unitPrice: DEFAULT_PRICES.outOfTownStay,
+      quantity: staffCount,
+      days: outOfTownNights,
+      subtotal: DEFAULT_PRICES.outOfTownStay * staffCount * outOfTownNights,
+    })
+  }
+
+  for (const item of otherItems.filter((candidate) => candidate.type === 'custom')) {
+    items.push({
+      ...item,
+      subtotal: item.unitPrice * item.quantity * item.days,
+    })
+  }
+
+  return items
 }
 
 export function StructuredQuotationTable({
@@ -29,143 +181,14 @@ export function StructuredQuotationTable({
   onDailyItemsChange,
   onOtherItemsChange,
 }: Props) {
-  const totalPeople = basicInfo.adults + basicInfo.children
-
-  // 根據日期範圍生成每日項目（如果沒有的話）
-  const ensureDailyItems = (): DailyQuotationItem[] => {
-    if (!basicInfo.startDate || !basicInfo.endDate) return dailyItems
-
-    const dates = generateDateRange(basicInfo.startDate, basicInfo.endDate)
-    if (dailyItems.length === dates.length) return dailyItems
-
-    // 生成新的每日項目
-    return dates.map((date, index) => {
-      const existing = dailyItems.find((item) => item.date === date)
-      if (existing) return existing
-
-      const isFirst = index === 0
-      const isLast = index === dates.length - 1
-      let description = ''
-      let price = 4000
-
-      if (isFirst) {
-        description = '接機+市區'
-        price = 3700
-      } else if (isLast) {
-        description = '送機'
-        price = 700
-      }
-
-      return {
-        date,
-        weekday: getWeekday(date),
-        description,
-        price,
-      }
-    })
-  }
-
-  const currentDailyItems = ensureDailyItems()
-  const vehicleCount = basicInfo.vehicleCount || 1
+  const totalPeople = basicInfo.adults + basicInfo.children + basicInfo.infants
+  const fleet = resolveFleet(Math.max(1, totalPeople))
+  const currentDailyItems = resolveLegacyDailyQuotationItems(basicInfo, dailyItems)
+  const vehicleCount = fleet.carCount
   // 每日包車費用 = 單價 x 台數
   const dailyTotal = currentDailyItems.reduce((sum, item) => sum + item.price * vehicleCount, 0)
 
-  // 自動計算其他費用
-  const calculateOtherItems = (): OtherQuotationItem[] => {
-    const items: OtherQuotationItem[] = []
-
-    // 導遊
-    if (basicInfo.guideService.required) {
-      const qty = basicInfo.guideService.quantity || 1
-      const days = basicInfo.guideService.days || 1
-      const unitPrice =
-        otherItems.find((i) => i.type === 'guide')?.unitPrice || DEFAULT_PRICES.guide
-      items.push({
-        type: 'guide',
-        description: '導遊',
-        unitPrice,
-        quantity: qty,
-        days,
-        subtotal: unitPrice * qty * days,
-      })
-    }
-
-    // 兒童座椅
-    if (basicInfo.childSeat.required) {
-      const qty = basicInfo.childSeat.quantity || 1
-      const days = basicInfo.childSeat.days || 1
-      const unitPrice =
-        otherItems.find((i) => i.type === 'childSeat')?.unitPrice || DEFAULT_PRICES.childSeat
-      items.push({
-        type: 'childSeat',
-        description: '兒童座椅',
-        unitPrice,
-        quantity: qty,
-        days,
-        subtotal: unitPrice * qty * days,
-      })
-    }
-
-    // 雙條車
-    if (basicInfo.extraVehicle.required) {
-      const qty = basicInfo.extraVehicle.quantity || 1
-      const days = basicInfo.extraVehicle.days || 1
-      const unitPrice =
-        otherItems.find((i) => i.type === 'extraVehicle')?.unitPrice || DEFAULT_PRICES.extraVehicle
-      items.push({
-        type: 'extraVehicle',
-        description: '雙條車（行李）',
-        unitPrice,
-        quantity: qty,
-        days,
-        subtotal: unitPrice * qty * days,
-      })
-    }
-
-    // 保險（永遠顯示，但可以設為 0 表示不需要）
-    const existingInsurance = otherItems.find((i) => i.type === 'insurance')
-    const insurancePrice = existingInsurance?.unitPrice ?? DEFAULT_PRICES.insurance
-    items.push({
-      type: 'insurance',
-      description: '泰國旅遊保險',
-      unitPrice: insurancePrice,
-      quantity: totalPeople,
-      days: 1,
-      subtotal: insurancePrice * totalPeople,
-    })
-
-    // 外地住宿補貼（保留原有設定或預設為 0 晚）
-    const existingOutOfTown = otherItems.find((i) => i.type === 'outOfTownStay')
-    const outOfTownNights = existingOutOfTown?.days || 0
-    if (outOfTownNights > 0) {
-      // 人數 = 司機（包車台數）+ 導遊人數
-      const staffCount =
-        basicInfo.vehicleCount + (basicInfo.guideService.required ? basicInfo.guideService.quantity : 0)
-      const unitPrice = existingOutOfTown?.unitPrice || DEFAULT_PRICES.outOfTownStay
-      items.push({
-        type: 'outOfTownStay',
-        description: '外地住宿補貼',
-        unitPrice,
-        quantity: staffCount,
-        days: outOfTownNights,
-        subtotal: unitPrice * staffCount * outOfTownNights,
-      })
-    }
-
-    // 自訂項目
-    otherItems
-      .filter((i) => i.type === 'custom')
-      .forEach((item) => {
-        items.push({
-          ...item,
-          subtotal: item.unitPrice * item.quantity * item.days,
-        })
-      })
-
-    return items
-  }
-
-  const currentOtherItems = calculateOtherItems()
+  const currentOtherItems = buildLegacyOtherQuotationItems(basicInfo, otherItems)
   const otherTotal = currentOtherItems.reduce((sum, item) => sum + item.subtotal, 0)
   const grandTotal = dailyTotal + otherTotal
 
@@ -193,6 +216,25 @@ export function StructuredQuotationTable({
       })
     }
     onOtherItemsChange(newItems)
+  }
+
+  const addInsurance = () => {
+    if (otherItems.some((item) => item.type === 'insurance')) return
+    onOtherItemsChange([
+      ...otherItems,
+      {
+        type: 'insurance',
+        description: '旅遊保險（選配）',
+        unitPrice: INSURANCE_FEE_PER_PERSON,
+        quantity: totalPeople,
+        days: 1,
+        subtotal: INSURANCE_FEE_PER_PERSON * totalPeople,
+      },
+    ])
+  }
+
+  const removeInsurance = () => {
+    onOtherItemsChange(otherItems.filter((item) => item.type !== 'insurance'))
   }
 
   // 更新外地住宿晚數
@@ -336,7 +378,7 @@ export function StructuredQuotationTable({
         </Box>
         <Flex justify="flex-end" style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
           <Text size={1}>
-            包車小計：<strong>NT$ {dailyTotal.toLocaleString()}</strong>
+            包車小計：<strong>THB {dailyTotal.toLocaleString()}</strong>
             {vehicleCount > 1 && <span style={{ marginLeft: '8px', color: '#666' }}>（{vehicleCount}台）</span>}
           </Text>
         </Flex>
@@ -353,7 +395,7 @@ export function StructuredQuotationTable({
               <Text size={1} style={{ width: '100px' }}>
                 {item.type === 'guide' && '導遊'}
                 {item.type === 'childSeat' && '兒童座椅'}
-                {item.type === 'extraVehicle' && '雙條車'}
+                {item.type === 'extraVehicle' && '額外行李車'}
                 {item.type === 'insurance' && '保險'}
                 {item.type === 'outOfTownStay' && '外地住宿'}
                 {item.type === 'custom' && (
@@ -374,16 +416,22 @@ export function StructuredQuotationTable({
 
               {item.type !== 'custom' ? (
                 <>
-                  <TextInput
-                    type="number"
-                    value={item.unitPrice}
-                    onChange={(e) =>
-                      updateOtherItemPrice(item.type, parseInt(e.currentTarget.value) || 0)
-                    }
-                    style={{ width: '70px', textAlign: 'right' }}
-                    fontSize={1}
-                    padding={2}
-                  />
+                  {item.type === 'extraVehicle' ? (
+                    <TextInput
+                      type="number"
+                      value={item.unitPrice}
+                      onChange={(e) =>
+                        updateOtherItemPrice(item.type, parseInt(e.currentTarget.value) || 0)
+                      }
+                      style={{ width: '70px', textAlign: 'right' }}
+                      fontSize={1}
+                      padding={2}
+                    />
+                  ) : (
+                    <Text size={1} style={{ width: '70px', textAlign: 'right' }}>
+                      {item.unitPrice.toLocaleString()}
+                    </Text>
+                  )}
                   <Text size={1}>x</Text>
                   <Text size={1} style={{ width: '40px', textAlign: 'center' }}>
                     {item.quantity}
@@ -411,6 +459,16 @@ export function StructuredQuotationTable({
                       )}
                       <Text size={1}>{item.type === 'outOfTownStay' ? '晚' : '天'}</Text>
                     </>
+                  )}
+                  {item.type === 'insurance' && (
+                    <Button
+                      icon={TrashIcon}
+                      mode="ghost"
+                      tone="critical"
+                      padding={2}
+                      aria-label="移除旅遊保險"
+                      onClick={removeInsurance}
+                    />
                   )}
                 </>
               ) : (
@@ -473,11 +531,23 @@ export function StructuredQuotationTable({
             onClick={addCustomItem}
             style={{ marginTop: '8px' }}
           />
+          {!currentOtherItems.some((item) => item.type === 'insurance') && (
+            <Button
+              text={`加購旅遊保險（THB ${INSURANCE_FEE_PER_PERSON}／人／趟）`}
+              mode="ghost"
+              fontSize={1}
+              padding={2}
+              onClick={addInsurance}
+            />
+          )}
+          <Text size={0} muted>
+            兒童安全座椅為 THB {CHILD_SEAT_FEE_PER_DAY}／日／張，安裝於該孩童的乘客座位，不另加算一位。
+          </Text>
         </Stack>
 
         <Flex justify="flex-end" style={{ marginTop: '12px', borderTop: '1px solid #eee', paddingTop: '8px' }}>
           <Text size={1}>
-            其他小計：<strong>NT$ {otherTotal.toLocaleString()}</strong>
+            其他小計：<strong>THB {otherTotal.toLocaleString()}</strong>
           </Text>
         </Flex>
       </Card>
@@ -487,14 +557,14 @@ export function StructuredQuotationTable({
         <Flex justify="space-between" align="center">
           <Stack space={1}>
             <Text size={1} muted>
-              包車小計：NT$ {dailyTotal.toLocaleString()}
+              包車小計：THB {dailyTotal.toLocaleString()}
             </Text>
             <Text size={1} muted>
-              其他小計：NT$ {otherTotal.toLocaleString()}
+              其他小計：THB {otherTotal.toLocaleString()}
             </Text>
           </Stack>
           <Text size={3} weight="bold">
-            總計：NT$ {grandTotal.toLocaleString()}
+            總計：THB {grandTotal.toLocaleString()}
           </Text>
         </Flex>
       </Card>

@@ -17,7 +17,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
   const arrivalHint = getFlightHint(ARRIVAL_FLIGHTS, value.arrivalFlight.preset)
   const departureHint = getFlightHint(DEPARTURE_FLIGHTS, value.departureFlight.preset)
 
-  const totalPeople = value.adults + value.children
+  const totalPeople = value.adults + value.children + value.infants
 
   return (
     <Stack space={4}>
@@ -183,6 +183,17 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
           </Box>
           <Box style={{ width: '80px' }}>
             <Text size={0} muted style={{ marginBottom: '4px' }}>
+              嬰幼兒
+            </Text>
+            <TextInput
+              type="number"
+              min={0}
+              value={value.infants}
+              onChange={(e) => updateField('infants', Math.max(0, parseInt(e.currentTarget.value) || 0))}
+            />
+          </Box>
+          <Box style={{ width: '80px' }}>
+            <Text size={0} muted style={{ marginBottom: '4px' }}>
               小朋友
             </Text>
             <TextInput
@@ -199,8 +210,8 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
             <TextInput
               value={value.childrenAges}
               onChange={(e) => updateField('childrenAges', e.currentTarget.value)}
-              placeholder="例：5歲、8歲"
-              disabled={value.children === 0}
+              placeholder="例：5歲、8歲、10個月"
+              disabled={value.children + value.infants === 0}
             />
           </Box>
         </Flex>
@@ -379,7 +390,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
               type="number"
               min={1}
               value={value.vehicleCount}
-              onChange={(e) => updateField('vehicleCount', Math.max(1, parseInt(e.currentTarget.value) || 1))}
+              readOnly
               style={{ width: '60px' }}
             />
             <Text size={1}>台</Text>
@@ -387,7 +398,7 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
           <Box style={{ flex: 1, minWidth: '150px' }}>
             <Select
               value={value.vehicleType}
-              onChange={(e) => updateField('vehicleType', e.currentTarget.value)}
+              disabled
             >
               {VEHICLE_TYPES.map((v) => (
                 <option key={v.value} value={v.value}>
@@ -397,6 +408,9 @@ export function StructuredBasicInfoForm({ value, onChange, totalDays }: Props) {
             </Select>
           </Box>
         </Flex>
+        <Text size={0} muted style={{ marginTop: '8px' }}>
+          車型與台數依占用座位自動決定；19 人以上改由人工報價。
+        </Text>
         <Box style={{ marginTop: '12px' }}>
           <Text size={0} muted style={{ marginBottom: '4px' }}>
             行李備註
