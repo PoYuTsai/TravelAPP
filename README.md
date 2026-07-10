@@ -110,4 +110,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-07-09 每日轉換表日期欄改首次詢問日＋production 補 AI_AGENT_DAILY_COST_CAP_USD 讓摘要真打 Haiku -->
+<!-- Last build trigger: 2026-07-10 廣告訪客 LINE CTA 切換加入好友管道追蹤連結（gclid 7天歸因） -->
