@@ -73,9 +73,13 @@ export interface AutomaticPerPersonQuoteResult extends PerPersonQuoteResultBase 
   groupTourPrice: number
 }
 
+export type PerPersonManualQuoteReason =
+  | ManualQuoteReason
+  | 'minimum-group-size-required'
+
 export interface ManualPerPersonQuoteResult extends PerPersonQuoteResultBase {
   manualQuoteRequired: true
-  manualQuoteReason: ManualQuoteReason
+  manualQuoteReason: PerPersonManualQuoteReason
   trip: ManualTripQuote | null
   /** Manual quotes must never expose a fake public total. */
   groupTourPrice: null
@@ -119,11 +123,6 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     transferTrips *
     (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + luggagePerTrip)
 
-  const trip =
-    tripDays.length > 0
-      ? calcTrip({ days: tripDays, adults, children, infants, withGuide: guided })
-      : null
-
   const baseResult = {
     occupiedSeats,
     fleet,
@@ -131,6 +130,21 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     transferFee,
     transferTrips,
   }
+
+  if (occupiedSeats === 1) {
+    return {
+      ...baseResult,
+      manualQuoteRequired: true,
+      manualQuoteReason: 'minimum-group-size-required',
+      trip: null,
+      groupTourPrice: null,
+    }
+  }
+
+  const trip =
+    tripDays.length > 0
+      ? calcTrip({ days: tripDays, adults, children, infants, withGuide: guided })
+      : null
 
   if (trip) {
     if (trip.manualQuoteRequired) {

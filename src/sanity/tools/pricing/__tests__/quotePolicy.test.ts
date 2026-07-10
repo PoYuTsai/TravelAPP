@@ -35,6 +35,16 @@ describe('resolveCustomerQuoteGate', () => {
     expect(gate.blocked).toBe(true)
     expect(gate.message).toMatch(/19 人以上.*人工報價/)
   })
+
+  it('blocks a single-traveler quote with a clear minimum-size reason', () => {
+    const gate = resolveCustomerQuoteGate({
+      manualQuoteRequired: true,
+      manualQuoteReason: 'minimum-group-size-required',
+    })
+
+    expect(gate.blocked).toBe(true)
+    expect(gate.message).toMatch(/至少 2 位旅客.*自動報價.*人工確認/)
+  })
 })
 
 describe('getGuideControlPolicy', () => {

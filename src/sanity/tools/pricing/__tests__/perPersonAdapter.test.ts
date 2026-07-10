@@ -171,6 +171,23 @@ describe('buildPerPersonQuote', () => {
     expect(result.manualQuoteReason).toBeNull()
   })
 
+  it('1 位成人含行程日時回傳 typed manual quote，不在 render path throw', () => {
+    const result = buildPerPersonQuote({
+      days: [{ name: '市區一日遊', type: 'city' }],
+      adults: 1,
+      children: 0,
+      infants: 0,
+      withGuide: false,
+    })
+
+    expect(result.occupiedSeats).toBe(1)
+    expect(result.fleet).toMatchObject({ vehicle: 'sedan', carCount: 1 })
+    expect(result.manualQuoteRequired).toBe(true)
+    expect(result.manualQuoteReason).toBe('minimum-group-size-required')
+    expect(result.trip).toBeNull()
+    expect(result.groupTourPrice).toBeNull()
+  })
+
   it('全部都是接送日時只收接送費，不 throw', () => {
     const result = buildPerPersonQuote({
       days: [{ name: '接機', type: 'airport' }, { name: '送機', type: 'airport' }],

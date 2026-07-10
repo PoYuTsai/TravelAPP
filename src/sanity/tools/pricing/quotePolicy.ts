@@ -1,11 +1,15 @@
-import type { ManualQuoteReason } from '@/lib/pricing/perPersonRates'
-import { dayTypeToTier } from './perPersonAdapter'
+import {
+  dayTypeToTier,
+  type PerPersonManualQuoteReason,
+} from './perPersonAdapter'
 
 export type CustomerQuoteGate =
   | { blocked: false; message: null }
   | { blocked: true; message: string }
 
-const MANUAL_QUOTE_MESSAGES: Record<ManualQuoteReason, string> = {
+const MANUAL_QUOTE_MESSAGES: Record<PerPersonManualQuoteReason, string> = {
+  'minimum-group-size-required':
+    '至少 2 位旅客才能使用自動報價，請人工確認後再對客出單。',
   'guided-sedan-requires-vehicle-confirmation':
     '2–3 人加中文導遊需確認車型，請先人工確認後再對客出單。',
   'group-size-requires-manual-quote':
@@ -18,7 +22,7 @@ const MANUAL_QUOTE_MESSAGES: Record<ManualQuoteReason, string> = {
 
 export function resolveCustomerQuoteGate(quote: {
   manualQuoteRequired: boolean
-  manualQuoteReason: ManualQuoteReason | null
+  manualQuoteReason: PerPersonManualQuoteReason | null
 }): CustomerQuoteGate {
   if (!quote.manualQuoteRequired) return { blocked: false, message: null }
 
