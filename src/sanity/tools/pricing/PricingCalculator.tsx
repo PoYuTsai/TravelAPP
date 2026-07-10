@@ -196,6 +196,7 @@ interface DynamicTicket {
   childCount?: number     // 兒童票數量（預設用 children state）
   adultPriceOverride?: number   // 成人價覆寫
   childPriceOverride?: number   // 兒童價覆寫
+  payOnSite?: boolean     // 現場付型門票（代收代付）：進報價明細時標「現場付」，金額照列
 }
 
 // 門票關鍵字對照表 - 用於智能匹配
@@ -1634,7 +1635,7 @@ interface SavedQuote {
     _quoteSnapshot?: {
       pricingModel?: 'perPerson' // 無此欄位＝舊成本拆項快照，前台走現行渲染
       externalQuote: {
-        items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
+        items: { label: string; amountTHB: number; amountTWD: number; description?: string; payOnSite?: boolean }[]
         included: string[]
         excluded: string[]
         paymentNotes: string[]

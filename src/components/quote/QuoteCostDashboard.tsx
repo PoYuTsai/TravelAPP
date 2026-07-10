@@ -233,7 +233,7 @@ function LineItemBreakdown({
   isPackageShowcase,
   isPerPerson,
 }: {
-  items: { label: string; amountTHB: number; amountTWD: number; description?: string }[]
+  items: { label: string; amountTHB: number; amountTWD: number; description?: string; payOnSite?: boolean }[]
   tripDays: number
   tripNights: number
   adults: number
@@ -281,12 +281,26 @@ function LineItemBreakdown({
             )}
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <p
-                  className="text-[14px] font-semibold"
-                  style={{ color: '#0F0B05' }}
-                >
-                  {item.label}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p
+                    className="text-[14px] font-semibold"
+                    style={{ color: '#0F0B05' }}
+                  >
+                    {item.label}
+                  </p>
+                  {item.payOnSite && (
+                    <span
+                      className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
+                      style={{
+                        background: 'rgba(202, 138, 4, 0.12)',
+                        color: '#CA8A04',
+                        border: '1px solid rgba(202, 138, 4, 0.35)',
+                      }}
+                    >
+                      現場付
+                    </span>
+                  )}
+                </div>
                 {item.description && (
                   <p className="mt-0.5 text-[12px]" style={{ color: '#7A6F5C' }}>
                     {item.description}

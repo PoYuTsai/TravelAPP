@@ -46,6 +46,8 @@ export interface ExternalQuoteBreakdownItem {
   amountTHB: number
   amountTWD: number
   description?: string
+  /** 現場付（代收代付，當日跟團費一起收）：前台明細標「現場付」徽章，金額照列 */
+  payOnSite?: boolean
 }
 
 export interface ExternalQuoteBreakdown {

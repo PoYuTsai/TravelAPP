@@ -101,3 +101,40 @@ describe('QuoteCostDashboard 幣別主次分流', () => {
     expect(screen.getByText('NT$ 20,000')).toBeTruthy()
   })
 })
+
+describe('QuoteCostDashboard 現場付標註', () => {
+  it('payOnSite item 顯示「現場付」徽章，金額照列', () => {
+    const base = buildQuote({ pricingModel: 'perPerson' })
+    render(
+      <QuoteCostDashboard
+        quote={{
+          ...base,
+          quote: {
+            ...base.quote!,
+            items: [
+              ...base.quote!.items,
+              {
+                label: '大象保護營門票',
+                amountTHB: 3200,
+                amountTWD: 2909,
+                description: '2 位 × 1,600',
+                payOnSite: true,
+              },
+            ],
+          },
+        }}
+      />
+    )
+
+    expect(screen.getByText('現場付')).toBeTruthy()
+    expect(screen.getByText('大象保護營門票')).toBeTruthy()
+    // 金額照常顯示（perPerson：THB 為主）
+    expect(screen.getByText('3,200 THB')).toBeTruthy()
+  })
+
+  it('無 payOnSite 的 item 不顯示徽章', () => {
+    render(<QuoteCostDashboard quote={buildQuote({ pricingModel: 'perPerson' })} />)
+
+    expect(screen.queryByText('現場付')).toBeNull()
+  })
+})
