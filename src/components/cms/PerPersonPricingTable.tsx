@@ -93,7 +93,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           單位：THB／人／日，以同行總人數（嬰幼兒皆佔位）查表。標準安排為泰國司機；
           需要隨車中文溝通或導覽，可加聘中文導遊。
         </p>
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {RATE_TABLES.map((table) => (
             <div
               key={table.title + table.subtitle}

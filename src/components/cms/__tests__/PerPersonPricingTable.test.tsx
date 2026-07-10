@@ -24,6 +24,18 @@ function rateRowsFor(title: string) {
 }
 
 describe('PerPersonPricingTable', () => {
+  it('keeps desktop rate cards wide enough to show all four regions', () => {
+    const { container } = render(<PerPersonPricingTable />)
+    const rateGrid = Array.from(container.querySelectorAll('div')).find(
+      (element) =>
+        element.className.includes('grid-cols-1') &&
+        element.querySelectorAll('table').length === 4,
+    )
+
+    expect(rateGrid?.className).toContain('lg:grid-cols-2')
+    expect(rateGrid?.className).not.toContain('xl:grid-cols-4')
+  })
+
   it('renders four public price cards with exact guided sedan rates', () => {
     const text = renderPricingCopy()
 
