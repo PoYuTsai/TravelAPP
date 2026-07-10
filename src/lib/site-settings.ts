@@ -1,5 +1,6 @@
 import {
   HOME_PUBLIC_COPY,
+  PAID_CHILD_SEAT_POLICY,
   PUBLIC_PRICE_RANGE,
   SITEWIDE_METADATA_DESCRIPTION,
 } from '@/lib/home-public-copy'
@@ -101,21 +102,11 @@ export const siteSettingsQuery = `*[_type == "siteSettings"][0]{
     thailandPhoneLabel
   },
   authorProfile{
-    eyebrow,
-    imageAlt,
-    name,
-    summary,
-    primaryCtaText,
-    secondaryCtaText
+    name
   },
   trustSection{
-    eyebrow,
-    title,
-    description,
     cards[]{
       metric,
-      title,
-      description,
       href,
       external,
       valueOverride
@@ -206,11 +197,11 @@ export const defaultSiteSettings: SiteSettings = {
     },
     {
       question: '清邁一日親子包車的費用是多少？如何預訂？',
-      answer: '目前公開包車價格依總佔位人數與行程區域計算；每位乘客（含嬰幼兒）各佔一席。每人每日 THB 750–3,500；車輛、泰國司機、油資、過路費、停車費與 LINE 中文支援已含，正式報價依行程與人數確認。',
+      answer: `目前公開包車價格依總佔位人數與行程區域計算；每位乘客（含嬰幼兒）各佔一席。公開參考範圍為 ${PUBLIC_PRICE_RANGE}；車輛、泰國司機、油資、過路費、停車費與 LINE 中文支援已含，正式報價依行程與人數確認。`,
     },
     {
       question: '清微旅行有提供兒童汽車座椅嗎？',
-      answer: '有，可付費加購兒童安全座椅，費用為 THB 500／日／張，且佔一個座位。每位乘客（含嬰幼兒）各佔一席；安全座椅安裝於該乘客座位，不另加算一人，但需納入車內座位配置。請提前告知兒童年齡與體重。',
+      answer: `有，可付費加購。${PAID_CHILD_SEAT_POLICY}請提前告知兒童年齡與體重。`,
     },
     {
       question: '第一次帶孩子去清邁，清微旅行推薦哪些景點或行程？',
@@ -333,17 +324,15 @@ function mergeFooterSettings(input: SiteFooterSettings | undefined): SiteFooterS
 
 function mergeAuthorProfile(input: SiteAuthorProfile | undefined): SiteAuthorProfile {
   return {
-    eyebrow: input?.eyebrow?.trim() || defaultSiteSettings.authorProfile.eyebrow,
-    imageAlt: input?.imageAlt?.trim() || defaultSiteSettings.authorProfile.imageAlt,
+    eyebrow: defaultSiteSettings.authorProfile.eyebrow,
+    imageAlt: defaultSiteSettings.authorProfile.imageAlt,
     name: input?.name?.trim() || defaultSiteSettings.authorProfile.name,
     description: defaultSiteSettings.authorProfile.description,
     serviceLabel: defaultSiteSettings.authorProfile.serviceLabel,
     serviceValue: defaultSiteSettings.authorProfile.serviceValue,
-    summary: input?.summary?.trim() || defaultSiteSettings.authorProfile.summary,
-    primaryCtaText:
-      input?.primaryCtaText?.trim() || defaultSiteSettings.authorProfile.primaryCtaText,
-    secondaryCtaText:
-      input?.secondaryCtaText?.trim() || defaultSiteSettings.authorProfile.secondaryCtaText,
+    summary: defaultSiteSettings.authorProfile.summary,
+    primaryCtaText: defaultSiteSettings.authorProfile.primaryCtaText,
+    secondaryCtaText: defaultSiteSettings.authorProfile.secondaryCtaText,
   }
 }
 
@@ -356,18 +345,20 @@ function normalizeTrustCards(items: SiteTrustCard[] | undefined) {
     .filter(
       (item): item is SiteTrustCard =>
         isValidTrustMetric(item?.metric) &&
-        Boolean(item?.title?.trim()) &&
-        Boolean(item?.description?.trim()) &&
         Boolean(item?.href?.trim())
     )
-    .map((item) => ({
-      metric: item.metric,
-      title: item.title.trim(),
-      description: item.description.trim(),
-      href: item.href.trim(),
-      external: Boolean(item.external),
-      valueOverride: item.valueOverride?.trim() || undefined,
-    }))
+    .map((item) => {
+      const canonicalCard = defaultSiteSettings.trustSection.cards.find(
+        (card) => card.metric === item.metric,
+      )!
+
+      return {
+        ...canonicalCard,
+        href: item.href.trim(),
+        external: Boolean(item.external),
+        valueOverride: item.valueOverride?.trim() || canonicalCard.valueOverride,
+      }
+    })
 
   return normalized.length > 0 ? normalized : defaultSiteSettings.trustSection.cards
 }
@@ -393,10 +384,9 @@ export function mergeSiteSettings(input: SiteSettingsInput): SiteSettings {
     footer: mergeFooterSettings(input?.footer),
     authorProfile: mergeAuthorProfile(input?.authorProfile),
     trustSection: {
-      eyebrow: input?.trustSection?.eyebrow?.trim() || defaultSiteSettings.trustSection.eyebrow,
-      title: input?.trustSection?.title?.trim() || defaultSiteSettings.trustSection.title,
-      description:
-        input?.trustSection?.description?.trim() || defaultSiteSettings.trustSection.description,
+      eyebrow: defaultSiteSettings.trustSection.eyebrow,
+      title: defaultSiteSettings.trustSection.title,
+      description: defaultSiteSettings.trustSection.description,
       cards: normalizeTrustCards(input?.trustSection?.cards),
     },
     homeFaq: defaultSiteSettings.homeFaq,

@@ -6,6 +6,7 @@ import {
   calcPerPersonDay,
   type Tier,
 } from '@/lib/pricing/perPersonRates'
+import { CHILD_SEAT_OCCUPANCY_POLICY } from '@/lib/home-public-copy'
 
 /**
  * 公開版人頭計價價目表（framework 文件第 6 節公開版）。
@@ -47,6 +48,13 @@ const RATE_TABLES: RateTableSpec[] = [
     withGuide: false,
   },
   {
+    icon: '🚗',
+    title: '轎車＋泰國司機＋中文導遊',
+    subtitle: '2–3 人，中文導遊選配方案',
+    groupSizes: [2, 3],
+    withGuide: true,
+  },
+  {
     icon: '🚐',
     title: 'Van＋泰國司機＋中文導遊',
     subtitle: '4–9 人，中文導遊選配方案',
@@ -56,7 +64,7 @@ const RATE_TABLES: RateTableSpec[] = [
 ]
 
 const SEAT_RULES = [
-  { people: '2–3 人', rule: '轎車＋泰國司機；如加聘中文導遊，需先確認車型' },
+  { people: '2–3 人', rule: '轎車＋泰國司機；中文導遊可選配。3 人加導遊時，一般 5 人座剛好滿座；座位、安全座椅、行李較多或舒適度需求會由調度確認車型' },
   { people: '4–9 人', rule: '一台 Van＋泰國司機；中文導遊可選配' },
   { people: '10–18 人', rule: 'Van×2（兩台 Van）＋泰國司機；請用 LINE 取得整團報價；如選配中文導遊，兩台車共用一位' },
   { people: '19 人以上', rule: '人工報價，確認車輛與服務安排' },
@@ -79,13 +87,13 @@ interface PerPersonPricingTableProps {
 export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTableProps) {
   return (
     <div className="space-y-10">
-      {/* 每人每日價三張表 */}
+      {/* 每人每日價四張表 */}
       <div>
         <p className="text-sm text-gray-500 mb-4 text-center">
           單位：THB／人／日，以同行總人數（嬰幼兒皆佔位）查表。標準安排為泰國司機；
           需要隨車中文溝通或導覽，可加聘中文導遊。
         </p>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
           {RATE_TABLES.map((table) => (
             <div
               key={table.title + table.subtitle}
@@ -146,7 +154,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           ))}
         </div>
         <p className="text-sm text-gray-500 mt-3 text-center">
-          司機與導遊是分開的專業角色；中文導遊不因人數強制安排，4–18 人皆可依需求選配。
+          司機與導遊是分開的專業角色；中文導遊不因人數強制安排，2–18 人皆可依需求選配。
         </p>
       </div>
 
@@ -178,7 +186,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
               </span>
             </li>
             <li className="flex justify-between gap-4">
-              <span className="text-gray-700">兒童安全座椅也佔一個座位</span>
+              <span className="text-gray-700">{CHILD_SEAT_OCCUPANCY_POLICY}</span>
               <span className="font-semibold text-gray-900 whitespace-nowrap">
                 THB {thb(CHILD_SEAT_FEE_PER_DAY)}／日／張
               </span>
@@ -201,8 +209,8 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           <h3 className="text-lg font-bold text-gray-900 mb-4">費用不含</h3>
           <ul className="space-y-3 text-sm text-gray-700">
             <li>
-              超時費：清邁一日 10 小時、清萊／金三角一日 12 小時，超過後 THB{' '}
-              {thb(OVERTIME_FEE_PER_HOUR_PER_CAR)}／小時／台，按台實收
+              超時費：清邁一日 10 小時、清萊／金三角一日 12 小時，結束時間有 30 分鐘彈性；
+              超過後 THB {thb(OVERTIME_FEE_PER_HOUR_PER_CAR)}／小時／台，按台實收，導遊不另收超時費
             </li>
             <li>景點門票、餐食（可代訂另計）</li>
           </ul>

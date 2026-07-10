@@ -10,9 +10,21 @@ import {
 import type {
   FareProtection,
   ManualQuoteReason,
+  Tier,
   TripAddons,
   TripQuote,
 } from '@/lib/pricing/perPersonRates'
+
+const GUIDED_SEDAN_ADULT_RATES = [
+  ['T1', 2, 3550],
+  ['T1', 3, 2450],
+  ['T2', 2, 3800],
+  ['T2', 3, 2600],
+  ['T3', 2, 4450],
+  ['T3', 3, 3050],
+  ['T4', 2, 4750],
+  ['T4', 3, 3250],
+] satisfies Array<[Tier, number, number]>
 
 function narrowedQuoteFields(quote: TripQuote) {
   if (quote.manualQuoteRequired) {
@@ -43,10 +55,13 @@ describe('resolveFleet', () => {
       vehicle: 'sedan',
       carCount: 1,
       guideRequired: false,
-      guideAllowed: false,
+      guideAllowed: true,
       manualQuoteRequired: false,
     })
-    expect(resolveFleet(3).vehicle).toBe('sedan')
+    expect(resolveFleet(3)).toMatchObject({
+      vehicle: 'sedan',
+      guideAllowed: true,
+    })
     expect(resolveFleet(4)).toMatchObject({
       vehicle: 'van',
       carCount: 1,
@@ -167,9 +182,19 @@ describe('calcPerPersonDay', () => {
     expect(calcPerPersonDay('T4', 3, false)).toBe(2400)
   })
 
-  it('does not silently return an unguided sedan price for a guided request', () => {
-    expect(() => calcPerPersonDay('T1', 2, true)).toThrow(/manual|車型|人工/i)
-  })
+  it.each(GUIDED_SEDAN_ADULT_RATES)(
+    'prices guided sedan %s for %i adults at THB %i per adult per day',
+    (tier, adults, expectedRate) => {
+      expect(calcPerPersonDay(tier, adults, true)).toBe(expectedRate)
+    },
+  )
+
+  it.each([false, true])(
+    'does not expose a one-traveler automatic rate (withGuide=%s)',
+    (withGuide) => {
+      expect(() => calcPerPersonDay('T1', 1, withGuide)).toThrow(/at least two|至少 2|manual/i)
+    },
+  )
 
   it('prices two Vans and one shared guide for 10-18 adults', () => {
     expect(calcPerPersonDay('T2', 10, true)).toBe(1600)
@@ -203,21 +228,31 @@ describe('calcTrip automatic and manual quote states', () => {
     expect(trip.items.some((item) => item.label.includes('導遊成本'))).toBe(false)
   })
 
-  it('returns typed manual state for a 2-3 guest guided request', () => {
-    const trip = calcTrip({
-      days: [{ tier: 'T1' }],
-      adults: 2,
-      children: 0,
-      infants: 0,
-      withGuide: true,
-    })
+  it.each(GUIDED_SEDAN_ADULT_RATES)(
+    'finalizes guided sedan %s for %i adults at THB %i per adult per day',
+    (tier, adults, expectedRate) => {
+      const trip = calcTrip({
+        days: [{ tier }],
+        adults,
+        children: 0,
+        infants: 0,
+        withGuide: true,
+      })
 
-    expect(trip.manualQuoteRequired).toBe(true)
-    expect(trip.manualQuoteReason).toMatch(/車型|vehicle/i)
-    expect(trip.totalThb).toBeNull()
-    expect(trip.fareProtection).toBeNull()
-    expect(trip.items).toEqual([])
-  })
+      expect(trip.manualQuoteRequired).toBe(false)
+      expect(trip.manualQuoteReason).toBeNull()
+      expect(trip.fleet).toMatchObject({
+        vehicle: 'sedan',
+        carCount: 1,
+        guideAllowed: true,
+        withGuide: true,
+      })
+      expect(trip.guideCostThb).toBe(1500)
+      expect(trip.perPersonDayPrices).toEqual([expectedRate])
+      expect(trip.perPerson.adult).toBe(expectedRate)
+      expect(trip.totalThb).toBe(expectedRate * adults)
+    },
+  )
 
   it('returns typed manual state for 19+ instead of a fake final price', () => {
     const trip = calcTrip({
@@ -250,7 +285,7 @@ describe('calcTrip automatic and manual quote states', () => {
   it('exposes a discriminated quote type that narrows all coupled fields', () => {
     const manual = calcTrip({
       days: [{ tier: 'T1' }],
-      adults: 2,
+      adults: 19,
       children: 0,
       infants: 0,
       withGuide: true,
@@ -383,7 +418,7 @@ describe('calcTrip fare protection', () => {
     expect(fourAdults.fareProtection).toEqual({
       provisionalThb: 9000,
       coreFloorThb: 8300,
-      monotonicFloorThb: 0,
+      monotonicFloorThb: 7800,
       finalThb: 9000,
       appliedRule: 'provisional',
     })

@@ -1,4 +1,5 @@
 import { calcPerPersonDay } from './perPersonRates'
+import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
 
 export interface CarCharterPublicFeature {
   icon?: string
@@ -54,7 +55,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     {
       icon: '🧒',
       title: '兒童安全座椅付費加購',
-      description: 'THB 500／日／張，請事先提供孩子年齡與體重；安全座椅也佔一個座位。',
+      description: `${PAID_CHILD_SEAT_POLICY}請事先提供孩子年齡與體重。`,
     },
     {
       icon: '🧳',
@@ -81,12 +82,12 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     {
       question: '中文導遊一定要加嗎？',
       answer:
-        '不一定，4–18 人皆可選配。2–3 人加聘中文導遊需先確認車型；10–18 人安排兩台 Van 時，選配導遊由兩台車共用一位。19 人以上請由 LINE 人工確認。',
+        '不一定，2–18 人皆可選配。2–3 人為轎車方案；3 人加導遊時，一般 5 人座剛好滿座，座位、安全座椅、行李較多或舒適度需求會由調度確認車型。10–18 人安排兩台 Van 時，選配導遊由兩台車共用一位。19 人以上請由 LINE 人工確認。',
     },
     {
       question: '超時怎麼計算？',
       answer:
-        '清邁一日用車 10 小時、清萊與金三角一日 12 小時。超過用車時數後，超時費為 THB 300／小時／台，按台計收。',
+        '清邁一日用車 10 小時、清萊與金三角一日 12 小時，結束時間有 30 分鐘彈性。超過後，超時費為 THB 300／小時／台，按台計收；中文導遊不另收超時費。',
     },
     {
       question: '可以帶嬰兒車嗎？',
@@ -94,8 +95,7 @@ export const CAR_CHARTER_PUBLIC_COPY = {
     },
     {
       question: '安全座椅怎麼安排？',
-      answer:
-        '兒童安全座椅為 THB 500／日／張，付費加購。請事先提供孩子年齡與體重；安全座椅也佔一個座位。',
+      answer: `${PAID_CHILD_SEAT_POLICY}付費加購，請事先提供孩子年齡與體重。`,
     },
     {
       question: '可以客製行程嗎？',

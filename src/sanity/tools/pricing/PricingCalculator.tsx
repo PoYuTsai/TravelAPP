@@ -71,8 +71,10 @@ import {
   type QuotePublicPageMode,
 } from '@/lib/quote/publicPageMode'
 import {
+  getCharterOvertimePolicyCopy,
   getGuideControlPolicy,
   getLockedGuideServiceDays,
+  resolveGuideService,
   resolveCustomerQuoteGate,
 } from './quotePolicy'
 
@@ -449,6 +451,7 @@ function downloadExternalQuote(
 ) {
   const tripNights = tripDays - 1
   const fmt = (n: number) => n.toLocaleString()
+  const overtimePolicy = getCharterOvertimePolicyCopy(c.carCount)
   const mealLabels: Record<number, string> = { 600: '簡餐', 900: '平價', 1200: '精選', 1500: '高級' }
 
   const hotelInfo = hotels.map(h => `${h.name}(${h.nights}晚)`).join(' + ')
@@ -894,8 +897,9 @@ function downloadExternalQuote(
       <div style="margin-top: 12px; padding: 10px; background: #fff3e0; border: 1px solid #ffcc02; border-radius: 6px; font-size: 12px;">
         <div style="font-weight:bold;color:#9a6b2a;margin-bottom:4px;">⏱️ 超時費說明</div>
         <div style="color:#555;">
-          • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-          • 超時費：<strong>300 泰銖/小時 × ${c.carCount}台車</strong>${c.guided ? '（導遊不另收）' : ''}
+          • ${overtimePolicy.serviceHours}<br />
+          • ${overtimePolicy.grace}<br />
+          • <strong>${overtimePolicy.fee}</strong>
         </div>
       </div>
       <!-- 台幣匯款資訊 -->
@@ -1032,6 +1036,7 @@ function downloadSimpleExternalQuote(
 ) {
   const tripNights = tripDays - 1
   const fmt = (n: number) => n.toLocaleString()
+  const overtimePolicy = getCharterOvertimePolicyCopy(c.carCount)
   const externalQuote = buildExternalQuoteBreakdown({
     pricingModel: 'perPerson',
     perPersonItems: c.perPerson?.trip?.items ?? [],
@@ -1403,8 +1408,9 @@ function downloadSimpleExternalQuote(
         <div class="mini-note">
           <div><strong>加時說明</strong></div>
           <div style="margin-top: 4px; color: ${EXTERNAL_QUOTE_THEME.textSoft};">
-            • 每日包車服務最多 10 小時，如需超時另計 12 小時。<br />
-            • 加班費為 <strong>300 泰銖/小時 × ${c.carCount} 台車</strong>。
+            • ${overtimePolicy.serviceHours}<br />
+            • ${overtimePolicy.grace}<br />
+            • <strong>${overtimePolicy.fee}</strong>
           </div>
         </div>
       </div>
@@ -2954,7 +2960,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const childSeatDays = totalChildSeatCount > 0
       ? clampChildSeatServiceDays(childSeatServiceDays, carServiceDays, carServiceDays)
       : 0
-    // 人頭計價：2–3 人加導遊與 19+ 由 engine 回傳 typed manual quote。
+    // 人頭計價：2–3 人可選配導遊並自動報價；1 人與 19+ 維持 typed manual quote。
     const perPerson = buildPerPersonQuote({
       days: dailyCarFees,
       adults,
@@ -2962,8 +2968,9 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       infants,
       withGuide: includeGuide,
     })
-    const guided = perPerson.guided
-    const guideDays = getLockedGuideServiceDays(guided, dailyCarFees)
+    const guideService = resolveGuideService(perPerson.guided, dailyCarFees)
+    const guided = guideService.active
+    const guideDays = guideService.days
     const photographerCount = getThaiDressPhotographerCount({
       isSelected: thaiDressPhoto,
       people,
@@ -3207,6 +3214,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const roundScaled = (n: number | null, scale: number) => n === null ? null : Math.round(n * scale)
   const quoteGate = resolveCustomerQuoteGate(calculation.perPerson)
   const guideControlPolicy = getGuideControlPolicy(calculation.people)
+  const overtimePolicy = getCharterOvertimePolicyCopy(calculation.carCount)
   const formalProfitShares =
     variant === 'formal' && calculation.yourTotalProfit !== null
       ? calculateFormalProfitShares(calculation.yourTotalProfit + calculation.partnerTotalProfit)
@@ -4532,7 +4540,7 @@ Day 5｜送機
           <Section title="🚗 車導費">
             <div style={{ background: '#f5f5f5', borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 13 }}>
               <strong>🚐 座位硬規則（人頭計價）</strong><br />
-              • 2~3 人 → 轎車（導遊選配；加導遊需確認車型）<br />
+              • 2~3 人 → 轎車（導遊選配；3 人加導遊時一般 5 人座剛好滿座，座椅與行李由調度確認）<br />
               • 4~9 人 → 1 台 Van（導遊選配）<br />
               • 10~18 人 → 2 台 Van（導遊選配）｜19 人以上 → 人工報價
             </div>
@@ -4559,9 +4567,9 @@ Day 5｜送機
             )}
             <div style={{ background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8, padding: 12, fontSize: 13 }}>
               <strong>⏱️ 超時費規則</strong><br />
-              • 清邁行程：10 小時/天<br />
-              • 清萊行程：12 小時/天<br />
-              • 超時費：300 泰銖/小時
+              • {overtimePolicy.serviceHours}<br />
+              • {overtimePolicy.grace}<br />
+              • {overtimePolicy.fee}
             </div>
 
             {/* 兒童座椅 */}
@@ -5467,8 +5475,9 @@ Day 5｜送機
 
               {/* 超時費規則 */}
               <SectionRow title="⏱️ 超時費規則（未計入報價）" />
-              <InfoRow text="清邁行程：10小時/天，超時 300 泰銖/小時" />
-              <InfoRow text="清萊行程：12小時/天，超時 300 泰銖/小時" />
+              <InfoRow text={overtimePolicy.serviceHours} />
+              <InfoRow text={overtimePolicy.grace} />
+              <InfoRow text={overtimePolicy.fee} />
             </tbody>
           </table>
 
@@ -5970,8 +5979,9 @@ Day 5｜送機
                 <div style={{ marginTop: 8, padding: 10, background: '#fff3e0', borderRadius: 6, fontSize: 12, border: '1px solid #ffcc02' }}>
                   <div style={{ fontWeight: 'bold', color: '#9a6b2a', marginBottom: 4 }}>⏱️ 超時費說明</div>
                   <div style={{ color: '#555' }}>
-                    • 清邁行程：每日 10 小時｜清萊：每日 12 小時<br />
-                    • 超時費：<strong>300 泰銖/小時 × {calculation.carCount}台車</strong>{calculation.guided ? '（導遊不另收）' : ''}
+                    • {overtimePolicy.serviceHours}<br />
+                    • {overtimePolicy.grace}<br />
+                    • <strong>{overtimePolicy.fee}</strong>
                   </div>
                 </div>
 
@@ -6204,6 +6214,7 @@ function ExternalQuoteTab({
   })
   const headerCopy = getExternalQuoteHeaderCopy(tripDays, tripNights)
   const travelerSummary = `${adults} 位成人${childCount > 0 ? ` + ${childCount} 位小孩` : ''}`
+  const overtimePolicy = getCharterOvertimePolicyCopy(calculation.carCount)
 
   const cardShadow = `0 18px 42px ${EXTERNAL_QUOTE_THEME.shadow}`
   const surfaceShadow = `0 10px 24px ${EXTERNAL_QUOTE_THEME.shadow}`
@@ -6470,8 +6481,9 @@ function ExternalQuoteTab({
           >
             <div style={{ fontWeight: 700, color: EXTERNAL_QUOTE_THEME.accentDeep, marginBottom: 4 }}>加時說明</div>
             <div style={{ color: EXTERNAL_QUOTE_THEME.textSoft }}>
-              • 每日包車服務最多 10 小時，如需超時另計 12 小時<br />
-              • 加班費為 <strong>300 泰銖/小時 × {calculation.carCount} 台車</strong>
+              • {overtimePolicy.serviceHours}<br />
+              • {overtimePolicy.grace}<br />
+              • <strong>{overtimePolicy.fee}</strong>
             </div>
           </div>
         </div>

@@ -6,22 +6,23 @@ const PUBLIC_SOURCE_ROOTS = [
   // New public routes/components/pricing copy are picked up without maintaining a file list.
   'src/app',
   'src/components',
-  'src/lib/pricing',
+  'src/lib',
 ] as const
 
 const PUBLIC_SOURCE_FILES = [
-  // These public-copy modules live outside the recursive roots above.
-  'src/lib/brand-entity.ts',
-  'src/lib/home-public-copy.ts',
-  'src/lib/site-settings.ts',
+  // This production-facing Sanity schema lives outside the recursive roots above.
   'src/sanity/schemas/siteSettings.ts',
 ] as const
 
 const EXCLUDED_PUBLIC_SOURCE_FILES = new Set([
-  // Verified customer wording must stay verbatim. A separate render test requires the
-  // canonical staffing disclaimer beside this exact component.
-  'src/components/sections/Testimonials.tsx',
+  // Verified customer wording must stay verbatim; the rendering component remains scanned.
+  'src/components/sections/testimonials-data.ts',
 ])
+
+const EXCLUDED_PUBLIC_SOURCE_PREFIXES = [
+  // LINE-agent workflows are internal; generated public artwork remains scanned.
+  'src/lib/line-agent/',
+] as const
 
 interface ForbiddenCopy {
   label: string
@@ -31,7 +32,7 @@ interface ForbiddenCopy {
 const FORBIDDEN_COPY: ForbiddenCopy[] = [
   {
     label: '正面中文司機承諾',
-    pattern: /中文司機|司機\s*(?:都|皆|也)?\s*(?:會|能|可以)\s*(?:說)?中文|(?:會|能|可)(?:說)?中文(?:的)?司機|中文(?:流利|溝通)[^。；\n]{0,4}(?:的)?司機/g,
+    pattern: /中文司機|司機\s*(?:都|皆|也)?\s*(?:會|能|可以)\s*(?:說)?中文|司機(?:兼導遊)?\s*中文\s*(?:非常好|很好|流利|溝通(?:良好|順暢)?)|(?:會|能|可)(?:說)?中文(?:的)?司機|中文(?:流利|溝通)[^。；\n]{0,4}(?:的)?司機/g,
   },
   {
     label: '8 人與未證實法規綁定',
@@ -69,6 +70,9 @@ function normalizePath(relativePath: string) {
 
 function isPublicSourceFile(relativePath: string) {
   const normalized = normalizePath(relativePath)
+  if (EXCLUDED_PUBLIC_SOURCE_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+    return false
+  }
   if (!/\.[cm]?[jt]sx?$/.test(normalized)) return false
   if (/(?:^|\/)(?:__tests__|__fixtures__)(?:\/|$)/.test(normalized)) return false
   if (/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalized)) return false
@@ -79,7 +83,13 @@ function discoverSourceFiles(relativeDirectory: string): string[] {
   return readdirSync(resolve(process.cwd(), relativeDirectory), { withFileTypes: true }).flatMap(
     (entry) => {
       const relativePath = normalizePath(`${relativeDirectory}/${entry.name}`)
-      if (entry.isDirectory()) return discoverSourceFiles(relativePath)
+      if (entry.isDirectory()) {
+        return EXCLUDED_PUBLIC_SOURCE_PREFIXES.some((prefix) =>
+          `${relativePath}/`.startsWith(prefix)
+        )
+          ? []
+          : discoverSourceFiles(relativePath)
+      }
       return isPublicSourceFile(relativePath) ? [relativePath] : []
     }
   )
@@ -133,12 +143,22 @@ describe('production public copy tripwire', () => {
     expect(violations).toEqual([])
   })
 
-  it('recursively includes public routes and components while excluding verbatim reviews', () => {
+  it('recursively includes public routes, components and lib while isolating only review data and internal prefixes', () => {
     const paths = readPublicSources().map(({ relativePath }) => relativePath.replace(/\\/g, '/'))
 
     expect(paths).toContain('src/app/homestay/page.tsx')
     expect(paths).toContain('src/components/sections/ToursPreview.tsx')
-    expect(paths).not.toContain('src/components/sections/Testimonials.tsx')
+    expect(paths).toContain('src/components/sections/Testimonials.tsx')
+    expect(paths).toContain('src/lib/site-settings.ts')
+    expect(paths).toContain('src/lib/quote/quoteDisplay.ts')
+    expect(paths).not.toContain('src/components/sections/testimonials-data.ts')
+    expect(paths).not.toContain('src/lib/line-agent/cases/auto-reply.ts')
+
+    const testimonialsComponent = readFileSync(
+      resolve(process.cwd(), 'src/components/sections/Testimonials.tsx'),
+      'utf8',
+    )
+    expect(testimonialsComponent).not.toContain('司機兼導遊中文非常好')
   })
 
   it('catches positive Chinese-speaking-driver promises in alternate word order', () => {
@@ -147,5 +167,15 @@ describe('production public copy tripwire', () => {
     ])
     expect(findViolations('virtual-public-page.tsx', '不保證中文司機，標準安排為泰國司機')).toEqual([])
     expect(findViolations('virtual-public-page.tsx', '不保證會中文的司機，請使用 LINE 支援')).toEqual([])
+
+    for (const promise of [
+      '司機中文非常好',
+      '司機兼導遊中文非常好',
+      '司機中文流利',
+    ]) {
+      expect(findViolations('virtual-public-page.tsx', promise)).toEqual([
+        expect.stringContaining('正面中文司機承諾'),
+      ])
+    }
   })
 })

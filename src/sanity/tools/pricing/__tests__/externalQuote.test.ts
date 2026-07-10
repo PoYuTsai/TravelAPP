@@ -148,7 +148,9 @@ describe('pricing external quote breakdown', () => {
     expect(breakdown.included).toContain('中文導遊')
     expect(breakdown.included).toContain('車資、油費、過路費、停車費')
     expect(breakdown.included).not.toContain('超時費')
-    expect(breakdown.excluded).toContain('超時費（THB 300/小時/台）')
+    expect(breakdown.excluded).toContain(
+      '超時費（30 分鐘彈性後，THB 300／小時／台；中文導遊不另收）',
+    )
     expect(breakdown.included).not.toContain('大人')
     expect(breakdown.excluded).not.toContain('中文導遊')
     expect(breakdown.totalTHB).toBe(63600)
@@ -189,6 +191,43 @@ describe('pricing external quote breakdown', () => {
     })
 
     expect(breakdown.items.map((item) => item.label)).toEqual(['大人'])
+    expect(breakdown.included).not.toContain('中文導遊')
+    expect(breakdown.excluded).toContain('中文導遊')
+  })
+
+  it('perPerson 純接送：勾選導遊但服務日為 0 時不得對客承諾包含導遊', () => {
+    const breakdown = buildExternalQuoteBreakdown({
+      pricingModel: 'perPerson',
+      perPersonItems: [],
+      transferFee: 1000,
+      transferTrips: 2,
+      includeAccommodation: false,
+      includeMeals: false,
+      includeGuide: true,
+      includeInsurance: false,
+      accommodationCost: 0,
+      mealCost: 0,
+      carPriceTotal: 1000,
+      guidePrice: 0,
+      luggageCost: 0,
+      childSeatCost: 0,
+      ticketPrice: 0,
+      thaiDressPrice: 0,
+      insuranceCost: 0,
+      totalPrice: 1000,
+      exchangeRate: 1.1,
+      totalNights: 0,
+      mealDays: 0,
+      guideDays: 0,
+      carServiceDays: 0,
+      carCount: 1,
+      childSeatDays: 0,
+      totalChildSeatCount: 0,
+      selectedTicketCount: 0,
+      hasThaiDress: false,
+    })
+
+    expect(breakdown.items.map((item) => item.label)).toEqual(['接送機'])
     expect(breakdown.included).not.toContain('中文導遊')
     expect(breakdown.excluded).toContain('中文導遊')
   })

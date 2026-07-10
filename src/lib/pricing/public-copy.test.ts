@@ -136,10 +136,20 @@ describe('car-charter canonical public copy', () => {
     expect(driverFaq?.answer).toMatch(/隨車中文溝通或導覽.*中文導遊/)
 
     const guideFaq = copy.faq.find((item) => item.question === '中文導遊一定要加嗎？')
-    expect(guideFaq?.answer).toContain('4–18 人皆可選配')
+    expect(guideFaq?.answer).toContain('2–18 人皆可選配')
+    expect(guideFaq?.answer).toMatch(/3 人.*導遊.*一般 5 人座.*剛好滿/)
+    expect(guideFaq?.answer).toMatch(/安全座椅.*行李.*舒適度.*調度.*確認車型/)
+    expect(guideFaq?.answer).not.toContain('需先確認車型')
     const childSeatFaq = copy.faq.find((item) => item.question === '安全座椅怎麼安排？')
     expect(childSeatFaq?.answer).toMatch(/THB 500／日／張.*付費加購/)
-    expect(childSeatFaq?.answer).toContain('也佔一個座位')
+    expect(childSeatFaq?.answer).toContain('每位乘客（含嬰幼兒）各佔一席')
+    expect(childSeatFaq?.answer).toContain('安全座椅安裝於該乘客座位，不另加算一人')
+    expect(childSeatFaq?.answer).toContain('需納入車內座位配置')
+
+    const overtimeFaq = copy.faq.find((item) => item.question === '超時怎麼計算？')
+    expect(overtimeFaq?.answer).toContain('30 分鐘彈性')
+    expect(overtimeFaq?.answer).toContain('THB 300／小時／台')
+    expect(overtimeFaq?.answer).toContain('中文導遊不另收超時費')
 
     expect(copy.metadata.description).toContain('兒童安全座椅付費加購')
     expect(copy.serviceSchemaDescription).toContain('泰國司機')
@@ -151,6 +161,7 @@ describe('car-charter canonical public copy', () => {
     expect(allCopy).not.toContain('泰國法規')
     expect(allCopy).not.toContain('必配持證')
     expect(allCopy).not.toMatch(/(?:提供|安排|保證)中文司機/)
+    expect(allCopy).not.toMatch(/SUV/i)
   })
 
   it('uses the canonical metadata as the page metadata source', () => {
@@ -198,6 +209,7 @@ describe('car-charter canonical public copy', () => {
 
     // Render the real component, rather than source-grepping for price-table words.
     expect(text).toContain('轎車＋泰國司機')
+    expect(text).toContain('轎車＋泰國司機＋中文導遊')
     expect(text).toContain('Van＋泰國司機＋中文導遊')
     expect(text).toContain('最低成團價')
 

@@ -7,6 +7,13 @@ export type CustomerQuoteGate =
   | { blocked: false; message: null }
   | { blocked: true; message: string }
 
+export interface CharterOvertimePolicyCopy {
+  serviceHours: string
+  grace: string
+  fee: string
+  excludedLabel: string
+}
+
 const MANUAL_QUOTE_MESSAGES: Record<PerPersonManualQuoteReason, string> = {
   'minimum-group-size-required':
     '至少 2 位旅客才能使用自動報價，請人工確認後再對客出單。',
@@ -34,16 +41,13 @@ export function resolveCustomerQuoteGate(quote: {
   }
 }
 
-export function getGuideControlPolicy(occupiedSeats: number): {
+export function getGuideControlPolicy(_occupiedSeats: number): {
   disabled: boolean
   note: string | null
 } {
   return {
     disabled: false,
-    note:
-      occupiedSeats >= 2 && occupiedSeats <= 3
-        ? '（加導遊需確認車型）'
-        : null,
+    note: null,
   }
 }
 
@@ -58,4 +62,26 @@ export function getLockedGuideServiceDays(
   days: ReadonlyArray<{ type: string }>,
 ): number {
   return withGuide ? countGuideServiceDays(days) : 0
+}
+
+export function resolveGuideService(
+  withGuide: boolean,
+  days: ReadonlyArray<{ type: string }>,
+): { days: number; active: boolean } {
+  const guideDays = getLockedGuideServiceDays(withGuide, days)
+  return {
+    days: guideDays,
+    active: guideDays > 0,
+  }
+}
+
+export function getCharterOvertimePolicyCopy(
+  carCount: number,
+): CharterOvertimePolicyCopy {
+  return {
+    serviceHours: '清邁行程：每日 10 小時；清萊／金三角行程：每日 12 小時',
+    grace: '結束時間有 30 分鐘彈性',
+    fee: `超過後按 THB 300／小時／台計收（${carCount} 台車按台計）；中文導遊不另收超時費`,
+    excludedLabel: '超時費（30 分鐘彈性後，THB 300／小時／台；中文導遊不另收）',
+  }
 }

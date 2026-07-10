@@ -3,6 +3,7 @@ import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
+import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
 
 interface ServiceItem {
   image?: { asset: SanityImageSource; alt?: string }
@@ -21,7 +22,7 @@ const defaultServices: ServiceItem[] = [
     features: [
       '標準泰國司機，行程事先確認',
       'LINE 中文支援；中文導遊依需求選配',
-      '兒童安全座椅 THB 500／日／張，且佔一個座位；安裝於該乘客座位，不另加算一人',
+      PAID_CHILD_SEAT_POLICY,
       '車輛、油資、過路費與停車費已含',
     ],
     price: '每人每日 THB 750 起，依人數與區域報價',

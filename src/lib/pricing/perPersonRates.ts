@@ -56,6 +56,7 @@ export const DRIVER_GUIDE_ROOM_FEE_PER_NIGHT = 750
 export const DEFAULT_THB_PER_TWD = 1.1
 
 export type ManualQuoteReason =
+  /** @deprecated Retained so serialized legacy quotes can still be gated safely. */
   | 'guided-sedan-requires-vehicle-confirmation'
   | 'group-size-requires-manual-quote'
   | 'guide-sell-price-unset'
@@ -82,7 +83,7 @@ export function resolveFleet(occupiedSeats: number): Fleet {
       vehicle: 'sedan',
       carCount: 1,
       guideRequired: false,
-      guideAllowed: false,
+      guideAllowed: true,
       manualQuoteRequired: false,
       manualQuoteReason: null,
     }
@@ -164,11 +165,11 @@ function coreFixedDayThb(
 
 function automaticPricingContext(groupSize: number, withGuide: boolean) {
   const fleet = resolveFleet(groupSize)
+  if (groupSize < 2) {
+    throw new Error('At least two travelers are required for automatic pricing')
+  }
   if (fleet.manualQuoteRequired) {
     throw new Error('此人數需人工報價（manual quote）')
-  }
-  if (withGuide && !fleet.guideAllowed) {
-    throw new Error('2–3 人加中文導遊需人工確認合適車型')
   }
 
   const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
@@ -347,7 +348,7 @@ function calculateProtectedCore(
     }
 
     const fleet = resolveFleet(occupiedSeats)
-    if (fleet.manualQuoteRequired || (withGuide && !fleet.guideAllowed)) {
+    if (fleet.manualQuoteRequired) {
       memo.set(key, null)
       return null
     }
@@ -436,16 +437,6 @@ export function calcTrip(input: TripInput): TripQuote {
       fleet,
       withGuide,
       fleet.manualQuoteReason ?? 'group-size-requires-manual-quote',
-      guideCostThb,
-    )
-  }
-
-  if (withGuide && !fleet.guideAllowed) {
-    return manualTripQuote(
-      occupiedSeats,
-      fleet,
-      true,
-      'guided-sedan-requires-vehicle-confirmation',
       guideCostThb,
     )
   }

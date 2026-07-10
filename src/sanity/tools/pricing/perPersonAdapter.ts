@@ -168,9 +168,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
 
   const manualQuoteReason = fleet.manualQuoteRequired
     ? fleet.manualQuoteReason
-    : guided && !fleet.guideAllowed
-      ? 'guided-sedan-requires-vehicle-confirmation'
-      : null
+    : null
 
   if (manualQuoteReason) {
     return {

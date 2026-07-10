@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   countGuideServiceDays,
+  getCharterOvertimePolicyCopy,
   getGuideControlPolicy,
   getLockedGuideServiceDays,
+  resolveGuideService,
   resolveCustomerQuoteGate,
 } from '../quotePolicy'
 
@@ -16,7 +18,7 @@ describe('resolveCustomerQuoteGate', () => {
     ).toEqual({ blocked: false, message: null })
   })
 
-  it('blocks guided sedan quotes with a clear vehicle-confirmation reason', () => {
+  it('still blocks a serialized legacy guided-sedan manual state', () => {
     const gate = resolveCustomerQuoteGate({
       manualQuoteRequired: true,
       manualQuoteReason: 'guided-sedan-requires-vehicle-confirmation',
@@ -48,18 +50,11 @@ describe('resolveCustomerQuoteGate', () => {
 })
 
 describe('getGuideControlPolicy', () => {
-  it.each([4, 8, 9, 10, 18])('keeps guide optional for %i guests', (occupiedSeats) => {
+  it.each([2, 3, 4, 8, 9, 10, 18])('keeps guide optional for %i guests without a manual vehicle note', (occupiedSeats) => {
     const policy = getGuideControlPolicy(occupiedSeats)
 
     expect(policy.disabled).toBe(false)
     expect(policy.note).toBeNull()
-  })
-
-  it.each([2, 3])('keeps guide selectable for %i guests and explains manual vehicle confirmation', (occupiedSeats) => {
-    const policy = getGuideControlPolicy(occupiedSeats)
-
-    expect(policy.disabled).toBe(false)
-    expect(policy.note).toMatch(/加導遊需確認車型/)
   })
 })
 
@@ -80,5 +75,33 @@ describe('getLockedGuideServiceDays', () => {
   it('locks guide service to non-transfer itinerary days when selected', () => {
     expect(getLockedGuideServiceDays(true, mixedDays)).toBe(5)
     expect(getLockedGuideServiceDays(false, mixedDays)).toBe(0)
+  })
+
+  it('separates a saved guide selection from actual service on transfer-only days', () => {
+    const transferOnly = [{ type: 'airport' }, { type: 'airport' }]
+
+    expect(resolveGuideService(true, transferOnly)).toEqual({
+      days: 0,
+      active: false,
+    })
+    expect(resolveGuideService(true, mixedDays)).toEqual({
+      days: 5,
+      active: true,
+    })
+    expect(resolveGuideService(false, mixedDays)).toEqual({
+      days: 0,
+      active: false,
+    })
+  })
+})
+
+describe('getCharterOvertimePolicyCopy', () => {
+  it('keeps customer and internal quote outputs on the full overtime policy', () => {
+    expect(getCharterOvertimePolicyCopy(2)).toEqual({
+      serviceHours: '清邁行程：每日 10 小時；清萊／金三角行程：每日 12 小時',
+      grace: '結束時間有 30 分鐘彈性',
+      fee: '超過後按 THB 300／小時／台計收（2 台車按台計）；中文導遊不另收超時費',
+      excludedLabel: '超時費（30 分鐘彈性後，THB 300／小時／台；中文導遊不另收）',
+    })
   })
 })

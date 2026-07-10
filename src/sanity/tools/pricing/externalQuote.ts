@@ -1,3 +1,5 @@
+import { getCharterOvertimePolicyCopy } from './quotePolicy'
+
 export interface ExternalQuotePerPersonItem {
   label: string
   quantity: number
@@ -89,6 +91,8 @@ export function buildExternalQuoteBreakdown(
   const items: ExternalQuoteBreakdownItem[] = []
   const activityAmount = input.ticketPrice + input.thaiDressPrice
   const isPerPerson = input.pricingModel === 'perPerson'
+  const includesGuideService = input.includeGuide && input.guideDays > 0
+  const overtimePolicy = getCharterOvertimePolicyCopy(input.carCount)
   const perPersonLabels = new Set<string>()
 
   if (isPerPerson) {
@@ -121,7 +125,7 @@ export function buildExternalQuoteBreakdown(
       })
     }
 
-    if (input.includeGuide && input.guidePrice > 0) {
+    if (includesGuideService && input.guidePrice > 0) {
       items.push({
         label: '中文導遊',
         amountTHB: input.guidePrice,
@@ -198,7 +202,7 @@ export function buildExternalQuoteBreakdown(
     ? [
         '車資、油費、過路費、停車費',
         '專業司機',
-        ...(input.includeGuide ? ['中文導遊'] : []),
+        ...(includesGuideService ? ['中文導遊'] : []),
         '貼心中文客服',
         ...items
           .filter((item) => !perPersonLabels.has(item.label) && item.label !== '接送機')
@@ -213,13 +217,13 @@ export function buildExternalQuoteBreakdown(
       : null,
     !input.includeMeals ? '餐食' : null,
     activityAmount <= 0 ? ACTIVITY_BOOKING_LABEL : null,
-    !input.includeGuide ? '中文導遊' : null,
+    !includesGuideService ? '中文導遊' : null,
     !input.includeInsurance ? '旅遊保險' : null,
     '機票',
     '個人消費',
     '司機導遊小費',
-    // 超時費按台實收（清邁 10hr、清萊/金三角 12hr 後），不進包含清單
-    isPerPerson ? '超時費（THB 300/小時/台）' : null,
+    // 超時費在 30 分鐘彈性後按台實收，不進包含清單。
+    isPerPerson ? overtimePolicy.excludedLabel : null,
   ].filter((item): item is string => Boolean(item))
 
   const hasPrepaidItems =

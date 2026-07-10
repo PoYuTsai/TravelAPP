@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
+import {
+  defaultTestimonials,
+  type Testimonial,
+} from '@/components/sections/testimonials-data'
 
 // Star icon
 function StarIcon({ className }: { className?: string }) {
@@ -22,64 +26,6 @@ function QuoteIcon({ className }: { className?: string }) {
     </svg>
   )
 }
-
-interface Testimonial {
-  name: string
-  location?: string
-  kids?: string
-  content: string
-  highlight: string
-  source?: 'facebook' | 'google'
-}
-
-// Real customer reviews from Google (一字不漏，優先挑選親子相關評價)
-const defaultTestimonials: Testimonial[] = [
-  {
-    name: '王婉蓉',
-    location: '台灣',
-    content: '整個服務非常的好…在詢問的時候就非常的細心而且很耐心的回覆，當天服務也非常到位，司機兼導遊中文非常好…會介紹清邁歷史和沿途風光，嬰兒座椅非常舒服安全讓小朋友坐上去…還能睡著多次😀😀尤其是車子很乾淨也有冷氣，真的非常好的體驗👍👍👍推薦大家來清邁可以找他們包車，價格含油錢我覺得非常合理😊…能按照你的需要調整行程，下次去清邁包車還會再光顧！！',
-    highlight: '嬰兒座椅安全舒服，小朋友還能睡著',
-    source: 'google',
-  },
-  {
-    name: 'Sky',
-    location: '台灣',
-    kids: '2大2小',
-    content: '我們1家4口，2+2第一次來清邁，選擇了包車+導遊服務，行程可以自由變動，很彈性且方便，導遊和司機都很親切～重點是小朋友都很開心！！大推👍👍',
-    highlight: '重點是小朋友都很開心',
-    source: 'google',
-  },
-  {
-    name: 'Milu Jen',
-    location: '台灣',
-    kids: '6大2小',
-    content: '6大2小清邁包車+導遊旅行，找清微省了很多時間與煩惱，有任何問題只要詢問，老闆阿裕都會認真解答～行程與用餐也會依據我們的需求給出建議，也能代訂位與訂票，我們的隨車導遊是小胖，很健談對各景點介紹詳細，對小朋友也很有耐心，當大人在化妝或拍照、按摩時，也願意陪伴他們真的很感謝！另外小胖也會依據我們的時間與景點狀況給出建議讓我們參考是否要調整，很感謝這趟旅行能有清微與小胖，讓大家渡過一個輕鬆快樂的年假！',
-    highlight: '對小朋友很有耐心，大人放鬆時會陪伴孩子',
-    source: 'google',
-  },
-  {
-    name: 'Esun Chuang',
-    location: '台灣',
-    content: '第一次規劃清邁家族旅遊，很幸運的遇到了清微旅行，官方賴全程有中文客服即時回覆，行程上的安排非常流暢，導遊專業有耐心、司機和善親切，五天的家族旅遊十分順利、非常愉快…',
-    highlight: '家族旅遊十分順利，導遊專業有耐心',
-    source: 'google',
-  },
-  {
-    name: '勞美美',
-    location: '台灣',
-    content: '這趟旅行真的要大力感謝郭姐和包車司機❤️一路上不只行程安排得很順，對孩子更是貼心到不行。我們大人和大哥哥姐姐出去玩時，會主動幫忙照顧最小的兩歲孩子，讓我們可以放心玩；孩子太累在車上睡著，也會陪著照顧，醒了再帶來找正在逛街的我們，真的超貼心！不論是帶小孩或長輩的家庭，都非常適合！郭姐和司機讓人超安心，推薦的景點、餐廳也都很棒，不論多晚在哪兒都能找到好吃又適合全家的地方，還幫忙預訂餐廳，預約任何行程！厲害的是導遊郭姐還會幫忙側拍好多照片影片，都好好看！這是一趟讓人留下滿滿美好回憶的旅程，真心大推✨',
-    highlight: '主動照顧兩歲孩子，讓爸媽放心玩',
-    source: 'google',
-  },
-  {
-    name: '洪偉傑',
-    location: '台灣',
-    kids: '2大2小',
-    content: '我們包車清萊一日遊，客製化的行程，雖然只有2大2小，仍然給我們一台11人座的麵包車，位置非常寬敞，價格公道，司機從頭到尾都非常親切有禮貌，給了我們一個很美好的包車體驗與旅程👍👍👍',
-    highlight: '2大2小也給寬敞車型，價格公道',
-    source: 'google',
-  },
-]
 
 interface TestimonialsProps {
   testimonials?: Testimonial[]

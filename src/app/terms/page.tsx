@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
 
 export const metadata: Metadata = {
   title: '服務條款',
@@ -108,7 +109,7 @@ export default function TermsPage() {
               <li>景點門票</li>
               <li>餐飲費用</li>
               <li>中文導遊服務（選配方案另計）</li>
-              <li>兒童安全座椅：THB 500／日／張，且佔一個座位；每位乘客（含嬰幼兒）各佔一席，安全座椅安裝於該乘客座位，不另加算一人</li>
+              <li>{PAID_CHILD_SEAT_POLICY}</li>
               <li>小費（建議但非強制）</li>
             </ul>
           </section>

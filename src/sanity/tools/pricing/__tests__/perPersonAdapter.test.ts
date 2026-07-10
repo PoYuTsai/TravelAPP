@@ -88,24 +88,43 @@ describe('buildPerPersonQuote', () => {
     expect(result.trip!.totalThb).toBe(expected.totalThb)
   })
 
-  it('3 人選導遊時保留選擇並要求人工確認車型，不回傳假報價', () => {
+  it.each([2, 3])('%i 人選導遊時使用 sedan＋guide 並自動完成報價', (occupiedSeats) => {
     const result = buildPerPersonQuote({
       days: sixDays,
-      adults: 2,
+      adults: occupiedSeats - 1,
       children: 1,
       infants: 0,
       withGuide: true,
     })
     expect(result.guided).toBe(true)
     expect(result.fleet?.vehicle).toBe('sedan')
-    expect(result.manualQuoteRequired).toBe(true)
-    expect(result.manualQuoteReason).toBe(
-      'guided-sedan-requires-vehicle-confirmation',
+    expect(result.manualQuoteRequired).toBe(false)
+    expect(result.manualQuoteReason).toBeNull()
+    expect(result.trip?.manualQuoteRequired).toBe(false)
+    expect(result.trip?.guideCostThb).toBe(7500)
+    expect(result.groupTourPrice).toBe(
+      result.trip?.manualQuoteRequired ? null : result.trip!.totalThb + 500,
     )
-    expect(result.trip?.manualQuoteRequired).toBe(true)
-    expect(result.groupTourPrice).toBeNull()
     // 送機日：sedan 500 × 1 台，人數 <8 無行李車
     expect(result.transferFee).toBe(500)
+  })
+
+  it('2–3 人 guided 純接送仍只收既有接送費，不新增導遊服務日', () => {
+    const result = buildPerPersonQuote({
+      days: [{ name: '接機', type: 'airport' }, { name: '送機', type: 'airport' }],
+      adults: 3,
+      children: 0,
+      infants: 0,
+      withGuide: true,
+    })
+
+    expect(result.guided).toBe(true)
+    expect(result.fleet?.vehicle).toBe('sedan')
+    expect(result.trip).toBeNull()
+    expect(result.manualQuoteRequired).toBe(false)
+    expect(result.manualQuoteReason).toBeNull()
+    expect(result.transferFee).toBe(1000)
+    expect(result.groupTourPrice).toBe(1000)
   })
 
   it('10 人 guided T2 單日使用兩台 Van，自動團費為 16,000', () => {
@@ -171,13 +190,13 @@ describe('buildPerPersonQuote', () => {
     expect(result.manualQuoteReason).toBeNull()
   })
 
-  it('1 位成人含行程日時回傳 typed manual quote，不在 render path throw', () => {
+  it.each([false, true])('1 位成人（withGuide=%s）含行程日時維持 typed manual quote', (withGuide) => {
     const result = buildPerPersonQuote({
       days: [{ name: '市區一日遊', type: 'city' }],
       adults: 1,
       children: 0,
       infants: 0,
-      withGuide: false,
+      withGuide,
     })
 
     expect(result.occupiedSeats).toBe(1)
@@ -186,6 +205,7 @@ describe('buildPerPersonQuote', () => {
     expect(result.manualQuoteReason).toBe('minimum-group-size-required')
     expect(result.trip).toBeNull()
     expect(result.groupTourPrice).toBeNull()
+    expect(result.guided).toBe(withGuide)
   })
 
   it('全部都是接送日時只收接送費，不 throw', () => {

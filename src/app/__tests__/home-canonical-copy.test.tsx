@@ -111,7 +111,7 @@ describe('homepage canonical service copy', () => {
     expect(description).toContain('LINE 中文支援')
     expect(description).toContain('中文導遊選配')
     expect(description).toContain('兒童安全座椅付費加購')
-    expect(html).toContain('THB 750–3,500／人／日')
+    expect(html).toContain('THB 750–4,750／人／日')
     expect(html).toContain('標準泰國司機')
     expect(html).toContain('LINE 中文支援')
     expect(html).toContain('中文導遊選配')
