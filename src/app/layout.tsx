@@ -4,6 +4,7 @@ import './globals.css'
 import Header from '@/components/Header'
 import Footer from '@/components/Footer'
 import FloatingLineButton from '@/components/ui/FloatingLineButton'
+import AdLineLinkSwap from '@/components/AdLineLinkSwap'
 
 // Google Tag Manager ID
 const GTM_ID = 'GTM-5WH32MLX'
@@ -195,6 +196,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         </main>
         <Footer />
         <FloatingLineButton />
+        <AdLineLinkSwap />
       </body>
     </html>
   )
