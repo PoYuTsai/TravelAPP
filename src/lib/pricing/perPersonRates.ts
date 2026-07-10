@@ -59,6 +59,7 @@ export type ManualQuoteReason =
   | 'guided-sedan-requires-vehicle-confirmation'
   | 'group-size-requires-manual-quote'
   | 'guide-sell-price-unset'
+  | 'guide-capacity-requires-manual-quote'
 
 export interface Fleet {
   vehicle: Vehicle
@@ -103,7 +104,7 @@ export function resolveFleet(occupiedSeats: number): Fleet {
 }
 
 export interface GuidePricing {
-  guideCostThb: number
+  guideCostThb: number | null
   guideSellThb: number | null
   manualQuoteRequired: boolean
   manualQuoteReason: ManualQuoteReason | null
@@ -139,10 +140,10 @@ export function resolveGuidePricing(
   }
 
   return {
-    guideCostThb: 0,
+    guideCostThb: null,
     guideSellThb: null,
     manualQuoteRequired: true,
-    manualQuoteReason: 'guide-sell-price-unset',
+    manualQuoteReason: 'guide-capacity-requires-manual-quote',
   }
 }
 
@@ -229,20 +230,33 @@ export interface FareProtection {
   appliedRule: 'provisional' | 'core-floor' | 'monotonic-floor'
 }
 
-export interface TripQuote {
+export interface TripQuoteBase {
   occupiedSeats: number
   fleet: Fleet & { withGuide: boolean }
-  manualQuoteRequired: boolean
-  manualQuoteReason: ManualQuoteReason | null
   /** Internal-only actual guide cost for all priced trip days. */
-  guideCostThb: number
+  guideCostThb: number | null
   perPersonDayPrices: number[]
   perPerson: { adult: number; child: number; infant: number }
-  fareProtection: FareProtection | null
   items: QuoteItem[]
-  /** Null means no automatic final price may be presented. */
-  totalThb: number | null
 }
+
+export interface ManualTripQuote extends TripQuoteBase {
+  manualQuoteRequired: true
+  manualQuoteReason: ManualQuoteReason
+  fareProtection: null
+  /** Null means no automatic final price may be presented. */
+  totalThb: null
+}
+
+export interface AutomaticTripQuote extends TripQuoteBase {
+  manualQuoteRequired: false
+  manualQuoteReason: null
+  guideCostThb: number
+  fareProtection: FareProtection
+  totalThb: number
+}
+
+export type TripQuote = ManualTripQuote | AutomaticTripQuote
 
 function longTripDiscountPerDay(dayCount: number): number {
   for (const { minDays, perPersonPerDay } of LONG_TRIP_DISCOUNTS) {
@@ -264,6 +278,16 @@ function validateTripInput(input: TripInput) {
   assertNonNegativeInteger(input.children, 'children')
   assertNonNegativeInteger(input.infants, 'infants')
 
+  const addons = input.addons ?? {}
+  for (const addonKey of [
+    'childSeats',
+    'insurancePersons',
+    'overnightRoomNights',
+  ] as const) {
+    const value = addons[addonKey]
+    if (value !== undefined) assertNonNegativeInteger(value, addonKey)
+  }
+
   if (input.adults < 1) throw new Error('At least one adult is required')
   if (input.adults + input.children + input.infants < 2) {
     throw new Error('At least two travelers are required')
@@ -275,8 +299,8 @@ function manualTripQuote(
   fleet: Fleet,
   withGuide: boolean,
   reason: ManualQuoteReason,
-  guideCostThb: number,
-): TripQuote {
+  guideCostThb: number | null,
+): ManualTripQuote {
   return {
     occupiedSeats,
     fleet: { ...fleet, withGuide },
@@ -401,7 +425,10 @@ export function calcTrip(input: TripInput): TripQuote {
   const occupiedSeats = adults + children + infants
   const fleet = resolveFleet(occupiedSeats)
   const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
-  const guideCostThb = guidePricing.guideCostThb * days.length
+  const guideCostThb =
+    guidePricing.guideCostThb === null
+      ? null
+      : guidePricing.guideCostThb * days.length
 
   if (fleet.manualQuoteRequired) {
     return manualTripQuote(
@@ -423,7 +450,11 @@ export function calcTrip(input: TripInput): TripQuote {
     )
   }
 
-  if (guidePricing.manualQuoteRequired || guidePricing.guideSellThb === null) {
+  if (
+    guidePricing.manualQuoteRequired ||
+    guidePricing.guideSellThb === null ||
+    guideCostThb === null
+  ) {
     return manualTripQuote(
       occupiedSeats,
       fleet,

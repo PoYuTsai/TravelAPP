@@ -7,6 +7,28 @@ import {
   resolveFleet,
   resolveGuidePricing,
 } from '@/lib/pricing/perPersonRates'
+import type {
+  FareProtection,
+  ManualQuoteReason,
+  TripAddons,
+  TripQuote,
+} from '@/lib/pricing/perPersonRates'
+
+function narrowedQuoteFields(quote: TripQuote) {
+  if (quote.manualQuoteRequired) {
+    const reason: ManualQuoteReason = quote.manualQuoteReason
+    const totalThb: null = quote.totalThb
+    const fareProtection: null = quote.fareProtection
+    const guideCostThb: number | null = quote.guideCostThb
+    return { manual: true as const, reason, totalThb, fareProtection, guideCostThb }
+  }
+
+  const reason: null = quote.manualQuoteReason
+  const totalThb: number = quote.totalThb
+  const fareProtection: FareProtection = quote.fareProtection
+  const guideCostThb: number = quote.guideCostThb
+  return { manual: false as const, reason, totalThb, fareProtection, guideCostThb }
+}
 
 describe('pricing constants', () => {
   it('keeps airport transfer and TWD fallback constants stable', () => {
@@ -110,6 +132,15 @@ describe('resolveGuidePricing', () => {
       manualQuoteRequired: true,
     })
   })
+
+  it('uses null instead of zero when four-Van guide cost is unknown', () => {
+    expect(resolveGuidePricing(4, true)).toEqual({
+      guideCostThb: null,
+      guideSellThb: null,
+      manualQuoteRequired: true,
+      manualQuoteReason: 'guide-capacity-requires-manual-quote',
+    })
+  })
 })
 
 describe('calcPerPersonDay', () => {
@@ -202,6 +233,47 @@ describe('calcTrip automatic and manual quote states', () => {
     expect(trip.fareProtection).toBeNull()
   })
 
+  it('keeps unknown guide cost null for a guided 28-person manual quote', () => {
+    const trip = calcTrip({
+      days: [{ tier: 'T2' }],
+      adults: 28,
+      children: 0,
+      infants: 0,
+      withGuide: true,
+    })
+
+    expect(trip.manualQuoteRequired).toBe(true)
+    expect(trip.guideCostThb).toBeNull()
+    expect(trip.totalThb).toBeNull()
+  })
+
+  it('exposes a discriminated quote type that narrows all coupled fields', () => {
+    const manual = calcTrip({
+      days: [{ tier: 'T1' }],
+      adults: 2,
+      children: 0,
+      infants: 0,
+      withGuide: true,
+    })
+    const automatic = calcTrip({
+      days: [{ tier: 'T1' }],
+      adults: 4,
+      children: 0,
+      infants: 0,
+      withGuide: false,
+    })
+
+    expect(narrowedQuoteFields(manual)).toMatchObject({
+      manual: true,
+      totalThb: null,
+      fareProtection: null,
+    })
+    expect(narrowedQuoteFields(automatic)).toMatchObject({
+      manual: false,
+      totalThb: 5600,
+    })
+  })
+
   it('requires at least one adult and at least two travelers', () => {
     expect(() =>
       calcTrip({
@@ -292,6 +364,38 @@ describe('calcTrip fare protection', () => {
     expect(trip.totalThb).toBeGreaterThanOrEqual(14100)
   })
 
+  it('uses the monotonic floor when adding one child to T2 guided 4A', () => {
+    const fourAdults = calcTrip({
+      days: [{ tier: 'T2' }],
+      adults: 4,
+      children: 0,
+      infants: 0,
+      withGuide: true,
+    })
+    const withChild = calcTrip({
+      days: [{ tier: 'T2' }],
+      adults: 4,
+      children: 1,
+      infants: 0,
+      withGuide: true,
+    })
+
+    expect(fourAdults.fareProtection).toEqual({
+      provisionalThb: 9000,
+      coreFloorThb: 8300,
+      monotonicFloorThb: 0,
+      finalThb: 9000,
+      appliedRule: 'provisional',
+    })
+    expect(withChild.fareProtection).toEqual({
+      provisionalThb: 8880,
+      coreFloorThb: 8300,
+      monotonicFloorThb: 9000,
+      finalThb: 9000,
+      appliedRule: 'monotonic-floor',
+    })
+  })
+
   it('never lowers core group fare when one adult, child, or infant is added', () => {
     const tiers = ['T1', 'T2', 'T3', 'T4'] as const
 
@@ -347,6 +451,32 @@ describe('calcTrip fare protection', () => {
 })
 
 describe('calcTrip add-ons remain outside fare protection', () => {
+  it('rejects non-integer, negative, and non-finite add-on counts', () => {
+    const addonKeys: Array<keyof TripAddons> = [
+      'childSeats',
+      'insurancePersons',
+      'overnightRoomNights',
+    ]
+    const invalidValues = [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]
+
+    for (const addonKey of addonKeys) {
+      for (const invalidValue of invalidValues) {
+        expect(
+          () =>
+            calcTrip({
+              days: [{ tier: 'T1' }],
+              adults: 2,
+              children: 0,
+              infants: 0,
+              withGuide: false,
+              addons: { [addonKey]: invalidValue },
+            }),
+          `${addonKey}=${invalidValue}`,
+        ).toThrow(addonKey)
+      }
+    }
+  })
+
   it('adds a child seat and six-person insurance in full after the THB 8,300 floor', () => {
     const trip = calcTrip({
       days: [{ tier: 'T2' }],
