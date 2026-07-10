@@ -4,6 +4,10 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/client'
+import {
+  DAY_TOUR_PUBLIC_PRICING,
+  getDayTourPricingTierLabel,
+} from '@/lib/pricing/dayTourPricing'
 
 // Map location codes to Chinese names
 const locationNames: Record<string, string> = {
@@ -20,7 +24,7 @@ interface DayTourCardProps {
   location?: string
   coverImage?: any
   highlights?: string[]
-  priceFrom?: number
+  pricingTier?: unknown
 }
 
 export default function DayTourCard({
@@ -29,7 +33,7 @@ export default function DayTourCard({
   location = 'chiang-mai',
   coverImage,
   highlights,
-  priceFrom,
+  pricingTier,
 }: DayTourCardProps) {
   const locationDisplay = locationNames[location] || location || '清邁'
   return (
@@ -75,15 +79,12 @@ export default function DayTourCard({
           </p>
         )}
 
-        {/* Price */}
-        {priceFrom && (
-          <div className="mt-3 flex items-baseline gap-1">
-            <span className="text-lg font-bold text-primary">
-              ${priceFrom.toLocaleString()}
-            </span>
-            <span className="text-sm text-gray-400">起/團</span>
-          </div>
-        )}
+        <p className="mt-3 text-sm font-medium text-primary">
+          {DAY_TOUR_PUBLIC_PRICING.cardLabel}
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          {getDayTourPricingTierLabel({ pricingTier, title, slug })}
+        </p>
 
         {/* CTA Arrow */}
         <div className="mt-2 text-primary text-sm font-medium flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

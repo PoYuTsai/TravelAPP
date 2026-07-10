@@ -1,16 +1,8 @@
-/**
- * 每人計價引擎（Per-Person Pricing）
- * 規格：docs/plans/2026-07-10-per-person-pricing-framework.md
- *
- * 單日團費總額 = 基準車價 + 導遊費(若配) + 每車日加成 G + 人數 n × 每人日加成 V
- * 每人每日價   = ⌈總額 ÷ n ÷ 50⌉ × 50
- * 級距一律看「總佔位人數」——嬰兒 0-2 歲也佔位。
- */
+/** Canonical per-person pricing for Chiangway Travel charter quotes. */
 
 export type Tier = 'T1' | 'T2' | 'T3' | 'T4'
 export type Vehicle = 'sedan' | 'van'
 
-/** 內部基準車價（黃表，THB/日）——不對客展示 */
 export const TIER_BASE_PRICES: Record<Tier, { sedan: number; van: number }> = {
   T1: { sedan: 3300, van: 4000 },
   T2: { sedan: 3800, van: 4800 },
@@ -18,7 +10,7 @@ export const TIER_BASE_PRICES: Record<Tier, { sedan: number; van: number }> = {
   T4: { sedan: 5200, van: 6600 },
 }
 
-/** 每車日加成 G（THB/日） */
+/** Per-car, per-day operating markup. */
 export const CAR_DAY_MARKUP: Record<Tier, number> = {
   T1: 1000,
   T2: 1000,
@@ -26,102 +18,179 @@ export const CAR_DAY_MARKUP: Record<Tier, number> = {
   T4: 1500,
 }
 
-/** 每人日加成 V（THB/人/日） */
 export const PER_PERSON_DAY_MARKUP = 150
 
-/** 持證中文導遊（THB/日） */
+/** Kept as the public one/two-car guide sell anchor for existing consumers. */
 export const GUIDE_FEE_PER_DAY = 2500
 
-/** 機場日佔位 ≥8 自動加行李車（THB/趟，攤入該日團費） */
+export const VAN_GUEST_CAPACITY = 9
+export const MAX_VANS_PER_GUIDE = 3
+
+export const GUIDE_PRICING = {
+  1: { guideCostThb: 1500, guideSellThb: 2500 },
+  2: { guideCostThb: 2000, guideSellThb: 2500 },
+  3: { guideCostThb: 2500, guideSellThb: null },
+} as const
+
 export const LUGGAGE_VAN_FEE = 700
 export const LUGGAGE_VAN_SEAT_THRESHOLD = 8
 
-/** 僅接送日（接機/送機無排行程）按車收單趟價，不算一日團費 */
 export const AIRPORT_TRANSFER_FEES: Record<Vehicle, number> = {
   sedan: 500,
   van: 700,
 }
 
-/** 收費三段制 */
-export const CHILD_PRICE_RATIO = 0.8 // 3-11 歲
-export const INFANT_PRICE_RATIO = 0.5 // 0-2 歲
+export const CHILD_PRICE_RATIO = 0.8
+export const INFANT_PRICE_RATIO = 0.5
 
-/** 長包折扣（每人每日，THB） */
 export const LONG_TRIP_DISCOUNTS = [
   { minDays: 5, perPersonPerDay: 100 },
   { minDays: 3, perPersonPerDay: 50 },
 ]
 
-/** 加購項（實收） */
 export const CHILD_SEAT_FEE_PER_DAY = 500
 export const INSURANCE_FEE_PER_PERSON = 100
 export const DRIVER_GUIDE_ROOM_FEE_PER_NIGHT = 750
 
-/**
- * 匯率 fallback（TWD = THB ÷ rate）。
- * 前後台統一用這個值；後台舊值 0.93 是方向錯誤（會把 TWD 灌水），一律改用本常數。
- */
+/** Fallback conversion: TWD = THB / rate. */
 export const DEFAULT_THB_PER_TWD = 1.1
+
+export type ManualQuoteReason =
+  /** @deprecated Retained so serialized legacy quotes can still be gated safely. */
+  | 'guided-sedan-requires-vehicle-confirmation'
+  | 'group-size-requires-manual-quote'
+  | 'guide-sell-price-unset'
+  | 'guide-capacity-requires-manual-quote'
 
 export interface Fleet {
   vehicle: Vehicle
   carCount: number
+  /** Retained for compatibility; passenger count never forces guide service. */
   guideRequired: boolean
   guideAllowed: boolean
+  manualQuoteRequired: boolean
+  manualQuoteReason: ManualQuoteReason | null
 }
 
-/** 座位硬規則：2-3 轎車；4-7 van 導遊選配；8-9 van 必配導遊；10+ 兩台 */
+/** Resolve occupied seats into vehicles. Every passenger, including infants, occupies a seat. */
 export function resolveFleet(occupiedSeats: number): Fleet {
   if (!Number.isInteger(occupiedSeats) || occupiedSeats < 1) {
-    throw new Error(`佔位人數無效：${occupiedSeats}`)
+    throw new Error(`Invalid occupied-seat count: ${occupiedSeats}`)
   }
+
   if (occupiedSeats <= 3) {
-    return { vehicle: 'sedan', carCount: 1, guideRequired: false, guideAllowed: false }
+    return {
+      vehicle: 'sedan',
+      carCount: 1,
+      guideRequired: false,
+      guideAllowed: true,
+      manualQuoteRequired: false,
+      manualQuoteReason: null,
+    }
   }
-  if (occupiedSeats <= 7) {
-    return { vehicle: 'van', carCount: 1, guideRequired: false, guideAllowed: true }
+
+  const carCount = Math.ceil(occupiedSeats / VAN_GUEST_CAPACITY)
+  const manualQuoteRequired = occupiedSeats >= 19
+
+  return {
+    vehicle: 'van',
+    carCount,
+    guideRequired: false,
+    guideAllowed: true,
+    manualQuoteRequired,
+    manualQuoteReason: manualQuoteRequired
+      ? 'group-size-requires-manual-quote'
+      : null,
   }
-  if (occupiedSeats <= 9) {
-    return { vehicle: 'van', carCount: 1, guideRequired: true, guideAllowed: true }
+}
+
+export interface GuidePricing {
+  guideCostThb: number | null
+  guideSellThb: number | null
+  manualQuoteRequired: boolean
+  manualQuoteReason: ManualQuoteReason | null
+}
+
+/** Resolve internal guide cost separately from the public sell anchor. */
+export function resolveGuidePricing(
+  carCount: number,
+  withGuide: boolean,
+): GuidePricing {
+  if (!Number.isInteger(carCount) || carCount < 1) {
+    throw new Error(`Invalid car count: ${carCount}`)
   }
-  return { vehicle: 'van', carCount: 2, guideRequired: true, guideAllowed: true }
+
+  if (!withGuide) {
+    return {
+      guideCostThb: 0,
+      guideSellThb: 0,
+      manualQuoteRequired: false,
+      manualQuoteReason: null,
+    }
+  }
+
+  if (carCount <= MAX_VANS_PER_GUIDE) {
+    const anchor = GUIDE_PRICING[carCount as keyof typeof GUIDE_PRICING]
+    const manualQuoteRequired = anchor.guideSellThb === null
+    return {
+      guideCostThb: anchor.guideCostThb,
+      guideSellThb: anchor.guideSellThb,
+      manualQuoteRequired,
+      manualQuoteReason: manualQuoteRequired ? 'guide-sell-price-unset' : null,
+    }
+  }
+
+  return {
+    guideCostThb: null,
+    guideSellThb: null,
+    manualQuoteRequired: true,
+    manualQuoteReason: 'guide-capacity-requires-manual-quote',
+  }
 }
 
 export function roundUpTo50(amount: number): number {
   return Math.ceil(amount / 50) * 50
 }
 
-/** 依座位規則收斂實際是否配導遊 */
-function effectiveWithGuide(fleet: Fleet, withGuide: boolean): boolean {
-  if (fleet.guideRequired) return true
-  if (!fleet.guideAllowed) return false
-  return withGuide
-}
-
-function dayTotalThb(
+function coreFixedDayThb(
   tier: Tier,
-  groupSize: number,
-  withGuide: boolean,
-  extraThb = 0,
+  fleet: Fleet,
+  guideSellThb: number,
 ): number {
-  const fleet = resolveFleet(groupSize)
-  const guided = effectiveWithGuide(fleet, withGuide)
   return (
-    TIER_BASE_PRICES[tier][fleet.vehicle] +
-    (guided ? GUIDE_FEE_PER_DAY : 0) +
-    CAR_DAY_MARKUP[tier] +
-    groupSize * PER_PERSON_DAY_MARKUP +
-    extraThb
+    fleet.carCount * (TIER_BASE_PRICES[tier][fleet.vehicle] + CAR_DAY_MARKUP[tier]) +
+    guideSellThb
   )
 }
 
-/** 每人日價（framework 第 6 節價目表由此公式推導） */
+function automaticPricingContext(groupSize: number, withGuide: boolean) {
+  const fleet = resolveFleet(groupSize)
+  if (groupSize < 2) {
+    throw new Error('At least two travelers are required for automatic pricing')
+  }
+  if (fleet.manualQuoteRequired) {
+    throw new Error('此人數需人工報價（manual quote）')
+  }
+
+  const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
+  const { guideSellThb } = guidePricing
+  if (guidePricing.manualQuoteRequired || guideSellThb === null) {
+    throw new Error('導遊售價需人工報價（manual quote）')
+  }
+
+  return { fleet, guidePricing, guideSellThb }
+}
+
 export function calcPerPersonDay(
   tier: Tier,
   groupSize: number,
   withGuide: boolean,
 ): number {
-  return roundUpTo50(dayTotalThb(tier, groupSize, withGuide) / groupSize)
+  const { fleet, guideSellThb } = automaticPricingContext(groupSize, withGuide)
+  const coreFixed = coreFixedDayThb(tier, fleet, guideSellThb)
+  return roundUpTo50(
+    (coreFixed + groupSize * PER_PERSON_DAY_MARKUP) / groupSize,
+  )
 }
 
 export interface TripDay {
@@ -130,19 +199,19 @@ export interface TripDay {
 }
 
 export interface TripAddons {
-  /** 兒童安全座椅張數（500/日/張 × 全程天數） */
+  /** THB 500 per seat per trip day. */
   childSeats?: number
-  /** 投保人數（100/人/趟） */
+  /** THB 100 per insured traveler per trip. */
   insurancePersons?: number
-  /** 司導過夜房數合計（750/房/晚，攤入每人價） */
+  /** THB 750 per room-night. */
   overnightRoomNights?: number
 }
 
 export interface TripInput {
   days: TripDay[]
   adults: number
-  children: number // 3-11 歲
-  infants: number // 0-2 歲
+  children: number
+  infants: number
   withGuide: boolean
   addons?: TripAddons
 }
@@ -154,15 +223,41 @@ export interface QuoteItem {
   subtotalThb: number
 }
 
-export interface TripQuote {
+export interface FareProtection {
+  provisionalThb: number
+  coreFloorThb: number
+  monotonicFloorThb: number
+  finalThb: number
+  appliedRule: 'provisional' | 'core-floor' | 'monotonic-floor'
+}
+
+export interface TripQuoteBase {
   occupiedSeats: number
   fleet: Fleet & { withGuide: boolean }
-  /** 大人每日價（含長包折扣、機場日行李車攤提） */
+  /** Internal-only actual guide cost for all priced trip days. */
+  guideCostThb: number | null
   perPersonDayPrices: number[]
   perPerson: { adult: number; child: number; infant: number }
   items: QuoteItem[]
+}
+
+export interface ManualTripQuote extends TripQuoteBase {
+  manualQuoteRequired: true
+  manualQuoteReason: ManualQuoteReason
+  fareProtection: null
+  /** Null means no automatic final price may be presented. */
+  totalThb: null
+}
+
+export interface AutomaticTripQuote extends TripQuoteBase {
+  manualQuoteRequired: false
+  manualQuoteReason: null
+  guideCostThb: number
+  fareProtection: FareProtection
   totalThb: number
 }
+
+export type TripQuote = ManualTripQuote | AutomaticTripQuote
 
 function longTripDiscountPerDay(dayCount: number): number {
   for (const { minDays, perPersonPerDay } of LONG_TRIP_DISCOUNTS) {
@@ -171,63 +266,249 @@ function longTripDiscountPerDay(dayCount: number): number {
   return 0
 }
 
-export function calcTrip(input: TripInput): TripQuote {
-  const { days, adults, children, infants, withGuide, addons = {} } = input
-  if (days.length === 0) throw new Error('至少需要一天行程')
+function assertNonNegativeInteger(value: number, label: string) {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative integer`)
+  }
+}
 
+function validateTripInput(input: TripInput) {
+  if (input.days.length === 0) throw new Error('At least one trip day is required')
+
+  assertNonNegativeInteger(input.adults, 'adults')
+  assertNonNegativeInteger(input.children, 'children')
+  assertNonNegativeInteger(input.infants, 'infants')
+
+  const addons = input.addons ?? {}
+  for (const addonKey of [
+    'childSeats',
+    'insurancePersons',
+    'overnightRoomNights',
+  ] as const) {
+    const value = addons[addonKey]
+    if (value !== undefined) assertNonNegativeInteger(value, addonKey)
+  }
+
+  if (input.adults < 1) throw new Error('At least one adult is required')
+  if (input.adults + input.children + input.infants < 2) {
+    throw new Error('At least two travelers are required')
+  }
+}
+
+function manualTripQuote(
+  occupiedSeats: number,
+  fleet: Fleet,
+  withGuide: boolean,
+  reason: ManualQuoteReason,
+  guideCostThb: number | null,
+): ManualTripQuote {
+  return {
+    occupiedSeats,
+    fleet: { ...fleet, withGuide },
+    manualQuoteRequired: true,
+    manualQuoteReason: reason,
+    guideCostThb,
+    perPersonDayPrices: [],
+    perPerson: { adult: 0, child: 0, infant: 0 },
+    fareProtection: null,
+    items: [],
+    totalThb: null,
+  }
+}
+
+interface ProtectedCoreCalculation {
+  perPersonDayPrices: number[]
+  perPerson: { adult: number; child: number; infant: number }
+  fareProtection: FareProtection
+}
+
+function calculateProtectedCore(
+  days: TripDay[],
+  adults: number,
+  children: number,
+  infants: number,
+  withGuide: boolean,
+): ProtectedCoreCalculation {
+  const discount = longTripDiscountPerDay(days.length)
+  const memo = new Map<string, ProtectedCoreCalculation | null>()
+
+  const calculate = (
+    currentAdults: number,
+    currentChildren: number,
+    currentInfants: number,
+  ): ProtectedCoreCalculation | null => {
+    const key = `${currentAdults}:${currentChildren}:${currentInfants}`
+    const cached = memo.get(key)
+    if (cached !== undefined) return cached
+
+    const occupiedSeats = currentAdults + currentChildren + currentInfants
+    if (currentAdults < 1 || occupiedSeats < 2) {
+      memo.set(key, null)
+      return null
+    }
+
+    const fleet = resolveFleet(occupiedSeats)
+    if (fleet.manualQuoteRequired) {
+      memo.set(key, null)
+      return null
+    }
+
+    const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
+    if (guidePricing.manualQuoteRequired || guidePricing.guideSellThb === null) {
+      memo.set(key, null)
+      return null
+    }
+
+    const coreFixedDays = days.map((day) =>
+      coreFixedDayThb(day.tier, fleet, guidePricing.guideSellThb as number),
+    )
+    const perPersonDayPrices = coreFixedDays.map(
+      (coreFixed) =>
+        roundUpTo50(
+          (coreFixed + occupiedSeats * PER_PERSON_DAY_MARKUP) / occupiedSeats,
+        ) - discount,
+    )
+    const adult = perPersonDayPrices.reduce((sum, price) => sum + price, 0)
+    const child = adult * CHILD_PRICE_RATIO
+    const infant = adult * INFANT_PRICE_RATIO
+    const provisionalThb =
+      currentAdults * adult + currentChildren * child + currentInfants * infant
+    const coreFloorThb = coreFixedDays.reduce((sum, amount) => sum + amount, 0)
+
+    const predecessors: Array<ProtectedCoreCalculation | null> = []
+    if (currentAdults > 1) {
+      predecessors.push(calculate(currentAdults - 1, currentChildren, currentInfants))
+    }
+    if (currentChildren > 0) {
+      predecessors.push(calculate(currentAdults, currentChildren - 1, currentInfants))
+    }
+    if (currentInfants > 0) {
+      predecessors.push(calculate(currentAdults, currentChildren, currentInfants - 1))
+    }
+
+    const monotonicFloorThb = predecessors.reduce(
+      (highest, predecessor) =>
+        Math.max(highest, predecessor?.fareProtection.finalThb ?? 0),
+      0,
+    )
+    const finalThb = Math.max(provisionalThb, coreFloorThb, monotonicFloorThb)
+    const appliedRule: FareProtection['appliedRule'] =
+      provisionalThb >= coreFloorThb && provisionalThb >= monotonicFloorThb
+        ? 'provisional'
+        : coreFloorThb >= monotonicFloorThb
+          ? 'core-floor'
+          : 'monotonic-floor'
+
+    const result: ProtectedCoreCalculation = {
+      perPersonDayPrices,
+      perPerson: { adult, child, infant },
+      fareProtection: {
+        provisionalThb,
+        coreFloorThb,
+        monotonicFloorThb,
+        finalThb,
+        appliedRule,
+      },
+    }
+    memo.set(key, result)
+    return result
+  }
+
+  const result = calculate(adults, children, infants)
+  if (!result) throw new Error('Trip combination cannot be priced automatically')
+  return result
+}
+
+export function calcTrip(input: TripInput): TripQuote {
+  validateTripInput(input)
+
+  const { days, adults, children, infants, withGuide, addons = {} } = input
   const occupiedSeats = adults + children + infants
   const fleet = resolveFleet(occupiedSeats)
-  if (fleet.carCount > 1) {
-    throw new Error('10 人以上需兩台車，請拆成兩張單各自計價')
+  const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
+  const guideCostThb =
+    guidePricing.guideCostThb === null
+      ? null
+      : guidePricing.guideCostThb * days.length
+
+  if (fleet.manualQuoteRequired) {
+    return manualTripQuote(
+      occupiedSeats,
+      fleet,
+      withGuide,
+      fleet.manualQuoteReason ?? 'group-size-requires-manual-quote',
+      guideCostThb,
+    )
   }
-  const guided = effectiveWithGuide(fleet, withGuide)
-  const discount = longTripDiscountPerDay(days.length)
 
-  const perPersonDayPrices = days.map((day) => {
-    const luggage =
-      day.isAirportDay && occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD
-        ? LUGGAGE_VAN_FEE
-        : 0
-    const total = dayTotalThb(day.tier, occupiedSeats, guided, luggage)
-    return roundUpTo50(total / occupiedSeats) - discount
-  })
+  if (
+    guidePricing.manualQuoteRequired ||
+    guidePricing.guideSellThb === null ||
+    guideCostThb === null
+  ) {
+    return manualTripQuote(
+      occupiedSeats,
+      fleet,
+      withGuide,
+      guidePricing.manualQuoteReason ?? 'guide-sell-price-unset',
+      guideCostThb,
+    )
+  }
 
-  const roomNights = addons.overnightRoomNights ?? 0
-  const roomSharePerPerson =
-    roomNights > 0
-      ? roundUpTo50((roomNights * DRIVER_GUIDE_ROOM_FEE_PER_NIGHT) / occupiedSeats)
-      : 0
-
-  const adultTotal =
-    perPersonDayPrices.reduce((sum, p) => sum + p, 0) + roomSharePerPerson
-  const childTotal = adultTotal * CHILD_PRICE_RATIO
-  const infantTotal = adultTotal * INFANT_PRICE_RATIO
+  const protectedCore = calculateProtectedCore(
+    days,
+    adults,
+    children,
+    infants,
+    withGuide,
+  )
+  const { perPersonDayPrices, perPerson, fareProtection } = protectedCore
 
   const items: QuoteItem[] = []
   const pushItem = (label: string, quantity: number, unitPriceThb: number) => {
-    if (quantity > 0) {
-      items.push({
-        label,
-        quantity,
-        unitPriceThb,
-        subtotalThb: quantity * unitPriceThb,
-      })
-    }
+    if (quantity <= 0) return
+    items.push({
+      label,
+      quantity,
+      unitPriceThb,
+      subtotalThb: quantity * unitPriceThb,
+    })
   }
-  pushItem('大人', adults, adultTotal)
-  pushItem('兒童（3-11歲）', children, childTotal)
-  pushItem('嬰兒（0-2歲）', infants, infantTotal)
-  pushItem('兒童安全座椅', addons.childSeats ?? 0, CHILD_SEAT_FEE_PER_DAY * days.length)
-  pushItem('旅遊保險', addons.insurancePersons ?? 0, INSURANCE_FEE_PER_PERSON)
 
-  const totalThb = items.reduce((sum, i) => sum + i.subtotalThb, 0)
+  if (fareProtection.appliedRule === 'provisional') {
+    pushItem('成人', adults, perPerson.adult)
+    pushItem('兒童（3–11 歲）', children, perPerson.child)
+    pushItem('嬰幼兒（0–2 歲）', infants, perPerson.infant)
+  } else {
+    pushItem('親子包車團費（家庭優惠後）', 1, fareProtection.finalThb)
+  }
+
+  const luggageVanDays = days.filter(
+    (day) => day.isAirportDay && occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD,
+  ).length
+  pushItem('機場行李車', luggageVanDays, LUGGAGE_VAN_FEE)
+  pushItem(
+    '兒童安全座椅',
+    addons.childSeats ?? 0,
+    CHILD_SEAT_FEE_PER_DAY * days.length,
+  )
+  pushItem('旅遊保險', addons.insurancePersons ?? 0, INSURANCE_FEE_PER_PERSON)
+  pushItem(
+    '外地過夜司機／導遊房費',
+    addons.overnightRoomNights ?? 0,
+    DRIVER_GUIDE_ROOM_FEE_PER_NIGHT,
+  )
 
   return {
     occupiedSeats,
-    fleet: { ...fleet, withGuide: guided },
+    fleet: { ...fleet, withGuide },
+    manualQuoteRequired: false,
+    manualQuoteReason: null,
+    guideCostThb,
     perPersonDayPrices,
-    perPerson: { adult: adultTotal, child: childTotal, infant: infantTotal },
+    perPerson,
+    fareProtection,
     items,
-    totalThb,
+    totalThb: items.reduce((sum, item) => sum + item.subtotalThb, 0),
   }
 }

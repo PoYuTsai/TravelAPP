@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { createElement } from 'react'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
@@ -65,6 +67,25 @@ function buildQuote(overrides: Partial<QuoteData> = {}): QuoteData {
 }
 
 describe('QuoteCostDashboard 幣別主次分流', () => {
+  it('derives overtime numbers from the canonical public policy', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/quote/QuoteCostDashboard.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain("from '@/lib/pricing/publicPolicy'")
+    for (const field of [
+      'chiangMaiHours',
+      'chiangRaiGoldenTriangleHours',
+      'graceMinutes',
+      'feeThbPerHourPerCar',
+      'guideFeeThbPerHour',
+    ]) {
+      expect(source).toContain(`CHARTER_OVERTIME_POLICY.${field}`)
+    }
+    expect(source).not.toMatch(/(?:10|12) 小時|30 分鐘|THB 300/)
+  })
+
   it('perPerson 快照：主金額 THB 大字、TWD 縮為約值註記', () => {
     render(<QuoteCostDashboard quote={buildQuote({ pricingModel: 'perPerson' })} />)
 
@@ -77,6 +98,17 @@ describe('QuoteCostDashboard 幣別主次分流', () => {
 
     // 明細列：THB 為主
     expect(screen.getByText('22,000 THB')).toBeTruthy()
+  })
+
+  it('perPerson 單車報價仍顯示每台超時單位與區域時數', () => {
+    render(<QuoteCostDashboard quote={buildQuote({ pricingModel: 'perPerson', carCount: 1 })} />)
+
+    expect(screen.getByText(/清邁用車 10 小時/)).toBeTruthy()
+    expect(screen.getByText(/清萊／金三角用車 12 小時/)).toBeTruthy()
+    expect(screen.getByText(/THB 300／小時／台/)).toBeTruthy()
+    expect(screen.getByText(/中文導遊不另收超時費/)).toBeTruthy()
+    expect(screen.getByText(/30 分鐘彈性/)).toBeTruthy()
+    expect(screen.queryByText(/300 泰銖\/小時/)).toBeNull()
   })
 
   it('套餐展示頁（package mode）：不露價格明細區塊', () => {

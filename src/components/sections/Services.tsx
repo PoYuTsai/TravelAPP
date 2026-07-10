@@ -3,6 +3,7 @@ import SectionTitle from '@/components/ui/SectionTitle'
 import Button from '@/components/ui/Button'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
+import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
 
 interface ServiceItem {
   image?: { asset: SanityImageSource; alt?: string }
@@ -19,12 +20,12 @@ const defaultServices: ServiceItem[] = [
   {
     title: '親子包車服務',
     features: [
-      '專屬司機 + 中文導遊，專業分工',
-      '兒童安全座椅，爸媽更安心',
-      '行程彈性不趕路，配合小孩節奏',
-      '接機 / 送機服務',
+      '標準泰國司機，行程事先確認',
+      'LINE 中文支援；中文導遊依需求選配',
+      PAID_CHILD_SEAT_POLICY,
+      '車輛、油資、過路費與停車費已含',
     ],
-    price: '每日 NT$ 3,700 起',
+    price: '每人每日 THB 750 起，依人數與區域報價',
     ctaText: '了解包車服務',
     ctaLink: '/services/car-charter',
   },

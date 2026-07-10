@@ -10,6 +10,7 @@ export async function getItineraryById(id: string) {
     endDate,
     adults,
     children,
+    infants,
     childrenAges,
     days[]{
       date,
@@ -23,9 +24,7 @@ export async function getItineraryById(id: string) {
       },
       lunch,
       dinner,
-      accommodation,
-      carPrice,
-      guidePrice
+      accommodation
     },
     hotels[]{
       hotelName,
@@ -35,7 +34,15 @@ export async function getItineraryById(id: string) {
       note,
       color
     },
-    totalPrice,
+    quotationItems[]{
+      date,
+      description,
+      unitPrice,
+      quantity,
+      unit,
+      subtotal
+    },
+    quotationTotal,
     priceIncludes,
     priceExcludes
   }`

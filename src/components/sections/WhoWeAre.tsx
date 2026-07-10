@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { urlFor } from '@/sanity/client'
+import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
 
 interface TrustPoint {
   text: string
@@ -12,30 +13,14 @@ interface WhoWeAreProps {
   videoUrl?: string
   videoPoster?: any
   videoAspect?: 'portrait' | 'landscape' | 'square' | 'responsive'
-  title?: string
-  subtitle?: string
-  description?: string
-  trustPoints?: TrustPoint[]
   storyLink?: string
-  storyLinkText?: string
 }
-
-const defaultTrustPoints: TrustPoint[] = [
-  { text: '媽媽在地 30 年，路線私房不踩雷' },
-  { text: '爸爸懂台灣家庭，溝通零距離' },
-  { text: '司機專心開車，導遊專心服務' },
-]
 
 export default function WhoWeAre({
   videoUrl,
   videoPoster,
   videoAspect = 'responsive',
-  title = '嗨，我們是 Eric & Min',
-  subtitle = '台灣爸爸 × 在地 30 年泰國媽媽',
-  description = '帶著女兒 Miya，為親子家庭設計清邁旅程。',
-  trustPoints = defaultTrustPoints,
   storyLink = '/blog/eric-story-taiwan-to-chiang-mai',
-  storyLinkText = '閱讀我們的故事',
 }: WhoWeAreProps) {
   const [isPlaying, setIsPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -68,7 +53,7 @@ export default function WhoWeAre({
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Title */}
         <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
-          {title}
+          {HOME_PUBLIC_COPY.whoWeAre.title}
         </h2>
 
         {/* Video Container */}
@@ -110,16 +95,16 @@ export default function WhoWeAre({
 
         {/* Subtitle & Description */}
         <p className="text-lg md:text-xl font-medium text-gray-800 mb-2">
-          {subtitle}
+          {HOME_PUBLIC_COPY.whoWeAre.subtitle}
         </p>
         <p className="text-base md:text-lg text-gray-600 mb-8">
-          {description}
+          {HOME_PUBLIC_COPY.whoWeAre.description}
         </p>
 
         {/* Trust Points */}
-        {trustPoints && trustPoints.length > 0 && (
+        {HOME_PUBLIC_COPY.whoWeAre.trustPoints.length > 0 && (
           <div className="space-y-3 mb-8">
-            {trustPoints.map((point, i) => (
+            {HOME_PUBLIC_COPY.whoWeAre.trustPoints.map((point: TrustPoint, i) => (
               <div key={i} className="flex items-center justify-center gap-2 text-gray-700">
                 <svg className="w-5 h-5 text-primary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -136,7 +121,7 @@ export default function WhoWeAre({
             href={storyLink}
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full transition-colors group"
           >
-            {storyLinkText}
+            {HOME_PUBLIC_COPY.whoWeAre.storyLinkText}
             <svg
               className="w-5 h-5 transform transition-transform group-hover:translate-x-1"
               fill="none"

@@ -1,6 +1,6 @@
 /**
  * 人頭計價轉接層：把報價器的每日車費列（CarFeeDay）映射成
- * perPersonRates 引擎輸入，並處理引擎沒有的邊界（純接送日按車收、10+ 拆單）。
+ * perPersonRates 引擎輸入，並處理引擎沒有的邊界（純接送日按車收）。
  * 規格：docs/plans/2026-07-10-per-person-pricing-framework.md 第 3、5 節
  */
 
@@ -10,7 +10,10 @@ import {
   LUGGAGE_VAN_SEAT_THRESHOLD,
   calcTrip,
   resolveFleet,
+  type AutomaticTripQuote,
   type Fleet,
+  type ManualQuoteReason,
+  type ManualTripQuote,
   type Tier,
   type TripQuote,
 } from '@/lib/pricing/perPersonRates'
@@ -51,26 +54,47 @@ export interface PerPersonQuoteInput {
   withGuide: boolean
 }
 
-export interface PerPersonQuoteResult {
+interface PerPersonQuoteResultBase {
   occupiedSeats: number
   fleet: Fleet | null
-  /** 座位規則收斂後實際是否配導遊（8-9 強制、2-3 轎車不配） */
+  /** 保留使用者的導遊選擇；不能自動履約時改由 manual quote 表達。 */
   guided: boolean
-  /** 佔位 ≥10 需兩台車 → 拆兩張單各自計價 */
-  splitOrderRequired: boolean
   trip: TripQuote | null
   /** 純接送日合計（按車收，含 ≥8 行李車） */
   transferFee: number
   transferTrips: number
-  /** 團費售價總額 = 引擎人頭總價 + 接送費（拆單時為 0） */
+}
+
+export interface AutomaticPerPersonQuoteResult extends PerPersonQuoteResultBase {
+  manualQuoteRequired: false
+  manualQuoteReason: null
+  trip: AutomaticTripQuote | null
+  /** 團費售價總額 = 引擎人頭總價 + 接送費。 */
   groupTourPrice: number
 }
 
-const EMPTY_RESULT: PerPersonQuoteResult = {
+export type PerPersonManualQuoteReason =
+  | ManualQuoteReason
+  | 'minimum-group-size-required'
+
+export interface ManualPerPersonQuoteResult extends PerPersonQuoteResultBase {
+  manualQuoteRequired: true
+  manualQuoteReason: PerPersonManualQuoteReason
+  trip: ManualTripQuote | null
+  /** Manual quotes must never expose a fake public total. */
+  groupTourPrice: null
+}
+
+export type PerPersonQuoteResult =
+  | AutomaticPerPersonQuoteResult
+  | ManualPerPersonQuoteResult
+
+const EMPTY_RESULT: AutomaticPerPersonQuoteResult = {
   occupiedSeats: 0,
   fleet: null,
   guided: false,
-  splitOrderRequired: false,
+  manualQuoteRequired: false,
+  manualQuoteReason: null,
   trip: null,
   transferFee: 0,
   transferTrips: 0,
@@ -83,17 +107,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
   if (occupiedSeats < 1) return EMPTY_RESULT
 
   const fleet = resolveFleet(occupiedSeats)
-  const guided = fleet.guideRequired ? true : fleet.guideAllowed ? withGuide : false
-
-  if (fleet.carCount > 1) {
-    return {
-      ...EMPTY_RESULT,
-      occupiedSeats,
-      fleet,
-      guided,
-      splitOrderRequired: true,
-    }
-  }
+  const guided = withGuide
 
   const tripDays = days
     .filter((d) => dayTypeToTier(d.type) !== 'transfer')
@@ -109,19 +123,68 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     transferTrips *
     (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + luggagePerTrip)
 
+  const baseResult = {
+    occupiedSeats,
+    fleet,
+    guided,
+    transferFee,
+    transferTrips,
+  }
+
+  if (occupiedSeats === 1) {
+    return {
+      ...baseResult,
+      manualQuoteRequired: true,
+      manualQuoteReason: 'minimum-group-size-required',
+      trip: null,
+      groupTourPrice: null,
+    }
+  }
+
   const trip =
     tripDays.length > 0
       ? calcTrip({ days: tripDays, adults, children, infants, withGuide: guided })
       : null
 
+  if (trip) {
+    if (trip.manualQuoteRequired) {
+      return {
+        ...baseResult,
+        manualQuoteRequired: true,
+        manualQuoteReason: trip.manualQuoteReason,
+        trip,
+        groupTourPrice: null,
+      }
+    }
+
+    return {
+      ...baseResult,
+      manualQuoteRequired: false,
+      manualQuoteReason: null,
+      trip,
+      groupTourPrice: trip.totalThb + transferFee,
+    }
+  }
+
+  const manualQuoteReason = fleet.manualQuoteRequired
+    ? fleet.manualQuoteReason
+    : null
+
+  if (manualQuoteReason) {
+    return {
+      ...baseResult,
+      manualQuoteRequired: true,
+      manualQuoteReason,
+      trip: null,
+      groupTourPrice: null,
+    }
+  }
+
   return {
-    occupiedSeats,
-    fleet,
-    guided,
-    splitOrderRequired: false,
-    trip,
-    transferFee,
-    transferTrips,
-    groupTourPrice: (trip?.totalThb ?? 0) + transferFee,
+    ...baseResult,
+    manualQuoteRequired: false,
+    manualQuoteReason: null,
+    trip: null,
+    groupTourPrice: transferFee,
   }
 }

@@ -56,10 +56,20 @@ export default defineType({
     }),
     defineField({
       name: 'children',
-      title: '小孩人數',
+      title: '孩童人數',
       type: 'number',
       group: 'basic',
       initialValue: 0,
+      validation: (Rule) => Rule.min(0),
+    }),
+    defineField({
+      name: 'infants',
+      title: '嬰幼兒人數',
+      type: 'number',
+      group: 'basic',
+      initialValue: 0,
+      description: '每位嬰幼兒仍占一個乘客座位；亦會計入保險人數',
+      validation: (Rule) => Rule.min(0),
     }),
     defineField({
       name: 'childrenAges',
@@ -80,7 +90,7 @@ export default defineType({
       title: '總人數',
       type: 'number',
       group: 'basic',
-      description: '全團總人數（大人+小孩）',
+      description: '全團占用座位人數（成人＋孩童＋嬰幼兒；安全座椅不另加算一位）',
     }),
     defineField({
       name: 'luggageNote',
@@ -94,14 +104,14 @@ export default defineType({
       title: '包車說明',
       type: 'string',
       group: 'basic',
-      description: '例：2台10人座大車',
+      description: '公開配置：2–3 位小轎車；4–9 位 1 台 Van；10–18 位 2 台 Van；19 位以上人工報價',
     }),
     defineField({
       name: 'guideNote',
       title: '導遊說明',
       type: 'string',
       group: 'basic',
-      description: '例：中英泰導遊 1位',
+      description: '例：中文導遊 1 位（選配；標準服務為泰國司機）',
     }),
 
     // === 航班資訊 ===
@@ -175,7 +185,7 @@ export default defineType({
           name: 'required',
           title: '需要導遊',
           type: 'boolean',
-          initialValue: true,
+          initialValue: false,
         }),
         defineField({
           name: 'quantity',
@@ -199,6 +209,7 @@ export default defineType({
       title: '兒童安全座椅',
       type: 'object',
       group: 'basic',
+      description: 'THB 500／日／張；安裝於該孩童的乘客座位，不另加算一位',
       fields: [
         defineField({
           name: 'required',
@@ -255,6 +266,8 @@ export default defineType({
       type: 'number',
       group: 'basic',
       initialValue: 1,
+      readOnly: true,
+      description: '由占用座位人數自動決定；19 位以上不可自動報價',
       validation: (Rule) => Rule.min(1),
     }),
     defineField({
@@ -264,13 +277,13 @@ export default defineType({
       group: 'basic',
       options: {
         list: [
-          { title: '4人座小車', value: 'sedan' },
-          { title: '7人座休旅車', value: 'suv' },
-          { title: '10人座大車（麵包車）', value: 'van' },
-          { title: '其他', value: 'custom' },
+          { title: '小轎車（2–3 位乘客）', value: 'sedan' },
+          { title: 'Van（4–9 位 1 台；10–18 位 2 台）', value: 'van' },
         ],
       },
-      initialValue: 'van',
+      initialValue: 'sedan',
+      readOnly: true,
+      description: '不公開 SUV 方案；特殊調度只由內部人工處理',
     }),
 
     // === 行程原始文字（隱藏欄位，供備份用）===
@@ -447,24 +460,27 @@ export default defineType({
             // 每日費用
             defineField({
               name: 'carPrice',
-              title: '車費（台幣）',
+              title: '舊版車費（已停用）',
               type: 'number',
-              description: '當日包車費用',
+              description: '僅保留既有資料相容；新報價請使用 THB 報價項目',
+              hidden: true,
+              readOnly: true,
             }),
             defineField({
               name: 'guidePrice',
-              title: '導遊費（台幣）',
+              title: '舊版導遊費（已停用）',
               type: 'number',
-              description: '當日導遊費用',
+              description: '僅保留既有資料相容；中文導遊為選配，新報價請使用 THB 報價項目',
+              hidden: true,
+              readOnly: true,
             }),
           ],
           preview: {
-            select: { date: 'date', title: 'title', carPrice: 'carPrice', guidePrice: 'guidePrice' },
-            prepare: ({ date, title, carPrice, guidePrice }) => {
-              const total = (carPrice || 0) + (guidePrice || 0)
+            select: { date: 'date', title: 'title' },
+            prepare: ({ date, title }) => {
               return {
                 title: title,
-                subtitle: total > 0 ? `${date} | NT$${total.toLocaleString()}` : date,
+                subtitle: date,
               }
             },
           },
@@ -650,10 +666,10 @@ export default defineType({
     // === 報價明細 ===
     defineField({
       name: 'quotationItems',
-      title: '報價項目',
+      title: '報價項目（THB）',
       type: 'array',
       group: 'quotation',
-      description: '每日包車費用、導遊費、保險等',
+      description: '每日包車與已選配項目；標準為泰國司機，中文導遊與旅遊保險均非預設包含',
       of: [
         defineArrayMember({
           type: 'object',
@@ -671,7 +687,7 @@ export default defineType({
               title: '項目說明',
               type: 'string',
               validation: (Rule) => Rule.required(),
-              description: '例：接機旅遊、杭東一日、專業導遊',
+              description: '例：接機、杭東一日、中文導遊（選配）',
             }),
             defineField({
               name: 'unitPrice',
@@ -714,7 +730,7 @@ export default defineType({
               const dateStr = date ? date.substring(5).replace('-', '/') : ''
               return {
                 title: dateStr ? `${dateStr} ${description}` : description,
-                subtitle: `${unitPrice?.toLocaleString() || 0} × ${quantity || 1}${unit || ''} = NT$${subtotal.toLocaleString()}`,
+                subtitle: `${unitPrice?.toLocaleString() || 0} × ${quantity || 1}${unit || ''} = THB ${subtotal.toLocaleString()}`,
               }
             },
           },
@@ -723,10 +739,10 @@ export default defineType({
     }),
     defineField({
       name: 'quotationTotal',
-      title: '報價總計',
+      title: '報價總計（THB）',
       type: 'number',
       group: 'quotation',
-      description: '自動從報價項目加總',
+      description: '自動從 THB 報價項目加總',
       validation: (Rule) =>
         Rule.custom((total, context) => {
           const parent = context.parent as { quotationItems?: Array<{ unitPrice?: number; quantity?: number }> }
@@ -737,7 +753,7 @@ export default defineType({
           }, 0)
 
           if (calculated > 0 && total && total !== calculated) {
-            return `提示：報價項目加總為 NT$${calculated.toLocaleString()}，與此欄位不同`
+            return `提示：報價項目加總為 THB ${calculated.toLocaleString()}，與此欄位不同`
           }
           return true
         }).warning(),
@@ -754,10 +770,12 @@ export default defineType({
     // === 費用說明 ===
     defineField({
       name: 'totalPrice',
-      title: '總費用（台幣）',
+      title: '舊版每日費用總計（已停用）',
       type: 'number',
       group: 'pricing',
-      description: '會自動從每日費用計算，也可手動覆蓋',
+      description: '僅保留既有資料相容；新報價請使用 quotationTotal（THB）',
+      hidden: true,
+      readOnly: true,
       validation: (Rule) =>
         Rule.custom((totalPrice, context) => {
           const parent = context.parent as { days?: Array<{ carPrice?: number; guidePrice?: number }> }
@@ -768,7 +786,7 @@ export default defineType({
           }, 0)
 
           if (calculated > 0 && totalPrice && totalPrice !== calculated) {
-            return `提示：每日費用加總為 NT$${calculated.toLocaleString()}，與此欄位不同`
+            return `提示：舊版每日費用加總為 THB ${calculated.toLocaleString()}，與此欄位不同`
           }
           return true
         }).warning(),
@@ -779,7 +797,7 @@ export default defineType({
       type: 'text',
       group: 'pricing',
       rows: 5,
-      description: '每行一項，例：\n- 7人座包車（含油、過路費）\n- 中文導遊服務',
+      description: '每行一項。標準為泰國司機包車；中文導遊與旅遊保險只有選配後才能列入',
     }),
     defineField({
       name: 'priceExcludes',
@@ -797,9 +815,10 @@ export default defineType({
       endDate: 'endDate',
       adults: 'adults',
       children: 'children',
-      days: 'days',
+      infants: 'infants',
+      quotationTotal: 'quotationTotal',
     },
-    prepare: ({ clientName, startDate, endDate, adults, children, days }) => {
+    prepare: ({ clientName, startDate, endDate, adults, children, infants, quotationTotal }) => {
       // 計算天數和夜數
       let daysNights = ''
       if (startDate && endDate) {
@@ -810,18 +829,11 @@ export default defineType({
         if (totalDays > 0) daysNights = `${totalDays}天${nights}夜`
       }
 
-      // 計算總費用
-      let totalCost = 0
-      if (days && Array.isArray(days)) {
-        days.forEach((day: any) => {
-          totalCost += (day.carPrice || 0) + (day.guidePrice || 0)
-        })
-      }
-      const costStr = totalCost > 0 ? ` | NT$${totalCost.toLocaleString()}` : ''
+      const costStr = quotationTotal > 0 ? ` | THB ${quotationTotal.toLocaleString()}` : ''
 
       return {
         title: clientName || '未命名行程',
-        subtitle: `${daysNights || '?天?夜'} | ${adults || 0}大${children || 0}小${costStr}`,
+        subtitle: `${daysNights || '?天?夜'} | ${adults || 0}大${children || 0}小${infants || 0}嬰${costStr}`,
       }
     },
   },

@@ -1,4 +1,5 @@
 // src/sanity/components/structured-editor/types.ts
+import { resolveFleet } from '@/lib/pricing/perPersonRates'
 
 export interface FlightInfo {
   preset: string
@@ -19,6 +20,7 @@ export interface BasicInfo {
   departureFlight: FlightInfo
   adults: number
   children: number
+  infants: number
   childrenAges: string
   guideService: ServiceOption
   childSeat: ServiceOption
@@ -65,29 +67,49 @@ export interface EditorState {
   validation: ValidationResult
 }
 
+/** Keep the editor preview on the same public fleet that will be persisted. */
+export function alignLegacyBasicInfoFleet(basicInfo: BasicInfo): BasicInfo {
+  const occupiedSeats = Math.max(
+    1,
+    basicInfo.adults + basicInfo.children + basicInfo.infants,
+  )
+  const fleet = resolveFleet(occupiedSeats)
+
+  return {
+    ...basicInfo,
+    vehicleCount: fleet.carCount,
+    vehicleType: fleet.vehicle,
+  }
+}
+
 // 從 Sanity 文件轉換成 EditorState
 export function documentToEditorState(doc: any): EditorState {
   const days = doc?.days || []
   const startDate = doc?.startDate || ''
   const endDate = doc?.endDate || ''
+  const adults = doc?.adults || 2
+  const children = doc?.children || 0
+  // `infantCount` is accepted as a read alias for serialized pre-schema documents.
+  const infants = doc?.infants ?? doc?.infantCount ?? 0
 
   // 基本資訊
-  const basicInfo: BasicInfo = {
+  const basicInfo = alignLegacyBasicInfoFleet({
     clientName: doc?.clientName || '',
     startDate,
     endDate,
     arrivalFlight: doc?.arrivalFlight || { preset: '', custom: '' },
     departureFlight: doc?.departureFlight || { preset: '', custom: '' },
-    adults: doc?.adults || 2,
-    children: doc?.children || 0,
+    adults,
+    children,
+    infants,
     childrenAges: doc?.childrenAges || '',
-    guideService: doc?.guideService || { required: true, quantity: 1, days: days.length || 1 },
+    guideService: doc?.guideService || { required: false, quantity: 1, days: days.length || 1 },
     childSeat: doc?.childSeat || { required: false, quantity: 0, days: 0 },
     extraVehicle: doc?.extraVehicle || { required: false, quantity: 0, days: 0 },
-    vehicleCount: doc?.vehicleCount || 1,
-    vehicleType: doc?.vehicleType || 'van',
+    vehicleCount: 1,
+    vehicleType: 'sedan',
     luggageNote: doc?.luggageNote || '',
-  }
+  })
 
   // 報價
   const quotationItems = doc?.quotationItems || []
@@ -109,18 +131,33 @@ export function documentToEditorState(doc: any): EditorState {
       let type: OtherQuotationItem['type'] = 'custom'
       if (item.description?.includes('導遊')) type = 'guide'
       else if (item.description?.includes('座椅')) type = 'childSeat'
-      else if (item.description?.includes('雙條車')) type = 'extraVehicle'
-      else if (item.description?.includes('保險')) type = 'insurance'
+      else if (/雙條車|額外行李車/.test(item.description || '')) type = 'extraVehicle'
+      else if (item.description?.includes('保險')) {
+        // Old versions created an insurance row on every quote. Only the new
+        // explicit selection marker is allowed to opt a migrated document in.
+        if (!item.description.includes('選配')) return
+        type = 'insurance'
+      }
       else if (item.description?.includes('外地住宿') || item.description?.includes('住宿補貼'))
         type = 'outOfTownStay'
+
+      const rawQuantity = item.quantity || 1
+      const staffCount =
+        basicInfo.vehicleCount +
+        (basicInfo.guideService.required ? basicInfo.guideService.quantity : 0)
+      const quantity = type === 'outOfTownStay' ? staffCount : rawQuantity
+      const itemDays =
+        type === 'outOfTownStay'
+          ? Math.max(1, Math.ceil(rawQuantity / Math.max(1, staffCount)))
+          : 1
 
       otherItems.push({
         type,
         description: item.description || '',
         unitPrice: item.unitPrice || 0,
-        quantity: item.quantity || 1,
-        days: 1,
-        subtotal: (item.unitPrice || 0) * (item.quantity || 1),
+        quantity,
+        days: itemDays,
+        subtotal: (item.unitPrice || 0) * quantity * itemDays,
       })
     }
   })

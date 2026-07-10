@@ -12,8 +12,9 @@ const BASIC_INFO_TEMPLATE = `客戶姓名: 巧玲(KAI &MINNIE 媽)
 人數: 5人
 成人3 (1長者) 小朋友2 (國中生*2)
 行李: 1台車大約可以放6~7顆28~30吋
-包車: 1台(10人座大車)
-導遊: 中英泰導遊 1位`
+包車: 1台 Van
+司機: 泰國司機
+導遊: 未選配（需要中文導覽時另加）`
 
 const ITINERARY_TEMPLATE = `2/12 (四)
 Day 1｜抵達清邁・放鬆展開旅程
@@ -92,9 +93,7 @@ const QUOTATION_TEMPLATE = `2/12 接機+市區 3700
 2/16 清萊 5300
 2/17 湄登 4300
 2/18 送機 700
-導遊 2500*6天
-保險 500
-小計: 42100`
+小計: 26600`
 
 export function QuickStartInput(props: any) {
   const { id, type } = props.document || {}
@@ -278,7 +277,7 @@ export function QuickStartInput(props: any) {
                 <TextArea
                   value={basicText}
                   onChange={(e) => setBasicText(e.currentTarget.value)}
-                  rows={7}
+                  rows={8}
                   style={{ fontFamily: 'monospace', fontSize: '12px' }}
                 />
               </Box>

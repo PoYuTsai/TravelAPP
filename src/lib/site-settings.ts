@@ -1,3 +1,10 @@
+import {
+  HOME_PUBLIC_COPY,
+  PAID_CHILD_SEAT_POLICY,
+  PUBLIC_PRICE_RANGE,
+  SITEWIDE_METADATA_DESCRIPTION,
+} from '@/lib/home-public-copy'
+
 export type TestimonialSource = 'facebook' | 'google'
 export type TrustMetric = 'families' | 'reviews' | 'brand'
 
@@ -81,15 +88,12 @@ export type SiteSettingsInput = Partial<SiteSettings> | null | undefined
 
 export const siteSettingsQuery = `*[_type == "siteSettings"][0]{
   businessName,
-  description,
   telephone,
   email,
-  priceRange,
   areaServed,
   socialLinks,
   aggregateRating,
   footer{
-    description,
     addressText,
     addressUrl,
     taiwanPhone,
@@ -98,32 +102,15 @@ export const siteSettingsQuery = `*[_type == "siteSettings"][0]{
     thailandPhoneLabel
   },
   authorProfile{
-    eyebrow,
-    imageAlt,
-    name,
-    description,
-    serviceLabel,
-    serviceValue,
-    summary,
-    primaryCtaText,
-    secondaryCtaText
+    name
   },
   trustSection{
-    eyebrow,
-    title,
-    description,
     cards[]{
       metric,
-      title,
-      description,
       href,
       external,
       valueOverride
     }
-  },
-  homeFaq[]{
-    question,
-    answer
   },
   homeTestimonials[]{
     name,
@@ -137,10 +124,10 @@ export const siteSettingsQuery = `*[_type == "siteSettings"][0]{
 
 export const defaultSiteSettings: SiteSettings = {
   businessName: '清微旅行 Chiangway Travel',
-  description: '爸媽開的清邁親子包車 — 台灣爸爸 Eric × 泰國媽媽 Min 經營，司機導遊專業分工、兒童座椅、中文溝通，深受台灣家庭信賴。',
+  description: SITEWIDE_METADATA_DESCRIPTION,
   telephone: '+66-63-790-0666',
   email: 'eric19921204@gmail.com',
-  priceRange: 'NT$ 3,000 - 10,000',
+  priceRange: PUBLIC_PRICE_RANGE,
   areaServed: 'Chiang Mai',
   socialLinks: {
     line: 'https://line.me/R/ti/p/@037nyuwk',
@@ -153,8 +140,7 @@ export const defaultSiteSettings: SiteSettings = {
     reviewCount: 110,
   },
   footer: {
-    description:
-      '爸媽開的清邁親子包車。台灣爸爸 Eric × 泰國媽媽 Min，司機導遊專業分工，專為帶小孩的家庭設計，深受台灣家庭信賴。',
+    description: HOME_PUBLIC_COPY.footerDescription,
     addressText: '444, Wiang, Fang District, Chiang Mai 50110',
     addressUrl: 'https://share.google/p6anNFwTvi9Sc7JAt',
     taiwanPhone: '+886 987-591-322',
@@ -166,9 +152,9 @@ export const defaultSiteSettings: SiteSettings = {
     eyebrow: 'About Chiangway',
     imageAlt: 'Eric 與 Min，清微旅行在地家庭團隊',
     name: 'Eric & Min',
-    description: '爸媽開的清邁親子包車，由台灣爸爸 Eric 與泰國媽媽 Min 經營，專為帶小孩的家庭設計。',
+    description: '清微旅行由台灣爸爸 Eric 與泰國媽媽 Min 在地經營；標準泰國司機與 LINE 中文支援，中文導遊依需求選配。',
     serviceLabel: '服務方式',
-    serviceValue: '司機 + 導遊',
+    serviceValue: '標準泰國司機｜中文導遊選配',
     summary: '文章內容會從親子旅行、交通、景點與在地生活角度出發，幫你把清邁自由行需要的資訊先整理順。',
     primaryCtaText: 'LINE 詢問清邁行程',
     secondaryCtaText: '看行程案例',
@@ -206,16 +192,16 @@ export const defaultSiteSettings: SiteSettings = {
       answer: '清微旅行提供飯店門口接送服務，不需要自行前往集合點，詳細接送地點可透過 LINE 免費諮詢確認。',
     },
     {
-      question: '什麼是「司機導遊分工」服務？和一般包車有什麼不同？',
-      answer: '清微旅行的司機專心負責開車，另有中文導遊隨行服務，兩人各司其職。一般包車通常由司機兼導遊，容易分心，行程品質不穩定。分工制讓行車更安全、導覽更專業。',
+      question: '標準包車怎麼安排司機、中文支援與導遊？',
+      answer: '標準服務安排泰國司機，通常不以中文服務；行程事先確認並提供 LINE 中文支援。需要隨車中文溝通或導覽時，可依需求選配中文導遊，司機與導遊是不同的專業角色。',
     },
     {
       question: '清邁一日親子包車的費用是多少？如何預訂？',
-      answer: '一日包車方案從 NT$3,700 起，含油費，10 小時服務。可透過官網 LINE 按鈕免費諮詢，與 Eric 或 Min 討論行程後確認預訂。',
+      answer: `目前公開包車價格依總佔位人數與行程區域計算；每位乘客（含嬰幼兒）各佔一席。公開參考範圍為 ${PUBLIC_PRICE_RANGE}；車輛、泰國司機、油資、過路費、停車費與 LINE 中文支援已含，正式報價依行程與人數確認。`,
     },
     {
       question: '清微旅行有提供兒童汽車座椅嗎？',
-      answer: '有，清微旅行提供兒童汽車座椅，這在清邁的包車服務中相當罕見，是專為親子家庭設計的重要配備。建議提前告知兒童年齡與體重以準備合適座椅。',
+      answer: `有，可付費加購。${PAID_CHILD_SEAT_POLICY}請提前告知兒童年齡與體重。`,
     },
     {
       question: '第一次帶孩子去清邁，清微旅行推薦哪些景點或行程？',
@@ -227,7 +213,7 @@ export const defaultSiteSettings: SiteSettings = {
     },
     {
       question: '清微旅行和一般旅行社或當地包車相比，有什麼優勢？',
-      answer: '清微最大優勢是「在地家庭身分」：台泰家庭本身住在清邁，非外包業者，可即時回覆問題、彈性調整行程。全中文溝通、兒童座椅、不趕路的節奏，是專為台灣親子家庭設計的服務，一般清邁包車難以複製。',
+      answer: '清微最大優勢是「在地家庭身分」：台泰家庭本身住在清邁，可透過 LINE 提供中文支援並協助事先安排親子節奏。標準安排泰國司機；需要隨車中文溝通或導覽時，再依需求選配中文導遊。',
     },
     {
       question: '如何與清微旅行聯繫？行前諮詢需要費用嗎？',
@@ -307,19 +293,6 @@ function isValidTrustMetric(metric: string | undefined): metric is TrustMetric {
   return Boolean(metric && VALID_TRUST_METRICS.includes(metric as TrustMetric))
 }
 
-function normalizeFaqItems(items: HomeFaqItem[] | undefined) {
-  if (!items?.length) {
-    return defaultSiteSettings.homeFaq
-  }
-
-  const normalized = items.filter(
-    (item): item is HomeFaqItem =>
-      Boolean(item?.question?.trim()) && Boolean(item?.answer?.trim())
-  )
-
-  return normalized.length > 0 ? normalized : defaultSiteSettings.homeFaq
-}
-
 function normalizeTestimonials(items: SiteTestimonial[] | undefined) {
   if (!items?.length) {
     return defaultSiteSettings.homeTestimonials
@@ -337,7 +310,7 @@ function normalizeTestimonials(items: SiteTestimonial[] | undefined) {
 
 function mergeFooterSettings(input: SiteFooterSettings | undefined): SiteFooterSettings {
   return {
-    description: input?.description?.trim() || defaultSiteSettings.footer.description,
+    description: defaultSiteSettings.footer.description,
     addressText: input?.addressText?.trim() || defaultSiteSettings.footer.addressText,
     addressUrl: input?.addressUrl?.trim() || defaultSiteSettings.footer.addressUrl,
     taiwanPhone: input?.taiwanPhone?.trim() || defaultSiteSettings.footer.taiwanPhone,
@@ -351,17 +324,15 @@ function mergeFooterSettings(input: SiteFooterSettings | undefined): SiteFooterS
 
 function mergeAuthorProfile(input: SiteAuthorProfile | undefined): SiteAuthorProfile {
   return {
-    eyebrow: input?.eyebrow?.trim() || defaultSiteSettings.authorProfile.eyebrow,
-    imageAlt: input?.imageAlt?.trim() || defaultSiteSettings.authorProfile.imageAlt,
+    eyebrow: defaultSiteSettings.authorProfile.eyebrow,
+    imageAlt: defaultSiteSettings.authorProfile.imageAlt,
     name: input?.name?.trim() || defaultSiteSettings.authorProfile.name,
-    description: input?.description?.trim() || defaultSiteSettings.authorProfile.description,
-    serviceLabel: input?.serviceLabel?.trim() || defaultSiteSettings.authorProfile.serviceLabel,
-    serviceValue: input?.serviceValue?.trim() || defaultSiteSettings.authorProfile.serviceValue,
-    summary: input?.summary?.trim() || defaultSiteSettings.authorProfile.summary,
-    primaryCtaText:
-      input?.primaryCtaText?.trim() || defaultSiteSettings.authorProfile.primaryCtaText,
-    secondaryCtaText:
-      input?.secondaryCtaText?.trim() || defaultSiteSettings.authorProfile.secondaryCtaText,
+    description: defaultSiteSettings.authorProfile.description,
+    serviceLabel: defaultSiteSettings.authorProfile.serviceLabel,
+    serviceValue: defaultSiteSettings.authorProfile.serviceValue,
+    summary: defaultSiteSettings.authorProfile.summary,
+    primaryCtaText: defaultSiteSettings.authorProfile.primaryCtaText,
+    secondaryCtaText: defaultSiteSettings.authorProfile.secondaryCtaText,
   }
 }
 
@@ -374,18 +345,20 @@ function normalizeTrustCards(items: SiteTrustCard[] | undefined) {
     .filter(
       (item): item is SiteTrustCard =>
         isValidTrustMetric(item?.metric) &&
-        Boolean(item?.title?.trim()) &&
-        Boolean(item?.description?.trim()) &&
         Boolean(item?.href?.trim())
     )
-    .map((item) => ({
-      metric: item.metric,
-      title: item.title.trim(),
-      description: item.description.trim(),
-      href: item.href.trim(),
-      external: Boolean(item.external),
-      valueOverride: item.valueOverride?.trim() || undefined,
-    }))
+    .map((item) => {
+      const canonicalCard = defaultSiteSettings.trustSection.cards.find(
+        (card) => card.metric === item.metric,
+      )!
+
+      return {
+        ...canonicalCard,
+        href: item.href.trim(),
+        external: Boolean(item.external),
+        valueOverride: item.valueOverride?.trim() || canonicalCard.valueOverride,
+      }
+    })
 
   return normalized.length > 0 ? normalized : defaultSiteSettings.trustSection.cards
 }
@@ -393,10 +366,10 @@ function normalizeTrustCards(items: SiteTrustCard[] | undefined) {
 export function mergeSiteSettings(input: SiteSettingsInput): SiteSettings {
   return {
     businessName: input?.businessName?.trim() || defaultSiteSettings.businessName,
-    description: input?.description?.trim() || defaultSiteSettings.description,
+    description: defaultSiteSettings.description,
     telephone: input?.telephone?.trim() || defaultSiteSettings.telephone,
     email: input?.email?.trim() || defaultSiteSettings.email,
-    priceRange: input?.priceRange?.trim() || defaultSiteSettings.priceRange,
+    priceRange: defaultSiteSettings.priceRange,
     areaServed: input?.areaServed?.trim() || defaultSiteSettings.areaServed,
     socialLinks: {
       line: input?.socialLinks?.line?.trim() || defaultSiteSettings.socialLinks.line,
@@ -411,13 +384,12 @@ export function mergeSiteSettings(input: SiteSettingsInput): SiteSettings {
     footer: mergeFooterSettings(input?.footer),
     authorProfile: mergeAuthorProfile(input?.authorProfile),
     trustSection: {
-      eyebrow: input?.trustSection?.eyebrow?.trim() || defaultSiteSettings.trustSection.eyebrow,
-      title: input?.trustSection?.title?.trim() || defaultSiteSettings.trustSection.title,
-      description:
-        input?.trustSection?.description?.trim() || defaultSiteSettings.trustSection.description,
+      eyebrow: defaultSiteSettings.trustSection.eyebrow,
+      title: defaultSiteSettings.trustSection.title,
+      description: defaultSiteSettings.trustSection.description,
       cards: normalizeTrustCards(input?.trustSection?.cards),
     },
-    homeFaq: normalizeFaqItems(input?.homeFaq),
+    homeFaq: defaultSiteSettings.homeFaq,
     homeTestimonials: normalizeTestimonials(input?.homeTestimonials),
   }
 }

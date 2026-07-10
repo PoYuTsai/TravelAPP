@@ -34,7 +34,10 @@
     "lint:article": "node scripts/article-lint.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "artifacts:render": "tsx scripts/artifacts/render-pricing-line-assets.ts",
+    "artifacts:layout": "tsx scripts/artifacts/render-pricing-line-assets.ts --layout-preview",
+    "artifacts:line": "tsx scripts/artifacts/render-pricing-line-assets.ts --line-only"
   },
   "repository": {
     "type": "git",
@@ -77,6 +80,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.0.6",

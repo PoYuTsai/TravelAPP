@@ -83,7 +83,7 @@ function markdownToPortableText(markdown) {
         _type: 'ctaBlock',
         _key: generateKey(),
         title: '想來清邁親子旅遊？',
-        description: '清微旅行提供專業司機 + 中文導遊，行程彈性、不踩雷。',
+        description: '清微旅行標準泰國司機、中文導遊可選配，行程彈性、不踩雷。',
       })
       i++
       continue

@@ -23,6 +23,7 @@ import type { ComponentType } from 'react'
 import type { QuoteData } from '@/lib/quote/types'
 import { getIncludedDisplayLabel } from '@/lib/quote/quoteDisplay'
 import { formatPackageEstimateBasis } from '@/lib/quote/publicPageMode'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 const LINE_URL = 'https://line.me/R/ti/p/@037nyuwk'
 
@@ -460,15 +461,14 @@ function TotalQuoteCard({
   )
 }
 
-/* ─── Sub: Payment Notes ─── */
+/* ─── Sub: Overtime policy ─── */
 
-function PaymentNotesSection({
-  paymentNotes,
-  carCount,
-}: {
-  paymentNotes: string[]
-  carCount: number
-}) {
+function OvertimePolicyNotice() {
+  const guideOvertimeText =
+    CHARTER_OVERTIME_POLICY.guideFeeThbPerHour === 0
+      ? '中文導遊不另收超時費'
+      : `中文導遊超時費為 THB ${CHARTER_OVERTIME_POLICY.guideFeeThbPerHour}／小時`
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -485,33 +485,14 @@ function PaymentNotesSection({
       }}
     >
       <h3
-        className="mb-4 text-[18px] font-black"
+        className="mb-2 text-[18px] font-black"
         style={{ color: '#0F0B05', fontFamily: 'var(--font-display, serif)' }}
       >
-        付款說明
+        超時費用
       </h3>
-      <ul className="space-y-2">
-        {paymentNotes.map((note, i) => (
-          <li key={i} className="flex gap-2 text-[14px]" style={{ color: '#3A3224' }}>
-            <span className="mt-0.5 shrink-0" style={{ color: '#CA8A04' }}>
-              &#x2022;
-            </span>
-            {note}
-          </li>
-        ))}
-      </ul>
-      <div
-        className="mt-5 border-t border-dashed pt-4"
-        style={{ borderColor: '#EAE4D2' }}
-      >
-        <h4 className="mb-1 text-[14px] font-semibold" style={{ color: '#0F0B05' }}>
-          超時費用
-        </h4>
-        <p className="text-[14px]" style={{ color: '#3A3224' }}>
-          每日包車服務最多 10 小時，超時 300 泰銖/小時
-          {carCount > 1 ? ` × ${carCount} 台車` : ''}
-        </p>
-      </div>
+      <p className="text-[14px] leading-7" style={{ color: '#3A3224' }}>
+        清邁用車 {CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時；清萊／金三角用車 {CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時。基本用車時間用完後，另有 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘彈性；超過後 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台，{guideOvertimeText}。
+      </p>
     </motion.div>
   )
 }
@@ -769,6 +750,8 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               basisLabel={packageEstimateBasis}
               isPerPerson={isPerPerson}
             />
+
+            <OvertimePolicyNotice />
 
             {/* 付款說明、匯款帳號已移除 — 在 LINE 私訊溝通 */}
           </div>

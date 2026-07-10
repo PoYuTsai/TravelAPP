@@ -1,15 +1,29 @@
 #!/usr/bin/env node
 
 /**
- * 建立話術資料庫並填入初始資料
+ * LEGACY / MANUAL-ONLY：建立全新的空白話術資料庫並填入初始資料。
  *
- * 使用方式:
- * node scripts/setup-notion-replies.mjs
+ * 這不是同步或 migration 腳本，不得用來修正或覆寫既有 live Notion；
+ * live 話術需先人工審核，再以一次性 migration 或 Notion UI 更新。
+ *
+ * 使用方式（僅限已確認的全新空白資料庫）：
+ * node scripts/setup-notion-replies.mjs --confirm-empty-database
  */
 
 import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, resolve } from 'path'
+
+const CONFIRM_EMPTY_DATABASE_FLAG = '--confirm-empty-database'
+
+if (!process.argv.includes(CONFIRM_EMPTY_DATABASE_FLAG)) {
+  console.error(
+    `❌ 這是 LEGACY / MANUAL-ONLY seed，只能建立全新空白資料庫。` +
+      `若已人工確認目標為空白資料庫，請加上 ${CONFIRM_EMPTY_DATABASE_FLAG}；` +
+      '不得用來修正或覆寫既有 live Notion。'
+  )
+  process.exit(1)
+}
 
 // 手動載入 .env.local
 const __filename = fileURLToPath(import.meta.url)
@@ -102,15 +116,17 @@ https://chiangway-travel.com/cancellation
 
 ---
 
-**包含:** 油費、停車費、過路費、外地住宿補貼、泰國旅遊保險
-**用車時間:** 清邁10小時; 清萊12小時，超時再麻煩補給司機200/hr
+**包含:** 油費、停車費、過路費、外地住宿補貼
+**服務角色:** 公開標準服務是泰國司機，中文導遊為選配；司機與導遊是不同專業角色。
+**旅遊保險:** 旅遊保險為自由選配，THB 100／人／趟；未加購不影響包車服務。
+**用車時間:** 清邁 10 小時；清萊／金三角 12 小時。基本用車時間用完後，另有 30 分鐘彈性；超過則 THB 300／小時／車，導遊不另收超時費。
 **小費:** 看服務跟心意，不強制~ (有給的話司機跟導遊會很開心)
 
 **不包含:** 門票、餐費、機票跟飯店、小費、個人花費
 
 ---
 
-導遊會全程照顧大家，包含景點文化導覽、餐廳推薦點菜
+若有選配中文導遊，導遊會全程照顧大家，包含景點文化導覽、餐廳推薦點菜
 我們也會全程在群組線上中文協助，幫忙預訂餐廳，協助一些意外狀況
 門票費用跟餐費可以根據預算讓導遊處理
 例如: 第一天換錢後先給導遊20000泰銖，交代用餐口味偏好
@@ -139,7 +155,7 @@ https://chiangway-travel.com/cancellation
 再麻煩加一下我的個人line:
 1003904
 
-安排好車之後，我會開一個群組邀請您與團隊的導遊(司機)，還有我的太太，都是泰國人，都會用中文協助聯絡。
+安排好車之後，我會開一個群組邀請負責的泰國司機；若有選配中文導遊，也會邀請導遊加入。Eric 與團隊會在群組協助中文聯絡。
 
 行程會貼在群組記事本，全程有任何突發狀況我們都會隨時連絡保持聯繫與處理。`,
     note: '確認收到訂金後發送',
@@ -165,9 +181,10 @@ https://tdac.immigration.go.th/arrival-card/#/home
   // === 服務說明 ===
   {
     category: '服務說明',
-    title: '包含費用',
-    content: `**包含:** 油費、停車費、過路費、外地住宿補貼、泰國旅遊保險`,
-    note: '說明包車費用包含項目',
+    title: '包含費用與保險選配',
+    content: `**包車費用包含:** 油費、停車費、過路費、外地住宿補貼
+**選配:** 旅遊保險為自由選配，THB 100／人／趟；未加購不影響包車服務。`,
+    note: '說明包車費用包含項目與旅遊保險選配',
     order: 10,
   },
   {
@@ -180,14 +197,15 @@ https://tdac.immigration.go.th/arrival-card/#/home
   {
     category: '服務說明',
     title: '用車時間說明',
-    content: `**用車時間:** 清邁10小時; 清萊12小時，超時再麻煩補給司機200/hr`,
+    content: `**用車時間:** 清邁 10 小時；清萊／金三角 12 小時。基本用車時間用完後，另有 30 分鐘彈性；超過則 THB 300／小時／車，導遊不另收超時費。`,
     note: '說明用車時間與超時費用',
     order: 12,
   },
   {
     category: '服務說明',
     title: '導遊服務說明',
-    content: `導遊會全程照顧大家，包含景點文化導覽、餐廳推薦點菜
+    content: `公開標準服務是泰國司機，中文導遊為選配；司機與導遊是不同專業角色。
+若有選配中文導遊，導遊會全程照顧大家，包含景點文化導覽、餐廳推薦點菜
 我們也會全程在群組線上中文協助，幫忙預訂餐廳，協助一些意外狀況
 門票費用跟餐費可以根據預算讓導遊處理
 例如: 第一天換錢後先給導遊20000泰銖，交代用餐口味偏好
@@ -255,7 +273,7 @@ https://tdac.immigration.go.th/arrival-card/#/home`,
     content: `收到款項待確認沒問題後，再麻煩加一下我的個人line:
 1003904
 
-安排好車之後，我會開一個群組邀請您與團隊的導遊(司機)，還有我的太太，都是泰國人，都會用中文協助聯絡。
+安排好車之後，我會開一個群組邀請負責的泰國司機；若有選配中文導遊，也會邀請導遊加入。Eric 與團隊會在群組協助中文聯絡。
 
 行程會貼在群組記事本，全程有任何突發狀況我們都會隨時連絡保持聯繫與處理。`,
     note: '說明收到訂金後的流程',
@@ -301,6 +319,22 @@ async function checkDatabaseSchema() {
   }
 
   return db.properties
+}
+
+async function assertTargetDatabaseIsEmpty() {
+  console.log('🔒 確認目標話術資料庫為空白...')
+  const result = await notionRequest(`/databases/${REPLIES_DB}/query`, 'POST', {
+    page_size: 1,
+  })
+
+  if (Array.isArray(result.results) && result.results.length > 0) {
+    throw new Error(
+      '目標話術資料庫不是空白；已中止且不會修改 schema 或新增頁面。' +
+        'live 話術請改用經審核的一次性 migration 或 Notion UI 更新。'
+    )
+  }
+
+  console.log('✅ 目標資料庫為空白')
 }
 
 // ====================================
@@ -369,10 +403,13 @@ async function main() {
     // 1. 檢查現有結構
     await checkDatabaseSchema()
 
-    // 2. 更新結構
+    // 2. 實際確認資料庫沒有既有頁面；確認旗標本身不構成證明。
+    await assertTargetDatabaseIsEmpty()
+
+    // 3. 更新結構
     await updateDatabaseSchema()
 
-    // 3. 新增資料
+    // 4. 新增資料
     await addReplies()
 
     console.log('\n' + '='.repeat(50))

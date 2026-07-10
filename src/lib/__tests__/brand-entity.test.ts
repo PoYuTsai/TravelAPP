@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/notion', () => ({
+  fetchTotalFamilyCount: vi.fn(),
+}))
+
 import { metadata as carCharterMetadata } from '@/app/services/car-charter/page'
 import { metadata as homeMetadata } from '@/app/page'
 import {
@@ -31,6 +36,11 @@ describe('brand entity copy helpers', () => {
     expect(HOMEPAGE_ENTITY_SENTENCE).toContain('清邁親子包車')
     expect(CAR_CHARTER_ENTITY_SENTENCE).toContain('清微旅行')
     expect(CAR_CHARTER_ENTITY_SENTENCE).toContain('清邁親子包車')
+    expect(HOMEPAGE_ENTITY_SENTENCE).toContain('標準泰國司機')
+    expect(HOMEPAGE_ENTITY_SENTENCE).toContain('LINE 中文支援')
+    expect(HOMEPAGE_ENTITY_SENTENCE).toContain('中文導遊依需求選配')
+    expect(CAR_CHARTER_ENTITY_SENTENCE).toContain('標準泰國司機')
+    expect(CAR_CHARTER_ENTITY_SENTENCE).toContain('兒童安全座椅付費加購')
   })
 
   it('keeps homepage and car-charter metadata aligned to the brand and service query', () => {

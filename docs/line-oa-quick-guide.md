@@ -1,5 +1,8 @@
 # LINE OA Rich Menu 快速執行指南
 
+> [!WARNING]
+> **ARCHIVED / SUPERSEDED — 2026-07-10.** 本快速指南的 1 大＋3 小版型、`VIP 價格`／`小車價格`、`$` 金額與「各 200฿」超時話術均已失效；**不可複製貼上或上線**。現行步驟與 exact copy 請見 [`plans/2026-07-10-line-rich-menu-production-spec.md`](plans/2026-07-10-line-rich-menu-production-spec.md)。
+
 > 精簡版，只列必要步驟與對應內容
 > 最後更新：2026-01-29
 

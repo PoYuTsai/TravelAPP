@@ -77,12 +77,22 @@ describe('buildPartnerGroupSystemPrompt', () => {
   // --- 清微旅行 domain 車型硬規則（2026-06-05）---
   // 鎖住實務車型判斷，避免 responder 用泛用旅遊車型邏輯。
 
-  it('locks the 小轎車 capacity rule (4 seats, recommend ≤3, up to 4 with kids)', () => {
-    expect(prompt).toContain('小轎車')
-    expect(prompt).toContain('4 人座')
-    expect(prompt).toContain('最多 3 人')
-    expect(prompt).toContain('小朋友')
-    expect(prompt).toContain('坐到 4 位')
+  it('counts every adult, child, and infant as one occupied passenger seat', () => {
+    expect(prompt).toContain('每位乘客（包含成人、兒童與嬰幼兒）各佔一席')
+    expect(prompt).toContain('4 人家庭即使有小孩也安排 Van')
+    expect(prompt).not.toContain('若有帶小朋友，可視情況坐到 4 位')
+  })
+
+  it('locks the public fleet thresholds by total occupied seats', () => {
+    expect(prompt).toContain('2–3 位安排一台小轎車')
+    expect(prompt).toContain('4–9 位安排一台 Toyota Commuter 10 人座 Van')
+    expect(prompt).toContain('10–18 位安排兩台 Toyota Commuter 10 人座 Van')
+    expect(prompt).toContain('19 位以上轉人工確認')
+  })
+
+  it('keeps SUV out of public promises and automatic vehicle recommendations', () => {
+    expect(prompt).toContain('SUV 不是公開車型或價格方案')
+    expect(prompt).toContain('不得對外承諾、報價或主動推薦 SUV')
   })
 
   it('locks the Toyota Commuter rule (10-seat Van, excludes guide/front, ≤9 rear passengers)', () => {
@@ -101,9 +111,25 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('使用者原文')
   })
 
-  it('routes 6-person charters toward the Toyota Commuter 10-seat Van', () => {
-    expect(prompt).toContain('6 人包車')
-    expect(prompt).toContain('Toyota Commuter 10 人座 Van')
+  it('keeps Thai drivers standard and Chinese-speaking guides optional', () => {
+    expect(prompt).toContain('公開標準服務是泰國司機')
+    expect(prompt).toContain('中文導遊為選配')
+    expect(prompt).toContain('司機與導遊是不同專業角色')
+    expect(prompt).toContain('2–18 位皆可依需求選配一位中文導遊')
+  })
+
+  it('treats travel insurance as an optional THB 100 per-person trip add-on', () => {
+    expect(prompt).toContain('旅遊保險是自由選配')
+    expect(prompt).toContain('THB 100／人／趟')
+    expect(prompt).toContain('未加購不構成報價缺漏')
+  })
+
+  it('locks charter hours, grace period, and per-vehicle overtime without guide overtime', () => {
+    expect(prompt).toContain('清邁 10 小時')
+    expect(prompt).toContain('清萊／金三角 12 小時')
+    expect(prompt).toContain('基本用車時間用完後，另有 30 分鐘彈性')
+    expect(prompt).toContain('THB 300／小時／車')
+    expect(prompt).toContain('導遊不另收超時費')
   })
 
   it('flags airport transfers with 6+ luggage to confirm size/count and consider a second vehicle', () => {

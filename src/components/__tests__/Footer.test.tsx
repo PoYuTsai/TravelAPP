@@ -28,4 +28,13 @@ describe('Footer', () => {
     expect(html).not.toContain('Claude Code')
     expect(html).not.toContain('claude.ai/claude-code')
   })
+
+  it('states the standard Thai-driver and optional-guide policy', () => {
+    const html = renderToStaticMarkup(<Footer />)
+
+    expect(html).toContain('標準服務安排泰國司機')
+    expect(html).toContain('LINE 中文支援')
+    expect(html).toContain('中文導遊依需求選配')
+    expect(html).not.toContain('司機導遊專業分工')
+  })
 })

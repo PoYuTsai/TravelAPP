@@ -520,7 +520,7 @@ const post = {
       style: 'normal',
       children: [
         { _type: 'span', _key: 'family2a', text: '安全座椅：', marks: ['strong'] },
-        { _type: 'span', _key: 'family2b', text: 'Grab 沒有提供，雙條車更不可能有。如果你的小孩還小，這是最大的痛點。包車可以事先預約安全座椅，這也是我們清微旅行一定會準備的配備。' }
+        { _type: 'span', _key: 'family2b', text: 'Grab 沒有提供，雙條車更不可能有。如果你的小孩還小，這是最大的痛點。清微旅行的包車可事先付費加購安全座椅（THB 500／日／張），我們會依預約準備。' }
       ],
       markDefs: [],
     },
@@ -664,7 +664,7 @@ const post = {
       _type: 'block',
       _key: 'cta',
       style: 'normal',
-      children: [{ _type: 'span', _key: 'ctaa', text: '📍 不想煩惱交通？清微旅行提供專業司機 + 中文導遊，可預約兒童安全座椅，行程彈性不趕路。👉 LINE 免費諮詢：https://line.me/R/ti/p/@037nyuwk' }],
+      children: [{ _type: 'span', _key: 'ctaa', text: '📍 不想煩惱交通？清微旅行標準安排泰國司機，中文導遊可選配，兒童安全座椅可付費預約，行程彈性不趕路。👉 LINE 免費諮詢：https://line.me/R/ti/p/@037nyuwk' }],
       markDefs: [],
     },
   ],

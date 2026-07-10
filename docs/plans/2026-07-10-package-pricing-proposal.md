@@ -1,5 +1,8 @@
 # 三張示範套餐 — 人頭計價定價提案（2026-07-10）
 
+> [!WARNING]
+> **HISTORICAL / SUPERSEDED.** 本提案保留當時的試算紀錄，內文含強制導遊、拆單與舊套餐錨點，不可直接對客或作 production 報價。現行配車、導遊、家庭優惠與底價保護一律以 [`2026-07-10-per-person-pricing-framework.md`](2026-07-10-per-person-pricing-framework.md) 及 canonical pricing engine 為準。
+
 資料來源：Sanity production（projectId xefjjue7）`pricingExample` by publicSlug，以 `SANITY_API_TOKEN` 讀取（公開 query 看不到此 type）。
 引擎：`src/lib/pricing/perPersonRates.ts` `calcTrip`；轉接規則照 `src/sanity/tools/pricing/perPersonAdapter.ts`。
 口徑：全部以「大人 × 佔位人數」試算；含導遊照 payload（三張皆 includeGuide=true，但 2-3 人轎車制度上不配導遊、8-9 人強制配）；不含保險/安全座椅/司導過夜房。type:'airport' 純接送日不進引擎，按車收 sedan 500 / van 700，佔位≥8 每趟加行李車 700。10 人以上需兩台車 → 以「拆兩張 5 人單」示意（每單各自 van＋導遊，故每人價回跳）。

@@ -6,6 +6,7 @@ import { trackLineClick } from '@/lib/analytics'
 import { footerNavLinks, legalLinks, socialLinks } from '@/lib/navigation'
 import { CATEGORY_NAMES } from '@/lib/constants'
 import { LineIcon, InstagramIcon, FacebookIcon, TikTokIcon } from '@/components/icons/SocialIcons'
+import { HOME_PUBLIC_COPY } from '@/lib/home-public-copy'
 
 // Map social link labels to icons
 const socialIconMap: Record<string, React.ReactNode> = {
@@ -34,7 +35,7 @@ export default function Footer() {
               />
             </div>
             <p className="text-gray-400 text-sm leading-relaxed">
-              爸媽開的清邁親子包車。台灣爸爸 Eric × 泰國媽媽 Min，司機導遊專業分工，專為帶小孩的家庭設計，深受台灣家庭信賴。
+              {HOME_PUBLIC_COPY.footerDescription}
             </p>
           </div>
 

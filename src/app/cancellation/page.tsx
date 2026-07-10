@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Script from 'next/script'
+import { CHARTER_OVERTIME_POLICY } from '@/lib/pricing/publicPolicy'
 
 export const metadata: Metadata = {
   title: '取消與退款政策',
@@ -20,6 +21,11 @@ export const metadata: Metadata = {
 }
 
 export default function CancellationPage() {
+  const guideOvertimeText =
+    CHARTER_OVERTIME_POLICY.guideFeeThbPerHour === 0
+      ? '中文導遊不另收超時費'
+      : `中文導遊超時費為 THB ${CHARTER_OVERTIME_POLICY.guideFeeThbPerHour}／小時`
+
   // Static schema - no user input, safe to use
   const webPageSchema = {
     '@context': 'https://schema.org',
@@ -36,7 +42,7 @@ export default function CancellationPage() {
       '@type': 'Organization',
       '@id': 'https://chiangway-travel.com/#organization',
     },
-    dateModified: '2026-01-01',
+    dateModified: '2026-07-10',
   }
 
   return (
@@ -54,7 +60,7 @@ export default function CancellationPage() {
 
         <div className="prose prose-lg max-w-none">
           <p className="text-gray-600 mb-6">
-            最後更新日期：2026 年 1 月
+            最後更新日期：2026 年 7 月
           </p>
 
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
@@ -93,12 +99,14 @@ export default function CancellationPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">服務方式</h2>
             <div className="bg-green-50 border border-green-200 rounded-lg p-6 space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-2">👥 泰文司機 + 中文導遊</h3>
-                <p className="text-gray-700">我們採用<strong>專業分工模式</strong>：泰文司機負責駕駛，中文導遊負責溝通與照顧。司機不會說中文，行程中的溝通請透過導遊或 LINE 群組。</p>
+                <h3 className="font-semibold text-gray-900 mb-2">👥 標準泰國司機，中文導遊選配</h3>
+                <p className="text-gray-700">
+                  <strong>標準服務安排泰國司機，通常不以中文服務</strong>。行程會在出發前確認，旅途中提供 LINE 中文支援；需要隨車中文溝通或導覽時，再選配中文導遊。
+                </p>
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">📋 行程事先確定</h3>
-                <p className="text-gray-700">為避免行程當下的溝通成本，<strong>出發前會先排好完整行程</strong>，貼在 LINE 群組記事本供隨時查看。行程確定後，司機會照表走。</p>
+                <p className="text-gray-700">為避免行程當下的溝通成本，<strong>出發前會先排好完整行程</strong>，貼在 LINE 群組記事本供隨時查看。行程確定後，司機會照表走；需要調整時可透過 LINE 中文支援聯繫。</p>
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-2">⏱️ 景點停留時間</h3>
@@ -114,21 +122,23 @@ export default function CancellationPage() {
               <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 mb-2">⏰ 用車時數限制</h3>
                 <ul className="list-disc pl-6 text-gray-700 space-y-1">
-                  <li><strong>清邁用車：</strong>10 小時</li>
-                  <li><strong>清萊用車：</strong>12 小時</li>
+                  <li><strong>清邁用車：</strong>{CHARTER_OVERTIME_POLICY.chiangMaiHours} 小時</li>
+                  <li><strong>清萊／金三角用車：</strong>{CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時</li>
                 </ul>
               </div>
               <div className="mb-4">
                 <h3 className="font-semibold text-gray-900 mb-2">💵 超時費計算</h3>
-                <p className="text-gray-700">超過用車時數後，需支付司機與導遊<strong>各 200 泰銖/小時</strong>的超時費。</p>
+                <p className="text-gray-700">
+                  標準用車時數結束後有彈性 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘；超過彈性後，每台車收取 <strong>THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}／小時／台</strong>，{guideOvertimeText}。
+                </p>
               </div>
               <div className="p-4 bg-white rounded-lg border border-orange-100">
                 <p className="text-gray-700 text-sm">
-                  <strong>範例：</strong>清萊一日遊（12 小時）8:00 出發 → 20:00 結束
+                  <strong>範例：</strong>清萊一日遊（{CHARTER_OVERTIME_POLICY.chiangRaiGoldenTriangleHours} 小時）8:00 出發 → 20:00 結束
                 </p>
                 <ul className="text-gray-600 text-sm mt-2 space-y-1">
-                  <li>• 20:30 前結束：<span className="text-green-600 font-medium">不收超時費</span>（彈性 30 分鐘）</li>
-                  <li>• 20:40 後結束：需支付司機 200 泰銖 + 導遊 200 泰銖 = 400 泰銖/小時</li>
+                  <li>• 20:30 前結束：<span className="text-green-600 font-medium">不收超時費</span>（彈性 {CHARTER_OVERTIME_POLICY.graceMinutes} 分鐘）</li>
+                  <li>• 20:40 後結束：一台車超時費 THB {CHARTER_OVERTIME_POLICY.feeThbPerHourPerCar}；如為多台車，依實際車數計費</li>
                 </ul>
               </div>
             </div>
@@ -146,40 +156,40 @@ export default function CancellationPage() {
                   <tr className="bg-gray-100">
                     <th className="border border-gray-300 px-4 py-2 text-left">取消時間</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">退款比例</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 10,000 元）</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 THB 10,000）</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">14 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-green-600 font-semibold">全額退款（100%）</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 5,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 5,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7-13 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-yellow-600 font-semibold">退款 50%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 5,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 5,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">4-6 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-orange-600 font-semibold">退款 30%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">3 天內取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">當天取消或未到</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-gray-500 text-xs mt-2">
-              * 範例假設訂單總金額 10,000 元，已付 50% 訂金（5,000 元）
+              * 範例假設訂單總金額 THB 10,000，已付 50% 訂金（THB 5,000）
             </p>
           </section>
 
@@ -195,35 +205,35 @@ export default function CancellationPage() {
                   <tr className="bg-gray-100">
                     <th className="border border-gray-300 px-4 py-2 text-left">取消時間</th>
                     <th className="border border-gray-300 px-4 py-2 text-left">退款比例</th>
-                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 6,000 元）</th>
+                    <th className="border border-gray-300 px-4 py-2 text-left">範例（訂單 THB 6,000）</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">30 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-green-600 font-semibold">全額退款（100%）</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">14-29 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-yellow-600 font-semibold">退款 50%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 3,000 元（訂金全退）</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 3,000（訂金全退）</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7-13 天前取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-orange-600 font-semibold">退款 30%</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 1,800 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 1,800</td>
                   </tr>
                   <tr>
                     <td className="border border-gray-300 px-4 py-2">7 天內取消</td>
                     <td className="border border-gray-300 px-4 py-2 text-red-600 font-semibold">不予退款</td>
-                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 0 元</td>
+                    <td className="border border-gray-300 px-4 py-2 text-gray-600">退 THB 0</td>
                   </tr>
                 </tbody>
               </table>
             </div>
             <p className="text-gray-500 text-xs mt-2">
-              * 範例假設訂單總金額 6,000 元，已付 50% 訂金（3,000 元）
+              * 範例假設訂單總金額 THB 6,000，已付 50% 訂金（THB 3,000）
             </p>
           </section>
 
