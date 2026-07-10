@@ -34,38 +34,38 @@ interface RateTableSpec {
 const RATE_TABLES: RateTableSpec[] = [
   {
     icon: '🚗',
-    title: '轎車＋司機',
-    subtitle: '2–3 人，不配導遊',
+    title: '轎車＋泰國司機',
+    subtitle: '2–3 人，不含中文導遊',
     groupSizes: [2, 3],
     withGuide: false,
   },
   {
     icon: '🚐',
-    title: 'Van＋司機',
-    subtitle: '4–7 人，中文導遊選配',
-    groupSizes: [4, 5, 6, 7],
+    title: 'Van＋泰國司機',
+    subtitle: '4–9 人，不含中文導遊',
+    groupSizes: [4, 5, 6, 7, 8, 9],
     withGuide: false,
   },
   {
     icon: '🚐',
-    title: 'Van＋司機＋中文導遊',
-    subtitle: '4–9 人（8 人以上依泰國法規必配持證導遊）',
+    title: 'Van＋泰國司機＋中文導遊',
+    subtitle: '4–9 人，中文導遊選配方案',
     groupSizes: [4, 5, 6, 7, 8, 9],
     withGuide: true,
   },
 ]
 
 const SEAT_RULES = [
-  { people: '2–3 人', rule: '轎車＋司機，不配導遊' },
-  { people: '4–7 人', rule: 'Van＋司機，中文導遊可選配' },
-  { people: '8–9 人', rule: 'Van＋司機＋必配持證中文導遊（泰國法規）' },
-  { people: '10 人以上', rule: '兩台車，各自依人數計價' },
+  { people: '2–3 人', rule: '轎車＋泰國司機；如加聘中文導遊，需先確認車型' },
+  { people: '4–9 人', rule: '一台 Van＋泰國司機；中文導遊可選配' },
+  { people: '10–18 人', rule: 'Van×2（兩台 Van）＋泰國司機；請用 LINE 取得整團報價；如選配中文導遊，兩台車共用一位' },
+  { people: '19 人以上', rule: '人工報價，確認車輛與服務安排' },
 ]
 
 const CHILD_RULES = [
-  { age: '12 歲以上', price: '全價' },
-  { age: '3–11 歲', price: '8 折' },
-  { age: '0–2 歲', price: '半價' },
+  { age: '12 歲以上', price: '成人價' },
+  { age: '3–11 歲', price: '成人價 × 0.8（8 折試算）' },
+  { age: '0–2 歲', price: '成人價 × 0.5（半價試算）' },
 ]
 
 function thb(amount: number): string {
@@ -82,7 +82,8 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
       {/* 每人每日價三張表 */}
       <div>
         <p className="text-sm text-gray-500 mb-4 text-center">
-          單位：THB／人／日，以同行總人數（含嬰兒）查表
+          單位：THB／人／日，以同行總人數（嬰幼兒皆佔位）查表。標準安排為泰國司機；
+          需要隨車中文溝通或導覽，可加聘中文導遊。
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {RATE_TABLES.map((table) => (
@@ -145,13 +146,13 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           ))}
         </div>
         <p className="text-sm text-gray-500 mt-3 text-center">
-          司機與導遊是分開的專業角色：司機專心開車，中文導遊專心照顧一家人。
+          司機與導遊是分開的專業角色；中文導遊不因人數強制安排，4–18 人皆可依需求選配。
         </p>
       </div>
 
       {/* 小孩收費 */}
       <div>
-        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">小孩怎麼算</h3>
+        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">兒童優惠試算</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
           {CHILD_RULES.map((item) => (
             <div key={item.age} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 text-center">
@@ -161,7 +162,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
           ))}
         </div>
         <p className="text-sm text-gray-500 mt-3 text-center">
-          嬰兒也需要一個座位（安全座椅），人數級距以總座位數計。
+          嬰幼兒皆佔位，人數級距以總座位數計。上述優惠是初步試算，正式報價會依家庭組合與最低成團價取保護後確認。
         </p>
       </div>
 
@@ -177,7 +178,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
               </span>
             </li>
             <li className="flex justify-between gap-4">
-              <span className="text-gray-700">兒童安全座椅</span>
+              <span className="text-gray-700">兒童安全座椅也佔一個座位</span>
               <span className="font-semibold text-gray-900 whitespace-nowrap">
                 THB {thb(CHILD_SEAT_FEE_PER_DAY)}／日／張
               </span>
@@ -206,7 +207,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
             <li>景點門票、餐食（可代訂另計）</li>
           </ul>
           <p className="text-sm text-gray-500 mt-4">
-            每人價已包含：車資、油費、過路費、停車費、司機，配導遊方案含中文導遊，以及全程中文客服。
+            每人價已包含：車輛、泰國司機、油費、過路費、停車費與 LINE 中文支援；選配導遊方案另含中文導遊。
           </p>
         </div>
       </div>

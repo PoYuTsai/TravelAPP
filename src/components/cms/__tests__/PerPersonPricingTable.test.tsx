@@ -1,70 +1,86 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it } from 'vitest'
 import { render } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 
 import PerPersonPricingTable from '../PerPersonPricingTable'
 
-/**
- * 黃金值來源：docs/plans/2026-07-10-per-person-pricing-framework.md 第 6 節價目表。
- * 元件由 perPersonRates 引擎推導價格，這裡用 framework 文件數字交叉驗證，
- * 引擎參數若被改動而偏離定案表，本測試會抓到。
- */
-describe('PerPersonPricingTable', () => {
-  it('renders framework golden per-person day prices for all three tables', () => {
-    const { container } = render(<PerPersonPricingTable />)
-    const text = container.textContent ?? ''
+function renderPricingCopy() {
+  const { container } = render(<PerPersonPricingTable />)
+  return container.textContent ?? ''
+}
 
-    // 轎車 2-3 人：2 人 T1 = 2,300；3 人 T4 = 2,400
+describe('PerPersonPricingTable', () => {
+  it('renders the three public price cards with the current engine prices', () => {
+    const text = renderPricingCopy()
+
+    expect(text).toContain('轎車＋泰國司機')
+    expect(text).toContain('2–3 人')
+    expect(text).toContain('Van＋泰國司機')
+    expect(text).toContain('4–9 人')
+    expect(text).toContain('Van＋泰國司機＋中文導遊')
+
+    // 轎車：2 人 T1 = 2,300；3 人 T4 = 2,400
     expect(text).toContain('2,300')
     expect(text).toContain('2,400')
-    // van 不含導遊：7 人 T1 = 900；4 人 T4 = 2,200
-    expect(text).toContain('900')
-    expect(text).toContain('2,200')
-    // van 含導遊：4 人 T1 = 2,050；9 人 T1 = 1,000
+    // Van 不含導遊的新 8、9 人引擎數字
+    expect(text).toContain('800')
+    expect(text).toContain('750')
+    // Van 含導遊：4 人 T1 = 2,050；9 人 T1 = 1,000
     expect(text).toContain('2,050')
     expect(text).toContain('1,000')
   })
 
-  it('renders seat rules, child tiers and honest notes', () => {
-    const { container } = render(<PerPersonPricingTable />)
-    const text = container.textContent ?? ''
+  it('states the driver, optional-guide and fleet rules without legacy claims', () => {
+    const text = renderPricingCopy()
 
-    // 座位硬規則
-    expect(text).toContain('必配持證中文導遊')
-    expect(text).toContain('10 人以上')
-    // 小孩三段
-    expect(text).toContain('全價')
-    expect(text).toContain('8 折')
-    expect(text).toContain('半價')
-    // 嬰兒佔位
-    expect(text).toContain('嬰兒也需要一個座位')
-    // 誠實註記
-    expect(text).toContain('實際以正式報價為準')
+    expect(text).toContain('標準安排為泰國司機')
+    expect(text).toMatch(/中文導遊.*(?:選配|加聘)/)
+    expect(text).toContain('4–9 人')
+    expect(text).toMatch(/10–18 人.*(?:Van×2|兩台 Van)/)
+    expect(text).toMatch(/10–18 人.*LINE.*整團報價/)
+    expect(text).toMatch(/19 人以上.*人工報價/)
+    expect(text).toMatch(/2–3 人.*中文導遊.*確認車型/)
+    expect(text).toMatch(/10–18 人.*中文導遊.*共用一位/)
+
+    expect(text).not.toContain('泰國法規')
+    expect(text).not.toContain('必配持證')
+    expect(text).not.toContain('拆兩張單')
+    expect(text).not.toMatch(/(?:提供|安排|保證)中文司機/)
   })
 
-  it('lists overtime as excluded, charged per car (Eric 2026-07-10 定案)', () => {
-    const { container } = render(<PerPersonPricingTable />)
-    const text = container.textContent ?? ''
+  it('labels child rates as estimates protected by family composition and the minimum group price', () => {
+    const text = renderPricingCopy()
+
+    expect(text).toContain('嬰幼兒皆佔位')
+    expect(text).toContain('兒童優惠試算')
+    expect(text).toContain('8 折試算')
+    expect(text).toContain('半價試算')
+    expect(text).toContain('家庭組合')
+    expect(text).toContain('最低成團價')
+    expect(text).toContain('正式報價')
+  })
+
+  it('lists paid add-ons and overtime with their exact units', () => {
+    const text = renderPricingCopy()
 
     expect(text).toContain('費用不含')
     expect(text).toMatch(/300\s*／小時／台/)
+    expect(text).toMatch(/500\s*／日／張/)
+    expect(text).toMatch(/100\s*／人／趟/)
+    expect(text).toContain('安全座椅也佔一個座位')
     expect(text).toContain('10 小時')
     expect(text).toContain('12 小時')
-    // 超時費絕不出現在「包含」句
     expect(text).not.toContain('包含超時')
   })
 
-  it('renders optional insurance including infants, and Sanity footnotes', () => {
+  it('renders Sanity footnotes without reviving disallowed guide copy', () => {
     const { container } = render(
       <PerPersonPricingTable footnotes={['測試備註一則']} />
     )
     const text = container.textContent ?? ''
 
-    expect(text).toContain('投保時嬰兒也投保')
-    expect(text).toContain('100')
     expect(text).toContain('測試備註一則')
-    // 品牌紅線：絕不寫「中英泰文導遊」
     expect(text).not.toContain('中英泰文')
   })
 })
