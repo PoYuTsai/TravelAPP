@@ -28,6 +28,7 @@ import {
   type PricingExampleDocument,
 } from './sharedExamples'
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
+import { DEFAULT_THB_PER_TWD } from '@/lib/pricing/perPersonRates'
 import { buildParsedActivityTickets } from './activityTickets'
 import { normalizeGuidePerDayRate } from './guideRate'
 import {
@@ -152,7 +153,7 @@ const EXCLUSIVE_GROUPS: Record<string, string[]> = {
 
 // 預設資料（跟 HTML prototype v3 一樣）
 const DEFAULT_CONFIG = {
-  exchangeRate: 0.93,
+  exchangeRate: DEFAULT_THB_PER_TWD,
   nights: 5,
   mealDays: 5,
   guideDays: 5,
@@ -1727,7 +1728,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [adults, setAdults] = useState(8)
   const [children, setChildren] = useState(2)
   const people = adults + children  // 總人數（用於配車、房間計算）
-  const [exchangeRate, setExchangeRate] = useState(0.93)
+  const [exchangeRate, setExchangeRate] = useState(DEFAULT_THB_PER_TWD)
 
   // 多飯店住宿（每飯店 4 種固定房型分類，每種 3 個子房型）
   const createEmptySubRooms = (defaultPrice: number): CategoryRooms => [
@@ -2668,7 +2669,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 重置基本設定
     setAdults(8)
     setChildren(2)
-    setExchangeRate(0.93)
+    setExchangeRate(DEFAULT_THB_PER_TWD)
     setIncludeAccommodation(true)
     setIncludeMeals(true)
     setMealServiceDays(config.mealDays)

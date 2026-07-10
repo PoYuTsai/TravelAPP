@@ -13,6 +13,7 @@ import { buildQuoteItinerary } from '@/sanity/tools/pricing/quoteDetails'
 import type { QuoteData, QuotePhoto } from './types'
 import { enhanceQuoteBreakdown } from './quoteDisplay'
 import { resolveQuotePublicPageMode } from './publicPageMode'
+import { DEFAULT_THB_PER_TWD } from '@/lib/pricing/perPersonRates'
 
 const SAMPLE_SLUG = 'sample'
 
@@ -166,7 +167,7 @@ export async function fetchQuoteBySlug(
   const carFees = data.carFees ?? []
   const tripDays = carFees.length || 1
   const tripNights = Math.max(tripDays - 1, 0)
-  const exchangeRate = data.exchangeRate ?? 1.1
+  const exchangeRate = data.exchangeRate ?? DEFAULT_THB_PER_TWD
   const hotels = data.hotels ?? []
   const includeAccommodation = data.includeAccommodation ?? false
 
