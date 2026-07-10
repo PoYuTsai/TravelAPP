@@ -220,6 +220,35 @@ describe('generateValidationReport — inline math-inconsistent quote', () => {
 // ---------------------------------------------------------------------------
 
 describe('severity hierarchy', () => {
+  it('keeps a quote without optional insurance at ok severity', () => {
+    const quoteWithoutInsurance = `
+9/1 包車 3200
+
+小計：3200
+`.trim()
+
+    const report = generateValidationReport(quoteWithoutInsurance, 2026)
+
+    expect(report.findings.map(f => f.code)).not.toContain('MISSING_INSURANCE')
+    expect(report.severity).toBe('ok')
+  })
+
+  it('accepts selected insurance at THB 100 per passenger per trip', () => {
+    const quoteWithInsurance = `
+9/1 包車 3200
+旅遊保險 100*4人
+
+小計：3600
+`.trim()
+
+    const report = generateValidationReport(quoteWithInsurance, 2026)
+
+    expect(report.computedTotal).toBe(3600)
+    expect(report.statedTotal).toBe(3600)
+    expect(report.mathOk).toBe(true)
+    expect(report.findings.map(f => f.code)).not.toContain('MISSING_INSURANCE')
+  })
+
   it('ok is the best outcome — no findings or only info', () => {
     // A minimal quote with correct math
     const minimalQuote = `

@@ -98,17 +98,7 @@ export function generateValidationReport(text: string, year?: number): Validatio
     })
   }
 
-  // ---- 4. Missing insurance ------------------------------------------------
-  const hasInsurance = items.some(item => item.description.includes('保險'))
-  if (!hasInsurance) {
-    findings.push({
-      code: 'MISSING_INSURANCE',
-      severity: 'needs_human_check',
-      message: '報價未列乘客保險（保險費），請確認是否已包含。',
-    })
-  }
-
-  // ---- 5. Guide fee possible double-count ----------------------------------
+  // ---- 4. Guide fee possible double-count ----------------------------------
   const guideFeeItems = items.filter(item => item.description.includes('導遊'))
   if (guideFeeItems.length > 1) {
     findings.push({
@@ -119,7 +109,7 @@ export function generateValidationReport(text: string, year?: number): Validatio
     })
   }
 
-  // ---- 6. Implausibly low total (currency confusion heuristic) --------------
+  // ---- 5. Implausibly low total (currency confusion heuristic) --------------
   if (statedTotal > 0 && statedTotal < 5000 && items.length > 2) {
     findings.push({
       code: 'TOTAL_IMPLAUSIBLY_LOW',
