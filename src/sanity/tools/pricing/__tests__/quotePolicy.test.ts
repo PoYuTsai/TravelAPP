@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  countGuideServiceDays,
   getGuideControlPolicy,
   getLockedGuideServiceDays,
   resolveCustomerQuoteGate,
@@ -53,8 +54,21 @@ describe('getGuideControlPolicy', () => {
 })
 
 describe('getLockedGuideServiceDays', () => {
-  it('locks guide service to every car service day when selected', () => {
-    expect(getLockedGuideServiceDays(true, 6)).toBe(6)
-    expect(getLockedGuideServiceDays(false, 6)).toBe(0)
+  const mixedDays = [
+    { type: 'city' },
+    { type: 'suburban' },
+    { type: 'chiangrai' },
+    { type: 'suburban' },
+    { type: 'goldentriangle' },
+    { type: 'airport' },
+  ]
+
+  it('counts only non-transfer itinerary day types', () => {
+    expect(countGuideServiceDays(mixedDays)).toBe(5)
+  })
+
+  it('locks guide service to non-transfer itinerary days when selected', () => {
+    expect(getLockedGuideServiceDays(true, mixedDays)).toBe(5)
+    expect(getLockedGuideServiceDays(false, mixedDays)).toBe(0)
   })
 })

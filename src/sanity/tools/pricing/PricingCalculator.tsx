@@ -2905,8 +2905,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const totalChildSeatCount = babySeatCount + childSeatCount
 
   useEffect(() => {
-    setGuideServiceDays(getLockedGuideServiceDays(true, tripDays))
-  }, [tripDays])
+    setGuideServiceDays(getLockedGuideServiceDays(true, carFees))
+  }, [carFees])
 
   useEffect(() => {
     setMealServiceDays((prev) => clampMealServiceDays(prev, tripDays, config.mealDays))
@@ -2963,7 +2963,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       withGuide: includeGuide,
     })
     const guided = perPerson.guided
-    const guideDays = getLockedGuideServiceDays(guided, carServiceDays)
+    const guideDays = getLockedGuideServiceDays(guided, dailyCarFees)
     const photographerCount = getThaiDressPhotographerCount({
       isSelected: thaiDressPhoto,
       people,
@@ -4134,7 +4134,7 @@ Day 5｜送機
                   )}
                   {calculation.guided && (
                     <span style={{ ...noteStyle, color: '#666' }}>
-                      導遊已鎖定所有車程日；若只需部分天數請人工調整／另行報價。成本由引擎依車數計算，舊導遊售價欄不參與本版試算。
+                      導遊已鎖定所有非純接送行程日；若只需部分天數請人工調整／另行報價。成本由引擎依車數計算，舊導遊售價欄不參與本版試算。
                     </span>
                   )}
                 </div>

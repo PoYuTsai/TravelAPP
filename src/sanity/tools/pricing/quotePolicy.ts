@@ -1,4 +1,5 @@
 import type { ManualQuoteReason } from '@/lib/pricing/perPersonRates'
+import { dayTypeToTier } from './perPersonAdapter'
 
 export type CustomerQuoteGate =
   | { blocked: false; message: null }
@@ -42,9 +43,15 @@ export function getGuideControlPolicy(occupiedSeats: number): {
   }
 }
 
+export function countGuideServiceDays(
+  days: ReadonlyArray<{ type: string }>,
+): number {
+  return days.filter((day) => dayTypeToTier(day.type) !== 'transfer').length
+}
+
 export function getLockedGuideServiceDays(
   withGuide: boolean,
-  carServiceDays: number,
+  days: ReadonlyArray<{ type: string }>,
 ): number {
-  return withGuide ? carServiceDays : 0
+  return withGuide ? countGuideServiceDays(days) : 0
 }
