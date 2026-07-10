@@ -12,9 +12,8 @@ import RelatedBlogPosts from '@/components/tours/RelatedBlogPosts'
 import Breadcrumb from '@/components/ui/Breadcrumb'
 import OverviewVideo from '@/components/tours/OverviewVideo'
 import {
-  DAY_TOUR_PRICING_TIER_LABELS,
   DAY_TOUR_PUBLIC_PRICING,
-  type DayTourPricingTier,
+  getDayTourPricingTierLabel,
 } from '@/lib/pricing/dayTourPricing'
 
 // === Types ===
@@ -61,7 +60,7 @@ interface DayTour {
   stops?: Stop[]
   tips?: string[]
   additionalInfo?: string
-  pricingTier?: DayTourPricingTier
+  pricingTier?: unknown
 }
 
 type TourData = TourPackage | DayTour
@@ -208,13 +207,6 @@ export default async function TourDetailPage({
         numberOfItems: (tour as TourPackage).dailySchedule?.length || 0,
       },
     }),
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '5',
-      reviewCount: '110',
-      bestRating: '5',
-      worstRating: '1',
-    },
   }
 
   // BreadcrumbList Schema for SEO
@@ -404,11 +396,9 @@ export default async function TourDetailPage({
               <p className="text-gray-700 leading-relaxed">
                 {DAY_TOUR_PUBLIC_PRICING.disclosure.join('；')}。
               </p>
-              {(tour as DayTour).pricingTier && (
-                <p className="mt-3 text-sm font-medium text-primary">
-                  服務區域：{DAY_TOUR_PRICING_TIER_LABELS[(tour as DayTour).pricingTier!]}
-                </p>
-              )}
+              <p className="mt-3 text-sm font-medium text-primary">
+                服務區域：{getDayTourPricingTierLabel((tour as DayTour).pricingTier)}
+              </p>
               <Link
                 href={DAY_TOUR_PUBLIC_PRICING.pricingHref}
                 className="inline-flex mt-4 text-primary font-medium hover:underline"

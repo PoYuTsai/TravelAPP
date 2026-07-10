@@ -74,6 +74,52 @@ afterEach(() => {
 })
 
 describe('day-tour canonical public pricing', () => {
+  it.each([
+    ['missing', undefined],
+    ['unknown tier', 'T9'],
+    ['prototype key', '__proto__'],
+  ])('renders a safe card tier label for %s runtime pricingTier', (_label, pricingTier) => {
+    const RuntimeCard = DayTourCard as unknown as React.ComponentType<Record<string, unknown>>
+    let text = ''
+
+    expect(() => {
+      const { container } = render(
+        <RuntimeCard
+          title="未知區域一日遊"
+          slug="unknown-area-day-tour"
+          pricingTier={pricingTier}
+        />
+      )
+      text = container.textContent ?? ''
+    }).not.toThrow()
+
+    expect(text).toContain('T1 市區')
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['unknown tier', 'T9'],
+    ['prototype key', '__proto__'],
+  ])('renders a safe detail tier label for %s runtime pricingTier', async (_label, pricingTier) => {
+    const runtimeDayTour = { ...hostileDayTour, pricingTier }
+    mocks.sanityFetch.mockImplementation(async (query: string) => {
+      if (query.includes('_type == "tourPackage"')) return null
+      if (query.includes('_type == "dayTour"')) return runtimeDayTour
+      return null
+    })
+
+    const page = await TourDetailPage({
+      params: Promise.resolve({ slug: runtimeDayTour.slug }),
+    })
+    let text = ''
+    expect(() => {
+      const { container } = render(page)
+      text = container.textContent ?? ''
+    }).not.toThrow()
+
+    expect(text).toContain('服務區域：T1 市區')
+  })
+
   it('renders per-occupant pricing copy and ignores hostile legacy price props', () => {
     const HostileCard = DayTourCard as unknown as React.ComponentType<Record<string, unknown>>
     const { container } = render(
@@ -130,8 +176,17 @@ describe('day-tour canonical public pricing', () => {
       container.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]')
     ).map((script) => JSON.parse(script.textContent || '{}'))
     const schema = schemas.find((item) => item.name === hostileDayTour.title)
-    expect(schema?.['@type']).toBe('TouristTrip')
+    expect(schema).toMatchObject({
+      '@type': 'TouristTrip',
+      name: hostileDayTour.title,
+      provider: {
+        '@type': 'TravelAgency',
+        name: '清微旅行 Chiangway Travel',
+        url: 'https://chiangway-travel.com',
+      },
+    })
     expect(schema).not.toHaveProperty('offers')
+    expect(schema).not.toHaveProperty('aggregateRating')
     expect(JSON.stringify(schema)).not.toMatch(/3200|"price(?:Currency)?"|"offers"/)
 
     const detailQuery = mocks.sanityFetch.mock.calls

@@ -1,9 +1,35 @@
 import { describe, expect, it } from 'vitest'
 import {
   DAY_TOUR_ROUTE_TIER_PROPOSALS,
+  getDayTourPricingTierLabel,
+  isDayTourPricingTier,
+  normalizeDayTourPricingTier,
   proposeDayTourPricingTier,
   type DayTourPricingTier,
 } from './dayTourPricing'
+
+describe('day-tour runtime pricing tier normalization', () => {
+  it.each([
+    ['T1', 'T1 市區'],
+    ['T2', 'T2 近郊'],
+    ['T3', 'T3 清萊'],
+    ['T4', 'T4 金三角'],
+  ] satisfies Array<[DayTourPricingTier, string]>)('keeps %s and returns its label', (tier, label) => {
+    expect(isDayTourPricingTier(tier)).toBe(true)
+    expect(normalizeDayTourPricingTier(tier)).toBe(tier)
+    expect(getDayTourPricingTierLabel(tier)).toBe(label)
+  })
+
+  it.each([
+    ['missing', undefined],
+    ['unknown tier', 'T9'],
+    ['prototype key', '__proto__'],
+  ])('falls back safely for %s', (_label, value) => {
+    expect(isDayTourPricingTier(value)).toBe(false)
+    expect(normalizeDayTourPricingTier(value)).toBe('T1')
+    expect(getDayTourPricingTierLabel(value)).toBe('T1 市區')
+  })
+})
 
 describe('day-tour pricing tier proposals', () => {
   it.each([

@@ -7,6 +7,24 @@ export const DAY_TOUR_PRICING_TIER_LABELS: Record<DayTourPricingTier, string> = 
   T4: 'T4 金三角',
 }
 
+const DAY_TOUR_PRICING_TIERS: readonly DayTourPricingTier[] = ['T1', 'T2', 'T3', 'T4']
+const DEFAULT_DAY_TOUR_PRICING_TIER: DayTourPricingTier = 'T1'
+
+export function isDayTourPricingTier(value: unknown): value is DayTourPricingTier {
+  return (
+    typeof value === 'string' &&
+    (DAY_TOUR_PRICING_TIERS as readonly string[]).includes(value)
+  )
+}
+
+export function normalizeDayTourPricingTier(value: unknown): DayTourPricingTier {
+  return isDayTourPricingTier(value) ? value : DEFAULT_DAY_TOUR_PRICING_TIER
+}
+
+export function getDayTourPricingTierLabel(value: unknown): string {
+  return DAY_TOUR_PRICING_TIER_LABELS[normalizeDayTourPricingTier(value)]
+}
+
 /** Public day-tour pricing promises are code-owned; Sanity only selects a tier. */
 export const DAY_TOUR_PUBLIC_PRICING = {
   cardLabel: '私家半客製一日遊｜依總佔位人數計價',
