@@ -173,14 +173,14 @@ export default defineType({
       title: '價格範圍',
       type: 'string',
       group: 'pricing',
-      description: '例：NT$ 16,000 - 20,000 起',
+      description: '人頭計價口徑，例：每人 THB 6,000 起',
     }),
     defineField({
       name: 'priceNote',
       title: '價格說明',
       type: 'string',
       group: 'pricing',
-      description: '例：依人數、車型、導遊天數調整',
+      description: '例：以 6 人同行計，實際依人數級距報價',
     }),
   ],
   preview: {

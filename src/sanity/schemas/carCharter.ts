@@ -187,10 +187,12 @@ export default defineType({
     }),
     defineField({
       name: 'pricingVehicleTypes',
-      title: 'Vehicle Types / 車型與價格',
+      title: 'Vehicle Types / 車型與價格（舊版，已停用）',
       type: 'array',
       group: 'pricing',
-      description: '每張價格卡代表一種車型。至少建議 1 種。',
+      description:
+        '⚠️ 已停用（2026-07 人頭計價改版）：官網價目區改由程式內每人計價表產生（src/lib/pricing/perPersonRates.ts），此欄位內容不再顯示於前台，保留僅為歷史相容。',
+      readOnly: true,
       of: [
         defineArrayMember({
           type: 'object',
@@ -269,6 +271,7 @@ export default defineType({
       title: 'Pricing Footnotes / 價格備註',
       type: 'array',
       group: 'pricing',
+      description: '顯示在人頭計價價目表下方的補充備註（程式已內建計價口徑、超時費等固定註記）。',
       of: [{ type: 'string' }],
     }),
 

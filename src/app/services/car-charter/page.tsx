@@ -5,27 +5,32 @@ import { formatFamilyCountLabel } from '@/lib/family-count'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
-import { FeatureGrid, PricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
+import { FeatureGrid, PerPersonPricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
+import { calcPerPersonDay } from '@/lib/pricing/perPersonRates'
 
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60
 
+// 人頭計價起價（引擎推導，與價目表單一事實來源）：起價 = 各表最低每人日價
+const CITY_DAY_FROM_THB = calcPerPersonDay('T1', 7, false) // 清邁市區，7 人 van 不含導遊
+const CHIANGRAI_DAY_FROM_THB = calcPerPersonDay('T3', 7, false) // 清萊，7 人 van 不含導遊
+
 export const metadata: Metadata = {
   title: '爸媽開的清邁親子包車｜兒童座椅、中文導遊、司機導遊分工｜清微旅行',
-  description: '爸媽開的清邁親子包車 — 清微旅行提供司機+導遊專業分工（不是一人包辦）、兒童安全座椅（0-6歲皆有）、全程中文溝通。清邁一日 NT$3,700 起，清萊一日 NT$5,300 起。台灣爸爸 Eric × 泰國媽媽 Min 經營，專為帶小孩的家庭設計。',
+  description: `爸媽開的清邁親子包車 — 清微旅行提供司機+導遊專業分工（不是一人包辦）、兒童安全座椅（0-6歲皆有）、全程中文溝通。以人數計價：清邁一日每人 THB ${CITY_DAY_FROM_THB} 起、清萊一日每人 THB ${CHIANGRAI_DAY_FROM_THB.toLocaleString('en-US')} 起。台灣爸爸 Eric × 泰國媽媽 Min 經營，專為帶小孩的家庭設計。`,
   alternates: {
     canonical: 'https://chiangway-travel.com/services/car-charter',
   },
   openGraph: {
     title: '爸媽開的清邁親子包車｜兒童座椅、中文導遊、司機導遊分工｜清微旅行',
-    description: '爸媽開的清邁親子包車 — 司機+導遊專業分工、兒童安全座椅（0-6歲）、全程中文溝通。清邁一日 NT$3,700 起。',
+    description: `爸媽開的清邁親子包車 — 司機+導遊專業分工、兒童安全座椅（0-6歲）、全程中文溝通。清邁一日每人 THB ${CITY_DAY_FROM_THB} 起。`,
     url: 'https://chiangway-travel.com/services/car-charter',
     images: [{ url: '/images/og-image.png', width: 1200, height: 630, alt: '爸媽開的清邁親子包車 — 清微旅行' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: '爸媽開的清邁親子包車｜兒童座椅、中文導遊｜清微旅行',
-    description: '爸媽開的清邁親子包車 — 司機+導遊專業分工、兒童安全座椅、全程中文。清邁一日 NT$3,700 起。',
+    description: `爸媽開的清邁親子包車 — 司機+導遊專業分工、兒童安全座椅、全程中文。清邁一日每人 THB ${CITY_DAY_FROM_THB} 起。`,
     images: ['/images/og-image.png'],
   },
 }
@@ -64,15 +69,23 @@ const defaultData = {
     { icon: '💬', title: '全程中文溝通', description: '從諮詢到結束都用中文，完全無障礙' },
   ],
   faq: [
-    { question: '價格包含什麼？', answer: '包含車輛、司機、油資、過路費。導遊服務另計，依行程複雜度報價。' },
+    { question: '價格包含什麼？', answer: '每人價已包含車輛、司機、油資、過路費、停車費與全程中文客服；選配中文導遊的方案，導遊費也已含在每人價內。門票、餐食與超時費另計。' },
     { question: '司機會說中文嗎？', answer: '司機是泰國人，不會說中文。我們採用專業分工：泰文司機負責開車，中文導遊負責溝通與照顧。行程會事先排好貼在 LINE 群組，司機照表走。' },
-    { question: '超時怎麼計算？', answer: '清邁用車 10 小時、清萊 12 小時。超過用車時數後，需支付司機與導遊各 200 泰銖/小時的超時費。彈性 30 分鐘內不收費。' },
+    { question: '超時怎麼計算？', answer: '清邁一日用車 10 小時、清萊與金三角一日 12 小時。超過用車時數後，超時費為每小時 300 泰銖，按台計收。彈性 30 分鐘內不收費。' },
     { question: '可以帶嬰兒車嗎？', answer: '可以，我們的車輛空間充足。請事先告知，我們會確保有足夠空間。' },
     { question: '安全座椅怎麼安排？', answer: '有的，請事先告知孩子年齡和體重，我們會準備適合的安全座椅。' },
     { question: '可以客製行程嗎？', answer: '當然可以，這是我們的特色。告訴我們想去的地方、孩子年齡，我們幫你規劃。' },
     { question: '怎麼預訂？', answer: '透過 LINE 聯繫我們，討論需求後會提供報價，確認後付訂金即可。' },
   ],
 }
+
+// 三大套餐錨點價（2026-07-10 Eric 核價：6 人成行檔、整百取價）
+// 依人頭計價引擎試算，見 docs/plans/2026-07-10-package-pricing-proposal.md
+const packageAnchors = [
+  { name: '清邁親子 5 天 4 夜經典', pricePerPerson: '6,000' },
+  { name: '清萊 2 天自由行', pricePerPerson: '3,500' },
+  { name: '泰北 6 天 5 夜親子深度遊', pricePerPerson: '7,700' },
+]
 
 // Service Schema for SEO
 const serviceSchema = {
@@ -90,10 +103,10 @@ const serviceSchema = {
   },
   offers: {
     '@type': 'Offer',
-    priceCurrency: 'TWD',
-    price: '3700',
+    priceCurrency: 'THB',
+    price: String(CITY_DAY_FROM_THB),
     priceValidUntil: '2026-12-31',
-    description: '清邁一日（10小時）NT$ 3,700 起',
+    description: `清邁市區一日（10小時）每人 THB ${CITY_DAY_FROM_THB} 起，依人數與區域計價`,
   },
 }
 
@@ -124,8 +137,6 @@ const carCharterQuery = `*[_type == "carCharter"][0]{
   videoTitle,
   features,
   pricingSectionTitle,
-  pricingVehicleTypes,
-  pricingFootnotes,
   process,
   gallery,
   faq
@@ -210,21 +221,40 @@ export default async function CarCharterPage() {
           </div>
         </section>
 
-        {/* Pricing */}
-        {data?.pricingVehicleTypes?.length > 0 && (
-          <section className="py-16">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-              <SectionTitle
-                title={data.pricingSectionTitle || '服務價格'}
-                subtitle="實際報價依行程內容調整"
-              />
-              <PricingTable
-                vehicleTypes={data.pricingVehicleTypes}
-                footnotes={data.pricingFootnotes}
-              />
+        {/* Pricing — 人頭計價（價格由 perPersonRates 引擎推導，非 Sanity 內容） */}
+        <section className="py-16">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+            <SectionTitle
+              title={data?.pricingSectionTitle || '包車價格參考'}
+              subtitle="以人數計價，人越多每人越划算"
+            />
+            {/* 注意：Sanity pricingFootnotes 為舊「一台車價」時代內容（含導遊費/房費等成本拆項，
+                違反人頭計價對客展示原則），暫不渲染；Eric 更新 Sanity 內容後再接回 footnotes prop。 */}
+            <PerPersonPricingTable />
+
+            {/* 三大套餐錨點價 */}
+            <div className="mt-12">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">熱門套餐參考價</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                {packageAnchors.map((pkg) => (
+                  <div
+                    key={pkg.name}
+                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center"
+                  >
+                    <p className="text-sm text-gray-500 mb-2">{pkg.name}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      THB {pkg.pricePerPerson}
+                      <span className="text-sm font-medium text-gray-500">／人 起</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-sm text-gray-500 mt-3 text-center">
+                * 套餐價以 6 人同行計，人數不同每人價不同，實際以正式報價為準。
+              </p>
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         {/* Process Steps */}
         {data?.process?.length > 0 && (

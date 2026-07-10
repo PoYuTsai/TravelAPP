@@ -11,6 +11,7 @@ export { default as TrustNumbersBar } from './TrustNumbersBar'
 
 // Car charter components
 export { default as PricingTable } from './PricingTable'
+export { default as PerPersonPricingTable } from './PerPersonPricingTable'
 export { default as ProcessSteps } from './ProcessSteps'
 
 // Homestay components
