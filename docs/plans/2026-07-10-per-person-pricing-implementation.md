@@ -60,13 +60,15 @@
 |------|------|------|
 | 刀1 ✅ | Phase 0 引擎＋tests（2026-07-10 完成，a189e0e） | 無 |
 | 刀2 ✅ | Phase 1 報價器（2026-07-10 完成，eae12ed） | 刀1 |
-| 刀3 | Phase 2 前台報價頁＋重出三張套餐報價 | 刀2 |
+| 刀3 🔶 | Phase 2 前台報價頁（程式面完成 69d7f3c；重出三張套餐待 Eric） | 刀2 |
 | 刀4 | Phase 3 公開價目頁 | 刀1（可與刀3 並行） |
 | 刀5 | Phase 4 選單＋快查卡 | 刀4 上線後 |
 
 刀1 完成紀錄（a189e0e）：`src/lib/pricing/perPersonRates.ts`＋22 unit tests；匯率 fallback 單一事實來源 `DEFAULT_THB_PER_TWD=1.1`（TWD=THB÷rate；後台舊值 0.93 是方向錯誤、TWD 會灌水 ~7.5%，`PricingCalculator` 三處與 `src/lib/quote/fetchQuote.ts:169` 均改引常數）。
 
 刀2 完成紀錄（eae12ed）：引擎補 `AIRPORT_TRANSFER_FEES`（純接送日按車收 500/700，第5節規則2）；新增 `perPersonAdapter.ts`（type→tier 映射含 goldentriangle T4、機場日 name 推斷、10+ 拆單降級）；報價器三欄人數（嬰兒佔位計級距、餐費排除）、resolveFleet 配車、售價=人頭團費（黃表降內部成本毛利參考）、10+ 擋下載/產連結；externalQuote perPerson 售價結構 items＋`_quoteSnapshot.pricingModel:'perPerson'`（舊 snapshot 路徑不動）；載入舊 quote 匯率 <0.9 自動重設 1.1。Review 遺留建議（未做）：needLuggageCar 文案純看人數不看有無機場日、對外 tab「÷N 成人」舊口徑殘留、`downloadExternalQuote` dead code 可刪、保險改含嬰兒 +100/人需 Eric 確認。
+
+刀3 完成紀錄（69d7f3c，程式面）：修 `pricingModel` 斷鏈——`fetchQuote.ts` 原只取 `snapshot.externalQuote`、`pricingModel` 被丟棄，補傳到 `QuoteData`（types.ts 加 `pricingModel?: 'perPerson'`）；`QuoteCostDashboard` 的 `TotalQuoteCard`＋`LineItemBreakdown` 依 `pricingModel==='perPerson'` 反轉 THB 大字／TWD 縮約值註記，舊快照走現行 NT$ 渲染；included 對齊黃表補「超時費」。新增 fetchQuote mock 測試 3 條＋元件 jsdom/RTL 測試 2 條（mock framer-motion，jsdom 無 IntersectionObserver）。**未完項**：① 三張示範套餐（k8oeyepp/uao33058/lyx5aysy）用新報價器重出＋舊連結去留——quote 寫入 dry-run only＋去留需 Eric 決定；② 黃表「超時費 300/hr 加購實收」vs 框架第7節「超時費列包含清單」有張力，照計畫列入 included，需 Eric 確認口徑；③ 成本拆項對客隱藏開關（框架第7節「另開工單」）不在本刀。
 
 風險：
 - 舊 snapshot 相容（前台以 `pricingModel` 判別，舊格式走現行路徑）
