@@ -113,4 +113,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-07-11 固定套餐核價＋Sanity revision-safe save -->
+<!-- Last build trigger: 2026-07-11 固定套餐核價＋Sanity revision-safe save＋正式匯率 1 -->
