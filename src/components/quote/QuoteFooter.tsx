@@ -22,7 +22,7 @@ export function QuoteFooter({ isSample }: { isSample: boolean }) {
           想調整行程或確認報價？
         </p>
         <p className="mx-auto mt-3 max-w-md text-[14px] leading-[1.8]" style={{ color: '#5F5648' }}>
-          直接回 LINE 跟我們說，我們會依照人數、房型與實際需求協助微調。
+          直接回 LINE 跟我們說，我們會依照人數、兒童年齡與實際需求協助微調。
         </p>
         <a
           href={LINE_URL}

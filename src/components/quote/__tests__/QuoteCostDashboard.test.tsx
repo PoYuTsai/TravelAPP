@@ -67,6 +67,16 @@ function buildQuote(overrides: Partial<QuoteData> = {}): QuoteData {
 }
 
 describe('QuoteCostDashboard 幣別主次分流', () => {
+  it('套餐模式只以同行人數、兒童年齡、車數與加購需求說明價格變動', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/quote/QuoteCostDashboard.tsx'),
+      'utf8'
+    )
+
+    expect(source).toContain('同行總人數、兒童年齡、車數與加購需求')
+    expect(source).not.toContain('住宿等級、是否含導遊')
+  })
+
   it('derives overtime numbers from the canonical public policy', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/components/quote/QuoteCostDashboard.tsx'),

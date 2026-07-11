@@ -357,7 +357,7 @@ function PackageEstimateNotice({ basisLabel }: { basisLabel: string }) {
             這是套餐參考試算，不是固定團費
           </h3>
           <p className="mt-3 text-[14px] leading-[1.8]" style={{ color: 'rgba(253,251,244,0.78)' }}>
-            {basisLabel}。實際報價會依人數、車數、住宿等級、是否含導遊、門票活動與餐食需求調整。
+            {basisLabel}。實際報價會依同行總人數、兒童年齡、車數與加購需求調整；套餐固定包含項目以本頁為準。
           </p>
         </div>
       </div>
