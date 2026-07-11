@@ -24,7 +24,7 @@
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
 | 定價 2026-07 | 包車每人每日參考價、親子全家總價與 LINE 價格圖同步 | ✅ 完成 |
 | 套餐 2026-07 | 三個公開套餐報價沿用原網址，已同步新版人頭價、包含／不含與條件式行李車規則 | ✅ 完成 |
-| 後台 2026-07 | 報價儲存改用 Sanity revision 鎖；固定套餐獨立核價，避免匯率修改誤覆蓋公開總價 | ✅ 完成 |
+| 後台 2026-07 | 報價儲存改用 Sanity revision 鎖；固定套餐獨立核價；正式報價預設匯率為 1 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | 🧪 Preview AI + 夥伴群協作 + RAG groundwork |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。

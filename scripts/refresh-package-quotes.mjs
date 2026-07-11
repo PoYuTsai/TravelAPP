@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 const SLUGS = ['k8oeyepp', 'uao33058', 'lyx5aysy']
 const APPLY = process.argv.includes('--apply')
-const EXCHANGE_RATE = 1.1
+const EXCHANGE_RATE = 1
 
 const moneyItem = (label, quantity, unitPriceThb) => ({
   label,

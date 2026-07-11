@@ -54,7 +54,7 @@ export const INSURANCE_FEE_PER_PERSON = 100
 export const DRIVER_GUIDE_ROOM_FEE_PER_NIGHT = 750
 
 /** Fallback conversion: TWD = THB / rate. */
-export const DEFAULT_THB_PER_TWD = 1.1
+export const DEFAULT_THB_PER_TWD = 1
 
 export type ManualQuoteReason =
   /** @deprecated Retained so serialized legacy quotes can still be gated safely. */

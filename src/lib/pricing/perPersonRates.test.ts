@@ -46,7 +46,7 @@ function narrowedQuoteFields(quote: TripQuote) {
 describe('pricing constants', () => {
   it('keeps airport transfer and TWD fallback constants stable', () => {
     expect(AIRPORT_TRANSFER_FEES).toEqual({ sedan: 500, van: 700 })
-    expect(DEFAULT_THB_PER_TWD).toBe(1.1)
+    expect(DEFAULT_THB_PER_TWD).toBe(1)
   })
 
   it('flags each Van carrying 7 or more guests for luggage confirmation', () => {
