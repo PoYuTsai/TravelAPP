@@ -39,6 +39,13 @@ const packageConfigs = {
       { name: '湄林親子活動', type: 'suburban' },
       { name: '單趟送機', type: 'airport' },
     ],
+    fallbackCarFees: [
+      { day: 'D1', date: '', cost: 2_700, price: 4_000 },
+      { day: 'D2', date: '', cost: 3_300, price: 4_600 },
+      { day: 'D3', date: '', cost: 3_300, price: 4_000 },
+      { day: 'D4', date: '', cost: 3_300, price: 4_300 },
+      { day: 'D5', date: '', cost: 500, price: 700 },
+    ],
     itineraryText: `Day 1｜接機＋清邁市區慢遊
 ・機場接機（實際時間依航班調整）
 ・清邁市區午餐
@@ -92,6 +99,10 @@ Day 5｜單趟送機
     days: [
       { name: '清邁→清萊市區', type: 'chiangrai' },
       { name: '清萊市區→清邁', type: 'chiangrai' },
+    ],
+    fallbackCarFees: [
+      { day: 'D1', date: '', cost: 3_300, price: 5_300 },
+      { day: 'D2', date: '', cost: 3_300, price: 5_300 },
     ],
     itineraryText: `Day 1｜清邁出發・清萊市區
 ・清邁飯店出發
@@ -155,6 +166,14 @@ Day 2｜清萊景點・返回清邁
       { name: '茵他儂國家公園', type: 'suburban' },
       { name: '南邦一日', type: 'suburban' },
       { name: '單趟送機', type: 'airport' },
+    ],
+    fallbackCarFees: [
+      { day: 'D1', date: '', cost: 4_000, price: 4_800 },
+      { day: 'D2', date: '', cost: 4_500, price: 6_600 },
+      { day: 'D3', date: '', cost: 3_800, price: 4_800 },
+      { day: 'D4', date: '', cost: 3_500, price: 4_800 },
+      { day: 'D5', date: '', cost: 3_500, price: 4_800 },
+      { day: 'D6', date: '', cost: 500, price: 700 },
     ],
     itineraryText: `Day 1｜接機・清道・芳縣
 ・清邁機場接機（實際時間依航班調整）
@@ -254,11 +273,16 @@ function buildUpdatedPayload(rawPayload, config) {
     savedParsedTickets: [],
   })
 
-  if (!Array.isArray(data.carFees) || data.carFees.length !== config.days.length) {
-    throw new Error(`Unexpected carFees length: expected ${config.days.length}`)
+  const sourceCarFees =
+    Array.isArray(data.carFees) && data.carFees.length === config.days.length
+      ? data.carFees
+      : config.fallbackCarFees
+
+  if (!Array.isArray(sourceCarFees) || sourceCarFees.length !== config.days.length) {
+    throw new Error(`Unable to recover carFees: expected ${config.days.length}`)
   }
 
-  data.carFees = data.carFees.map((day, index) => ({
+  data.carFees = sourceCarFees.map((day, index) => ({
     ...day,
     name: config.days[index].name,
     type: config.days[index].type,
