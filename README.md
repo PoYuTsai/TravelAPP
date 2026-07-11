@@ -111,4 +111,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-07-10 人頭計價刀4 公開價目頁＋錨點價定案＋現場付標註＋門票設計落檔 -->
+<!-- Last build trigger: 2026-07-11 逐台行李確認＋套餐連結與錨點價＋對客 LINE 報價模板 -->

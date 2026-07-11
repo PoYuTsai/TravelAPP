@@ -13,6 +13,8 @@
 - Fleet by total occupied seats: 2–3 guests use one sedan, 4–9 use one Van, 10–18 use two Vans, and 19+ is manual. Every adult, child, and infant occupies a seat, so a four-person family is quoted as a Van even when some passengers are children.
 - Publicly, 4–5 guests are always shown and quoted as a Van. An SUV is never a public vehicle or price promise; operations may use one only as an availability-based, same-price internal dispatch/upgrade. A customer-requested SUV or unusual luggage, safety-seat, or seating needs require manual confirmation.
 - Optional insurance is THB 100/person/trip. An airport-only one-way transfer is THB 500 by sedan or THB 700 by Van; a transfer day is not a full charter day.
+- For airport pickup/dropoff, evaluate luggage space per Van. When one Van carries 7 or more guests, confirm that Van's large luggage and stroller count. If two Vans each carry 7 or more, confirm both separately. Add a luggage Van only after space is confirmed insufficient, at THB 700/vehicle/trip.
+- Paid child safety seats are currently offered only for ages 0–2 at THB 500/day/seat.
 - Chiang Mai service includes 10 hours and Chiang Rai/Golden Triangle service includes 12 hours. Allow 30 minutes of on-site flexibility, then charge THB 300/hour/car with no separate guide overtime.
 
 Locked 2–3 guest all-adult reference prices (THB/person/day):
@@ -23,6 +25,12 @@ Locked 2–3 guest all-adult reference prices (THB/person/day):
 | T2 | 2,550 | 3,800 | 1,750 | 2,600 |
 | T3 | 3,200 | 4,450 | 2,200 | 3,050 |
 | T4 | 3,500 | 4,750 | 2,400 | 3,250 |
+
+Current six-adult public package anchors (final mixed-age quotes still use the calculator):
+
+- Chiang Mai family 5D4N: THB 6,000/person, `/quote/k8oeyepp`
+- Chiang Rai 2-day: THB 3,750/person, `/quote/uao33058`
+- North Thailand family 6D5N: THB 9,200/person, `/quote/lyx5aysy`
 
 ## Package 1: 清邁 5 天 4 夜 親子家庭包車
 
@@ -47,7 +55,7 @@ D5: Checkout → airport dropoff (departure day per flight time)
 **Optional / quote-specific**:
 - Chinese-speaking guide on the confirmed non-transfer service days, including for 2–3 guests; a guide is not automatically included on every active day
 - Passenger insurance (THB 100/person/trip)
-- Child safety seat (THB 500/day/seat); it is installed on that child's passenger seat and does not add another traveler, but must be considered in the vehicle seating layout
+- Child safety seat for ages 0–2 only (THB 500/day/seat); it is installed on that child's passenger seat and does not add another traveler, but must be considered in the vehicle seating layout
 
 **Excluded (standard)**:
 - All meals
