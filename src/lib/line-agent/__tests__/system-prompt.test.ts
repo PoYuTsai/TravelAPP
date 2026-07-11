@@ -139,6 +139,14 @@ describe('buildPartnerGroupSystemPrompt', () => {
     expect(prompt).toContain('第二台車')
   })
 
+  it('applies the per-Van seven-passenger luggage confirmation rule without automatic fees', () => {
+    expect(prompt).toContain('每台 Van')
+    expect(prompt).toContain('載客達 7 位')
+    expect(prompt).toContain('兩台都要分別確認')
+    expect(prompt).toContain('THB 700／台／趟')
+    expect(prompt).toContain('不得自動加價')
+  })
+
   it('does not demand a caseId; lists missing info in plain language instead', () => {
     expect(prompt).toContain('不要要求')
     expect(prompt).toContain('caseId')

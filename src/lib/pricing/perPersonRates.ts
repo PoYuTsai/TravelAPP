@@ -33,7 +33,8 @@ export const GUIDE_PRICING = {
 } as const
 
 export const LUGGAGE_VAN_FEE = 700
-export const LUGGAGE_VAN_SEAT_THRESHOLD = 8
+/** A Van carrying this many guests requires a luggage-space confirmation. */
+export const LUGGAGE_VAN_SEAT_THRESHOLD = 7
 
 export const AIRPORT_TRANSFER_FEES: Record<Vehicle, number> = {
   sedan: 500,
@@ -102,6 +103,33 @@ export function resolveFleet(occupiedSeats: number): Fleet {
       ? 'group-size-requires-manual-quote'
       : null,
   }
+}
+
+/**
+ * Distribute guests as evenly as possible and count how many Vans carry at
+ * least seven guests. Each matching Van must be confirmed independently.
+ */
+export function countLuggageCheckCars(
+  occupiedSeats: number,
+  carCount: number,
+): number {
+  if (!Number.isInteger(occupiedSeats) || occupiedSeats < 0) {
+    throw new Error(`Invalid occupied-seat count: ${occupiedSeats}`)
+  }
+  if (!Number.isInteger(carCount) || carCount < 1) {
+    throw new Error(`Invalid car count: ${carCount}`)
+  }
+
+  const guestsPerCar = Math.floor(occupiedSeats / carCount)
+  const carsWithExtraGuest = occupiedSeats % carCount
+  let checkCount = 0
+
+  for (let index = 0; index < carCount; index += 1) {
+    const guests = guestsPerCar + (index < carsWithExtraGuest ? 1 : 0)
+    if (guests >= LUGGAGE_VAN_SEAT_THRESHOLD) checkCount += 1
+  }
+
+  return checkCount
 }
 
 export interface GuidePricing {
@@ -205,6 +233,8 @@ export interface TripAddons {
   insurancePersons?: number
   /** THB 750 per room-night. */
   overnightRoomNights?: number
+  /** Confirmed luggage Vans required for each airport service day. */
+  luggageVansPerAirportDay?: number
 }
 
 export interface TripInput {
@@ -284,6 +314,7 @@ function validateTripInput(input: TripInput) {
     'childSeats',
     'insurancePersons',
     'overnightRoomNights',
+    'luggageVansPerAirportDay',
   ] as const) {
     const value = addons[addonKey]
     if (value !== undefined) assertNonNegativeInteger(value, addonKey)
@@ -425,6 +456,10 @@ export function calcTrip(input: TripInput): TripQuote {
   const { days, adults, children, infants, withGuide, addons = {} } = input
   const occupiedSeats = adults + children + infants
   const fleet = resolveFleet(occupiedSeats)
+  const confirmedLuggageVans = addons.luggageVansPerAirportDay ?? 0
+  if (confirmedLuggageVans > fleet.carCount) {
+    throw new Error('luggageVansPerAirportDay cannot exceed the passenger vehicle count')
+  }
   const guidePricing = resolveGuidePricing(fleet.carCount, withGuide)
   const guideCostThb =
     guidePricing.guideCostThb === null
@@ -483,10 +518,12 @@ export function calcTrip(input: TripInput): TripQuote {
     pushItem('親子包車團費（家庭優惠後）', 1, fareProtection.finalThb)
   }
 
-  const luggageVanDays = days.filter(
-    (day) => day.isAirportDay && occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD,
-  ).length
-  pushItem('機場行李車', luggageVanDays, LUGGAGE_VAN_FEE)
+  const airportServiceDays = days.filter((day) => day.isAirportDay).length
+  pushItem(
+    '機場行李車',
+    airportServiceDays * confirmedLuggageVans,
+    LUGGAGE_VAN_FEE,
+  )
   pushItem(
     '兒童安全座椅',
     addons.childSeats ?? 0,

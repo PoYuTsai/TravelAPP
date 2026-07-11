@@ -42,7 +42,7 @@ describe('buildPerPersonQuote', () => {
     { name: '送機', type: 'airport' },
   ]
 
-  it.each([8, 9])('%i 人不選導遊時維持無導遊，5 個整日進引擎、送機日按車收費', (occupiedSeats) => {
+  it.each([8, 9])('%i 人未確認行李車時只收既有送機車費，並標示一台需確認', (occupiedSeats) => {
     const result = buildPerPersonQuote({
       days: sixDays,
       adults: occupiedSeats - 2,
@@ -54,23 +54,24 @@ describe('buildPerPersonQuote', () => {
     expect(result.manualQuoteReason).toBeNull()
     expect(result.guided).toBe(false)
     expect(result.fleet?.vehicle).toBe('van')
-    // 送機日：van 700 × 1 台 ＋ ≥8 人行李車 700
-    expect(result.transferFee).toBe(1400)
+    expect(result.luggageCheckCarCount).toBe(1)
+    expect(result.transferFee).toBe(700)
     expect(result.trip).not.toBeNull()
     expect(result.trip?.manualQuoteRequired).toBe(false)
     expect(result.trip!.perPersonDayPrices).toHaveLength(5)
     expect(result.groupTourPrice).toBe(
-      result.trip!.manualQuoteRequired ? null : result.trip!.totalThb + 1400,
+      result.trip!.manualQuoteRequired ? null : result.trip!.totalThb + 700,
     )
   })
 
-  it('整日接機日會攤入行李車（isAirportDay 傳進引擎）', () => {
+  it('確認一台行李車後，整日接機與純送機各計一趟', () => {
     const result = buildPerPersonQuote({
       days: sixDays,
       adults: 8,
       children: 0,
       infants: 0,
       withGuide: true,
+      luggageVansPerAirportDay: 1,
     })
     const expected = calcTrip({
       days: [
@@ -84,8 +85,10 @@ describe('buildPerPersonQuote', () => {
       children: 0,
       infants: 0,
       withGuide: true,
+      addons: { luggageVansPerAirportDay: 1 },
     })
     expect(result.trip!.totalThb).toBe(expected.totalThb)
+    expect(result.transferFee).toBe(1400)
   })
 
   it.each([2, 3])('%i 人選導遊時使用 sedan＋guide 並自動完成報價', (occupiedSeats) => {
@@ -105,7 +108,7 @@ describe('buildPerPersonQuote', () => {
     expect(result.groupTourPrice).toBe(
       result.trip?.manualQuoteRequired ? null : result.trip!.totalThb + 500,
     )
-    // 送機日：sedan 500 × 1 台，人數 <8 無行李車
+    // 送機日：sedan 500 × 1 台
     expect(result.transferFee).toBe(500)
   })
 
@@ -217,12 +220,12 @@ describe('buildPerPersonQuote', () => {
       withGuide: false,
     })
     expect(result.trip).toBeNull()
-    // van 700 × 2 趟，<8 人無行李車
+    // van 700 × 2 趟，未確認行李車不加價
     expect(result.transferFee).toBe(1400)
     expect(result.groupTourPrice).toBe(1400)
   })
 
-  it('10 人純接送依兩台 Van 收車費，行李車維持每趟一台', () => {
+  it('10 人平均分兩台 Van 時每台 5 人，不觸發行李確認', () => {
     const result = buildPerPersonQuote({
       days: [{ name: '接機', type: 'airport' }, { name: '送機', type: 'airport' }],
       adults: 10,
@@ -234,8 +237,24 @@ describe('buildPerPersonQuote', () => {
     expect(result.fleet?.carCount).toBe(2)
     expect(result.trip).toBeNull()
     expect(result.manualQuoteRequired).toBe(false)
-    // van 700 × 2 台 × 2 趟，另加行李車 700 × 2 趟
-    expect(result.transferFee).toBe(4200)
-    expect(result.groupTourPrice).toBe(4200)
+    expect(result.luggageCheckCarCount).toBe(0)
+    expect(result.transferFee).toBe(2800)
+    expect(result.groupTourPrice).toBe(2800)
+  })
+
+  it('14 人兩台 Van 都達 7 人，確認兩台行李車後逐台逐趟計價', () => {
+    const result = buildPerPersonQuote({
+      days: [{ name: '接機', type: 'airport' }, { name: '送機', type: 'airport' }],
+      adults: 14,
+      children: 0,
+      infants: 0,
+      withGuide: false,
+      luggageVansPerAirportDay: 2,
+    })
+
+    expect(result.fleet?.carCount).toBe(2)
+    expect(result.luggageCheckCarCount).toBe(2)
+    expect(result.transferFee).toBe(5600)
+    expect(result.groupTourPrice).toBe(5600)
   })
 })

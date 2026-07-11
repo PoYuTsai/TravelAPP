@@ -28,7 +28,7 @@ import {
   type PricingExampleDocument,
 } from './sharedExamples'
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
-import { DEFAULT_THB_PER_TWD, LUGGAGE_VAN_SEAT_THRESHOLD } from '@/lib/pricing/perPersonRates'
+import { countLuggageCheckCars, DEFAULT_THB_PER_TWD } from '@/lib/pricing/perPersonRates'
 import { buildPerPersonQuote } from './perPersonAdapter'
 import { buildParsedActivityTickets } from './activityTickets'
 import { normalizeGuidePerDayRate } from './guideRate'
@@ -1627,6 +1627,8 @@ interface SavedQuote {
     guideDays?: number
     guideCostPerDay?: number
     guidePricePerDay?: number
+    luggageCarCount?: number
+    /** Legacy saved-quote compatibility. */
     luggageCar?: boolean
     childSeatCount?: number
     babySeatCount?: number  // 嬰兒座椅
@@ -1854,7 +1856,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [extraPhotographer, setExtraPhotographer] = useState(false)
   const [makeupCount, setMakeupCount] = useState(0)
   const [thaiDressDay, setThaiDressDay] = useState<number | null>(null)  // 泰服在哪一天（從解析結果取得）
-  const [luggageCar, setLuggageCar] = useState(true)
+  const [luggageCarCount, setLuggageCarCount] = useState(0)
   // 兒童座椅
   const [babySeatCount, setBabySeatCount] = useState(0)  // 0-2歲嬰兒座椅
   const [childSeatCount, setChildSeatCount] = useState(0)  // 3-5歲兒童座椅
@@ -2363,7 +2365,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         guideDays: guideServiceDays,
         guideCostPerDay,
         guidePricePerDay,
-        luggageCar,
+        luggageCarCount,
+        luggageCar: luggageCarCount > 0,
         childSeatCount,
         babySeatCount,
         childSeatDays: childSeatServiceDays,
@@ -2616,7 +2619,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         config.mealDays
       )
     )
-    if (quote.data.luggageCar !== undefined) setLuggageCar(quote.data.luggageCar)
+    if (quote.data.luggageCarCount !== undefined) {
+      setLuggageCarCount(Math.max(0, quote.data.luggageCarCount))
+    } else if (quote.data.luggageCar !== undefined) {
+      setLuggageCarCount(quote.data.luggageCar ? 1 : 0)
+    }
     if (quote.data.childSeatCount !== undefined) setChildSeatCount(quote.data.childSeatCount)
     if (quote.data.babySeatCount !== undefined) setBabySeatCount(quote.data.babySeatCount)
     setChildSeatServiceDays(
@@ -2730,7 +2737,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setOutboundStayRooms(2)
     // 重置車費
     setCarFees(DEFAULT_CONFIG.dailyCarFees.map(d => ({ ...d, date: '' })))
-    setLuggageCar(true)
+    setLuggageCarCount(0)
     setBabySeatCount(0)
     setChildSeatCount(0)
     setChildSeatServiceDays(config.dailyCarFees.length)
@@ -2944,14 +2951,14 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     }
   }, [people, thaiDressPhoto])
 
-  // Auto-adjust luggage car based on max passengers per car
-  // maxPerCar >= 8 自動勾選（8人以上很緊，需要行李車）
   useEffect(() => {
-    const cars = people <= 9 ? 1 : 1 + Math.ceil((people - 9) / 10)
-    const basePerCar = Math.floor(people / cars)
-    const remainder = people % cars
-    const maxPerCar = basePerCar + (remainder > 0 ? 1 : 0)
-    setLuggageCar(maxPerCar >= 8)
+    const passengerCarCount = people <= 3 ? 1 : Math.ceil(people / 9)
+    const maximumConfirmedLuggageCars = people >= 4
+      ? countLuggageCheckCars(people, passengerCarCount)
+      : 0
+    setLuggageCarCount((current) =>
+      Math.min(current, maximumConfirmedLuggageCars)
+    )
   }, [people])
 
   // Calculations
@@ -2969,12 +2976,21 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       ? clampChildSeatServiceDays(childSeatServiceDays, carServiceDays, carServiceDays)
       : 0
     // 人頭計價：2–3 人可選配導遊並自動報價；1 人與 19+ 維持 typed manual quote。
+    const passengerCarCount = people <= 3 ? 1 : Math.ceil(people / 9)
+    const maximumConfirmedLuggageCars = people >= 4
+      ? countLuggageCheckCars(people, passengerCarCount)
+      : 0
+    const safeLuggageCarCount = Math.min(
+      luggageCarCount,
+      maximumConfirmedLuggageCars,
+    )
     const perPerson = buildPerPersonQuote({
       days: dailyCarFees,
       adults,
       children,
       infants,
       withGuide: includeGuide,
+      luggageVansPerAirportDay: safeLuggageCarCount,
     })
     const guideService = resolveGuideService(perPerson.guided, dailyCarFees)
     const guided = guideService.active
@@ -3003,10 +3019,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 最大單車人數（用於判斷行李空間）
     const maxPerCar = Math.max(...carDistributionArr)
 
-    // 行李：佔位 ≥8 機場日自動加行李車（700/趟，已攤入人頭團費，不另列項）
-    const luggageStatus: 'ok' | 'tight' = maxPerCar <= 7 ? 'ok' : 'tight'
-    const suggestLuggageCar = maxPerCar >= 8
-    const needLuggageCar = people >= LUGGAGE_VAN_SEAT_THRESHOLD
+    // 行李：每台 Van 載客達 7 位時逐台確認；只有人工選定後才計價。
+    const luggageCheckCarCount = perPerson.luggageCheckCarCount
+    const luggageStatus: 'ok' | 'tight' = luggageCheckCarCount === 0 ? 'ok' : 'tight'
+    const suggestLuggageCar = luggageCheckCarCount > 0
+    const needLuggageCar = safeLuggageCarCount > 0
 
     // 住宿 - 使用多飯店系統（可選擇不含住宿）
     // 每間飯店的住宿費 = 各房型分類內所有子房型 (數量 × 單價) 加總 × 晚數
@@ -3080,10 +3097,10 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 售價側：人頭團費已含 guide sell anchor；manual quote 必須維持 null。
     const carPriceTotal = perPerson.groupTourPrice
 
-    // Luggage：行李車已攤入團費（機場日 ≥8 佔位 700/趟），不另列項
+    // Luggage：只有人工確認的行李車會攤入團費，不另重複列項。
     const luggageCost = 0
 
-    // Child Seats (0-2歲嬰兒座椅, 3-5歲兒童座椅)
+    // Child Seats：新報價只提供 0–2 歲嬰兒座椅；舊報價欄位仍保留相容。
     const childSeatCost =
       totalChildSeatCount * config.childSeatPerDay * childSeatDays
 
@@ -3201,7 +3218,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     const perPersonTWD = perPersonTHB === null ? null : Math.round(perPersonTHB / exchangeRate)
 
     return {
-      people, adults, children, infants, carCount, carDistribution, maxPerCar, luggageStatus, suggestLuggageCar, needLuggageCar, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
+      people, adults, children, infants, carCount, carDistribution, maxPerCar, luggageStatus, luggageCheckCarCount, suggestLuggageCar, needLuggageCar, luggageCarCount: safeLuggageCarCount, nights, mealDays, guideDays, carServiceDays, childSeatDays, mealLevel,
       guided, vehicleType, perPerson,
       includeAccommodation, includeMeals, includeTickets, includeInsurance, hotels, quoteHotels, hotelsWithDeposit, totalRoomCapacity,
       includedAccommodationNights, includedAccommodationRoomCount, selfBookedAccommodationNights,
@@ -3215,7 +3232,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       perPersonTHB, perPersonTWD, exchangeRate,
       dailyCarFees,
     }
-  }, [config, adults, children, infants, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, carFees, outboundStayEnabled, outboundStayPerNight, outboundStayNights, outboundStayRooms])
+  }, [config, adults, children, infants, people, exchangeRate, hotels, totalNights, mealLevel, mealServiceDays, tickets, thaiDressCloth, thaiDressPhoto, extraPhotographer, makeupCount, totalChildSeatCount, childSeatServiceDays, includeAccommodation, includeMeals, includeTickets, includeInsurance, includeGuide, carFees, luggageCarCount, outboundStayEnabled, outboundStayPerNight, outboundStayNights, outboundStayRooms])
 
   const fmt = (n: number | null) => n === null ? '待人工確認' : n.toLocaleString()
   const fmtRounded = (n: number | null) => n === null ? '待人工確認' : fmt(Math.round(n))
@@ -4555,7 +4572,7 @@ Day 5｜送機
             <div style={{ background: '#f8f6f2', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <p style={{ margin: 0, fontWeight: 'bold', color: '#5c4a2a', fontSize: 15 }}>
                 🚗 {calculation.carCount} 台{calculation.vehicleType === 'sedan' ? '轎車' : ' van'}：<span style={{ fontFamily: 'monospace' }}>{calculation.carDistribution}</span>
-                {calculation.needLuggageCar ? ' + 🧳機場日行李車' : ''}
+                {calculation.needLuggageCar ? ` + 🧳行李車 × ${calculation.luggageCarCount}` : ''}
               </p>
               <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#555' }}>
                 舒適配車（單車最多 {calculation.maxPerCar} 人）｜導遊：{calculation.guided ? '有' : '無'}
@@ -4563,14 +4580,27 @@ Day 5｜送機
             </div>
             {calculation.luggageStatus === 'ok' ? (
               <div style={{ background: '#f9f8f6', padding: 10, borderRadius: 6, marginBottom: 12, fontSize: 13 }}>
-                ✅ 每車 ≤7 人，行李空間 OK，不需額外行李車
+                ✅ 每台 Van 少於 7 位；仍請記錄大件行李與嬰兒車數量
               </div>
             ) : (
               <div style={{ background: '#ffebee', padding: 10, borderRadius: 6, marginBottom: 12 }}>
                 <div style={{ fontSize: 13, color: '#c62828', background: '#fff', padding: 8, borderRadius: 4 }}>
-                  🧳 佔位 ≥8：機場日自動加行李車（700/趟，已攤入團費）<br />
-                  ⚠️ 單車 {calculation.maxPerCar} 人，<strong>行李空間很緊</strong>，請跟客人確認行李件數 & 尺寸
+                  🧳 有 {calculation.luggageCheckCarCount} 台 Van 載客達 7 位，接送機前需逐台確認行李空間。<br />
+                  ⚠️ 請先詢問大件行李與嬰兒車數量，確認不足後才加入行李車（700／台／趟）。
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 13 }}>
+                  已確認需要的行李車：
+                  <select
+                    value={calculation.luggageCarCount}
+                    onChange={(event) => setLuggageCarCount(Number(event.target.value))}
+                    style={{ width: 120, padding: 6, border: '1px solid #ddd', borderRadius: 4 }}
+                  >
+                    {Array.from(
+                      { length: calculation.luggageCheckCarCount + 1 },
+                      (_, count) => <option key={count} value={count}>{count} 台</option>
+                    )}
+                  </select>
+                </label>
               </div>
             )}
             <div style={{ background: '#f8f6f2', border: '1px solid #e8e4dc', borderRadius: 8, padding: 12, fontSize: 13 }}>
@@ -4591,21 +4621,6 @@ Day 5｜送機
                       type="number"
                       value={babySeatCount}
                       onChange={e => setBabySeatCount(Math.max(0, Number(e.target.value)))}
-                      min={0}
-                      max={10}
-                      style={{ width: 50, padding: 6, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }}
-                    />
-                    <span style={{ fontSize: 13, color: '#666' }}>張</span>
-                    <span style={{ fontSize: 12, color: '#999' }}>@500/天</span>
-                  </div>
-                </div>
-                <div style={{ background: 'white', padding: 10, borderRadius: 6, border: '1px solid #ddd' }}>
-                  <div style={{ fontSize: 12, color: '#666', marginBottom: 6 }}>🧒 3-5 歲兒童座椅</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="number"
-                      value={childSeatCount}
-                      onChange={e => setChildSeatCount(Math.max(0, Number(e.target.value)))}
                       min={0}
                       max={10}
                       style={{ width: 50, padding: 6, border: '1px solid #ddd', borderRadius: 4, textAlign: 'center' }}
@@ -5479,7 +5494,7 @@ Day 5｜送機
               {calculation.childSeatCost > 0 && <DataRow name={`兒童座椅 (${totalChildSeatCount}張 × ${calculation.childSeatDays}天)`} cost={0} price={calculation.childSeatCost} profit={calculation.childSeatCost} />}
               {calculation.outboundStayCost > 0 && <DataRow name={`外地住宿補貼 (${outboundStayRooms}間 × ${outboundStayNights}晚)`} cost={calculation.outboundStayCost} price={calculation.outboundStayCost} profit={0} />}
               <SubtotalRow name="車導總計" cost={calculation.transportCost} price={calculation.transportPrice} profit={calculation.transportProfit} />
-              <InfoRow text="※ 純接送日按車收（轎車500/van700一趟）；機場日 ≥8 佔位行李車 700/趟已攤入團費" />
+              <InfoRow text="※ 純接送日按車收（轎車500/van700一趟）；每台 Van 載客達 7 位須逐台確認行李空間，確認需要後才加行李車 700/台/趟" />
 
               {/* 超時費規則 */}
               <SectionRow title="⏱️ 超時費規則（未計入報價）" />

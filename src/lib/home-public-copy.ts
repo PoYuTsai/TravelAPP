@@ -6,7 +6,7 @@ export const STANDARD_SERVICE_POLICY =
   '標準服務由泰國司機駕駛，通常不以中文服務；行程事先確認並提供 LINE 中文支援。需要隨車中文溝通或導覽時，中文導遊依需求選配。'
 
 export const CHILD_SEAT_OCCUPANCY_POLICY =
-  '每位乘客（含嬰幼兒）各佔一席，安全座椅安裝於該乘客座位，不另加算一人，但需納入車內座位配置。'
+  '僅提供 0–2 歲嬰幼兒安全座椅。每位乘客（含嬰幼兒）各佔一席，安全座椅安裝於該乘客座位，不另加算一人，但需納入車內座位配置。'
 
 export const PAID_CHILD_SEAT_POLICY =
   `兒童安全座椅為 THB ${CHILD_SEAT_FEE_PER_DAY.toLocaleString('en-US')}／日／張；${CHILD_SEAT_OCCUPANCY_POLICY}`

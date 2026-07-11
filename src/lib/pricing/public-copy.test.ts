@@ -144,6 +144,12 @@ describe('car-charter canonical public copy', () => {
     expect(childSeatFaq?.answer).toContain('安全座椅安裝於該乘客座位，不另加算一人')
     expect(childSeatFaq?.answer).toContain('需納入車內座位配置')
 
+    const luggageFaq = copy.faq.find((item) => item.question === '可以帶嬰兒車嗎？')
+    expect(luggageFaq?.answer).toContain('每台 Van 載客達 7 位')
+    expect(luggageFaq?.answer).toContain('分別確認')
+    expect(luggageFaq?.answer).toContain('THB 700／台／趟')
+    expect(luggageFaq?.answer).not.toMatch(/8\s*人以上.*自動加派/)
+
     const overtimeFaq = copy.faq.find((item) => item.question === '超時怎麼計算？')
     expect(overtimeFaq?.answer).toContain('30 分鐘彈性')
     expect(overtimeFaq?.answer).toContain('THB 300／小時／台')

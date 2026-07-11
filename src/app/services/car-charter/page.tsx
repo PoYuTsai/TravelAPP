@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { client } from '@/sanity/client'
 import { formatFamilyCountLabel } from '@/lib/family-count'
 import { fetchTotalFamilyCount } from '@/lib/notion'
@@ -6,6 +7,7 @@ import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
 import { FeatureGrid, PerPersonPricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
 import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
+import { PACKAGE_ANCHORS } from './packageAnchors'
 
 // ISR: Revalidate every 60 seconds
 export const revalidate = 60
@@ -38,14 +40,6 @@ const mediaFallback = {
   videoUrl: 'https://res.cloudinary.com/dlgzrtl75/video/upload/vc_h264/v1769163410/790057116.088289_vz6u16.mp4',
   videoTitle: '清邁包車服務介紹',
 }
-
-// 三大套餐錨點價（2026-07-10 Eric 核價：6 人成行檔、整百取價）
-// 依人頭計價引擎試算，見 docs/plans/2026-07-10-package-pricing-proposal.md
-const packageAnchors = [
-  { name: '清邁親子 5 天 4 夜經典', pricePerPerson: '6,000' },
-  { name: '清萊 2 天自由行', pricePerPerson: '3,500' },
-  { name: '泰北 6 天 5 夜親子深度遊', pricePerPerson: '7,700' },
-]
 
 // Service Schema for SEO
 const serviceSchema = {
@@ -183,17 +177,20 @@ export default async function CarCharterPage() {
             <div className="mt-12">
               <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">熱門套餐參考價</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                {packageAnchors.map((pkg) => (
-                  <div
+                {PACKAGE_ANCHORS.map((pkg) => (
+                  <Link
                     key={pkg.name}
-                    className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center"
+                    href={pkg.href}
+                    className="group block bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
                   >
                     <p className="text-sm text-gray-500 mb-2">{pkg.name}</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      THB {pkg.pricePerPerson}
+                      THB {pkg.pricePerPerson.toLocaleString('en-US')}
                       <span className="text-sm font-medium text-gray-500">／人 起</span>
                     </p>
-                  </div>
+                    <p className="mt-3 text-xs leading-relaxed text-gray-500">{pkg.summary}</p>
+                    <p className="mt-4 text-sm font-semibold text-amber-700 group-hover:text-amber-800">查看套餐內容 →</p>
+                  </Link>
                 ))}
               </div>
               <p className="text-sm text-gray-500 mt-3 text-center">

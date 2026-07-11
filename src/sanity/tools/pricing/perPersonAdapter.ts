@@ -7,8 +7,8 @@
 import {
   AIRPORT_TRANSFER_FEES,
   LUGGAGE_VAN_FEE,
-  LUGGAGE_VAN_SEAT_THRESHOLD,
   calcTrip,
+  countLuggageCheckCars,
   resolveFleet,
   type AutomaticTripQuote,
   type Fleet,
@@ -36,7 +36,7 @@ export function dayTypeToTier(type: string): Tier | 'transfer' {
   }
 }
 
-/** 整日行程中含接機/送機 → 機場日（佔位 ≥8 引擎自動攤行李車） */
+/** 整日行程中含接機/送機 → 機場日；行李車僅在逐車確認需要後計入。 */
 export function isAirportServiceDay(name: string): boolean {
   return /接機|送機|機場/.test(name)
 }
@@ -52,6 +52,8 @@ export interface PerPersonQuoteInput {
   children: number // 3-11 歲
   infants: number // 0-2 歲
   withGuide: boolean
+  /** 每個機場服務日已確認需要的行李車台數；未確認時為 0。 */
+  luggageVansPerAirportDay?: number
 }
 
 interface PerPersonQuoteResultBase {
@@ -59,8 +61,10 @@ interface PerPersonQuoteResultBase {
   fleet: Fleet | null
   /** 保留使用者的導遊選擇；不能自動履約時改由 manual quote 表達。 */
   guided: boolean
+  /** 平均配車後，有幾台 Van 載客達 7 位，需逐台確認行李空間。 */
+  luggageCheckCarCount: number
   trip: TripQuote | null
-  /** 純接送日合計（按車收，含 ≥8 行李車） */
+  /** 純接送日合計（按車收，另含已確認需要的行李車）。 */
   transferFee: number
   transferTrips: number
 }
@@ -93,6 +97,7 @@ const EMPTY_RESULT: AutomaticPerPersonQuoteResult = {
   occupiedSeats: 0,
   fleet: null,
   guided: false,
+  luggageCheckCarCount: 0,
   manualQuoteRequired: false,
   manualQuoteReason: null,
   trip: null,
@@ -102,12 +107,23 @@ const EMPTY_RESULT: AutomaticPerPersonQuoteResult = {
 }
 
 export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteResult {
-  const { days, adults, children, infants, withGuide } = input
+  const {
+    days,
+    adults,
+    children,
+    infants,
+    withGuide,
+    luggageVansPerAirportDay = 0,
+  } = input
   const occupiedSeats = adults + children + infants
   if (occupiedSeats < 1) return EMPTY_RESULT
 
   const fleet = resolveFleet(occupiedSeats)
   const guided = withGuide
+  const luggageCheckCarCount =
+    fleet.vehicle === 'van'
+      ? countLuggageCheckCars(occupiedSeats, fleet.carCount)
+      : 0
 
   const tripDays = days
     .filter((d) => dayTypeToTier(d.type) !== 'transfer')
@@ -117,8 +133,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     }))
 
   const transferTrips = days.length - tripDays.length
-  const luggagePerTrip =
-    occupiedSeats >= LUGGAGE_VAN_SEAT_THRESHOLD ? LUGGAGE_VAN_FEE : 0
+  const luggagePerTrip = luggageVansPerAirportDay * LUGGAGE_VAN_FEE
   const transferFee =
     transferTrips *
     (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + luggagePerTrip)
@@ -127,6 +142,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     occupiedSeats,
     fleet,
     guided,
+    luggageCheckCarCount,
     transferFee,
     transferTrips,
   }
@@ -143,7 +159,14 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
 
   const trip =
     tripDays.length > 0
-      ? calcTrip({ days: tripDays, adults, children, infants, withGuide: guided })
+      ? calcTrip({
+          days: tripDays,
+          adults,
+          children,
+          infants,
+          withGuide: guided,
+          addons: { luggageVansPerAirportDay },
+        })
       : null
 
   if (trip) {

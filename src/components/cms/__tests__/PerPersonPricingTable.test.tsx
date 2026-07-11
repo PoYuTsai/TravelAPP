@@ -122,6 +122,11 @@ describe('PerPersonPricingTable', () => {
     expect(text).toContain('12 小時')
     expect(text).toContain('30 分鐘彈性')
     expect(text).toContain('導遊不另收超時費')
+    expect(text).toContain('每台 Van 載客達 7 位')
+    expect(text).toContain('確認空間不足後才加派')
+    expect(text).toContain('THB 700／台／趟')
+    expect(text).toContain('僅提供 0–2 歲嬰幼兒安全座椅')
+    expect(text).not.toContain('8 人以上加派行李車')
     expect(text).not.toContain('包含超時')
   })
 

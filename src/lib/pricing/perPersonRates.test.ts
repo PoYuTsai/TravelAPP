@@ -4,6 +4,7 @@ import {
   DEFAULT_THB_PER_TWD,
   calcPerPersonDay,
   calcTrip,
+  countLuggageCheckCars,
   resolveFleet,
   resolveGuidePricing,
 } from '@/lib/pricing/perPersonRates'
@@ -46,6 +47,14 @@ describe('pricing constants', () => {
   it('keeps airport transfer and TWD fallback constants stable', () => {
     expect(AIRPORT_TRANSFER_FEES).toEqual({ sedan: 500, van: 700 })
     expect(DEFAULT_THB_PER_TWD).toBe(1.1)
+  })
+
+  it('flags each Van carrying 7 or more guests for luggage confirmation', () => {
+    expect(countLuggageCheckCars(7, 1)).toBe(1)
+    expect(countLuggageCheckCars(10, 2)).toBe(0)
+    expect(countLuggageCheckCars(13, 2)).toBe(1)
+    expect(countLuggageCheckCars(14, 2)).toBe(2)
+    expect(countLuggageCheckCars(18, 2)).toBe(2)
   })
 })
 
@@ -546,8 +555,8 @@ describe('calcTrip add-ons remain outside fare protection', () => {
     ])
   })
 
-  it('adds the airport luggage Van in full without changing per-person prices', () => {
-    const trip = calcTrip({
+  it('does not charge an airport luggage Van until its count is confirmed', () => {
+    const unconfirmed = calcTrip({
       days: [{ tier: 'T1', isAirportDay: true }],
       adults: 8,
       children: 0,
@@ -555,14 +564,47 @@ describe('calcTrip add-ons remain outside fare protection', () => {
       withGuide: true,
     })
 
-    expect(trip.perPerson.adult).toBe(1100)
-    expect(trip.fareProtection?.finalThb).toBe(8800)
-    expect(trip.totalThb).toBe(9500)
-    expect(trip.items.find((item) => item.label === '機場行李車')).toEqual({
+    expect(unconfirmed.perPerson.adult).toBe(1100)
+    expect(unconfirmed.fareProtection?.finalThb).toBe(8800)
+    expect(unconfirmed.totalThb).toBe(8800)
+    expect(unconfirmed.items.find((item) => item.label === '機場行李車')).toBeUndefined()
+
+    const confirmed = calcTrip({
+      days: [{ tier: 'T1', isAirportDay: true }],
+      adults: 8,
+      children: 0,
+      infants: 0,
+      withGuide: true,
+      addons: { luggageVansPerAirportDay: 1 },
+    })
+
+    expect(confirmed.totalThb).toBe(9500)
+    expect(confirmed.items.find((item) => item.label === '機場行李車')).toEqual({
       label: '機場行李車',
       quantity: 1,
       unitPriceThb: 700,
       subtotalThb: 700,
+    })
+  })
+
+  it('charges two confirmed luggage Vans for each airport service day', () => {
+    const trip = calcTrip({
+      days: [
+        { tier: 'T1', isAirportDay: true },
+        { tier: 'T2', isAirportDay: true },
+      ],
+      adults: 14,
+      children: 0,
+      infants: 0,
+      withGuide: false,
+      addons: { luggageVansPerAirportDay: 2 },
+    })
+
+    expect(trip.items.find((item) => item.label === '機場行李車')).toEqual({
+      label: '機場行李車',
+      quantity: 4,
+      unitPriceThb: 700,
+      subtotalThb: 2800,
     })
   })
 
