@@ -45,7 +45,7 @@ describe('published package quote pricing', () => {
     })
   })
 
-  it('adds Fang accommodation after the northern Thailand package per-person table', () => {
+  it('adds Fang accommodation and two mandatory airport luggage trips for an 8-person northern package', () => {
     const snapshot = buildPublishedPackageSnapshot({
       packageId: 'northern-thailand-6d5n',
       adults: 7,
@@ -54,11 +54,16 @@ describe('published package quote pricing', () => {
       exchangeRate: 1.1,
     })
 
-    expect(snapshot.externalQuote.totalTHB).toBe(55_950)
-    expect(snapshot.externalQuote.items.at(-1)).toMatchObject({
+    expect(snapshot.externalQuote.totalTHB).toBe(56_950)
+    expect(snapshot.externalQuote.items.at(-2)).toMatchObject({
       label: '芳縣住宿（第一晚）',
       amountTHB: 6_000,
       description: '4 房 × THB 1,500',
+    })
+    expect(snapshot.externalQuote.items.at(-1)).toMatchObject({
+      label: '接送機行李車',
+      amountTHB: 1_000,
+      description: '2 趟 × THB 500',
     })
   })
 

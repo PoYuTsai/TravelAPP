@@ -145,10 +145,11 @@ describe('car-charter canonical public copy', () => {
     expect(childSeatFaq?.answer).toContain('需納入車內座位配置')
 
     const luggageFaq = copy.faq.find((item) => item.question === '可以帶嬰兒車嗎？')
-    expect(luggageFaq?.answer).toContain('每台 Van 載客達 7 位')
-    expect(luggageFaq?.answer).toContain('分別確認')
-    expect(luggageFaq?.answer).toContain('THB 700／台／趟')
-    expect(luggageFaq?.answer).not.toMatch(/8\s*人以上.*自動加派/)
+    expect(luggageFaq?.answer).toContain('6–7 人不加')
+    expect(luggageFaq?.answer).toContain('8–9 人固定加派 1 台')
+    expect(luggageFaq?.answer).toContain('10–14 人不加')
+    expect(luggageFaq?.answer).toContain('15–18 人固定加派 1 台')
+    expect(luggageFaq?.answer).toContain('THB 500／台／趟')
 
     const overtimeFaq = copy.faq.find((item) => item.question === '超時怎麼計算？')
     expect(overtimeFaq?.answer).toContain('30 分鐘彈性')

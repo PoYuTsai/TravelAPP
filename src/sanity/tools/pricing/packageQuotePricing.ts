@@ -1,3 +1,8 @@
+import {
+  LUGGAGE_VAN_FEE,
+  countLuggageCheckCars,
+} from '@/lib/pricing/perPersonRates'
+
 export type PublishedPackageId =
   | 'chiang-mai-5d4n'
   | 'chiang-rai-2d1n'
@@ -114,6 +119,12 @@ const PACKAGE_IDS = new Set<PublishedPackageId>([
   'northern-thailand-6d5n',
 ])
 
+const PACKAGE_AIRPORT_TRANSFER_TRIPS: Record<PublishedPackageId, number> = {
+  'chiang-mai-5d4n': 2,
+  'chiang-rai-2d1n': 0,
+  'northern-thailand-6d5n': 2,
+}
+
 function toTwd(amountTHB: number, exchangeRate: number) {
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
     throw new Error('匯率必須大於 0')
@@ -194,6 +205,21 @@ export function buildPublishedPackageSnapshot(input: {
     })
   }
 
+  const carCount = people >= 10 ? 2 : 1
+  const requiredLuggageVans = countLuggageCheckCars(people, carCount)
+  const airportTransferTrips = requiredLuggageVans > 0
+    ? PACKAGE_AIRPORT_TRANSFER_TRIPS[input.packageId]
+    : 0
+  if (airportTransferTrips > 0) {
+    const amountTHB = airportTransferTrips * LUGGAGE_VAN_FEE
+    items.push({
+      label: '接送機行李車',
+      amountTHB,
+      amountTWD: toTwd(amountTHB, input.exchangeRate),
+      description: `${airportTransferTrips} 趟 × THB ${LUGGAGE_VAN_FEE}`,
+    })
+  }
+
   for (const item of input.optionalItems ?? []) {
     if (!Number.isFinite(item.amountTHB) || item.amountTHB <= 0) continue
     items.push({
@@ -217,7 +243,7 @@ export function buildPublishedPackageSnapshot(input: {
     collectDeposit: false,
     hotelsWithDeposit: [],
     totalDeposit: 0,
-    carCount: people >= 10 ? 2 : 1,
+    carCount,
     travelerLabel: input.travelerLabel || undefined,
   }
 }

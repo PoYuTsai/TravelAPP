@@ -284,8 +284,8 @@
     <div class="section">
       <h2>🚗 車導費</h2>
       <div id="luggageRow" class="checkbox-row" style="display:none;">
-        <input type="checkbox" id="luggageCar" checked>
-        <label for="luggageCar">行李車（7人以上建議）接+送 = 1,200 泰銖</label>
+        <input type="checkbox" id="luggageCar" checked disabled>
+        <label for="luggageCar">固定行李車：8–9、15–18 人適用；接+送 = 1,000 泰銖</label>
       </div>
       <p class="note">車輛數：<span id="carCount">1</span> 台</p>
       <div class="info-box">
@@ -363,7 +363,7 @@
     // 車導其他費用（接送機已含在 D1/D6 車費）
     const otherTransport = {
       guidePerDay: { name: '導遊/天', cost: 1500, price: 2500, days: 5 },
-      luggagePerTrip: { name: '行李車/趟', cost: 0, price: 600 },
+      luggagePerTrip: { name: '行李車/趟', cost: 0, price: 500 },
     };
 
     // 超時費
@@ -470,9 +470,9 @@
       const roomFamily = parseInt(document.getElementById('roomFamily').value) || 0;
       const mealLevel = parseInt(document.getElementById('mealLevel').value) || 900;
       const makeupCount = parseInt(document.getElementById('makeupCount').value) || 0;
-      const luggageCheckbox = document.getElementById('luggageCar');
-      const needLuggageCar = people >= 7 && luggageCheckbox ? luggageCheckbox.checked : false;
       const carCount = people >= 10 ? 2 : 1;
+      const maxGuestsPerVan = Math.ceil(people / carCount);
+      const needLuggageCar = maxGuestsPerVan >= 8;
       const roomCapacity = roomDouble * 2 + roomTriple * 3 + roomFamily * 4;
 
       // 門票
@@ -639,7 +639,7 @@
       }
 
       document.getElementById('carCount').textContent = i.carCount;
-      document.getElementById('luggageRow').style.display = i.people >= 7 ? 'flex' : 'none';
+      document.getElementById('luggageRow').style.display = i.needLuggageCar ? 'flex' : 'none';
 
       // 泰服小計
       document.getElementById('thaiDressSubtotal').textContent = c.thaiDress.price.toLocaleString();

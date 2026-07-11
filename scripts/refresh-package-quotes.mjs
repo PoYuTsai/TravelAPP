@@ -30,6 +30,7 @@ const packageConfigs = {
     infants: 0,
     travelerLabel: '4 大 2 小（3–11 歲）',
     totalTHB: 33_600,
+    luggageCarCount: 0,
     includeAccommodation: false,
     hotels: [],
     outboundStay: { enabled: false, perNight: 750, nights: 0, rooms: 0 },
@@ -85,7 +86,7 @@ Day 5｜單趟送機
     excluded: [
       '客人住宿',
       ...commonExcluded,
-      '接送機行李車（確認需要後 THB 700／台／趟）',
+      '接送機行李車（8–9 人或 15–18 人固定 THB 500／台／趟；本試算 6 人不適用）',
     ],
   },
   uao33058: {
@@ -95,6 +96,7 @@ Day 5｜單趟送機
     infants: 0,
     travelerLabel: '3 位成人',
     totalTHB: 19_800,
+    luggageCarCount: 0,
     includeAccommodation: false,
     hotels: [],
     outboundStay: { enabled: true, perNight: 750, nights: 1, rooms: 2 },
@@ -135,7 +137,8 @@ Day 2｜清萊景點・返回清邁
     children: 1,
     infants: 0,
     travelerLabel: '7 大 1 小（3–11 歲）',
-    totalTHB: 55_950,
+    totalTHB: 56_950,
+    luggageCarCount: 1,
     includeAccommodation: true,
     hotels: [
       {
@@ -223,12 +226,19 @@ Day 6｜單趟送機
         amountTWD: Math.round(6_000 / EXCHANGE_RATE),
         description: '4 間 × THB 1,500',
       },
+      {
+        label: '接送機行李車',
+        amountTHB: 1_000,
+        amountTWD: Math.round(1_000 / EXCHANGE_RATE),
+        description: '接機＋送機共 2 趟 × THB 500',
+      },
     ],
     included: [
       'Day 1–5 完整包車',
       '泰國司機、油費、過路費與停車費',
       '中文導遊（Day 1–5）',
       'Day 6 單趟送機',
+      '接機與送機行李車（各 1 趟）',
       '芳縣自家民宿（第一晚，基本兩人一房）',
       '司機與導遊清萊外宿一晚',
       'LINE 中文支援',
@@ -236,7 +246,6 @@ Day 6｜單趟送機
     excluded: [
       '其餘客人住宿（4 晚，自行預訂）',
       ...commonExcluded,
-      '接送機行李車（確認需要後 THB 700／台／趟）',
     ],
   },
 }
@@ -258,8 +267,8 @@ function buildUpdatedPayload(rawPayload, config) {
     includeMeals: false,
     includeInsurance: false,
     includeGuide: true,
-    luggageCar: false,
-    luggageCarCount: 0,
+    luggageCar: config.luggageCarCount > 0,
+    luggageCarCount: config.luggageCarCount,
     childSeatCount: 0,
     babySeatCount: 0,
     includeTickets: false,
@@ -421,7 +430,7 @@ async function main() {
       summary.pricingModel !== 'perPerson' ||
       summary.packagePricingId !== packageConfigs[slug].packagePricingId ||
       summary.includeInsurance !== false ||
-      summary.luggageCarCount !== 0
+      summary.luggageCarCount !== packageConfigs[slug].luggageCarCount
     ) {
       throw new Error(`Post-write verification failed for ${slug}`)
     }

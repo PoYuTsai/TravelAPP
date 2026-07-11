@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AIRPORT_TRANSFER_FEES,
   DEFAULT_THB_PER_TWD,
+  LUGGAGE_VAN_FEE,
   calcPerPersonDay,
   calcTrip,
   countLuggageCheckCars,
@@ -49,12 +50,15 @@ describe('pricing constants', () => {
     expect(DEFAULT_THB_PER_TWD).toBe(1)
   })
 
-  it('flags each Van carrying 7 or more guests for luggage confirmation', () => {
-    expect(countLuggageCheckCars(7, 1)).toBe(1)
+  it('requires one luggage Van only when a passenger Van carries 8+ guests', () => {
+    expect(LUGGAGE_VAN_FEE).toBe(500)
+    expect(countLuggageCheckCars(6, 1)).toBe(0)
+    expect(countLuggageCheckCars(7, 1)).toBe(0)
+    expect(countLuggageCheckCars(8, 1)).toBe(1)
     expect(countLuggageCheckCars(10, 2)).toBe(0)
-    expect(countLuggageCheckCars(13, 2)).toBe(1)
-    expect(countLuggageCheckCars(14, 2)).toBe(2)
-    expect(countLuggageCheckCars(18, 2)).toBe(2)
+    expect(countLuggageCheckCars(14, 2)).toBe(0)
+    expect(countLuggageCheckCars(15, 2)).toBe(1)
+    expect(countLuggageCheckCars(18, 2)).toBe(1)
   })
 })
 
@@ -555,8 +559,8 @@ describe('calcTrip add-ons remain outside fare protection', () => {
     ])
   })
 
-  it('does not charge an airport luggage Van until its count is confirmed', () => {
-    const unconfirmed = calcTrip({
+  it('automatically charges one luggage Van per airport service for 8+ guests', () => {
+    const trip = calcTrip({
       days: [{ tier: 'T1', isAirportDay: true }],
       adults: 8,
       children: 0,
@@ -564,47 +568,34 @@ describe('calcTrip add-ons remain outside fare protection', () => {
       withGuide: true,
     })
 
-    expect(unconfirmed.perPerson.adult).toBe(1100)
-    expect(unconfirmed.fareProtection?.finalThb).toBe(8800)
-    expect(unconfirmed.totalThb).toBe(8800)
-    expect(unconfirmed.items.find((item) => item.label === '機場行李車')).toBeUndefined()
-
-    const confirmed = calcTrip({
-      days: [{ tier: 'T1', isAirportDay: true }],
-      adults: 8,
-      children: 0,
-      infants: 0,
-      withGuide: true,
-      addons: { luggageVansPerAirportDay: 1 },
-    })
-
-    expect(confirmed.totalThb).toBe(9500)
-    expect(confirmed.items.find((item) => item.label === '機場行李車')).toEqual({
+    expect(trip.perPerson.adult).toBe(1100)
+    expect(trip.fareProtection?.finalThb).toBe(8800)
+    expect(trip.totalThb).toBe(9300)
+    expect(trip.items.find((item) => item.label === '機場行李車')).toEqual({
       label: '機場行李車',
       quantity: 1,
-      unitPriceThb: 700,
-      subtotalThb: 700,
+      unitPriceThb: 500,
+      subtotalThb: 500,
     })
   })
 
-  it('charges two confirmed luggage Vans for each airport service day', () => {
+  it('charges only one luggage Van per airport service when both passenger Vans are full', () => {
     const trip = calcTrip({
       days: [
         { tier: 'T1', isAirportDay: true },
         { tier: 'T2', isAirportDay: true },
       ],
-      adults: 14,
+      adults: 16,
       children: 0,
       infants: 0,
       withGuide: false,
-      addons: { luggageVansPerAirportDay: 2 },
     })
 
     expect(trip.items.find((item) => item.label === '機場行李車')).toEqual({
       label: '機場行李車',
-      quantity: 4,
-      unitPriceThb: 700,
-      subtotalThb: 2800,
+      quantity: 2,
+      unitPriceThb: 500,
+      subtotalThb: 1000,
     })
   })
 

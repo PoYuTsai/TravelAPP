@@ -36,7 +36,7 @@ export function dayTypeToTier(type: string): Tier | 'transfer' {
   }
 }
 
-/** 整日行程中含接機/送機 → 機場日；行李車僅在逐車確認需要後計入。 */
+/** 整日行程中含接機/送機 → 機場日；行李車依分車後的固定人數級距計入。 */
 export function isAirportServiceDay(name: string): boolean {
   return /接機|送機|機場/.test(name)
 }
@@ -52,7 +52,7 @@ export interface PerPersonQuoteInput {
   children: number // 3-11 歲
   infants: number // 0-2 歲
   withGuide: boolean
-  /** 每個機場服務日已確認需要的行李車台數；未確認時為 0。 */
+  /** @deprecated 行李車已改由總佔位人數自動判斷。 */
   luggageVansPerAirportDay?: number
 }
 
@@ -61,7 +61,7 @@ interface PerPersonQuoteResultBase {
   fleet: Fleet | null
   /** 保留使用者的導遊選擇；不能自動履約時改由 manual quote 表達。 */
   guided: boolean
-  /** 平均配車後，有幾台 Van 載客達 7 位，需逐台確認行李空間。 */
+  /** 8–9、15–18 人為 1；2–7、10–14 人為 0。 */
   luggageCheckCarCount: number
   trip: TripQuote | null
   /** 純接送日合計（按車收，另含已確認需要的行李車）。 */
@@ -113,7 +113,6 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     children,
     infants,
     withGuide,
-    luggageVansPerAirportDay = 0,
   } = input
   const occupiedSeats = adults + children + infants
   if (occupiedSeats < 1) return EMPTY_RESULT
@@ -133,7 +132,7 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
     }))
 
   const transferTrips = days.length - tripDays.length
-  const luggagePerTrip = luggageVansPerAirportDay * LUGGAGE_VAN_FEE
+  const luggagePerTrip = luggageCheckCarCount * LUGGAGE_VAN_FEE
   const transferFee =
     transferTrips *
     (AIRPORT_TRANSFER_FEES[fleet.vehicle] * fleet.carCount + luggagePerTrip)
@@ -165,7 +164,6 @@ export function buildPerPersonQuote(input: PerPersonQuoteInput): PerPersonQuoteR
           children,
           infants,
           withGuide: guided,
-          addons: { luggageVansPerAirportDay },
         })
       : null
 

@@ -218,7 +218,7 @@ export default function PerPersonPricingTable({ footnotes }: PerPersonPricingTab
               </span>
             </li>
             <li className="flex justify-between gap-4">
-              <span className="text-gray-700">接送機每台 Van 載客達 7 位，先確認大件行李與嬰兒車；確認空間不足後才加派行李車</span>
+              <span className="text-gray-700">接送機依配車後空間計算：6–7 人不加行李車；8–9 人固定加派 1 台；10–14 人不加；15–18 人固定加派 1 台</span>
               <span className="font-semibold text-gray-900 whitespace-nowrap">
                 THB {thb(LUGGAGE_VAN_FEE)}／台／趟
               </span>
