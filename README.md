@@ -23,6 +23,7 @@
 | 品牌 2026-04 | 「爸媽開的」定位全面同步（官網 / Sanity / 評價 / bio）| ✅ 完成 |
 | 功能 2026-04 | `/quote/[slug]` 報價展示頁（LINE 動態互動報價）| ✅ 完成 |
 | 定價 2026-07 | 包車每人每日參考價、親子全家總價與 LINE 價格圖同步 | ✅ 完成 |
+| 套餐 2026-07 | 三個公開套餐報價沿用原網址，已同步新版人頭價、包含／不含與條件式行李車規則 | ✅ 完成 |
 | **Phase 7** | **LINE OA AI 客服助理** | 🧪 Preview AI + 夥伴群協作 + RAG groundwork |
 
 詳細歷史見 `git log` 與 `docs/plans/` 下的計畫文件；綜合審查歷次記錄見 `.claude/skills/comprehensive-review.md`。
@@ -39,7 +40,7 @@
 ### 內部營運工具（位於 `/studio`）
 - **Sanity Studio** — 內容管理 + 工具入口
 - **報價計算器（正式版）** — 智慧行程解析、多飯店房型、門票互斥群組、泰服體驗、三階段付款、超時計算、共享案例同步
-- **報價展示頁 `/quote/[slug]`** — 計算器「產生報價連結」→ LINE 貼給客戶看動態互動報價；`/quote/sample` 為 LINE OA 公開 showcase
+- **報價展示頁 `/quote/[slug]`** — 計算器「產生報價連結」→ LINE 貼給客戶看動態互動報價；三個招牌套餐沿用固定公開網址並以 THB 顯示新版家庭總價，`/quote/sample` 為 LINE OA 公開 showcase
 - **財務 Dashboard / 記帳** — Notion 業務成本串接、40 萬門檻警示，僅 owner 可存取
 - **知識庫** — Notion 資料庫（餐廳、咖啡、飯店、景點、門票、話術 共 96 筆）
 
