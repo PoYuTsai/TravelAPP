@@ -24,6 +24,7 @@ const commonExcluded = [
 
 const packageConfigs = {
   k8oeyepp: {
+    packagePricingId: 'chiang-mai-5d4n',
     adults: 4,
     children: 2,
     infants: 0,
@@ -88,6 +89,7 @@ Day 5｜單趟送機
     ],
   },
   uao33058: {
+    packagePricingId: 'chiang-rai-2d1n',
     adults: 3,
     children: 0,
     infants: 0,
@@ -128,6 +130,7 @@ Day 2｜清萊景點・返回清邁
     excluded: ['客人住宿', ...commonExcluded],
   },
   lyx5aysy: {
+    packagePricingId: 'northern-thailand-6d5n',
     adults: 7,
     children: 1,
     infants: 0,
@@ -261,6 +264,7 @@ function buildUpdatedPayload(rawPayload, config) {
     babySeatCount: 0,
     includeTickets: false,
     publicPageMode: 'package',
+    packagePricingId: config.packagePricingId,
     hotels: config.hotels,
     outboundStayEnabled: config.outboundStay.enabled,
     outboundStayPerNight: config.outboundStay.perNight,
@@ -304,6 +308,11 @@ function buildUpdatedPayload(rawPayload, config) {
     carCount: people >= 10 ? 2 : 1,
     travelerLabel: config.travelerLabel,
   }
+  data.packageCopy = {
+    included: [...config.included],
+    excluded: [...config.excluded],
+    paymentNotes: ['正式報價依旅行日期與確認內容為準，請於 LINE 確認後保留名額。'],
+  }
 
   if (saved.data) {
     saved.data = data
@@ -317,6 +326,7 @@ function summarize(payload) {
   const saved = JSON.parse(payload)
   const data = saved.data ?? saved
   return {
+    packagePricingId: data.packagePricingId,
     travelerLabel: data.travelerLabel,
     totalTHB: data._quoteSnapshot?.externalQuote?.totalTHB,
     pricingModel: data._quoteSnapshot?.pricingModel,
@@ -409,6 +419,7 @@ async function main() {
     if (
       summary.totalTHB !== packageConfigs[slug].totalTHB ||
       summary.pricingModel !== 'perPerson' ||
+      summary.packagePricingId !== packageConfigs[slug].packagePricingId ||
       summary.includeInsurance !== false ||
       summary.luggageCarCount !== 0
     ) {

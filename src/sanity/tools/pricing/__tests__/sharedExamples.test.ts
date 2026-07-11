@@ -56,6 +56,8 @@ describe('pricing shared examples', () => {
       updatedAt: '2026-04-04T11:00:00.000Z',
       createdByName: 'Lulu',
       createdByEmail: 'moon12sun20@yahoo.com.tw',
+      publicSlug: { _type: 'slug', current: 'quote-1-public' },
+      _rev: 'rev-loaded',
       payload: JSON.stringify({
         itineraryText: '共享行程',
         people: 6,
@@ -69,6 +71,8 @@ describe('pricing shared examples', () => {
       updatedAt: '2026-04-04T11:00:00.000Z',
       createdByName: 'Lulu',
       createdByEmail: 'moon12sun20@yahoo.com.tw',
+      publicSlug: 'quote-1-public',
+      revision: 'rev-loaded',
       data: {
         itineraryText: '共享行程',
         people: 6,

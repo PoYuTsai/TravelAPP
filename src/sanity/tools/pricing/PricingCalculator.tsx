@@ -27,6 +27,14 @@ import {
   parsePricingExampleDocument,
   type PricingExampleDocument,
 } from './sharedExamples'
+import { savePricingExampleDocument } from './sharedExampleMutations'
+import {
+  buildPublishedPackageSnapshot,
+  formatPackageTravelerLabel,
+  getPublishedPackageId,
+  getPublishedPackageStructureIssue,
+  type PublishedPackageId,
+} from './packageQuotePricing'
 import { getInsuranceCost, resolveSavedInsuranceSelection } from './insurance'
 import { countLuggageCheckCars, DEFAULT_THB_PER_TWD } from '@/lib/pricing/perPersonRates'
 import { buildPerPersonQuote } from './perPersonAdapter'
@@ -366,6 +374,7 @@ function resetTicketsToDefault(storageKey: string, defaultTickets: DynamicTicket
 
 const SHARED_QUOTES_QUERY = `*[_type == "pricingExample" && variant == $variant] | order(updatedAt desc, _updatedAt desc) {
   _id,
+  _rev,
   _type,
   name,
   variant,
@@ -374,6 +383,7 @@ const SHARED_QUOTES_QUERY = `*[_type == "pricingExample" && variant == $variant]
   createdByName,
   createdByEmail,
   itineraryPreview,
+  publicSlug,
   payload,
   _createdAt,
   _updatedAt
@@ -1652,6 +1662,12 @@ interface SavedQuote {
     savedParsedTickets?: DynamicTicket[]
     thaiDressDay?: number | null
     publicPageMode?: QuotePublicPageMode
+    packagePricingId?: PublishedPackageId
+    packageCopy?: {
+      included: string[]
+      excluded: string[]
+      paymentNotes: string[]
+    }
     // 報價快照（展示頁用）
     _quoteSnapshot?: {
       pricingModel?: 'perPerson' // 無此欄位＝舊成本拆項快照，前台走現行渲染
@@ -1676,6 +1692,8 @@ interface SavedQuote {
   updatedAt?: string
   createdByName?: string
   createdByEmail?: string
+  publicSlug?: string
+  revision?: string
 }
 
 interface PricingDraft {
@@ -1737,6 +1755,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const [savedQuotes, setSavedQuotes] = useState<SavedQuote[]>([])
   const [currentQuoteName, setCurrentQuoteName] = useState('')
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
+  const loadedQuoteRef = useRef<SavedQuote | null>(null)
   const [publicPageMode, setPublicPageMode] = useState<QuotePublicPageMode>('quote')
   const [isQuotesLoading, setIsQuotesLoading] = useState(false)
   const [isSavingQuote, setIsSavingQuote] = useState(false)
@@ -2330,13 +2349,147 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   }
 
   // 儲存當前報價
-  const saveCurrentQuote = async (): Promise<string> => {
+  const saveCurrentQuote = async (): Promise<string | null> => {
     const normalizedName = currentQuoteName.trim() || `報價 ${new Date().toLocaleDateString('zh-TW')}`
     const now = new Date().toISOString()
-    const existingQuote = editingQuoteId
-      ? savedQuotes.find((quote) => quote.id === editingQuoteId)
+    const existingQuote = editingQuoteId && loadedQuoteRef.current?.id === editingQuoteId
+      ? loadedQuoteRef.current
       : null
+    if (editingQuoteId && !existingQuote) {
+      alert('找不到原本載入的報價，為避免更新錯筆，請先按「同步案例」後重新載入。')
+      return null
+    }
+
+    let existingPublicSlug = existingQuote?.publicSlug
+    let existingRevision = existingQuote?.revision
+    let packagePricingId = getPublishedPackageId(
+      existingQuote?.data.packagePricingId,
+      existingPublicSlug
+    )
+    if (existingQuote && publicPageMode === 'package' && !packagePricingId) {
+      try {
+        const docId = getPricingExampleDocumentId(variant, existingQuote.id)
+        const metadata = await client.fetch<{
+          _rev?: string
+          publicSlug?: { current?: string }
+        } | null>(`*[_id == $docId][0]{ _rev, publicSlug }`, { docId })
+        existingPublicSlug = metadata?.publicSlug?.current ?? existingPublicSlug
+        existingRevision = existingRevision ?? metadata?._rev
+        packagePricingId = getPublishedPackageId(
+          existingQuote.data.packagePricingId,
+          existingPublicSlug
+        )
+      } catch (error) {
+        console.error('Failed to resolve package metadata:', error)
+        alert('無法確認這筆套餐的公開網址，系統沒有儲存。請同步案例後重新載入。')
+        return null
+      }
+    }
+    if (packagePricingId && publicPageMode !== 'package') {
+      alert('這是固定公開套餐。若要改成一般客製報價，請先按「複製」，不要直接改寫原套餐。')
+      return null
+    }
+    if (packagePricingId && existingQuote) {
+      const structureIssue = getPublishedPackageStructureIssue(existingQuote.data, {
+        includeGuide,
+        includeAccommodation,
+        includeMeals,
+        outboundStayEnabled,
+        outboundStayPerNight,
+        outboundStayNights,
+        outboundStayRooms,
+        carFees,
+      })
+      if (structureIssue) {
+        alert(`固定公開套餐的${structureIssue}。為避免破壞原套餐，請先按「複製」另存為客製報價。`)
+        return null
+      }
+    }
+
     const quoteId = editingQuoteId ?? Date.now().toString()
+    const effectiveTravelerLabel = packagePricingId
+      ? formatPackageTravelerLabel(adults, children, infants)
+      : travelerLabel
+    let normalizedHotels = hotels.map(h => ({ ...normalizeHotelForQuote(h) }))
+    if (packagePricingId === 'northern-thailand-6d5n' && normalizedHotels[0]) {
+      const fangRooms = Math.ceil((adults + children) / 2)
+      normalizedHotels = normalizedHotels.map((hotel, index) => {
+        if (index !== 0 || !hotel.rooms.twin[0]) return hotel
+        const twinRooms: CategoryRooms = [
+          { ...hotel.rooms.twin[0], quantity: fangRooms },
+          hotel.rooms.twin[1],
+          hotel.rooms.twin[2],
+        ]
+        return {
+          ...hotel,
+          rooms: {
+            ...hotel.rooms,
+            twin: twinRooms,
+          },
+        }
+      })
+    }
+
+    let packageSnapshot: SavedQuote['data']['_quoteSnapshot'] | undefined
+    let packageCopy = existingQuote?.data.packageCopy
+    if (packagePricingId) {
+      const priorCopy = existingQuote?.data._quoteSnapshot?.externalQuote
+      const fallbackCopy = externalQuote
+      packageCopy = packageCopy ?? {
+        included: [...(priorCopy?.included ?? fallbackCopy?.included ?? [])],
+        excluded: [...(priorCopy?.excluded ?? fallbackCopy?.excluded ?? [])],
+        paymentNotes: [...(priorCopy?.paymentNotes ?? fallbackCopy?.paymentNotes ?? [])],
+      }
+      const included = [...packageCopy.included]
+      let excluded = [...packageCopy.excluded]
+      const optionalItems: Array<{ label: string; amountTHB: number; description?: string }> = []
+
+      if (calculation.insuranceCost > 0) {
+        optionalItems.push({
+          label: '旅遊保險',
+          amountTHB: calculation.insuranceCost,
+          description: `${people} 人`,
+        })
+        if (!included.includes('旅遊保險')) included.push('旅遊保險')
+        excluded = excluded.filter((item) => !item.includes('保險'))
+      }
+      if (calculation.childSeatCost > 0) {
+        optionalItems.push({
+          label: '嬰幼兒安全座椅',
+          amountTHB: calculation.childSeatCost,
+          description: `${totalChildSeatCount} 張 × ${calculation.childSeatDays} 天`,
+        })
+        if (!included.includes('嬰幼兒安全座椅')) included.push('嬰幼兒安全座椅')
+        excluded = excluded.filter((item) => !item.includes('座椅'))
+      }
+      const activityTotal = includeTickets
+        ? calculation.ticketPrice + calculation.thaiDressPrice
+        : 0
+      if (activityTotal > 0) {
+        optionalItems.push({ label: '景點門票／體驗', amountTHB: activityTotal })
+        if (!included.includes('已勾選的景點門票／體驗')) included.push('已勾選的景點門票／體驗')
+        excluded = excluded.filter((item) => !item.includes('門票'))
+      }
+
+      try {
+        packageSnapshot = buildPublishedPackageSnapshot({
+          packageId: packagePricingId,
+          adults,
+          children,
+          infants,
+          exchangeRate,
+          travelerLabel: effectiveTravelerLabel,
+          included,
+          excluded,
+          paymentNotes: packageCopy.paymentNotes,
+          optionalItems,
+        })
+      } catch (error) {
+        alert(error instanceof Error ? error.message : '固定套餐核價失敗，請重新檢查人數。')
+        return null
+      }
+    }
+
     const newQuote: SavedQuote = {
       id: quoteId,
       name: normalizedName,
@@ -2345,6 +2498,8 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       createdByName: existingQuote?.createdByName ?? currentUser?.name ?? undefined,
       createdByEmail:
         existingQuote?.createdByEmail ?? currentUser?.email?.trim().toLowerCase() ?? undefined,
+      publicSlug: existingPublicSlug,
+      revision: existingRevision,
       data: {
         itineraryText,
         people,  // 保留舊欄位向後相容
@@ -2355,7 +2510,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         tickets: tickets.map(t => ({ ...t })),
         useDefaultTickets,
         // 新增欄位
-        hotels: hotels.map(h => ({ ...normalizeHotelForQuote(h) })),
+        hotels: normalizedHotels,
         exchangeRate,
         includeAccommodation,
         includeMeals,
@@ -2376,13 +2531,15 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         makeupCount,
         mealLevel,
         collectDeposit,
-        travelerLabel,
+        travelerLabel: effectiveTravelerLabel,
         outboundStayEnabled,
         outboundStayPerNight,
         outboundStayNights,
         outboundStayRooms,
         includeTickets,
         publicPageMode,
+        packagePricingId: packagePricingId ?? undefined,
+        packageCopy: packagePricingId ? packageCopy : undefined,
         parsedItinerary: parsedItinerary.map((day) => ({
           ...day,
           items: [...day.items],
@@ -2404,7 +2561,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         savedParsedTickets: savedParsedTickets.map((ticket) => ({ ...ticket })),
         thaiDressDay,
         // Automatic quotes 才能建立對客快照；manual 狀態仍可保存內部草稿。
-        _quoteSnapshot: externalQuote ? {
+        _quoteSnapshot: packageSnapshot ?? (externalQuote ? {
           pricingModel: 'perPerson' as const,
           externalQuote: {
             items: externalQuote.items,
@@ -2422,27 +2579,13 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           })),
           totalDeposit: calculation.totalDeposit,
           carCount: calculation.carCount,
-          travelerLabel: travelerLabel || undefined,
-        } : undefined,
+          travelerLabel: effectiveTravelerLabel || undefined,
+        } : undefined),
       },
     }
     setIsSavingQuote(true)
     try {
       const docId = getPricingExampleDocumentId(variant, newQuote.id)
-
-      // 在 createOrReplace 之前先保存現有的 publicSlug（因為 createOrReplace 會覆蓋整份文件）
-      const existingDoc = await client.fetch<{ publicSlug?: { _type: string; current: string } } | null>(
-        `*[_id == $docId][0]{ publicSlug }`,
-        { docId }
-      )
-
-      await client.createOrReplace(
-        buildPricingExampleDocument(variant, newQuote, {
-          name: newQuote.createdByName,
-          email: newQuote.createdByEmail,
-        })
-      )
-
       const photosArray = Object.entries(dayPhotos)
         .filter(([, images]) => images.length > 0)
         .map(([idx, images]) => ({
@@ -2455,17 +2598,34 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
           })),
         }))
 
-      // patch photos + 保留 publicSlug
-      const patchData: Record<string, unknown> = {
-        photos: photosArray.length > 0 ? photosArray : [],
+      let expectedRevision = existingRevision
+      if (existingQuote && !expectedRevision) {
+        const existingDoc = await client.fetch<{ _rev?: string } | null>(
+          `*[_id == $docId][0]{ _rev }`,
+          { docId }
+        )
+        expectedRevision = existingDoc?._rev
+        if (!expectedRevision) {
+          throw new Error('找不到要更新的共享報價，請重新同步後再試')
+        }
       }
-      if (existingDoc?.publicSlug?.current) {
-        patchData.publicSlug = existingDoc.publicSlug
+
+      const savedDocument = await savePricingExampleDocument({
+        client,
+        document: buildPricingExampleDocument(variant, newQuote, {
+          name: newQuote.createdByName,
+          email: newQuote.createdByEmail,
+        }),
+        expectedRevision,
+        photos: photosArray,
+      })
+      const savedQuote: SavedQuote = {
+        ...newQuote,
+        revision: savedDocument._rev ?? expectedRevision,
       }
-      await client.patch(docId).set(patchData).commit()
 
       const updatedQuotes = mergeSavedQuoteRecords(
-        [newQuote],
+        [savedQuote],
         savedQuotes.filter((quote) => quote.id !== newQuote.id)
       )
 
@@ -2473,21 +2633,21 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       saveSavedQuotesToStorage(quoteStorageKey, updatedQuotes)
       setCurrentQuoteName(normalizedName)
       setEditingQuoteId(newQuote.id)
+      setTravelerLabel(effectiveTravelerLabel)
+      loadedQuoteRef.current = savedQuote
       setLastQuotesSyncAt(now)
       alert(`✅ 已同步共享案例「${normalizedName}」`)
     } catch (e) {
       console.error('Failed to save shared quote:', e)
-
-      const fallbackQuotes = mergeSavedQuoteRecords(
-        [newQuote],
-        savedQuotes.filter((quote) => quote.id !== newQuote.id)
-      )
-
-      setSavedQuotes(fallbackQuotes)
-      saveSavedQuotesToStorage(quoteStorageKey, fallbackQuotes)
-      setCurrentQuoteName(normalizedName)
-      setEditingQuoteId(newQuote.id)
-      alert(`⚠️ 共享同步失敗，已先保留在這台裝置：「${normalizedName}」`)
+      const statusCode = typeof e === 'object' && e && 'statusCode' in e
+        ? Number((e as { statusCode?: unknown }).statusCode)
+        : null
+      if (statusCode === 409) {
+        alert('這筆報價已被其他人更新，系統沒有覆蓋對方內容。請按「同步案例」後重新載入再修改。')
+      } else {
+        alert(`儲存失敗，Sanity 沒有被改動：${e instanceof Error ? e.message : '請稍後重試'}`)
+      }
+      return null
     } finally {
       setIsSavingQuote(false)
     }
@@ -2505,6 +2665,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     try {
       // 先儲存目前報價（確保 Sanity 文件存在），取得實際的 quoteId
       const savedQuoteId = await saveCurrentQuote()
+      if (!savedQuoteId) return
 
       const docId = getPricingExampleDocumentId(variant, savedQuoteId)
 
@@ -2517,10 +2678,34 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
       let slug = existing?.publicSlug?.current
       if (!slug) {
         slug = generateShortSlug()
-        await client
-          .patch(docId)
+        let slugPatch = client.patch(docId)
+        const loadedRevision = loadedQuoteRef.current?.id === savedQuoteId
+          ? loadedQuoteRef.current.revision
+          : undefined
+        if (loadedRevision) slugPatch = slugPatch.ifRevisionId(loadedRevision)
+        const linkedDocument = await slugPatch
           .set({ publicSlug: { _type: 'slug', current: slug } })
           .commit()
+        if (loadedQuoteRef.current?.id === savedQuoteId) {
+          loadedQuoteRef.current = {
+            ...loadedQuoteRef.current,
+            publicSlug: slug,
+            revision: linkedDocument._rev ?? loadedQuoteRef.current.revision,
+          }
+        }
+        setSavedQuotes((quotes) => {
+          const nextQuotes = quotes.map((quote) => (
+            quote.id === savedQuoteId
+              ? {
+                  ...quote,
+                  publicSlug: slug,
+                  revision: linkedDocument._rev ?? quote.revision,
+                }
+              : quote
+          ))
+          saveSavedQuotesToStorage(quoteStorageKey, nextQuotes)
+          return nextQuotes
+        })
       }
 
       const url = `${window.location.origin}/quote/${slug}`
@@ -2653,6 +2838,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setThaiDressDay(restoredParseState.thaiDressDay)
     setCurrentQuoteName(quote.name)
     setEditingQuoteId(quote.id)
+    loadedQuoteRef.current = quote
     setShowParser(restoredParseState.shouldShowParser)
 
     // 從 Sanity 載入每日照片 + publicSlug
@@ -2702,6 +2888,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
   const forkQuote = (quote: SavedQuote) => {
     loadQuote(quote)
     setEditingQuoteId(null)
+    loadedQuoteRef.current = null
     setCurrentQuoteName(`${quote.name} (複製)`)
   }
 
@@ -2823,6 +3010,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     // 清空報價名稱
     setCurrentQuoteName('')
     setEditingQuoteId(null)
+    loadedQuoteRef.current = null
     setDayPhotos({})
     setShowParser(false)
     clearDraftFromStorage(draftStorageKey)
@@ -2844,6 +3032,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
 
     if (editingQuoteId === id) {
       setEditingQuoteId(null)
+      loadedQuoteRef.current = null
       setCurrentQuoteName('')
     }
   }
@@ -2862,6 +3051,7 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
     setSavedQuotes([])
     localStorage.removeItem(quoteStorageKey)
     setEditingQuoteId(null)
+    loadedQuoteRef.current = null
     setCurrentQuoteName('')
   }
 
@@ -3415,6 +3605,9 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
         minute: '2-digit',
       })
     : null
+  const activeEditingQuote = editingQuoteId
+    ? savedQuotes.find((quote) => quote.id === editingQuoteId) ?? null
+    : null
 
   if (!canUseCurrentTool) {
     return (
@@ -3630,6 +3823,33 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
             <p style={{ fontSize: 12, color: '#666', margin: '0 0 12px 0' }}>
               儲存完整報價設定，下次可快速載入或複製修改
             </p>
+            {activeEditingQuote && (
+              <div
+                style={{
+                  marginBottom: 12,
+                  padding: '10px 12px',
+                  borderRadius: 8,
+                  border: '2px solid #7b1fa2',
+                  background: '#fff',
+                  color: '#4a235a',
+                  fontSize: 12,
+                  lineHeight: 1.6,
+                }}
+              >
+                <strong>目前儲存會更新：「{activeEditingQuote.name}」</strong>
+                {activeEditingQuote.publicSlug && (
+                  <div>公開頁：/quote/{activeEditingQuote.publicSlug}</div>
+                )}
+                {getPublishedPackageId(
+                  activeEditingQuote.data.packagePricingId,
+                  activeEditingQuote.publicSlug
+                ) && (
+                  <div style={{ color: '#b26a00' }}>
+                    固定套餐價已鎖定：可改人數、匯率與加購；改天數／級距／車導結構請先複製。
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, alignItems: responsive.isCompact ? 'stretch' : 'center', flexDirection: responsive.isCompact ? 'column' : 'row', flexWrap: 'wrap', marginBottom: 12 }}>
               <input
                 type="text"
@@ -3643,7 +3863,11 @@ export function PricingCalculator({ variant = 'legacy' }: PricingCalculatorProps
                 disabled={isSavingQuote}
                 style={{ padding: '8px 16px', width: responsive.isCompact ? '100%' : 'auto', background: isSavingQuote ? '#c7a9cf' : '#9c27b0', color: 'white', border: 'none', borderRadius: 4, cursor: isSavingQuote ? 'wait' : 'pointer', fontSize: 13 }}
               >
-                💾 儲存
+                {isSavingQuote
+                  ? '⏳ 儲存中...'
+                  : activeEditingQuote
+                    ? `💾 更新「${activeEditingQuote.name}」`
+                    : '💾 儲存新報價'}
               </button>
               <button
                 onClick={resetAllFields}

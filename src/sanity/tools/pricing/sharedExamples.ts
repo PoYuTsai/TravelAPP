@@ -11,6 +11,8 @@ export interface PricingExampleDocument<TData = unknown> {
   createdByEmail?: string
   itineraryPreview?: string
   payload: string
+  publicSlug?: { _type?: 'slug'; current?: string }
+  _rev?: string
   _createdAt?: string
   _updatedAt?: string
 }
@@ -22,6 +24,8 @@ export interface SavedQuoteRecord<TData = unknown> {
   updatedAt?: string
   createdByName?: string
   createdByEmail?: string
+  publicSlug?: string
+  revision?: string
   data: TData
 }
 
@@ -78,6 +82,8 @@ export function parsePricingExampleDocument<TData>(
       updatedAt: doc.updatedAt || doc._updatedAt || doc.createdAt || doc._createdAt,
       createdByName: doc.createdByName,
       createdByEmail: doc.createdByEmail,
+      publicSlug: doc.publicSlug?.current,
+      revision: doc._rev,
       data,
     }
   } catch {
