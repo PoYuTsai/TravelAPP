@@ -104,4 +104,4 @@
 - 客人住宿與司導外宿分開表達；泰北只包含第一晚芳縣自家民宿，其餘 4 晚客人自理。
 - 舊客人的航班、飯店與預約時間已從公開套餐文字移除，改為可重複使用的參考行程。
 
-更新工具：`scripts/refresh-package-quotes.mjs`，預設只做 dry-run；必須明確加上 `--apply` 才會寫入 Sanity，寫入前自動保留本機 JSON 備份。
+更新工具：`scripts/refresh-package-quotes.mjs`，預設只做 dry-run；必須明確加上 `--apply` 才會寫入 Sanity，寫入前自動保留本機 JSON 備份。若某筆套餐被其他流程誤覆成錯誤天數，工具會以該套餐已核定的日程骨架復原後再套用新版快照。
