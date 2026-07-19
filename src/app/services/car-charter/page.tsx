@@ -5,7 +5,7 @@ import { formatFamilyCountLabel } from '@/lib/family-count'
 import { fetchTotalFamilyCount } from '@/lib/notion'
 import Button from '@/components/ui/Button'
 import SectionTitle from '@/components/ui/SectionTitle'
-import { FeatureGrid, PerPersonPricingTable, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
+import { FeatureGrid, FAQSection, VideoPlayer, ImageGallery, ProcessSteps } from '@/components/cms'
 import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
 import { PACKAGE_ANCHORS } from './packageAnchors'
 
@@ -164,38 +164,53 @@ export default async function CarCharterPage() {
           </div>
         </section>
 
-        {/* Pricing — 人頭計價（價格由 perPersonRates 引擎推導，非 Sanity 內容） */}
-        <section id={CAR_CHARTER_PUBLIC_COPY.sectionIds.pricing} className="py-16">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Pricing — 對外僅顯示常見套餐起價，完整人數×地區×導遊價目表保留於內部定價引擎 */}
+        <section
+          id={CAR_CHARTER_PUBLIC_COPY.sectionIds.pricing}
+          className="border-y border-amber-100 bg-amber-50/40 py-16 sm:py-20"
+        >
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
             <SectionTitle
-              title={CAR_CHARTER_PUBLIC_COPY.pricingSectionTitle}
-              subtitle="以同行總人數計價；以下皆為每人每日價，親子家庭直接看全家總價"
+              title="熱門套餐參考價"
+              subtitle="先掌握預算，再把行程調成你們家的樣子"
             />
-            <PerPersonPricingTable footnotes={CAR_CHARTER_PUBLIC_COPY.pricingFootnotes} />
+
+            <div
+              data-testid="package-pricing-basis"
+              className="mx-auto mb-8 max-w-3xl rounded-2xl border border-amber-200 bg-white px-5 py-4 text-center shadow-sm sm:px-6"
+            >
+              <div className="flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-3">
+                <span className="rounded-full bg-amber-500 px-3 py-1 text-sm font-bold text-white">
+                  6 人同行基準
+                </span>
+                <p className="text-base font-bold text-gray-900">以下金額為每人參考起價</p>
+              </div>
+              <p className="mt-2 text-sm leading-relaxed text-gray-600">
+                實際費用會依日期、同行人數、孩子年齡、每日路線與中文導遊需求正式報價。
+              </p>
+            </div>
 
             {/* 三大套餐錨點價 */}
-            <div className="mt-12">
-              <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">熱門套餐參考價</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
-                {PACKAGE_ANCHORS.map((pkg) => (
-                  <Link
-                    key={pkg.name}
-                    href={pkg.href}
-                    className="group block bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2"
-                  >
-                    <p className="text-sm text-gray-500 mb-2">{pkg.name}</p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      THB {pkg.pricePerPerson.toLocaleString('en-US')}
-                      <span className="text-sm font-medium text-gray-500">／人 起</span>
-                    </p>
-                    <p className="mt-3 text-xs leading-relaxed text-gray-500">{pkg.summary}</p>
-                    <p className="mt-4 text-sm font-semibold text-amber-700 group-hover:text-amber-800">查看套餐內容 →</p>
-                  </Link>
-                ))}
-              </div>
-              <p className="text-sm text-gray-500 mt-3 text-center">
-                * 套餐價以 6 人同行計，人數不同每人價不同，實際以正式報價為準。
-              </p>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              {PACKAGE_ANCHORS.map((pkg) => (
+                <Link
+                  key={pkg.name}
+                  href={pkg.href}
+                  className="group block rounded-3xl border border-amber-100 bg-white p-6 text-center shadow-sm transition-colors duration-200 hover:border-amber-300 hover:bg-amber-50/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 motion-reduce:transition-none"
+                >
+                  <p className="mb-3 text-base font-medium text-gray-600">{pkg.name}</p>
+                  <p className="text-3xl font-bold tracking-tight text-gray-950">
+                    THB {pkg.pricePerPerson.toLocaleString('en-US')}
+                    <span className="ml-1 text-sm font-semibold tracking-normal text-gray-600">
+                      ／人參考起價
+                    </span>
+                  </p>
+                  <p className="mt-4 text-sm leading-relaxed text-gray-600">{pkg.summary}</p>
+                  <p className="mt-5 text-sm font-bold text-amber-700 transition-colors duration-200 group-hover:text-amber-900 motion-reduce:transition-none">
+                    查看套餐內容 →
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         </section>

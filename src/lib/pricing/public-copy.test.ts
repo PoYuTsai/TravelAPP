@@ -25,6 +25,7 @@ vi.mock('@/components/cms', async () => {
 })
 
 import * as carCharterPageModule from '@/app/services/car-charter/page'
+import { PACKAGE_ANCHORS } from '@/app/services/car-charter/packageAnchors'
 import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
 
 interface PublicCopyContract {
@@ -185,7 +186,7 @@ describe('car-charter canonical public copy', () => {
     expect(metadata.twitter?.description).toBe(copy.metadata.socialDescription)
   })
 
-  it('renders code-owned critical copy, real pricing and section anchors despite stale CMS data', async () => {
+  it('renders code-owned critical copy, package anchors and section anchors without the public price matrix', async () => {
     const copy = canonicalCopy()
     const page = await carCharterPageModule.default()
     const { container } = render(page)
@@ -194,7 +195,7 @@ describe('car-charter canonical public copy', () => {
     expect(text).toContain(copy.heroTitle)
     expect(text).toContain(copy.heroSubtitle)
     expect(text).toContain(copy.heroCtaText)
-    expect(text).toContain(copy.pricingSectionTitle)
+    expect(text).toContain('熱門套餐參考價')
     copy.features.forEach((feature) => expect(text).toContain(feature.title))
     copy.faq.forEach((item) => expect(text).toContain(item.question))
 
@@ -212,16 +213,26 @@ describe('car-charter canonical public copy', () => {
     expect(container.querySelector(`#${copy.sectionIds.pricing}`)?.tagName).toBe('SECTION')
     expect(container.querySelector(`#${copy.sectionIds.faq}`)?.tagName).toBe('SECTION')
 
-    // Render the real component, rather than source-grepping for price-table words.
-    expect(text).toContain('方案 A｜泰國司機包車')
-    expect(text).toContain('方案 B｜泰國司機＋中文導遊同行')
-    expect(text).toContain('2–3 人使用轎車')
-    expect(text).toContain('4–9 人使用 Van')
-    expect(text).toContain('8 人（含）以上同行，建議安排中文導遊')
-    expect(text).toContain('以下金額皆為 THB／人／日')
-    expect(text).toContain('有小朋友？不用自己拆帳')
-    expect(text).toContain('全家包車總價')
-    expect(text).not.toContain('最低成團價')
+    // Public visitors see a few useful budget anchors, never the full
+    // people × region × guide matrix used by the internal pricing engine.
+    expect(container.querySelectorAll('article[data-pricing-plan]')).toHaveLength(0)
+    expect(text).not.toContain('方案 A｜泰國司機包車')
+    expect(text).not.toContain('方案 B｜泰國司機＋中文導遊同行')
+    expect(text).not.toContain('以下金額皆為 THB／人／日')
+
+    const pricingBasis = container.querySelector<HTMLElement>('[data-testid="package-pricing-basis"]')
+    expect(pricingBasis?.textContent).toContain('6 人同行基準')
+    expect(pricingBasis?.textContent).toContain('每人參考起價')
+
+    PACKAGE_ANCHORS.forEach((pkg) => {
+      const packageLink = container.querySelector<HTMLAnchorElement>(`a[href="${pkg.href}"]`)
+      expect(packageLink, `${pkg.name} should keep its quote link`).not.toBeNull()
+      expect(packageLink?.textContent).toContain(pkg.name)
+      expect(packageLink?.textContent).toContain(
+        `THB ${pkg.pricePerPerson.toLocaleString('en-US')}`
+      )
+      expect(packageLink?.textContent).toContain('人參考起價')
+    })
 
     const schemas = Array.from(
       container.querySelectorAll<HTMLScriptElement>('script[type="application/ld+json"]')
