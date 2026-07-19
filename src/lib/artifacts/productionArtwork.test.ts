@@ -122,57 +122,36 @@ describe('production artwork data', () => {
     ])
   })
 
-  it('defines the exact 2x3 LINE menu with five URI actions and one inquiry message', () => {
+  it('defines the approved one-large-three-small LINE menu with message actions', () => {
     expect(RICH_MENU_SPEC.size).toEqual({ width: 2500, height: 1686 })
-    expect(RICH_MENU_SPEC.areas).toHaveLength(6)
-    expect(RICH_MENU_SPEC.areas.filter(({ action }) => action.type === 'uri')).toHaveLength(5)
-    expect(RICH_MENU_SPEC.areas.filter(({ action }) => action.type === 'message')).toEqual([
-      expect.objectContaining({
-        action: {
-          type: 'message',
-          label: '開始詢價',
-          text: '我要詢價',
-        },
-      }),
-    ])
+    expect(RICH_MENU_SPEC.areas).toHaveLength(4)
+    expect(RICH_MENU_SPEC.areas.every(({ action }) => action.type === 'message')).toBe(true)
 
     expect(RICH_MENU_SPEC.areas.map(({ action }) => action)).toEqual([
       {
-        type: 'uri',
-        label: '一日遊',
-        uri: 'https://chiangway-travel.com/tours#day-tours',
-      },
-      {
-        type: 'uri',
-        label: '多日客製',
-        uri: 'https://chiangway-travel.com/tours#packages',
-      },
-      {
-        type: 'uri',
-        label: '包車價格',
-        uri: 'https://chiangway-travel.com/services/car-charter#pricing',
-      },
-      {
-        type: 'uri',
-        label: '用車須知',
-        uri: 'https://chiangway-travel.com/services/car-charter#faq',
-      },
-      {
-        type: 'uri',
-        label: '爸媽開的',
-        uri: 'https://chiangway-travel.com/blog/eric-story-taiwan-to-chiang-mai',
+        type: 'message',
+        label: '清微旅行',
+        text: '清微旅行',
       },
       {
         type: 'message',
-        label: '開始詢價',
-        text: '我要詢價',
+        label: '車輛實拍',
+        text: '車輛實拍',
+      },
+      {
+        type: 'message',
+        label: '招牌行程',
+        text: '招牌行程',
+      },
+      {
+        type: 'message',
+        label: '家庭實拍',
+        text: '家庭實拍',
       },
     ])
 
     expect(RICH_MENU_SPEC.areas.map(({ bounds }) => bounds)).toEqual([
-      { x: 0, y: 0, width: 833, height: 843 },
-      { x: 833, y: 0, width: 834, height: 843 },
-      { x: 1667, y: 0, width: 833, height: 843 },
+      { x: 0, y: 0, width: 2500, height: 843 },
       { x: 0, y: 843, width: 833, height: 843 },
       { x: 833, y: 843, width: 834, height: 843 },
       { x: 1667, y: 843, width: 833, height: 843 },
@@ -219,18 +198,39 @@ describe('production artwork data', () => {
     )).toThrow(/valid TrueType/i)
   })
 
+  it('includes every approved rich-menu glyph in the deterministic artwork font', async () => {
+    const renderGlyph = (glyph: string) => sharp(renderArtworkSvgWithFont(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140">
+        <text x="10" y="108" font-family="Chiangway Artwork Sans" font-size="96">${glyph}</text>
+      </svg>`,
+      [ARTWORK_FONT_PATHS[0]],
+    )).ensureAlpha().raw().toBuffer()
+    const missingGlyph = await renderGlyph('󿿿')
+    const approvedCopy = '清微旅行車輛實拍招牌行程家庭台灣爸爸泰國媽媽親子包車客製中文導遊看看實際車內三個人氣路線旅途中的真實片刻'
+
+    for (const glyph of new Set(approvedCopy)) {
+      const renderedGlyph = await renderGlyph(glyph)
+      expect(
+        renderedGlyph.equals(missingGlyph),
+        `artwork font must contain the glyph ${glyph}`,
+      ).toBe(false)
+    }
+  })
+
   it('renders a LINE-ready PNG under the platform byte limit', async () => {
     const svg = buildRichMenuSvg()
     const png = await renderRichMenuPng(ARTWORK_FONT_PATHS)
     const metadata = await sharp(png).metadata()
 
-    expect(svg).toContain('.tileTitle { font-size: 112px')
-    expect(svg).toContain('.tileSubtitle { font-size: 80px')
+    expect(svg).toContain('清微旅行')
+    expect(svg).toContain('車輛實拍')
+    expect(svg).toContain('招牌行程')
+    expect(svg).toContain('家庭實拍')
+    expect(svg).not.toContain('包車價格')
+    expect(svg).not.toContain('開始詢價')
     expect(svg).toContain("font-family: 'Chiangway Artwork Sans'")
     expect(svg).not.toContain('@font-face')
     expect(svg).not.toContain('data:font/')
-    expect(svg).not.toContain('tileBrand')
-    expect(svg).not.toContain('清微旅行・CHIANGWAY')
     expect(metadata).toMatchObject({ width: 2500, height: 1686, format: 'png' })
     expect(png.byteLength).toBeLessThan(1_000_000)
     expect(80 * (375 / 2500)).toBeGreaterThanOrEqual(12)
@@ -257,6 +257,20 @@ describe('production artwork data', () => {
     expect(persistedJson).toEqual(RICH_MENU_SPEC)
     expect(persistedPng.equals(png)).toBe(true)
     expect(persistedPreview.equals(expectedPreview)).toBe(true)
+  })
+
+  it('keeps complete LINE pricing matrices out of public assets', () => {
+    const renderScript = readFileSync(
+      resolve(process.cwd(), 'scripts/artifacts/render-pricing-line-assets.ts'),
+      'utf8',
+    )
+
+    expect(renderScript).toContain(
+      "path.join(ROOT, 'artifacts', 'internal', 'pricing-matrices')",
+    )
+    expect(renderScript).toContain('mkdir(LINE_PRICE_DIR')
+    expect(renderScript).toMatch(/path\.join\(\s*LINE_PRICE_DIR,\s*`\$\{stem\}-v/)
+    expect(renderScript).not.toMatch(/path\.join\(\s*LINE_DIR,\s*`\$\{stem\}-v/)
   })
 
   it('keeps the logo and CTA content inside the 4:5 production safe area', () => {

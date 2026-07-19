@@ -16,6 +16,7 @@ const VERSION = '2026-07-10'
 const LINE_PRICE_VERSION = '2026-07-11-v2'
 const PRICING_DIR = path.join(ROOT, 'public', 'images', 'pricing')
 const LINE_DIR = path.join(ROOT, 'public', 'images', 'line')
+const LINE_PRICE_DIR = path.join(ROOT, 'artifacts', 'internal', 'pricing-matrices')
 const LINE_SCRIPT_DIR = path.join(ROOT, 'scripts', 'line')
 const BACKGROUND_PATH = path.join(
   PRICING_DIR,
@@ -89,16 +90,16 @@ async function writeLineArtifacts(fontPaths: readonly string[]): Promise<Artifac
 async function writeLinePricingArtwork(
   fontPaths: readonly string[],
 ): Promise<ArtifactRecord[]> {
-  await mkdir(LINE_DIR, { recursive: true })
+  await mkdir(LINE_PRICE_DIR, { recursive: true })
 
   const outputPaths = await Promise.all(
     LINE_PRICE_SHEETS.map(async ({ sheet, stem }) => {
       const masterPath = path.join(
-        LINE_DIR,
+        LINE_PRICE_DIR,
         `${stem}-v${LINE_PRICE_VERSION}.png`,
       )
       const previewPath = path.join(
-        LINE_DIR,
+        LINE_PRICE_DIR,
         `${stem}-v${LINE_PRICE_VERSION}-preview.png`,
       )
       const master = await renderLinePricingArtworkPng(sheet, fontPaths)

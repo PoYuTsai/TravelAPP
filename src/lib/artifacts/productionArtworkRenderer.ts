@@ -413,42 +413,38 @@ export async function renderLinePricingArtworkPng(
   )
 }
 
-function richMenuIcon(index: number, x: number, y: number, stroke: string): string {
-  const common = `fill="none" stroke="${stroke}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"`
-  const icons = [
-    `<path ${common} d="M100 18c-35 0-64 28-64 63 0 49 64 111 64 111s64-62 64-111c0-35-29-63-64-63Z"/><circle ${common} cx="100" cy="80" r="22"/>`,
-    `<rect ${common} x="24" y="42" width="152" height="132" rx="20"/><path ${common} d="M24 78h152M62 20v42M138 20v42M61 112h28M111 112h28M61 143h28"/>`,
-    `<path ${common} d="M24 76h135l24 35v53H24Z"/><path ${common} d="M48 76l17-39h73l21 39"/><circle ${common} cx="62" cy="166" r="19"/><circle ${common} cx="149" cy="166" r="19"/><path ${common} d="M77 111h55"/>`,
-    `<circle ${common} cx="100" cy="100" r="78"/><path ${common} d="M100 88v55M100 56h.1"/>`,
-    `<path ${common} d="M26 91 100 28l74 63v83H55V95"/><path ${common} d="M100 145s-39-22-39-50c0-20 25-27 39-8 14-19 39-12 39 8 0 28-39 50-39 50Z"/>`,
-    `<path ${common} d="M26 31h148v111H86l-42 30v-30H26Z"/><path ${common} d="M62 83h76M100 60v46"/>`,
-  ]
+type RichMenuIconKind = 'vehicle' | 'itinerary' | 'camera'
 
-  return `<g transform="translate(${x} ${y})">${icons[index]}</g>`
+function richMenuIcon(kind: RichMenuIconKind, x: number, y: number, stroke: string): string {
+  const common = `fill="none" stroke="${stroke}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"`
+  const icons: Record<RichMenuIconKind, string> = {
+    vehicle: `<path ${common} d="M24 76h135l24 35v53H24Z"/><path ${common} d="M48 76l17-39h73l21 39"/><circle ${common} cx="62" cy="166" r="19"/><circle ${common} cx="149" cy="166" r="19"/><path ${common} d="M77 111h55"/>`,
+    itinerary: `<path ${common} d="M20 42 73 20l54 22 53-22v140l-53 22-54-22-53 22Z"/><path ${common} d="M73 20v140M127 42v140"/><path ${common} d="M94 91c0-20 15-35 33-35s33 15 33 35c0 25-33 53-33 53S94 116 94 91Z"/><circle ${common} cx="127" cy="91" r="10"/>`,
+    camera: `<path ${common} d="M24 65h38l18-28h47l18 28h31v107H24Z"/><circle ${common} cx="100" cy="116" r="38"/><path ${common} d="M148 88h2"/>`,
+  }
+
+  return `<g transform="translate(${x} ${y})">${icons[kind]}</g>`
 }
 
 const RICH_MENU_TILES = [
-  { title: '一日遊', subtitle: '看私家路線', background: '#FFF0A6', text: '#181512' },
-  { title: '多日客製', subtitle: '依你們家安排', background: '#FFFCED', text: '#181512' },
-  { title: '包車價格', subtitle: '看每人 THB', background: '#DDE8CF', text: '#181512' },
-  { title: '用車須知', subtitle: '時數・加購・座位', background: '#F4DECB', text: '#181512' },
-  { title: '爸媽開的', subtitle: 'Eric × Min 的故事', background: '#DDE9E8', text: '#181512' },
-  { title: '開始詢價', subtitle: '送出詢價訊息', background: '#181512', text: '#F7C009' },
+  { title: '車輛實拍', subtitle: '看看實際車內', icon: 'vehicle', background: '#F9DA55', text: '#5A4637' },
+  { title: '招牌行程', subtitle: '三個人氣路線', icon: 'itinerary', background: '#FFF9E9', text: '#5A4637' },
+  { title: '家庭實拍', subtitle: '旅途中的真實片刻', icon: 'camera', background: '#F6C35D', text: '#5A4637' },
 ] as const
 
 export function buildRichMenuSvg(): string {
-  const tiles = RICH_MENU_SPEC.areas.map(({ bounds }, index) => {
+  const tiles = RICH_MENU_SPEC.areas.slice(1).map(({ bounds }, index) => {
     const tile = RICH_MENU_TILES[index]
     const centerX = bounds.x + bounds.width / 2
     const iconX = Math.round(centerX - 100)
-    const iconY = bounds.y + 112
+    const iconY = bounds.y + 128
     const titleY = bounds.y + 520
     const subtitleY = bounds.y + 660
 
     return `
       <g>
         <rect x="${bounds.x}" y="${bounds.y}" width="${bounds.width}" height="${bounds.height}" fill="${tile.background}"/>
-        ${richMenuIcon(index, iconX, iconY, tile.text)}
+        ${richMenuIcon(tile.icon, iconX, iconY, tile.text)}
         <text x="${centerX}" y="${titleY}" text-anchor="middle" class="tileTitle" fill="${tile.text}">${tile.title}</text>
         <text x="${centerX}" y="${subtitleY}" text-anchor="middle" class="tileSubtitle" fill="${tile.text}">${tile.subtitle}</text>
       </g>`
@@ -456,13 +452,33 @@ export function buildRichMenuSvg(): string {
 
   return `
   <svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1686" viewBox="0 0 2500 1686">
+    <defs>
+      <linearGradient id="brandBackground" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#FFFDF5"/>
+        <stop offset="1" stop-color="#F7ECD5"/>
+      </linearGradient>
+    </defs>
     <style>
       text { font-family: '${ARTWORK_FONT_FAMILY}'; }
+      .brandKicker { font-size: 58px; font-weight: 900; letter-spacing: 8px; }
+      .brandTitle { font-size: 168px; font-weight: 900; letter-spacing: 3px; }
+      .brandSubtitle { font-size: 72px; font-weight: 800; letter-spacing: 3px; }
+      .brandService { font-size: 48px; font-weight: 700; letter-spacing: 2px; }
       .tileTitle { font-size: 112px; font-weight: 900; letter-spacing: 4px; }
-      .tileSubtitle { font-size: 80px; font-weight: 700; opacity: 0.88; }
+      .tileSubtitle { font-size: 50px; font-weight: 700; opacity: 0.88; }
     </style>
+    <rect x="0" y="0" width="2500" height="843" fill="url(#brandBackground)"/>
+    <path d="M0 700C470 590 690 820 1130 700s760-230 1370-45" fill="none" stroke="#F1C967" stroke-width="24" opacity="0.35"/>
+    <circle cx="2180" cy="150" r="105" fill="#F6C35D" opacity="0.28"/>
+    <circle cx="2280" cy="260" r="44" fill="#D8B887" opacity="0.28"/>
+    <text x="1250" y="180" text-anchor="middle" class="brandKicker" fill="#7A5D43">清微旅行 CHIANGWAY</text>
+    <text x="1250" y="440" text-anchor="middle" class="brandTitle" fill="#5A4637">Eric &amp; Min</text>
+    <text x="1250" y="590" text-anchor="middle" class="brandSubtitle" fill="#6B5543">台灣爸爸 × 泰國媽媽</text>
+    <rect x="720" y="655" width="1060" height="104" rx="52" fill="#FFFFFF" opacity="0.82"/>
+    <text x="1250" y="725" text-anchor="middle" class="brandService" fill="#6B5543">親子包車・客製行程・中文導遊</text>
+    <g transform="translate(1940 360) scale(1.15)" opacity="0.42">${richMenuIcon('vehicle', 0, 0, '#9A704A')}</g>
     ${tiles}
-    <path d="M833 0V1686M1667 0V1686M0 843H2500" stroke="#FFFFFF" stroke-width="12"/>
+    <path d="M0 843H2500M833 843V1686M1667 843V1686" stroke="#FFFFFF" stroke-width="12"/>
     <rect x="6" y="6" width="2488" height="1674" fill="none" stroke="#FFFFFF" stroke-width="12"/>
   </svg>`
 }
