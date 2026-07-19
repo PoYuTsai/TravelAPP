@@ -69,55 +69,39 @@ export interface RichMenuSpec {
 export const RICH_MENU_SPEC: RichMenuSpec = {
   size: { width: 2500, height: 1686 },
   selected: true,
-  name: 'chiangway-main-2026-07-10-v1',
+  name: 'chiangway-main-2026-07-19-v2',
   chatBarText: '清微旅行選單',
   areas: [
     {
-      bounds: { x: 0, y: 0, width: 833, height: 843 },
+      bounds: { x: 0, y: 0, width: 2500, height: 843 },
       action: {
-        type: 'uri',
-        label: '一日遊',
-        uri: 'https://chiangway-travel.com/tours#day-tours',
-      },
-    },
-    {
-      bounds: { x: 833, y: 0, width: 834, height: 843 },
-      action: {
-        type: 'uri',
-        label: '多日客製',
-        uri: 'https://chiangway-travel.com/tours#packages',
-      },
-    },
-    {
-      bounds: { x: 1667, y: 0, width: 833, height: 843 },
-      action: {
-        type: 'uri',
-        label: '包車價格',
-        uri: 'https://chiangway-travel.com/services/car-charter#pricing',
+        type: 'message',
+        label: '清微旅行',
+        text: '清微旅行',
       },
     },
     {
       bounds: { x: 0, y: 843, width: 833, height: 843 },
       action: {
-        type: 'uri',
-        label: '用車須知',
-        uri: 'https://chiangway-travel.com/services/car-charter#faq',
+        type: 'message',
+        label: '車輛實拍',
+        text: '車輛實拍',
       },
     },
     {
       bounds: { x: 833, y: 843, width: 834, height: 843 },
       action: {
-        type: 'uri',
-        label: '爸媽開的',
-        uri: 'https://chiangway-travel.com/blog/eric-story-taiwan-to-chiang-mai',
+        type: 'message',
+        label: '招牌行程',
+        text: '招牌行程',
       },
     },
     {
       bounds: { x: 1667, y: 843, width: 833, height: 843 },
       action: {
         type: 'message',
-        label: '開始詢價',
-        text: '我要詢價',
+        label: '家庭實拍',
+        text: '家庭實拍',
       },
     },
   ],
