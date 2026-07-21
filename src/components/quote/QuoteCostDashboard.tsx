@@ -375,6 +375,7 @@ function TotalQuoteCard({
   isPackageShowcase,
   basisLabel,
   isPerPerson,
+  travelerCount,
 }: {
   name: string
   totalTHB: number
@@ -383,7 +384,12 @@ function TotalQuoteCard({
   isPackageShowcase: boolean
   basisLabel: string
   isPerPerson: boolean
+  travelerCount: number
 }) {
+  const perPersonTHB =
+    isPackageShowcase && travelerCount > 0
+      ? Math.round(totalTHB / travelerCount)
+      : null
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -444,6 +450,11 @@ function TotalQuoteCard({
             {isPerPerson ? `THB ${fmt(totalTHB)}` : `NT$ ${fmt(totalTWD)}`}
           </span>
         </div>
+        {perPersonTHB !== null && (
+          <div className="mt-3 text-[16px] font-bold md:text-[18px]" style={{ color: 'rgba(253,251,244,0.78)' }}>
+            約 THB {fmt(perPersonTHB)}／人・以 {travelerCount} 人同行估算
+          </div>
+        )}
         <div className="mt-3 text-[16px] font-bold md:text-[18px]" style={{ color: 'rgba(253,251,244,0.6)' }}>
           {isPerPerson
             ? `約 NT$ ${fmt(totalTWD)} · 匯率 ${exchangeRate.toFixed(3)}`
@@ -749,6 +760,7 @@ export function QuoteCostDashboard({ quote }: QuoteCostDashboardProps) {
               isPackageShowcase={isPackageShowcase}
               basisLabel={packageEstimateBasis}
               isPerPerson={isPerPerson}
+              travelerCount={quote.adults + quote.children + quote.infants}
             />
 
             <OvertimePolicyNotice />

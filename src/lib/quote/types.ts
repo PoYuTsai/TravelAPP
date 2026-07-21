@@ -25,6 +25,7 @@ export interface QuoteData {
 
   adults: number
   children: number
+  infants: number
   tripDays: number
   tripNights: number
   exchangeRate: number

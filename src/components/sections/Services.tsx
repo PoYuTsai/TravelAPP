@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button'
 import { urlFor } from '@/sanity/client'
 import type { SanityImageSource } from '@sanity/image-url'
 import { PAID_CHILD_SEAT_POLICY } from '@/lib/home-public-copy'
+import { CAR_CHARTER_PUBLIC_COPY } from '@/lib/pricing/publicCopy'
 
 interface ServiceItem {
   image?: { asset: SanityImageSource; alt?: string }
@@ -25,7 +26,7 @@ const defaultServices: ServiceItem[] = [
       PAID_CHILD_SEAT_POLICY,
       '車輛、油資、過路費與停車費已含',
     ],
-    price: '每人每日 THB 750 起，依人數與區域報價',
+    price: `每人每日 THB ${CAR_CHARTER_PUBLIC_COPY.startingPrices.cityDayFromThb} 起，依人數與區域報價`,
     ctaText: '了解包車服務',
     ctaLink: '/services/car-charter',
   },

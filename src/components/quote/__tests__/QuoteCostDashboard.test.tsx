@@ -36,6 +36,7 @@ function buildQuote(overrides: Partial<QuoteData> = {}): QuoteData {
     createdAt: '2026-07-10T00:00:00Z',
     adults: 4,
     children: 2,
+    infants: 0,
     tripDays: 5,
     tripNights: 4,
     exchangeRate: 1.1,
@@ -132,6 +133,23 @@ describe('QuoteCostDashboard 幣別主次分流', () => {
     expect(screen.queryByText('價格明細')).toBeNull()
     // 總價卡仍在
     expect(screen.getByText(/THB 25,300/)).toBeTruthy()
+  })
+
+  it('套餐展示頁：大字總價旁顯示以佔位人數估算的每人價', () => {
+    render(
+      <QuoteCostDashboard
+        quote={buildQuote({ pricingModel: 'perPerson', publicPageMode: 'package' })}
+      />
+    )
+
+    // 25,300 ÷ (4 大 + 2 小) = 4,216.67 → 四捨五入 4,217
+    expect(screen.getByText('約 THB 4,217／人・以 6 人同行估算')).toBeTruthy()
+  })
+
+  it('非套餐報價頁：不顯示每人價估算行', () => {
+    render(<QuoteCostDashboard quote={buildQuote({ pricingModel: 'perPerson' })} />)
+
+    expect(screen.queryByText(/／人・以 \d+ 人同行估算/)).toBeNull()
   })
 
   it('舊快照（無 pricingModel）：維持 NT$ 大字現行渲染', () => {

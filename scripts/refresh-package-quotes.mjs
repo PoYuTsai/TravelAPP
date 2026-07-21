@@ -91,11 +91,11 @@ Day 5｜單趟送機
   },
   uao33058: {
     packagePricingId: 'chiang-rai-2d1n',
-    adults: 3,
+    adults: 6,
     children: 0,
     infants: 0,
-    travelerLabel: '3 位成人',
-    totalTHB: 19_800,
+    travelerLabel: '6 位成人',
+    totalTHB: 22_500,
     luggageCarCount: 0,
     includeAccommodation: false,
     hotels: [],
@@ -121,7 +121,7 @@ Day 2｜清萊景點・返回清邁
 ・清萊午餐
 ・白廟
 ・返回清邁飯店`,
-    items: [moneyItem('成人', 3, 6_600)],
+    items: [moneyItem('成人', 6, 3_750)],
     included: [
       '兩天清萊包車',
       '泰國司機、油費、過路費與停車費',
@@ -133,12 +133,12 @@ Day 2｜清萊景點・返回清邁
   },
   lyx5aysy: {
     packagePricingId: 'northern-thailand-6d5n',
-    adults: 7,
-    children: 1,
+    adults: 6,
+    children: 0,
     infants: 0,
-    travelerLabel: '7 大 1 小（3–11 歲）',
-    totalTHB: 56_950,
-    luggageCarCount: 1,
+    travelerLabel: '6 位成人',
+    totalTHB: 55_200,
+    luggageCarCount: 0,
     includeAccommodation: true,
     hotels: [
       {
@@ -154,7 +154,7 @@ Day 2｜清萊景點・返回清邁
           twin: [
             {
               name: '雙床／大床（依需求與房況）',
-              quantity: 4,
+              quantity: 3,
               price: 1_500,
               hasExtraBed: false,
             },
@@ -218,19 +218,12 @@ Day 6｜單趟送機
 ・依航班時間安排飯店出發
 ・單趟送至清邁機場`,
     items: [
-      moneyItem('成人', 7, 6_400),
-      moneyItem('3–11 歲兒童', 1, 5_150),
+      moneyItem('成人', 6, 8_450),
       {
         label: '芳縣民宿（第一晚）',
-        amountTHB: 6_000,
-        amountTWD: Math.round(6_000 / EXCHANGE_RATE),
-        description: '4 間 × THB 1,500',
-      },
-      {
-        label: '接送機行李車',
-        amountTHB: 1_000,
-        amountTWD: Math.round(1_000 / EXCHANGE_RATE),
-        description: '接機＋送機共 2 趟 × THB 500',
+        amountTHB: 4_500,
+        amountTWD: Math.round(4_500 / EXCHANGE_RATE),
+        description: '3 間 × THB 1,500',
       },
     ],
     included: [
@@ -238,7 +231,6 @@ Day 6｜單趟送機
       '泰國司機、油費、過路費與停車費',
       '中文導遊（Day 1–5）',
       'Day 6 單趟送機',
-      '接機與送機行李車（各 1 趟）',
       '芳縣自家民宿（第一晚，基本兩人一房）',
       '司機與導遊清萊外宿一晚',
       'LINE 中文支援',
@@ -246,6 +238,7 @@ Day 6｜單趟送機
     excluded: [
       '其餘客人住宿（4 晚，自行預訂）',
       ...commonExcluded,
+      '接送機行李車（8–9 人或 15–18 人固定 THB 500／台／趟；本試算 6 人不適用）',
     ],
   },
 }

@@ -45,6 +45,43 @@ describe('published package quote pricing', () => {
     })
   })
 
+  it('prices the six-adult Chiang Rai baseline used by the public package card', () => {
+    const snapshot = buildPublishedPackageSnapshot({
+      packageId: 'chiang-rai-2d1n',
+      adults: 6,
+      children: 0,
+      infants: 0,
+      exchangeRate: 1,
+    })
+
+    expect(snapshot.externalQuote.totalTHB).toBe(22_500)
+    expect(snapshot.externalQuote.items).toHaveLength(1)
+    expect(snapshot.externalQuote.items[0]).toMatchObject({
+      label: '成人',
+      amountTHB: 22_500,
+      description: '6 人 × THB 3,750',
+    })
+  })
+
+  it('prices the six-adult northern baseline with three Fang rooms and no luggage van', () => {
+    const snapshot = buildPublishedPackageSnapshot({
+      packageId: 'northern-thailand-6d5n',
+      adults: 6,
+      children: 0,
+      infants: 0,
+      exchangeRate: 1,
+    })
+
+    expect(snapshot.externalQuote.totalTHB).toBe(55_200)
+    expect(snapshot.externalQuote.items.map((item) => [item.label, item.amountTHB])).toEqual([
+      ['成人', 50_700],
+      ['芳縣住宿（第一晚）', 4_500],
+    ])
+    expect(snapshot.externalQuote.items.at(-1)).toMatchObject({
+      description: '3 房 × THB 1,500',
+    })
+  })
+
   it('adds Fang accommodation and two mandatory airport luggage trips for an 8-person northern package', () => {
     const snapshot = buildPublishedPackageSnapshot({
       packageId: 'northern-thailand-6d5n',

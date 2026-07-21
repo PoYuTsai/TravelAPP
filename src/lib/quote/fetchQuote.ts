@@ -164,6 +164,7 @@ export async function fetchQuoteBySlug(
 
   const adults = data.adults ?? data.people ?? 2
   const children = data.children ?? 0
+  const infants = data.infants ?? 0
   const carFees = data.carFees ?? []
   const tripDays = carFees.length || 1
   const tripNights = Math.max(tripDays - 1, 0)
@@ -220,6 +221,7 @@ export async function fetchQuoteBySlug(
     updatedAt: doc.updatedAt,
     adults,
     children,
+    infants,
     tripDays,
     tripNights,
     exchangeRate,
