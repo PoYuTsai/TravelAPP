@@ -113,4 +113,4 @@ NOTION_TOKEN=
 
 *由 Eric 與 [Claude Code](https://claude.ai/claude-code) 協作開發*
 
-<!-- Last build trigger: 2026-07-19 公開包車頁僅保留熱門套餐參考起價 -->
+<!-- Last build trigger: 2026-07-21 套餐統一 6 人口徑＋套餐頁每人價估算行 -->
